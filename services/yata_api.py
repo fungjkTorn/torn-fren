@@ -3,28 +3,47 @@ import requests
 YATA_EXPORT_URL = "https://yata.yt/api/v1/travel/export/"
 
 
-def get_country_stock(country_code: str):
+def get_travel_export():
     """
-    Calls YATA's travel export endpoint and returns the stock list for one country.
-
-    Returns a list of dicts like:
-        [{"id": 180, "name": "Teddy Bear", "quantity": 1860, "cost": 4200}, ...]
-    or an empty list if the country code doesn't match anything, or the request fails.
+    Calls YATA's travel export endpoint once and returns the full response.
     """
     try:
         response = requests.get(YATA_EXPORT_URL, timeout=10)
         response.raise_for_status()
+        return response.json()
     except requests.RequestException as e:
         print(f"YATA request failed: {e}")
-        return []
+        return {}
+    except ValueError:
+        print("YATA returned invalid JSON.")
+        return {}
 
-    data = response.json()
-    country_data = data.get("stocks", {}).get(country_code, {})
+
+def get_country_data(country_code: str):
+    """
+    Returns the raw YATA data for one country.
+    """
+    data = get_travel_export()
+    return data.get("stocks", {}).get(country_code, {})
+
+
+def get_country_stock(country_code: str):
+    """
+    Returns the stock list for one country.
+    """
+    country_data = get_country_data(country_code)
     return country_data.get("stocks", [])
 
 
+def get_country_update_time(country_code: str):
+    """
+    Returns YATA's last update timestamp for the country.
+    """
+    country_data = get_country_data(country_code)
+    return country_data.get("update")
+
+
 if __name__ == "__main__":
-    # Quick manual test: python services/yata_api.py
-    stock = get_country_stock("uk")
+    stock = get_country_stock("uni")
     for item in stock:
-        print(f"{item['name']}: {item['quantity']} (${item['cost']})")
+        print(f"{item['name']}: {item['quantity']} (${item['cost']:,})")

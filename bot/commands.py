@@ -1,23 +1,56 @@
-import discord
-from bot import config, alerts
-from modules import travel
 from typing import Literal
-from modules import stock
 
-CountryCode = Literal["mex", "cay", "can", "haw", "uni", "arg", "swi", "jap", "chi", "uae", "sou"]
+import discord
+
+from bot import alerts, config
+from modules import stock, travel
+
+CountryCode = Literal[
+    "mex",
+    "cay",
+    "can",
+    "haw",
+    "uni",
+    "arg",
+    "swi",
+    "jap",
+    "chi",
+    "uae",
+    "sou",
+]
+
 
 async def item_name_autocomplete(interaction: discord.Interaction, current: str):
-    country = getattr(interaction.namespace, "country", None)
-    if not country:
+    """
+    Fast autocomplete for item names.
+
+    Important:
+    Do NOT call YATA here. Discord autocomplete must respond quickly.
+    We only use locally stored database item names.
+    """
+    try:
+        country = getattr(interaction.namespace, "country", None)
+
+        if not country:
+            return []
+
+        names = stock.get_known_item_names(country)
+
+        current_lower = current.lower()
+
+        matches = [
+            name for name in names
+            if current_lower in name.lower()
+        ]
+
+        return [
+            discord.app_commands.Choice(name=name, value=name)
+            for name in matches[:25]
+        ]
+
+    except Exception as e:
+        print(f"Autocomplete failed: {e}")
         return []
-
-    names = stock.get_item_names(country)
-    matches = [name for name in names if current.lower() in name.lower()]
-
-    return [
-        discord.app_commands.Choice(name=name, value=name)
-        for name in matches[:25]  # Discord caps autocomplete results at 25
-    ]
 
 def setup_commands(bot):
 
@@ -32,6 +65,23 @@ def setup_commands(bot):
         message = stock.format_restock_message(country, item_name)
         await interaction.response.send_message(message)
 
+    @bot.tree.command(name="history", description="Show recent stock history for an item")
+    @discord.app_commands.autocomplete(item_name=item_name_autocomplete)
+    async def history_command(
+        interaction: discord.Interaction,
+        country: CountryCode,
+        item_name: str,
+        limit: int = 15,
+    ):
+        if limit < 1:
+            limit = 1
+
+        if limit > 25:
+            limit = 25
+
+        message = stock.format_history_message(country, item_name, limit=limit)
+        await interaction.response.send_message(message)
+
     @bot.tree.command(name="ping", description="Check if the bot is responsive")
     async def ping(interaction: discord.Interaction):
         await interaction.response.send_message("pong!")
@@ -41,43 +91,43 @@ def setup_commands(bot):
         message = (
             "**Torn Fren is Online!**\n\n"
             f"*Version:* {config.VERSION}\n"
-            "Watching: Nothing\n"
+            "Watching: Travel stock\n"
             "Alerts Enabled: 0"
         )
+
         await interaction.response.send_message(message)
 
-@bot.tree.command(name="help", description="List available commands")
-async def help_command(interaction: discord.Interaction):
-    message = (
-        "**📚 Torn Fren Commands**\n\n"
-        "**General**\n"
-        "• `/ping` - Check if the bot is online\n"
-        "• `/status` - Show bot status\n"
-        "• `/help` - Show this help menu\n\n"
-        "**Travel Stock**\n"
-        "• `/stock <country>` - Show the latest stock for a country\n"
-        "• `/predict <country> <item>` - Estimate the next restock using historical data\n\n"
-        "**Testing**\n"
-    )
+    @bot.tree.command(name="help", description="List available commands")
+    async def help_command(interaction: discord.Interaction):
+        message = (
+            "**📚 Torn Fren Bot Commands**\n\n"
+            "**General**\n"
+            "• `/ping` - Check if the bot is responsive\n"
+            "• `/status` - Show bot status\n"
+            "• `/help` - List available commands\n\n"
+            "**Travel Stock**\n"
+            "• `/stock <country>` - Show current abroad stock for a country\n"
+            "• `/predict <country> <item_name>` - Estimate the next restock time\n"
+            "• `/history <country> <item_name>` - Show recent recorded stock changes\n\n"
+        )
 
-    await interaction.response.send_message(message)
-
-    @bot.tree.command(name="testalert", description="Send a test alert to confirm the alert system works")
-    async def testalert(interaction: discord.Interaction):
-        await alerts.send_alert(bot, config.CHANNEL_ID, "Pickpocket Alert", "Walking Jogger detected!")
-        await interaction.response.send_message("Test alert sent!", ephemeral=True)
+        await interaction.response.send_message(message)
 
     @bot.tree.command(name="travel", description="Get travel info for a country")
     async def travel_command(interaction: discord.Interaction, country: str):
         info = travel.get_travel_info(country)
+
         if not info:
             await interaction.response.send_message(f"No data for '{country}' yet.")
             return
+
         items = "\n".join(f"• {item}" for item in info["items"])
+
         message = (
             f"{info['flag']} **{info['name']}**\n\n"
             f"**Travel Time**\n{info['travel_time']}\n\n"
             f"**Items**\n{items}\n\n"
             f"**Status**\nComing Soon..."
         )
+
         await interaction.response.send_message(message)
