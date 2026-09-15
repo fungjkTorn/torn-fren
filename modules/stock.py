@@ -1,11 +1,12 @@
 import time
-from services.history_service import get_known_items
-from services.yata_api import get_country_stock, get_country_update_time
+
 from services.history_service import (
-    get_restock_prediction,
-    get_known_items,
     get_item_history,
+    get_known_items,
+    get_latest_stock_snapshot,
+    get_restock_prediction,
 )
+
 
 COUNTRY_NAMES = {
     "mex": "🇲🇽 Mexico",
@@ -21,93 +22,209 @@ COUNTRY_NAMES = {
     "sou": "🇿🇦 South Africa",
 }
 
-def get_known_item_names(country_code: str):
-    """
-    Return item names from the local database only.
 
-    This is used for Discord autocomplete because autocomplete needs to be fast.
-    Do not call YATA from here.
-    """
-    return get_known_items(country_code)
+def _format_age(timestamp):
+    if timestamp is None:
+        return "unknown"
+
+    seconds = max(0, int(time.time()) - timestamp)
+
+    if seconds < 60:
+        return f"{seconds}s"
+
+    minutes = seconds // 60
+
+    if minutes < 60:
+        return f"{minutes}m"
+
+    hours = minutes // 60
+    remaining_minutes = minutes % 60
+
+    return f"{hours}h {remaining_minutes}m"
+
 
 def _format_timestamp(timestamp):
     if timestamp is None:
         return "Unknown"
 
-    return time.strftime("%I:%M:%S %p", time.localtime(timestamp))
+    return time.strftime(
+        "%I:%M:%S %p",
+        time.localtime(timestamp),
+    )
 
 
 def format_stock_message(country_code: str) -> str:
-    stock = get_country_stock(country_code)
-    label = COUNTRY_NAMES.get(country_code, country_code.upper())
+    """
+    Show the latest stock state stored in SQLite.
+
+    This intentionally does NOT call YATA or Prometheus.
+    The poller is responsible for collecting live data.
+
+    This means /stock can still work if the external APIs
+    are temporarily unavailable.
+    """
+    stock = get_latest_stock_snapshot(country_code)
+
+    label = COUNTRY_NAMES.get(
+        country_code,
+        country_code.upper(),
+    )
 
     if not stock:
-        return f"No stock data found for {label}."
+        return (
+            f"No stock data found for {label} yet.\n"
+            "The poller may not have collected data for this country."
+        )
 
-    # Sort by current stock amount, highest first.
-    # Sold out / low stock items naturally fall to the bottom.
-    stock = sorted(stock, key=lambda item: item["quantity"], reverse=True)
+    # Highest stock first.
+    stock = sorted(
+        stock,
+        key=lambda item: item["quantity"],
+        reverse=True,
+    )
 
-    lines = [f"**{label} — Current Stock**\n"]
+    latest_timestamp = max(
+        item["timestamp"]
+        for item in stock
+    )
+
+    latest_source = next(
+        (
+            item["source"]
+            for item in stock
+            if item["timestamp"] == latest_timestamp
+        ),
+        "unknown",
+    )
+
+    age_str = _format_age(latest_timestamp)
+
+    lines = [
+        f"**{label} — Current Stock**",
+        f"_Latest recorded data: {age_str} ago via {latest_source}_",
+        "",
+    ]
 
     for item in stock:
         quantity = item["quantity"]
         cost = item["cost"]
 
-        if quantity == 0:
-            lines.append(f"• **{item['name']}** — Stock: **0** | Cost: **${cost:,}**")
-        else:
-            lines.append(f"• **{item['name']}** — Stock: **{quantity:,}** | Cost: **${cost:,}**")
+        cost_text = (
+            f"${cost:,}"
+            if cost is not None
+            else "Unknown"
+        )
+
+        lines.append(
+            f"• **{item['name']}** — "
+            f"Stock: **{quantity:,}** | "
+            f"Cost: **{cost_text}**"
+        )
 
     return "\n".join(lines)
 
 
-def get_item_names(country_code: str):
+def get_known_item_names(country_code: str):
     """
-    Combines live current stock with everything ever recorded historically.
-    This lets sold-out items still show up in autocomplete.
+    Return item names from the local SQLite database.
+
+    Autocomplete must stay fast, so this function never
+    makes an external API request.
     """
-    live_names = {item["name"] for item in get_country_stock(country_code)}
-    known_names = set(get_known_items(country_code))
-    return sorted(live_names | known_names)
+    return get_known_items(country_code)
 
 
-def format_restock_message(country_code: str, item_name: str) -> str:
-    label = COUNTRY_NAMES.get(country_code, country_code.upper())
-    result = get_restock_prediction(country_code, item_name)
+def format_restock_message(
+    country_code: str,
+    item_name: str,
+) -> str:
+
+    label = COUNTRY_NAMES.get(
+        country_code,
+        country_code.upper(),
+    )
+
+    result = get_restock_prediction(
+        country_code,
+        item_name,
+    )
 
     if result is None:
-        return f"No history found for **{item_name}** in {label} yet. Keep collecting snapshots."
+        return (
+            f"No history found for **{item_name}** "
+            f"in {label} yet.\n"
+            "Keep collecting snapshots."
+        )
 
-    lines = [f"**{item_name} — {label}**", ""]
-
-    lines.append(f"Current Stock: **{result['current_stock']:,}**")
-    lines.append(f"Last Recorded Change: **{result['latest_time_str']}**")
-    lines.append(f"Observed Restocks: **{result['observed_restocks']}**")
-    lines.append(f"Average Sellout Time: **{result['avg_sellout_str']}**")
-    lines.append(f"Sellout Samples: **{result['sellout_samples']}**")
+    lines = [
+        f"**{item_name} — {label}**",
+        "",
+        f"Current Stock: **{result['current_stock']:,}**",
+        f"Last Recorded Change: **{result['latest_time_str']}**",
+        f"Observed Restocks: **{result['observed_restocks']}**",
+        f"Average Sellout Time: **{result['avg_sellout_str']}**",
+        f"Sellout Samples: **{result['sellout_samples']}**",
+    ]
 
     if result["avg_interval_minutes"] is None:
-        lines.append("")
-        lines.append("Prediction: **Not enough restocks observed yet.**")
-    else:
-        lines.append("")
-        lines.append(f"Average Restock Interval: **{result['avg_interval_minutes']:.1f} minutes**")
-        lines.append(f"Next Estimated Restock: **{result['predicted_next_str']}**")
+        lines.extend([
+            "",
+            "Prediction: **Not enough restocks observed yet.**",
+        ])
 
-        second_next = result.get("predicted_second_next_str")
+    else:
+        lines.extend([
+            "",
+            (
+                "Average Restock Interval: "
+                f"**{result['avg_interval_minutes']:.1f} minutes**"
+            ),
+            (
+                "Next Estimated Restock: "
+                f"**{result['predicted_next_str']}**"
+            ),
+        ])
+
+        second_next = result.get(
+            "predicted_second_next_str"
+        )
+
         if second_next:
-            lines.append(f"Second Estimated Restock: **{second_next}**")
+            lines.append(
+                "Second Estimated Restock: "
+                f"**{second_next}**"
+            )
 
     return "\n".join(lines)
 
-def format_history_message(country_code: str, item_name: str, limit: int = 15) -> str:
-    label = COUNTRY_NAMES.get(country_code, country_code.upper())
-    result = get_restock_prediction(country_code, item_name)
-    history = get_item_history(country_code, item_name, limit=limit)
+
+def format_history_message(
+    country_code: str,
+    item_name: str,
+    limit: int = 15,
+) -> str:
+
+    label = COUNTRY_NAMES.get(
+        country_code,
+        country_code.upper(),
+    )
+
+    result = get_restock_prediction(
+        country_code,
+        item_name,
+    )
+
+    history = get_item_history(
+        country_code,
+        item_name,
+        limit=limit,
+    )
 
     if not history:
-        return f"No history found for **{item_name}** in {label} yet."
+        return (
+            f"No history found for **{item_name}** "
+            f"in {label} yet."
+        )
 
     lines = [
         f"**{item_name} — {label} History**",
@@ -124,17 +241,40 @@ def format_history_message(country_code: str, item_name: str, limit: int = 15) -
         ])
 
         if result["avg_interval_minutes"] is not None:
-            lines.append(f"Average Restock Interval: **{result['avg_interval_minutes']:.1f} minutes**")
-            lines.append(f"Predicted Next Restock: **{result['predicted_next_str']}**")
-            lines.append("")
+            lines.extend([
+                (
+                    "Average Restock Interval: "
+                    f"**{result['avg_interval_minutes']:.1f} minutes**"
+                ),
+                (
+                    "Predicted Next Restock: "
+                    f"**{result['predicted_next_str']}**"
+                ),
+                "",
+            ])
 
-    lines.append(f"**Last {len(history)} Recorded Changes**")
+    lines.append(
+        f"**Last {len(history)} Recorded Changes**"
+    )
 
     for row in history:
-        timestamp = _format_timestamp(row["timestamp"])
+        timestamp = _format_timestamp(
+            row["timestamp"]
+        )
+
         quantity = row["quantity"]
         cost = row["cost"]
 
-        lines.append(f"• {timestamp} → **{quantity:,}** stock at **${cost:,}**")
+        cost_text = (
+            f"${cost:,}"
+            if cost is not None
+            else "Unknown"
+        )
+
+        lines.append(
+            f"• {timestamp} → "
+            f"**{quantity:,}** stock at "
+            f"**{cost_text}**"
+        )
 
     return "\n".join(lines)

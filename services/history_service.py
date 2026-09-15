@@ -390,3 +390,35 @@ def predict_restock(country: str, item_name: str):
 
 if __name__ == "__main__":
     save_snapshot("uni")
+
+def get_latest_stock_snapshot(country: str):
+    """
+    Return the most recently known quantity/cost for every item in a country,
+    straight from our own database — no live API call. This is what /stock
+    uses so it keeps working even if YATA and Prometheus are both down; it
+    just shows the latest known state along with how old that is.
+    """
+    init_db()
+
+    with _connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT sh.item_id, sh.item_name, sh.quantity, sh.cost, sh.timestamp, sh.source
+            FROM stock_history sh
+            INNER JOIN (
+                SELECT item_id, MAX(timestamp) AS max_ts
+                FROM stock_history
+                WHERE country = ?
+                GROUP BY item_id
+            ) latest
+            ON sh.item_id = latest.item_id AND sh.timestamp = latest.max_ts
+            WHERE sh.country = ?
+            ORDER BY sh.item_name ASC
+            """,
+            (country, country),
+        ).fetchall()
+
+    return [
+        {"id": row[0], "name": row[1], "quantity": row[2], "cost": row[3], "timestamp": row[4], "source": row[5]}
+        for row in rows
+    ]
