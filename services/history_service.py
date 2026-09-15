@@ -125,6 +125,78 @@ def save_snapshot(country: str):
         f"at {time.strftime('%H:%M:%S', time.localtime(timestamp))}"
     )
 
+def save_snapshot_from_export(country: str, country_data: dict, source: str):
+    """
+    Save one country's snapshot from an already-fetched export object,
+    instead of calling any API directly. This is what the poller uses now.
+    """
+    init_db()
+
+    stock = country_data.get("stocks", [])
+    timestamp = int(time.time())
+
+    inserted = 0
+    skipped = 0
+
+    with _connect() as conn:
+        for item in stock:
+            item_id = item["id"]
+            item_name = item["name"]
+            quantity = item["quantity"]
+            cost = item.get("cost")
+
+            latest_quantity = get_latest_quantity(conn, country, item_id)
+
+            if latest_quantity == quantity:
+                skipped += 1
+                continue
+
+            conn.execute(
+                """
+                INSERT INTO stock_history
+                (timestamp, country, item_id, item_name, quantity, cost, source)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (timestamp, country, item_id, item_name, quantity, cost, source),
+            )
+
+            inserted += 1
+
+    print(f"{country}: inserted {inserted}, skipped {skipped} unchanged")
+
+
+def save_all_snapshots(export: dict):
+    """
+    Save every country in one export object — one API call feeds every
+    country's row inserts, instead of calling the API once per country.
+    """
+    source = export.get("source", "unknown")
+    stocks = export.get("stocks", {})
+
+    for country, country_data in stocks.items():
+        save_snapshot_from_export(country, country_data, source)
+
+
+def get_item_history_since(country: str, item_name: str, hours: int = 24):
+    """
+    Return stock history rows for one item over the last X hours, oldest → newest.
+    Used later by /graph — not wired into any command yet.
+    """
+    init_db()
+    cutoff = int(time.time()) - (hours * 3600)
+
+    with _connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT timestamp, quantity, cost
+            FROM stock_history
+            WHERE country = ? AND LOWER(item_name) = LOWER(?) AND timestamp >= ?
+            ORDER BY timestamp ASC
+            """,
+            (country, item_name, cutoff),
+        ).fetchall()
+
+    return [{"timestamp": row[0], "quantity": row[1], "cost": row[2]} for row in rows]
 
 def get_item_history(country: str, item_name: str, limit: int = 15):
     """
