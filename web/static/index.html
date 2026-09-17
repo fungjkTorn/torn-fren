@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Torn Fren — Stock History</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8/hammer.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #1e1f22; color: #f2f3f5; margin: 0; padding: 16px; touch-action: none; }
+  h1 { font-size: 1.2rem; margin-bottom: 4px; }
+  #subtitle { color: #b5bac1; margin-bottom: 16px; font-size: 0.9rem; }
+  .controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 16px; }
+  .timeframes { display: flex; flex-wrap: wrap; gap: 8px; }
+  .timeframes button, #resetZoom {
+    background: #2b2d31; color: #f2f3f5; border: 1px solid #3f4147;
+    border-radius: 6px; padding: 8px 14px; font-size: 0.9rem; cursor: pointer;
+  }
+  .timeframes button.active { background: #5865f2; border-color: #5865f2; }
+  #resetZoom { margin-left: auto; }
+  #chart-container { position: relative; height: 60vh; max-height: 500px; }
+  #status { color: #b5bac1; margin-top: 12px; font-size: 0.85rem; }
+  #hint { color: #71767d; margin-top: 4px; font-size: 0.78rem; }
+</style>
+</head>
+<body>
+  <h1 id="title">Loading...</h1>
+  <div id="subtitle"></div>
+
+  <div class="controls">
+    <div class="timeframes" id="timeframes">
+      <button data-minutes="5">5m</button>
+      <button data-minutes="15">15m</button>
+      <button data-minutes="30">30m</button>
+      <button data-minutes="60">1h</button>
+      <button data-minutes="180">3h</button>
+      <button data-minutes="360">6h</button>
+      <button data-minutes="720">12h</button>
+      <button data-minutes="1440" class="active">24h</button>
+      <button data-minutes="4320">72h</button>
+      <button data-minutes="10080">7d</button>
+    </div>
+    <button id="resetZoom">Reset Zoom</button>
+  </div>
+
+  <div id="chart-container">
+    <canvas id="stockChart"></canvas>
+  </div>
+
+  <div id="status"></div>
+  <div id="hint">Drag to pan · scroll/pinch to zoom · gaps in the line mean stock was at 0</div>
+
+<script>
+  const params = new URLSearchParams(window.location.search);
+  const country = params.get("country") || "uni";
+  const item = params.get("item") || "";
+
+  document.getElementById("title").textContent = item || "No item specified";
+  document.getElementById("subtitle").textContent = "Country: " + country.toUpperCase();
+
+  let chart = null;
+
+  /**
+   * Turns raw rows into chart points where:
+   * - Real zero-stock stretches become true gaps (null) — no line drawn while sold out.
+   * - The moment right before a restock gets one synthetic zero point half a second
+   *   earlier, so the rise from 0 to the restocked amount renders as a sharp,
+   *   near-vertical line instead of a long misleading diagonal across the wait time.
+   */
+  function buildPoints(rows) {
+    const points = [];
+
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      const next = rows[i + 1];
+
+      if (row.quantity === 0) {
+        if (next && next.quantity > 0) {
+          points.push({ x: next.timestamp * 1000 - 500, y: 0 });
+        }
+        points.push({ x: row.timestamp * 1000, y: null });
+      } else {
+        points.push({ x: row.timestamp * 1000, y: row.quantity });
+      }
+    }
+
+    return points;
+  }
+
+  async function loadData(minutes) {
+    document.getElementById("status").textContent = "Loading...";
+
+    const url = `/api/history?country=${encodeURIComponent(country)}&item=${encodeURIComponent(item)}&minutes=${minutes}`;
+    const response = await fetch(url);
+    const data = await response.json();
+
+    if (!data.rows || data.rows.length === 0) {
+      document.getElementById("status").textContent = "No data available for this range.";
+      if (chart) { chart.data.datasets[0].data = []; chart.update(); }
+      return;
+    }
+
+    document.getElementById("status").textContent = `${data.rows.length} data points`;
+
+    const points = buildPoints(data.rows);
+
+    let unit = "hour";
+    if (minutes <= 720) unit = "minute";
+    else if (minutes <= 4320) unit = "hour";
+    else unit = "day";
+
+    if (chart) {
+      chart.data.datasets[0].data = points;
+      chart.options.scales.x.time.unit = unit;
+      chart.resetZoom();
+      chart.update();
+    } else {
+      const ctx = document.getElementById("stockChart").getContext("2d");
+      chart = new Chart(ctx, {
+        type: "line",
+        data: {
+          datasets: [{
+            label: "Stock Quantity",
+            data: points,
+            borderColor: "#5865f2",
+            backgroundColor: "rgba(88, 101, 242, 0.15)",
+            fill: true,
+            stepped: "after",
+            spanGaps: false,
+            pointRadius: 2,
+            pointHoverRadius: 5,
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { mode: "nearest", intersect: false },
+          scales: {
+            x: { type: "time", time: { unit: unit }, ticks: { color: "#b5bac1" }, grid: { color: "#2b2d31" } },
+            y: { beginAtZero: true, ticks: { color: "#b5bac1" }, grid: { color: "#2b2d31" } },
+          },
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                title: (items) => new Date(items[0].parsed.x).toLocaleString(),
+                label: (item) => item.parsed.y === null ? "Sold out" : `Stock: ${item.parsed.y.toLocaleString()}`,
+              }
+            },
+            zoom: {
+              pan: { enabled: true, mode: "x" },
+              zoom: {
+                wheel: { enabled: true },
+                pinch: { enabled: true },
+                mode: "x",
+              }
+            }
+          }
+        }
+      });
+    }
+  }
+
+  document.getElementById("timeframes").addEventListener("click", (e) => {
+    if (e.target.tagName !== "BUTTON") return;
+    document.querySelectorAll(".timeframes button").forEach(b => b.classList.remove("active"));
+    e.target.classList.add("active");
+    loadData(parseInt(e.target.dataset.minutes, 10));
+  });
+
+  document.getElementById("resetZoom").addEventListener("click", () => {
+    if (chart) chart.resetZoom();
+  });
+
+  loadData(1440);
+</script>
+</body>
+</html>
