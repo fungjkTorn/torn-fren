@@ -1,180 +1,763 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Torn Fren — Stock History</title>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8/hammer.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
-<style>
-  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #1e1f22; color: #f2f3f5; margin: 0; padding: 16px; touch-action: none; }
-  h1 { font-size: 1.2rem; margin-bottom: 4px; }
-  #subtitle { color: #b5bac1; margin-bottom: 16px; font-size: 0.9rem; }
-  .controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 16px; }
-  .timeframes { display: flex; flex-wrap: wrap; gap: 8px; }
-  .timeframes button, #resetZoom {
-    background: #2b2d31; color: #f2f3f5; border: 1px solid #3f4147;
-    border-radius: 6px; padding: 8px 14px; font-size: 0.9rem; cursor: pointer;
-  }
-  .timeframes button.active { background: #5865f2; border-color: #5865f2; }
-  #resetZoom { margin-left: auto; }
-  #chart-container { position: relative; height: 60vh; max-height: 500px; }
-  #status { color: #b5bac1; margin-top: 12px; font-size: 0.85rem; }
-  #hint { color: #71767d; margin-top: 4px; font-size: 0.78rem; }
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Torn Fren — Stock History</title>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #1e1f22;
+      --panel: #232428;
+      --panel-2: #2b2d31;
+      --border: #3f4147;
+      --text: #f2f3f5;
+      --muted: #b5bac1;
+      --subtle: #71767d;
+      --grid: #2b2d31;
+      --accent: #5865f2;
+      --green: #3ba55d;
+      --gold: #faa61a;
+      --red: #ed4245;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      padding: 14px;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    .page { width: 100%; margin: 0 auto; }
+
+    h1 {
+      margin: 0 0 4px;
+      font-size: 1.2rem;
+    }
+
+    #subtitle {
+      color: var(--muted);
+      margin-bottom: 12px;
+      font-size: 0.9rem;
+    }
+
+    .controls {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 12px;
+    }
+
+    .timeframes {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    button {
+      min-height: 36px;
+      padding: 7px 13px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--panel-2);
+      color: var(--text);
+      font-size: 0.9rem;
+      cursor: pointer;
+    }
+
+    button:hover { border-color: #5b5d65; }
+    button.active { background: var(--accent); border-color: var(--accent); }
+
+    .right-controls {
+      display: flex;
+      gap: 8px;
+      margin-left: auto;
+    }
+
+    #insights-toggle { display: none; }
+
+    #insights-panel {
+      display: grid;
+      grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr);
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+
+    .insight-section {
+      background: var(--panel);
+      border: 1px solid #303238;
+      border-radius: 8px;
+      padding: 10px 12px;
+      min-width: 0;
+    }
+
+    .insight-title {
+      margin: 0 0 8px;
+      color: var(--muted);
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+    }
+
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(120px, 1fr));
+      gap: 9px 14px;
+    }
+
+    .metric { min-width: 0; }
+
+    .metric-label {
+      color: var(--subtle);
+      font-size: 0.72rem;
+      margin-bottom: 2px;
+    }
+
+    .metric-value {
+      color: var(--text);
+      font-size: 0.9rem;
+      font-weight: 600;
+      overflow-wrap: anywhere;
+    }
+
+    .prediction-main {
+      font-size: 1.05rem;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .prediction-window {
+      color: var(--muted);
+      font-size: 0.83rem;
+      margin-bottom: 7px;
+    }
+
+    .prediction-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px 12px;
+      color: var(--muted);
+      font-size: 0.76rem;
+    }
+
+    .prediction-note {
+      margin-top: 7px;
+      color: var(--subtle);
+      font-size: 0.72rem;
+      line-height: 1.35;
+    }
+
+    #chart-scroll {
+      width: 100%;
+      overflow-x: auto;
+      overflow-y: hidden;
+      overscroll-behavior-inline: contain;
+      touch-action: pan-x pan-y;
+      border-top: 1px solid #25272b;
+      border-bottom: 1px solid #25272b;
+      scrollbar-color: #4b4e57 #232428;
+      scrollbar-width: thin;
+      cursor: grab;
+    }
+
+    #chart-scroll.dragging { cursor: grabbing; }
+
+    #chart-scroll::-webkit-scrollbar { height: 10px; }
+    #chart-scroll::-webkit-scrollbar-track { background: #232428; }
+    #chart-scroll::-webkit-scrollbar-thumb {
+      background: #4b4e57;
+      border-radius: 999px;
+    }
+
+    #chart-stage {
+      position: relative;
+      height: 520px;
+      min-width: 100%;
+    }
+
+    #stockChart { touch-action: pan-x pan-y; }
+
+    #status {
+      margin-top: 9px;
+      color: var(--muted);
+      font-size: 0.82rem;
+    }
+
+    #hint {
+      margin-top: 4px;
+      color: var(--subtle);
+      font-size: 0.76rem;
+    }
+
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin: 7px 0 0;
+      color: var(--muted);
+      font-size: 0.74rem;
+    }
+
+    .legend span::before {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      margin-right: 5px;
+      border-radius: 50%;
+      content: "";
+    }
+
+    .legend .restock::before { background: var(--green); }
+    .legend .peak::before { background: var(--gold); }
+    .legend .depletion::before { background: var(--red); }
+    .legend .prediction::before { background: var(--accent); }
+
+    @media (max-width: 1050px) {
+      .metrics { grid-template-columns: repeat(2, minmax(120px, 1fr)); }
+    }
+
+    @media (max-width: 760px) {
+      body { padding: 10px; }
+
+      button {
+        min-height: 42px;
+        padding: 8px 12px;
+      }
+
+      .right-controls {
+        width: 100%;
+        margin-left: 0;
+      }
+
+      #latestButton { margin-left: auto; }
+      #insights-toggle { display: inline-flex; }
+
+      #insights-panel {
+        display: none;
+        grid-template-columns: 1fr;
+      }
+
+      #insights-panel.open { display: grid; }
+      .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      #chart-stage { height: 410px; }
+    }
+  </style>
 </head>
 <body>
-  <h1 id="title">Loading...</h1>
-  <div id="subtitle"></div>
+  <main class="page">
+    <h1 id="title">Loading...</h1>
+    <div id="subtitle"></div>
 
-  <div class="controls">
-    <div class="timeframes" id="timeframes">
-      <button data-minutes="5">5m</button>
-      <button data-minutes="15">15m</button>
-      <button data-minutes="30">30m</button>
-      <button data-minutes="60">1h</button>
-      <button data-minutes="180">3h</button>
-      <button data-minutes="360">6h</button>
-      <button data-minutes="720">12h</button>
-      <button data-minutes="1440" class="active">24h</button>
-      <button data-minutes="4320">72h</button>
-      <button data-minutes="10080">7d</button>
+    <div class="controls">
+      <div class="timeframes" id="timeframes">
+        <button data-minutes="5">5m</button>
+        <button data-minutes="15">15m</button>
+        <button data-minutes="30">30m</button>
+        <button data-minutes="60">1h</button>
+        <button data-minutes="180">3h</button>
+        <button data-minutes="360" class="active">6h</button>
+        <button data-minutes="720">12h</button>
+        <button data-minutes="1440">24h</button>
+        <button data-minutes="4320">72h</button>
+        <button data-minutes="10080">7d</button>
+      </div>
+
+      <div class="right-controls">
+        <button id="insights-toggle" type="button" aria-expanded="false">Stats & prediction</button>
+        <button id="latestButton" type="button">Jump to latest</button>
+      </div>
     </div>
-    <button id="resetZoom">Reset Zoom</button>
-  </div>
 
-  <div id="chart-container">
-    <canvas id="stockChart"></canvas>
-  </div>
+    <section id="insights-panel" aria-live="polite">
+      <div class="insight-section">
+        <div class="insight-title">Observed history</div>
+        <div class="metrics">
+          <div class="metric"><div class="metric-label">Current stock</div><div class="metric-value" id="currentStock">—</div></div>
+          <div class="metric"><div class="metric-label">Last restock</div><div class="metric-value" id="lastRestock">—</div></div>
+          <div class="metric"><div class="metric-label">Observed peak</div><div class="metric-value" id="lastPeak">—</div></div>
+          <div class="metric"><div class="metric-label">Last depletion</div><div class="metric-value" id="lastDepletion">—</div></div>
+          <div class="metric"><div class="metric-label">Avg stock lifetime</div><div class="metric-value" id="avgLifetime">—</div></div>
+          <div class="metric"><div class="metric-label">Median stock lifetime</div><div class="metric-value" id="medianLifetime">—</div></div>
+          <div class="metric"><div class="metric-label">Avg zero → restock</div><div class="metric-value" id="avgZeroWait">—</div></div>
+          <div class="metric"><div class="metric-label">Median zero → restock</div><div class="metric-value" id="medianZeroWait">—</div></div>
+          <div class="metric"><div class="metric-label">Valid cycles</div><div class="metric-value" id="validCycles">—</div></div>
+          <div class="metric"><div class="metric-label">Excluded cycles</div><div class="metric-value" id="excludedCycles">—</div></div>
+        </div>
+      </div>
 
-  <div id="status"></div>
-  <div id="hint">Drag to pan · scroll/pinch to zoom · gaps in the line mean stock was at 0</div>
+      <div class="insight-section">
+        <div class="insight-title">Baseline prediction</div>
+        <div class="prediction-main" id="predictionEstimate">Not enough data</div>
+        <div class="prediction-window" id="predictionWindow">—</div>
+        <div class="prediction-meta">
+          <span id="predictionConfidence">Confidence: —</span>
+          <span id="predictionSamples">Samples: —</span>
+          <span id="predictionExcluded">Excluded: —</span>
+          <span id="predictionMethod">Method: —</span>
+        </div>
+        <div class="prediction-note" id="predictionNote">
+          This is still the baseline model. We will replace it with the item-specific drought/depletion-aware predictor after validating the event data.
+        </div>
+      </div>
+    </section>
 
-<script>
-  const params = new URLSearchParams(window.location.search);
-  const country = params.get("country") || "uni";
-  const item = params.get("item") || "";
+    <div id="chart-scroll" aria-label="Scrollable stock history chart">
+      <div id="chart-stage">
+        <canvas id="stockChart"></canvas>
+      </div>
+    </div>
 
-  document.getElementById("title").textContent = item || "No item specified";
-  document.getElementById("subtitle").textContent = "Country: " + country.toUpperCase();
+    <div class="legend">
+      <span class="restock">Restock</span>
+      <span class="peak">Observed peak</span>
+      <span class="depletion">Depletion</span>
+      <span class="prediction">Prediction window</span>
+    </div>
 
-  let chart = null;
+    <div id="status"></div>
+    <div id="hint">Scroll or swipe left/right for older data · hover on PC or tap on mobile for exact recorded values</div>
+  </main>
 
-  /**
-   * Turns raw rows into chart points where:
-   * - Real zero-stock stretches become true gaps (null) — no line drawn while sold out.
-   * - The moment right before a restock gets one synthetic zero point half a second
-   *   earlier, so the rise from 0 to the restocked amount renders as a sharp,
-   *   near-vertical line instead of a long misleading diagonal across the wait time.
-   */
-  function buildPoints(rows) {
-    const points = [];
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const country = (params.get("country") || "uni").toLowerCase();
+    const item = params.get("item") || "";
 
-    for (let i = 0; i < rows.length; i++) {
-      const row = rows[i];
-      const next = rows[i + 1];
+    const titleEl = document.getElementById("title");
+    const subtitleEl = document.getElementById("subtitle");
+    const statusEl = document.getElementById("status");
+    const scrollEl = document.getElementById("chart-scroll");
+    const stageEl = document.getElementById("chart-stage");
+    const latestButton = document.getElementById("latestButton");
+    const insightsToggle = document.getElementById("insights-toggle");
+    const insightsPanel = document.getElementById("insights-panel");
 
-      if (row.quantity === 0) {
-        if (next && next.quantity > 0) {
-          points.push({ x: next.timestamp * 1000 - 500, y: 0 });
+    titleEl.textContent = item || "No item specified";
+    subtitleEl.textContent = "Country: " + country.toUpperCase();
+
+    let chart = null;
+    let currentMinutes = 360;
+    let currentAnalysis = null;
+
+    const predictionOverlayPlugin = {
+      id: "predictionOverlay",
+      beforeDatasetsDraw(chartInstance) {
+        const prediction = chartInstance.$prediction;
+        if (!prediction || !prediction.estimate_timestamp) return;
+
+        const xScale = chartInstance.scales.x;
+        const area = chartInstance.chartArea;
+        const start = prediction.window_start_timestamp * 1000;
+        const end = prediction.window_end_timestamp * 1000;
+        const estimate = prediction.estimate_timestamp * 1000;
+
+        const left = xScale.getPixelForValue(start);
+        const right = xScale.getPixelForValue(end);
+        const estimateX = xScale.getPixelForValue(estimate);
+
+        const ctx = chartInstance.ctx;
+        ctx.save();
+
+        if (right >= area.left && left <= area.right) {
+          ctx.fillStyle = "rgba(88, 101, 242, 0.10)";
+          ctx.fillRect(
+            Math.max(left, area.left),
+            area.top,
+            Math.min(right, area.right) - Math.max(left, area.left),
+            area.bottom - area.top
+          );
         }
-        points.push({ x: row.timestamp * 1000, y: null });
-      } else {
-        points.push({ x: row.timestamp * 1000, y: row.quantity });
+
+        if (estimateX >= area.left && estimateX <= area.right) {
+          ctx.strokeStyle = "rgba(88, 101, 242, 0.95)";
+          ctx.lineWidth = 1.5;
+          ctx.setLineDash([6, 5]);
+          ctx.beginPath();
+          ctx.moveTo(estimateX, area.top);
+          ctx.lineTo(estimateX, area.bottom);
+          ctx.stroke();
+        }
+
+        ctx.restore();
       }
+    };
+
+    Chart.register(predictionOverlayPlugin);
+
+    function formatTimestamp(seconds) {
+      if (!seconds) return "—";
+      return new Date(seconds * 1000).toLocaleString();
     }
 
-    return points;
-  }
-
-  async function loadData(minutes) {
-    document.getElementById("status").textContent = "Loading...";
-
-    const url = `/api/history?country=${encodeURIComponent(country)}&item=${encodeURIComponent(item)}&minutes=${minutes}`;
-    const response = await fetch(url);
-    const data = await response.json();
-
-    if (!data.rows || data.rows.length === 0) {
-      document.getElementById("status").textContent = "No data available for this range.";
-      if (chart) { chart.data.datasets[0].data = []; chart.update(); }
-      return;
+    function formatClock(seconds) {
+      if (!seconds) return "—";
+      return new Date(seconds * 1000).toLocaleTimeString([], {
+        hour: "numeric",
+        minute: "2-digit",
+        second: "2-digit"
+      });
     }
 
-    document.getElementById("status").textContent = `${data.rows.length} data points`;
+    function formatNumber(value) {
+      if (value === null || value === undefined) return "—";
+      return Number(value).toLocaleString();
+    }
 
-    const points = buildPoints(data.rows);
+    function buildStockPoints(rows) {
+      return rows.map((row) => ({
+        x: row.timestamp * 1000,
+        y: row.quantity,
+        anchor: Boolean(row.anchor),
+      }));
+    }
 
-    let unit = "hour";
-    if (minutes <= 720) unit = "minute";
-    else if (minutes <= 4320) unit = "hour";
-    else unit = "day";
+    function buildEventPoints(events, type) {
+      return (events || [])
+        .filter((event) => event.type === type)
+        .map((event) => ({
+          x: event.timestamp * 1000,
+          y: event.quantity,
+          eventType: event.type,
+          validForPrediction: event.valid_for_prediction !== false,
+        }));
+    }
 
-    if (chart) {
-      chart.data.datasets[0].data = points;
-      chart.options.scales.x.time.unit = unit;
-      chart.resetZoom();
-      chart.update();
-    } else {
+    function getStageWidth(minutes) {
+      const viewportWidth = Math.max(scrollEl.clientWidth, 320);
+      const hours = minutes / 60;
+
+      let pixelsPerHour;
+      if (minutes <= 360) pixelsPerHour = 180;
+      else if (minutes <= 720) pixelsPerHour = 145;
+      else if (minutes <= 1440) pixelsPerHour = 120;
+      else if (minutes <= 4320) pixelsPerHour = 70;
+      else pixelsPerHour = 35;
+
+      return Math.max(viewportWidth, Math.round(hours * pixelsPerHour));
+    }
+
+    function getTimeScale(minutes) {
+      if (minutes <= 15) return { unit: "minute", stepSize: 1, format: "h:mm a" };
+      if (minutes <= 30) return { unit: "minute", stepSize: 5, format: "h:mm a" };
+      if (minutes <= 60) return { unit: "minute", stepSize: 10, format: "h:mm a" };
+      if (minutes <= 360) return { unit: "minute", stepSize: 30, format: "h:mm a" };
+      if (minutes <= 720) return { unit: "hour", stepSize: 1, format: "h a" };
+      if (minutes <= 1440) return { unit: "hour", stepSize: 2, format: "h a" };
+      if (minutes <= 4320) return { unit: "hour", stepSize: 6, format: "MMM d, h a" };
+      return { unit: "hour", stepSize: 12, format: "MMM d, h a" };
+    }
+
+    function getDisplayBounds(minutes, analysis) {
+      const now = Date.now();
+      const min = now - minutes * 60 * 1000;
+      let max = now;
+
+      const predictionEnd = analysis?.prediction?.window_end_timestamp;
+      if (predictionEnd) {
+        const allowanceMinutes = Math.min(minutes * 0.15, 180);
+        const allowanceEnd = now + allowanceMinutes * 60 * 1000;
+        const predictionEndMs = predictionEnd * 1000;
+        if (predictionEndMs <= allowanceEnd) max = Math.max(max, predictionEndMs);
+      }
+
+      return { min, max };
+    }
+
+    function updateInsights(analysis) {
+      currentAnalysis = analysis;
+      if (!analysis) return;
+
+      document.getElementById("currentStock").textContent = formatNumber(analysis.current_stock);
+      document.getElementById("lastRestock").textContent = formatClock(analysis.last_restock_timestamp);
+      document.getElementById("lastPeak").textContent = analysis.last_peak_quantity == null
+        ? "—"
+        : `${formatNumber(analysis.last_peak_quantity)} @ ${formatClock(analysis.last_peak_timestamp)}`;
+      document.getElementById("lastDepletion").textContent = formatClock(analysis.last_depletion_timestamp);
+      document.getElementById("avgLifetime").textContent = analysis.avg_lifetime_str || "—";
+      document.getElementById("medianLifetime").textContent = analysis.median_lifetime_str || "—";
+      document.getElementById("avgZeroWait").textContent = analysis.avg_zero_to_restock_str || "—";
+      document.getElementById("medianZeroWait").textContent = analysis.median_zero_to_restock_str || "—";
+      document.getElementById("validCycles").textContent = analysis.valid_cycles ?? "—";
+      document.getElementById("excludedCycles").textContent = analysis.excluded_cycles ?? "—";
+
+      const prediction = analysis.prediction || {};
+      const estimateEl = document.getElementById("predictionEstimate");
+      const windowEl = document.getElementById("predictionWindow");
+
+      if (prediction.estimate_timestamp) {
+        estimateEl.textContent = formatTimestamp(prediction.estimate_timestamp);
+        windowEl.textContent = `Window: ${formatClock(prediction.window_start_timestamp)} – ${formatClock(prediction.window_end_timestamp)}`;
+      } else {
+        estimateEl.textContent = "Not enough data";
+        windowEl.textContent = "—";
+      }
+
+      document.getElementById("predictionConfidence").textContent = `Confidence: ${prediction.confidence || "—"}`;
+      document.getElementById("predictionSamples").textContent = `Samples: ${prediction.sample_count ?? "—"}`;
+      document.getElementById("predictionExcluded").textContent = `Excluded: ${prediction.excluded_sample_count ?? "—"}`;
+      document.getElementById("predictionMethod").textContent = `Method: ${prediction.method || "—"}`;
+      document.getElementById("predictionNote").textContent = prediction.note ||
+        "This is still the baseline model. We will replace it with the item-specific drought/depletion-aware predictor after validating the event data.";
+    }
+
+    function jumpToLatest() {
+      scrollEl.scrollLeft = Math.max(0, scrollEl.scrollWidth - scrollEl.clientWidth);
+    }
+
+    function updateChartSize(minutes) {
+      stageEl.style.width = `${getStageWidth(minutes)}px`;
+      if (chart) chart.resize();
+    }
+
+    function datasetConfig(stockPoints, events) {
+      return [
+        {
+          label: "Stock",
+          data: stockPoints,
+          parsing: false,
+          borderColor: "#5865f2",
+          backgroundColor: "rgba(88, 101, 242, 0.14)",
+          fill: true,
+          borderWidth: 2,
+          stepped: "before",
+          tension: 0,
+          spanGaps: false,
+          pointRadius: (context) => context.raw?.anchor ? 0 : 1.5,
+          pointHoverRadius: 5,
+          pointHitRadius: 8,
+          order: 1,
+        },
+        {
+          type: "scatter",
+          label: "Restock",
+          data: buildEventPoints(events, "restock"),
+          parsing: false,
+          pointStyle: "triangle",
+          pointRadius: 6,
+          pointHoverRadius: 8,
+          backgroundColor: "#3ba55d",
+          borderColor: "#3ba55d",
+          order: 0,
+        },
+        {
+          type: "scatter",
+          label: "Observed peak",
+          data: buildEventPoints(events, "peak"),
+          parsing: false,
+          pointStyle: "circle",
+          pointRadius: 4.5,
+          pointHoverRadius: 7,
+          backgroundColor: "#faa61a",
+          borderColor: "#faa61a",
+          order: 0,
+        },
+        {
+          type: "scatter",
+          label: "Depletion",
+          data: buildEventPoints(events, "depletion"),
+          parsing: false,
+          pointStyle: "triangle",
+          pointRotation: 180,
+          pointRadius: 6,
+          pointHoverRadius: 8,
+          backgroundColor: "#ed4245",
+          borderColor: "#ed4245",
+          order: 0,
+        }
+      ];
+    }
+
+    function makeChart(stockPoints, analysis, minutes) {
       const ctx = document.getElementById("stockChart").getContext("2d");
+      const timeScale = getTimeScale(minutes);
+      const bounds = getDisplayBounds(minutes, analysis);
+
       chart = new Chart(ctx, {
         type: "line",
-        data: {
-          datasets: [{
-            label: "Stock Quantity",
-            data: points,
-            borderColor: "#5865f2",
-            backgroundColor: "rgba(88, 101, 242, 0.15)",
-            fill: true,
-            stepped: "after",
-            spanGaps: false,
-            pointRadius: 2,
-            pointHoverRadius: 5,
-          }]
-        },
+        data: { datasets: datasetConfig(stockPoints, analysis?.events || []) },
         options: {
           responsive: true,
           maintainAspectRatio: false,
-          interaction: { mode: "nearest", intersect: false },
+          animation: false,
+          normalized: true,
+          interaction: { mode: "nearest", axis: "x", intersect: false },
           scales: {
-            x: { type: "time", time: { unit: unit }, ticks: { color: "#b5bac1" }, grid: { color: "#2b2d31" } },
-            y: { beginAtZero: true, ticks: { color: "#b5bac1" }, grid: { color: "#2b2d31" } },
+            x: {
+              type: "time",
+              min: bounds.min,
+              max: bounds.max,
+              time: {
+                unit: timeScale.unit,
+                stepSize: timeScale.stepSize,
+                displayFormats: {
+                  minute: timeScale.format,
+                  hour: timeScale.format,
+                },
+                tooltipFormat: "M/d/yyyy, h:mm:ss a",
+              },
+              ticks: { color: "#b5bac1", autoSkip: false, maxRotation: 0 },
+              grid: { color: "#2b2d31" },
+            },
+            y: {
+              beginAtZero: true,
+              ticks: {
+                color: "#b5bac1",
+                callback: (value) => Number(value).toLocaleString(),
+              },
+              grid: { color: "#2b2d31" },
+            },
           },
           plugins: {
             legend: { display: false },
             tooltip: {
+              displayColors: false,
               callbacks: {
-                title: (items) => new Date(items[0].parsed.x).toLocaleString(),
-                label: (item) => item.parsed.y === null ? "Sold out" : `Stock: ${item.parsed.y.toLocaleString()}`,
-              }
+                title: (items) => items.length ? new Date(items[0].parsed.x).toLocaleString() : "",
+                label: (context) => {
+                  if (context.dataset.label === "Stock") {
+                    return `Stock: ${Number(context.parsed.y).toLocaleString()}`;
+                  }
+                  if (context.dataset.label === "Depletion") return "Depleted: stock reached 0";
+                  return `${context.dataset.label}: ${Number(context.parsed.y).toLocaleString()}`;
+                },
+                afterLabel: (context) => {
+                  if (context.raw?.anchor) return "State at start of selected range";
+                  if (context.raw?.validForPrediction === false) return "Excluded from prediction statistics";
+                  return "";
+                },
+              },
             },
-            zoom: {
-              pan: { enabled: true, mode: "x" },
-              zoom: {
-                wheel: { enabled: true },
-                pinch: { enabled: true },
-                mode: "x",
-              }
-            }
-          }
-        }
+          },
+        },
       });
+
+      chart.$prediction = analysis?.prediction || null;
     }
-  }
 
-  document.getElementById("timeframes").addEventListener("click", (e) => {
-    if (e.target.tagName !== "BUTTON") return;
-    document.querySelectorAll(".timeframes button").forEach(b => b.classList.remove("active"));
-    e.target.classList.add("active");
-    loadData(parseInt(e.target.dataset.minutes, 10));
-  });
+    function updateExistingChart(stockPoints, analysis, minutes) {
+      const timeScale = getTimeScale(minutes);
+      const bounds = getDisplayBounds(minutes, analysis);
 
-  document.getElementById("resetZoom").addEventListener("click", () => {
-    if (chart) chart.resetZoom();
-  });
+      chart.data.datasets = datasetConfig(stockPoints, analysis?.events || []);
+      chart.options.scales.x.min = bounds.min;
+      chart.options.scales.x.max = bounds.max;
+      chart.options.scales.x.time.unit = timeScale.unit;
+      chart.options.scales.x.time.stepSize = timeScale.stepSize;
+      chart.options.scales.x.time.displayFormats.minute = timeScale.format;
+      chart.options.scales.x.time.displayFormats.hour = timeScale.format;
+      chart.$prediction = analysis?.prediction || null;
+      chart.update("none");
+      chart.resize();
+    }
 
-  loadData(1440);
-</script>
+    async function loadData(minutes) {
+      currentMinutes = minutes;
+      statusEl.textContent = "Loading...";
+      updateChartSize(minutes);
+
+      try {
+        const url = `/api/history?country=${encodeURIComponent(country)}&item=${encodeURIComponent(item)}&minutes=${minutes}`;
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+        const data = await response.json();
+        updateInsights(data.analysis);
+
+        if (!data.rows || data.rows.length === 0) {
+          statusEl.textContent = "No stock history is available for this range.";
+          if (chart) {
+            chart.data.datasets.forEach((dataset) => { dataset.data = []; });
+            chart.update("none");
+          }
+          return;
+        }
+
+        const stockPoints = buildStockPoints(data.rows);
+        const actualChanges = data.rows.filter((row) => !row.anchor).length;
+        const latestActual = [...data.rows].reverse().find((row) => !row.anchor) || data.rows[data.rows.length - 1];
+
+        statusEl.textContent = `${actualChanges.toLocaleString()} plotted stock changes · latest recorded change: ${new Date(latestActual.timestamp * 1000).toLocaleString()}`;
+
+        if (!chart) makeChart(stockPoints, data.analysis, minutes);
+        else updateExistingChart(stockPoints, data.analysis, minutes);
+
+        requestAnimationFrame(jumpToLatest);
+      } catch (error) {
+        console.error(error);
+        statusEl.textContent = "Could not load stock history. Make sure the FastAPI server is running.";
+      }
+    }
+
+    document.getElementById("timeframes").addEventListener("click", (event) => {
+      const button = event.target.closest("button[data-minutes]");
+      if (!button) return;
+
+      document.querySelectorAll(".timeframes button").forEach((candidate) => candidate.classList.remove("active"));
+      button.classList.add("active");
+      loadData(Number(button.dataset.minutes));
+    });
+
+    latestButton.addEventListener("click", jumpToLatest);
+
+    insightsToggle.addEventListener("click", () => {
+      const open = insightsPanel.classList.toggle("open");
+      insightsToggle.setAttribute("aria-expanded", String(open));
+      insightsToggle.textContent = open ? "Hide stats" : "Stats & prediction";
+    });
+
+    scrollEl.addEventListener("wheel", (event) => {
+      if (scrollEl.scrollWidth <= scrollEl.clientWidth) return;
+      if (Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return;
+      event.preventDefault();
+      scrollEl.scrollLeft += event.deltaY;
+    }, { passive: false });
+
+    let dragging = false;
+    let dragStartX = 0;
+    let dragStartScrollLeft = 0;
+
+    scrollEl.addEventListener("pointerdown", (event) => {
+      if (event.pointerType === "touch") return;
+      dragging = true;
+      dragStartX = event.clientX;
+      dragStartScrollLeft = scrollEl.scrollLeft;
+      scrollEl.classList.add("dragging");
+      scrollEl.setPointerCapture(event.pointerId);
+    });
+
+    scrollEl.addEventListener("pointermove", (event) => {
+      if (!dragging) return;
+      scrollEl.scrollLeft = dragStartScrollLeft - (event.clientX - dragStartX);
+    });
+
+    function stopDragging(event) {
+      if (!dragging) return;
+      dragging = false;
+      scrollEl.classList.remove("dragging");
+      if (event.pointerId !== undefined && scrollEl.hasPointerCapture(event.pointerId)) {
+        scrollEl.releasePointerCapture(event.pointerId);
+      }
+    }
+
+    scrollEl.addEventListener("pointerup", stopDragging);
+    scrollEl.addEventListener("pointercancel", stopDragging);
+
+    window.addEventListener("resize", () => updateChartSize(currentMinutes));
+
+    if (!item) {
+      statusEl.textContent = "Add ?country=uni&item=Red%20Fox%20Plushie to the URL.";
+    } else {
+      loadData(currentMinutes);
+    }
+  </script>
 </body>
 </html>
