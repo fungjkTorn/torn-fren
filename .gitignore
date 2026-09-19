@@ -3,3 +3,21 @@ venv/
 .git/
 __pycache__/
 *.pyc
+
+# Secrets
+.env
+
+# Runtime databases
+data/*.db
+data/*.db-shm
+data/*.db-wal
+
+# Runtime/generated prediction data
+data/*.log
+data/prediction_v2_profiles.json
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/

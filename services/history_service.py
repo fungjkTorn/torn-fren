@@ -1,56 +1,447 @@
 import sqlite3
 import time
 import statistics
+import threading
 from pathlib import Path
 
 from services.yata_api import get_country_stock
 
 DB_PATH = Path(__file__).parent.parent / "data" / "stock_history.db"
 
+_DB_INIT_LOCK = threading.Lock()
+_DB_READY = False
+
+# Missing successful poll coverage longer than this is a real collection gap.
+GENERIC_COLLECTION_GAP_SECONDS = 180
+
+
 
 def _connect():
+    """
+    Open SQLite with a real busy timeout.
+
+    Torn Fren intentionally has multiple processes touching this DB at once:
+    poller, web server, Discord bot, and offline prediction labs.  A default
+    SQLite connection can fail immediately when one of those processes happens
+    to be committing.  Waiting briefly is safer than treating a normal
+    millisecond-scale writer collision as a fatal error.
+    """
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    return sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, timeout=30.0)
+    conn.execute("PRAGMA busy_timeout = 30000")
+    return conn
 
 
 def init_db():
+    """
+    Initialize schema once per Python process.
+
+    IMPORTANT: this function no longer reconciles collection gaps.  Gap
+    reconciliation is a write operation and used to run from every read helper,
+    which could make an offline analysis collide with the 30-second poller.
+    The poller reconciles gaps after heartbeat writes, and the explicit
+    reconcile_collection_gaps() diagnostic still performs it on demand.
+    """
+    global _DB_READY
+
+    if _DB_READY:
+        return
+
+    with _DB_INIT_LOCK:
+        if _DB_READY:
+            return
+
+        with _connect() as conn:
+            # WAL is persistent for the database and is much friendlier to the
+            # poller + web + Discord + analysis read/write pattern.
+            conn.execute("PRAGMA journal_mode = WAL")
+            conn.execute("PRAGMA synchronous = NORMAL")
+
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS stock_history (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    timestamp INTEGER NOT NULL,
+                    country TEXT NOT NULL,
+                    item_id INTEGER NOT NULL,
+                    item_name TEXT NOT NULL,
+                    quantity INTEGER NOT NULL,
+                    cost INTEGER,
+                    source TEXT NOT NULL
+                )
+            """)
+
+            conn.execute("""
+                CREATE INDEX IF NOT EXISTS idx_country_item_lookup
+                ON stock_history (country, item_name, timestamp)
+            """)
+
+            conn.execute("""
+                CREATE INDEX IF NOT EXISTS idx_country_item_id_lookup
+                ON stock_history (country, item_id, timestamp)
+            """)
+
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS poll_heartbeats (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    timestamp INTEGER NOT NULL,
+                    source TEXT NOT NULL,
+                    success INTEGER NOT NULL DEFAULT 1,
+                    error TEXT,
+                    mode TEXT
+                )
+            """)
+
+            heartbeat_columns = {
+                row[1] for row in conn.execute("PRAGMA table_info(poll_heartbeats)").fetchall()
+            }
+            if "success" not in heartbeat_columns:
+                conn.execute("ALTER TABLE poll_heartbeats ADD COLUMN success INTEGER NOT NULL DEFAULT 1")
+            if "error" not in heartbeat_columns:
+                conn.execute("ALTER TABLE poll_heartbeats ADD COLUMN error TEXT")
+            if "mode" not in heartbeat_columns:
+                conn.execute("ALTER TABLE poll_heartbeats ADD COLUMN mode TEXT")
+
+            conn.execute("""
+                CREATE INDEX IF NOT EXISTS idx_poll_heartbeats_timestamp
+                ON poll_heartbeats (timestamp)
+            """)
+
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS collection_gaps (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    start_timestamp INTEGER NOT NULL,
+                    end_timestamp INTEGER,
+                    reason TEXT NOT NULL,
+                    created_at INTEGER NOT NULL,
+                    closed_at INTEGER,
+                    UNIQUE(start_timestamp, reason)
+                )
+            """)
+
+            conn.execute("""
+                CREATE INDEX IF NOT EXISTS idx_collection_gaps_range
+                ON collection_gaps (start_timestamp, end_timestamp)
+            """)
+
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS prediction_audits (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    created_at INTEGER NOT NULL,
+                    country TEXT NOT NULL,
+                    item_name TEXT NOT NULL,
+                    method TEXT NOT NULL,
+                    model_name TEXT,
+                    model_version TEXT,
+                    anchor_type TEXT,
+                    anchor_timestamp INTEGER NOT NULL,
+                    estimate_timestamp INTEGER NOT NULL,
+                    window_start_timestamp INTEGER NOT NULL,
+                    window_end_timestamp INTEGER NOT NULL,
+                    sample_count INTEGER NOT NULL DEFAULT 0,
+                    excluded_sample_count INTEGER NOT NULL DEFAULT 0,
+                    confidence TEXT,
+                    status TEXT NOT NULL DEFAULT 'pending',
+                    actual_restock_timestamp INTEGER,
+                    signed_error_seconds INTEGER,
+                    absolute_error_seconds INTEGER,
+                    window_hit INTEGER,
+                    outside_window_seconds INTEGER,
+                    data_valid INTEGER,
+                    validation_reason TEXT,
+                    resolved_at INTEGER,
+                    UNIQUE(country, item_name, method, anchor_timestamp)
+                )
+            """)
+
+            audit_columns = {
+                row[1] for row in conn.execute("PRAGMA table_info(prediction_audits)").fetchall()
+            }
+            if "model_name" not in audit_columns:
+                conn.execute("ALTER TABLE prediction_audits ADD COLUMN model_name TEXT")
+            if "model_version" not in audit_columns:
+                conn.execute("ALTER TABLE prediction_audits ADD COLUMN model_version TEXT")
+            if "anchor_type" not in audit_columns:
+                conn.execute("ALTER TABLE prediction_audits ADD COLUMN anchor_type TEXT")
+            if "outside_window_seconds" not in audit_columns:
+                conn.execute("ALTER TABLE prediction_audits ADD COLUMN outside_window_seconds INTEGER")
+
+            conn.execute("""
+                UPDATE prediction_audits
+                SET model_name = COALESCE(model_name, 'baseline_median'),
+                    model_version = COALESCE(model_version, 'v1'),
+                    anchor_type = COALESCE(
+                        anchor_type,
+                        CASE
+                            WHEN method LIKE '%depletion%' THEN 'depletion'
+                            WHEN method LIKE '%restock%' THEN 'restock'
+                            ELSE 'unknown'
+                        END
+                    )
+            """)
+
+            conn.execute("""
+                CREATE INDEX IF NOT EXISTS idx_prediction_audits_pending
+                ON prediction_audits (country, item_name, status, created_at)
+            """)
+
+        _DB_READY = True
+
+def _group_contiguous_timestamps(timestamps, max_break_seconds: int = 300):
+    """Group repeated collector failures into distinct outage incidents."""
+    if not timestamps:
+        return []
+    groups = [[int(timestamps[0])]]
+    for raw_ts in timestamps[1:]:
+        ts = int(raw_ts)
+        if ts - groups[-1][-1] > max_break_seconds:
+            groups.append([ts])
+        else:
+            groups[-1].append(ts)
+    return groups
+
+
+def _reconcile_known_collection_gaps_conn(conn):
+    """
+    Detect the September 2026 changed_items collector failure from its own
+    heartbeat diagnostics and persist it as an explicit collection gap.
+
+    The buggy poller wrote a success heartbeat immediately before save failure,
+    so ordinary success-heartbeat continuity cannot identify this outage.  A
+    clean recovery is the first later successful poll-cycle heartbeat that does
+    NOT have a changed_items failure at the same time.
+    """
+    failure_rows = conn.execute(
+        """
+        SELECT timestamp
+        FROM poll_heartbeats
+        WHERE mode = 'poll-cycle'
+          AND success = 0
+          AND error LIKE '%changed_items%not defined%'
+        ORDER BY timestamp ASC
+        """
+    ).fetchall()
+    failure_timestamps = [int(row[0]) for row in failure_rows]
+    if not failure_timestamps:
+        return
+
+    now = int(time.time())
+    reason = "changed_items NameError prevented stock_history commits"
+
+    for group in _group_contiguous_timestamps(failure_timestamps):
+        start_ts = group[0]
+        last_failure_ts = group[-1]
+
+        # Find the first successful heartbeat after the failure run that is not
+        # paired with the same changed_items exception.  New poller versions only
+        # write success after save_all_snapshots() commits, so this timestamp is
+        # the first trustworthy recovery observation.
+        recovery = conn.execute(
+            """
+            SELECT h.timestamp
+            FROM poll_heartbeats h
+            WHERE h.mode = 'poll-cycle'
+              AND h.success = 1
+              AND h.timestamp > ?
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM poll_heartbeats e
+                  WHERE e.mode = 'poll-cycle'
+                    AND e.success = 0
+                    AND e.error LIKE '%changed_items%not defined%'
+                    AND ABS(e.timestamp - h.timestamp) <= 2
+              )
+            ORDER BY h.timestamp ASC
+            LIMIT 1
+            """,
+            (last_failure_ts,),
+        ).fetchone()
+        end_ts = int(recovery[0]) if recovery else None
+
+        conn.execute(
+            """
+            INSERT OR IGNORE INTO collection_gaps
+                (start_timestamp, end_timestamp, reason, created_at, closed_at)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (start_ts, end_ts, reason, now, now if end_ts is not None else None),
+        )
+
+        if end_ts is not None:
+            conn.execute(
+                """
+                UPDATE collection_gaps
+                SET end_timestamp = COALESCE(end_timestamp, ?),
+                    closed_at = COALESCE(closed_at, ?)
+                WHERE start_timestamp = ? AND reason = ?
+                """,
+                (end_ts, now, start_ts, reason),
+            )
+
+
+
+def _reconcile_heartbeat_collection_gaps_conn(conn):
+    """
+    Persist generic collector outages from successful poll heartbeat continuity.
+
+    This covers PC sleep, process crashes, VM/server restarts, internet loss,
+    provider downtime, and any other period where Torn Fren could not verify
+    foreign stock.  The first recovery snapshot is intentionally inside the
+    gap because it reveals the current state, not when transitions occurred.
+    """
+    rows = conn.execute(
+        """
+        SELECT timestamp
+        FROM poll_heartbeats
+        WHERE mode = 'poll-cycle'
+          AND success = 1
+        ORDER BY timestamp ASC
+        """
+    ).fetchall()
+
+    timestamps = [int(row[0]) for row in rows]
+    if len(timestamps) < 2:
+        return
+
+    now = int(time.time())
+    for previous_ts, recovery_ts in zip(timestamps, timestamps[1:]):
+        elapsed = recovery_ts - previous_ts
+        if elapsed <= GENERIC_COLLECTION_GAP_SECONDS:
+            continue
+
+        reason = (
+            f"collector heartbeat gap ({elapsed}s without verified successful polling)"
+        )
+        conn.execute(
+            """
+            INSERT OR IGNORE INTO collection_gaps
+                (start_timestamp, end_timestamp, reason, created_at, closed_at)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (previous_ts, recovery_ts, reason, now, now),
+        )
+
+
+def get_collector_recovery_status(now_timestamp=None):
+    """
+    Return whether the collector is currently stale enough that startup
+    prediction/audit seeding should be suppressed until a clean poll recovers.
+
+    This is read-only. The actual gap is persisted when the next successful
+    heartbeat is recorded.
+    """
+    init_db()
+    now = int(now_timestamp or time.time())
     with _connect() as conn:
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS stock_history (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                timestamp INTEGER NOT NULL,
-                country TEXT NOT NULL,
-                item_id INTEGER NOT NULL,
-                item_name TEXT NOT NULL,
-                quantity INTEGER NOT NULL,
-                cost INTEGER,
-                source TEXT NOT NULL
-            )
-        """)
+        row = conn.execute(
+            """
+            SELECT timestamp
+            FROM poll_heartbeats
+            WHERE mode = 'poll-cycle'
+              AND success = 1
+            ORDER BY timestamp DESC
+            LIMIT 1
+            """
+        ).fetchone()
 
-        conn.execute("""
-            CREATE INDEX IF NOT EXISTS idx_country_item_lookup
-            ON stock_history (country, item_name, timestamp)
-        """)
+    if row is None:
+        return {
+            "stale": False,
+            "last_success_timestamp": None,
+            "age_seconds": None,
+            "threshold_seconds": GENERIC_COLLECTION_GAP_SECONDS,
+        }
 
-        conn.execute("""
-            CREATE INDEX IF NOT EXISTS idx_country_item_id_lookup
-            ON stock_history (country, item_id, timestamp)
-        """)
+    last_success = int(row[0])
+    age = max(0, now - last_success)
+    return {
+        "stale": age > GENERIC_COLLECTION_GAP_SECONDS,
+        "last_success_timestamp": last_success,
+        "age_seconds": age,
+        "threshold_seconds": GENERIC_COLLECTION_GAP_SECONDS,
+    }
 
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS poll_heartbeats (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                timestamp INTEGER NOT NULL,
-                source TEXT NOT NULL
-            )
-        """)
+def reconcile_collection_gaps():
+    """Public helper used by diagnostics/tests; safe to call repeatedly."""
+    init_db()
+    with _connect() as conn:
+        _reconcile_known_collection_gaps_conn(conn)
+        _reconcile_heartbeat_collection_gaps_conn(conn)
 
-        conn.execute("""
-            CREATE INDEX IF NOT EXISTS idx_poll_heartbeats_timestamp
-            ON poll_heartbeats (timestamp)
-        """)
 
+def get_collection_gaps():
+    """Return known bad collector intervals, oldest first."""
+    init_db()
+    with _connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT start_timestamp, end_timestamp, reason
+            FROM collection_gaps
+            ORDER BY start_timestamp ASC
+            """
+        ).fetchall()
+    return [
+        {"start_timestamp": row[0], "end_timestamp": row[1], "reason": row[2]}
+        for row in rows
+    ]
+
+
+def _collection_gap_overlap(start_timestamp: int, end_timestamp: int):
+    """
+    Return a known bad collector interval overlapping [start, end].
+
+    Boundaries are inclusive on purpose.  The first recovery snapshot tells us
+    the current state, but not when a restock/depletion happened during the
+    outage, so transitions stamped at the recovery timestamp are not valid
+    training ground truth either.
+    """
+    init_db()
+    now = int(time.time())
+    with _connect() as conn:
+        row = conn.execute(
+            """
+            SELECT start_timestamp, end_timestamp, reason
+            FROM collection_gaps
+            WHERE start_timestamp <= ?
+              AND COALESCE(end_timestamp, ?) >= ?
+            ORDER BY start_timestamp ASC
+            LIMIT 1
+            """,
+            (int(end_timestamp), now, int(start_timestamp)),
+        ).fetchone()
+    if row is None:
+        return None
+    return {
+        "start_timestamp": int(row[0]),
+        "end_timestamp": int(row[1]) if row[1] is not None else None,
+        "reason": row[2],
+    }
+
+
+
+def _prediction_anchor_is_currently_trustworthy(anchor_timestamp: int, now_timestamp: int):
+    """
+    A live prediction anchor must have uninterrupted trustworthy collection
+    from the anchor through "now".  Historical samples can remain valid while
+    the CURRENT anchor is stale because a later collection outage occurred.
+
+    This is intentionally stricter than validating the historical cycle itself.
+    Example: if an item depleted at 2:58 PM, collection failed from 3:16-9:09 PM,
+    and the item is still observed at zero after recovery, we do NOT know whether
+    one or more restock/depletion cycles happened inside the outage.  The 2:58 PM
+    depletion therefore cannot be used as today's live countdown anchor.
+    """
+    if anchor_timestamp is None:
+        return False, "missing anchor"
+
+    overlap = _collection_gap_overlap(int(anchor_timestamp), int(now_timestamp))
+    if overlap:
+        return False, (
+            "current prediction anchor crosses a known collection outage "
+            f"({_format_datetime(overlap['start_timestamp'])} -> "
+            f"{_format_datetime(overlap['end_timestamp'])})"
+        )
+
+    return True, None
 
 def get_known_items(country: str):
     """
@@ -109,6 +500,7 @@ def save_snapshot(country: str):
 
     inserted = 0
     skipped = 0
+    changed_items = []
 
     with _connect() as conn:
         for item in stock:
@@ -151,6 +543,7 @@ def save_snapshot_from_export(country: str, country_data: dict, source: str):
 
     inserted = 0
     skipped = 0
+    changed_items = []
 
     with _connect() as conn:
         for item in stock:
@@ -175,8 +568,72 @@ def save_snapshot_from_export(country: str, country_data: dict, source: str):
             )
 
             inserted += 1
+            changed_items.append(item_name)
 
     print(f"{country}: inserted {inserted}, skipped {skipped} unchanged")
+    return changed_items
+
+
+def record_poll_heartbeat(success: bool, source: str = "none", error: str = None):
+    """
+    Record one row for every poll attempt.
+
+    A successful heartbeat means the provider fetch AND database save completed.
+    On success, detect whether this poll is recovering from a >3 minute period
+    without verified collection.  The recovery snapshot is included in the
+    collection gap so it may update current state without being treated as exact
+    event timing or model ground truth.
+
+    Returns metadata so poller.py can suppress downstream audit/model work on
+    the recovery burst.
+    """
+    init_db()
+    now = int(time.time())
+
+    with _connect() as conn:
+        previous_success = conn.execute(
+            """
+            SELECT timestamp
+            FROM poll_heartbeats
+            WHERE mode = 'poll-cycle'
+              AND success = 1
+            ORDER BY timestamp DESC
+            LIMIT 1
+            """
+        ).fetchone()
+        previous_success_ts = int(previous_success[0]) if previous_success else None
+
+        conn.execute(
+            """
+            INSERT INTO poll_heartbeats (timestamp, source, success, error, mode)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (now, source or "none", 1 if success else 0, error, "poll-cycle"),
+        )
+
+        _reconcile_known_collection_gaps_conn(conn)
+        _reconcile_heartbeat_collection_gaps_conn(conn)
+
+    elapsed = (
+        now - previous_success_ts
+        if success and previous_success_ts is not None
+        else None
+    )
+    recovered_from_gap = bool(
+        success
+        and elapsed is not None
+        and elapsed > GENERIC_COLLECTION_GAP_SECONDS
+    )
+
+    return {
+        "timestamp": now,
+        "success": bool(success),
+        "previous_success_timestamp": previous_success_ts,
+        "elapsed_since_success_seconds": elapsed,
+        "recovered_from_gap": recovered_from_gap,
+        "gap_start_timestamp": previous_success_ts if recovered_from_gap else None,
+        "gap_end_timestamp": now if recovered_from_gap else None,
+    }
 
 
 def save_all_snapshots(export: dict):
@@ -184,95 +641,138 @@ def save_all_snapshots(export: dict):
     Save every country in one export object — one API call feeds every
     country's row inserts, instead of calling the API once per country.
 
-    A heartbeat row is also written once per successful export cycle.
-    This gives the prediction engine a reliable way to know whether we
-    were actually collecting data continuously.
+    Heartbeats are recorded by poller.py for every attempt, including failures.
     """
     init_db()
 
     source = export.get("source", "unknown")
     stocks = export.get("stocks", {})
-    heartbeat_timestamp = int(time.time())
 
-    with _connect() as conn:
-        last_heartbeat = conn.execute(
-            """
-            SELECT MAX(timestamp)
-            FROM poll_heartbeats
-            """
-        ).fetchone()[0]
-
-        # We only need heartbeat resolution fine enough to detect multi-hour gaps.
-        # Recording at most once every 5 minutes avoids unnecessary DB growth.
-        if last_heartbeat is None or heartbeat_timestamp - last_heartbeat >= 300:
-            conn.execute(
-                """
-                INSERT INTO poll_heartbeats (timestamp, source)
-                VALUES (?, ?)
-                """,
-                (heartbeat_timestamp, source),
-            )
-
+    changed_by_country = {}
     for country, country_data in stocks.items():
-        save_snapshot_from_export(country, country_data, source)
+        changed = save_snapshot_from_export(country, country_data, source)
+        if changed:
+            changed_by_country[country] = changed
+
+    return changed_by_country
+
+
+def _get_all_item_rows_with_source(country: str, item_name: str):
+    init_db()
+    with _connect() as conn:
+        return conn.execute(
+            """
+            SELECT timestamp, quantity, source
+            FROM stock_history
+            WHERE country = ? AND LOWER(item_name) = LOWER(?)
+            ORDER BY timestamp ASC
+            """,
+            (country, item_name),
+        ).fetchall()
+
+
+def _suppress_provider_bounces(rows, max_bounce_seconds: int = 180):
+    """
+    Remove obvious one-poll provider disagreement from analysis/display without
+    deleting anything from SQLite.
+
+    Example seen in Japan Xanax:
+      16:20:31 2386 prometheus
+      16:21:02    0 yata       <- stale zero
+      16:21:34 2062 yata
+
+    The middle zero is suppressed because positive stock exists immediately on
+    both sides and the source switched.  The inverse (a one-poll positive spike
+    between zeros) is handled as well.
+    """
+    if len(rows) < 3:
+        return list(rows), []
+
+    suppressed = set()
+    anomalies = []
+
+    for i in range(1, len(rows) - 1):
+        prev_ts, prev_qty, prev_source = rows[i - 1]
+        ts, qty, source = rows[i]
+        next_ts, next_qty, next_source = rows[i + 1]
+
+        prev_gap = ts - prev_ts
+        next_gap = next_ts - ts
+        if prev_gap > max_bounce_seconds or next_gap > max_bounce_seconds:
+            continue
+
+        source_disagreement = source != prev_source or source != next_source
+        if not source_disagreement:
+            continue
+
+        # One stale zero inside a live batch.
+        if qty == 0 and prev_qty > 0 and next_qty > 0:
+            suppressed.add(i)
+            anomalies.append({
+                "type": "provider_zero_bounce",
+                "timestamp": ts,
+                "quantity": qty,
+                "source": source,
+                "previous_source": prev_source,
+                "next_source": next_source,
+            })
+
+        # One stale positive reading while both surrounding observations are zero.
+        elif qty > 0 and prev_qty == 0 and next_qty == 0:
+            suppressed.add(i)
+            anomalies.append({
+                "type": "provider_positive_bounce",
+                "timestamp": ts,
+                "quantity": qty,
+                "source": source,
+                "previous_source": prev_source,
+                "next_source": next_source,
+            })
+
+    cleaned = [row for i, row in enumerate(rows) if i not in suppressed]
+    return cleaned, anomalies
 
 
 def get_item_history_since(country: str, item_name: str, hours: float = 24):
     """
-    Return stock history for one item over the requested window, oldest -> newest.
+    Return cleaned stock history for graphing, oldest -> newest.
 
-    stock_history only stores quantity changes. The latest row before the cutoff is
-    therefore inserted as an anchor at the exact left edge of the requested range.
-    That lets the chart hold the prior quantity until the next real change.
+    Raw rows stay untouched in SQLite. Obvious one-poll cross-provider bounces are
+    suppressed only in the returned view so a stale provider reading cannot draw
+    a fake double restock/depletion on the chart.
     """
     init_db()
-
     hours = max(float(hours), 1 / 60)
     now = int(time.time())
     cutoff = now - int(hours * 3600)
 
-    with _connect() as conn:
-        previous = conn.execute(
-            """
-            SELECT timestamp, quantity, cost
-            FROM stock_history
-            WHERE country = ?
-              AND LOWER(item_name) = LOWER(?)
-              AND timestamp < ?
-            ORDER BY timestamp DESC
-            LIMIT 1
-            """,
-            (country, item_name, cutoff),
-        ).fetchone()
+    all_rows = _get_all_item_rows_with_source(country, item_name)
+    cleaned_rows, _ = _suppress_provider_bounces(all_rows)
 
-        rows = conn.execute(
-            """
-            SELECT timestamp, quantity, cost
-            FROM stock_history
-            WHERE country = ?
-              AND LOWER(item_name) = LOWER(?)
-              AND timestamp >= ?
-              AND timestamp <= ?
-            ORDER BY timestamp ASC
-            """,
-            (country, item_name, cutoff, now),
-        ).fetchall()
+    previous = None
+    visible = []
+    for ts, qty, source in cleaned_rows:
+        if ts < cutoff:
+            previous = (ts, qty, source)
+        elif ts <= now:
+            visible.append((ts, qty, source))
 
     result = []
-
     if previous is not None:
         result.append({
             "timestamp": cutoff,
             "quantity": previous[1],
-            "cost": previous[2],
+            "cost": None,
+            "source": previous[2],
             "anchor": True,
         })
 
-    for row in rows:
+    for ts, qty, source in visible:
         result.append({
-            "timestamp": row[0],
-            "quantity": row[1],
-            "cost": row[2],
+            "timestamp": ts,
+            "quantity": qty,
+            "cost": None,
+            "source": source,
             "anchor": False,
         })
 
@@ -465,59 +965,133 @@ def _format_datetime(timestamp):
     return time.strftime("%m/%d/%Y %I:%M:%S %p", time.localtime(timestamp))
 
 
-def _get_observation_timestamps(start_timestamp: int, end_timestamp: int):
-    """
-    Return timestamps that prove the collector was alive during an interval.
-
-    New data uses poll_heartbeats, which are written once per successful poll.
-    Historical data collected before heartbeat support falls back to timestamps
-    from stock_history across all countries/items. That historical fallback is
-    intentionally conservative and should be treated as a best-effort estimate.
-    """
+def _get_poll_cycle_start_timestamp():
     init_db()
-
-    if end_timestamp <= start_timestamp:
-        return [start_timestamp, end_timestamp]
-
     with _connect() as conn:
-        heartbeat_rows = conn.execute(
+        row = conn.execute(
+            """
+            SELECT MIN(timestamp)
+            FROM poll_heartbeats
+            WHERE mode = 'poll-cycle'
+            """
+        ).fetchone()
+    return row[0] if row else None
+
+
+def _get_successful_poll_timestamps(start_timestamp: int, end_timestamp: int):
+    init_db()
+    with _connect() as conn:
+        rows = conn.execute(
             """
             SELECT timestamp
             FROM poll_heartbeats
+            WHERE mode = 'poll-cycle'
+              AND success = 1
+              AND timestamp BETWEEN ? AND ?
+            ORDER BY timestamp ASC
+            """,
+            (start_timestamp, end_timestamp),
+        ).fetchall()
+    return [row[0] for row in rows]
+
+
+def _historical_observation_timestamps(start_timestamp: int, end_timestamp: int):
+    """Best-effort fallback for periods before per-poll heartbeat support."""
+    init_db()
+    with _connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT DISTINCT timestamp
+            FROM stock_history
             WHERE timestamp BETWEEN ? AND ?
             ORDER BY timestamp ASC
             """,
             (start_timestamp, end_timestamp),
         ).fetchall()
+    return [row[0] for row in rows]
 
-        if heartbeat_rows:
-            timestamps = [row[0] for row in heartbeat_rows]
-        else:
-            # Historical fallback for data collected before heartbeat support.
-            history_rows = conn.execute(
-                """
-                SELECT DISTINCT timestamp
-                FROM stock_history
-                WHERE timestamp BETWEEN ? AND ?
-                ORDER BY timestamp ASC
-                """,
-                (start_timestamp, end_timestamp),
-            ).fetchall()
-            timestamps = [row[0] for row in history_rows]
 
-    return [start_timestamp, *timestamps, end_timestamp]
+def _max_gap_from_timestamps(start_timestamp, end_timestamp, timestamps):
+    points = [start_timestamp, *timestamps, end_timestamp]
+    points = sorted(set(points))
+    if len(points) < 2:
+        return max(0, end_timestamp - start_timestamp)
+    return max(points[i] - points[i - 1] for i in range(1, len(points)))
+
+
+def _collection_coverage(start_timestamp: int, end_timestamp: int):
+    """
+    Evaluate whether the collector was continuously observing an interval.
+
+    After poll-cycle heartbeats begin, continuity is based on successful poll
+    heartbeats, with a 3-minute tolerance around the expected 30-second cadence.
+    Older history falls back to the prior conservative stock-activity heuristic
+    and uses the old 3-hour tolerance because exact collector uptime is unknowable.
+    """
+    if end_timestamp <= start_timestamp:
+        return {
+            "valid": True,
+            "max_gap_seconds": 0,
+            "allowed_gap_seconds": 180,
+            "method": "poll-heartbeat",
+        }
+
+    known_gap = _collection_gap_overlap(start_timestamp, end_timestamp)
+    if known_gap is not None:
+        gap_end = known_gap["end_timestamp"] or int(time.time())
+        overlap_start = max(int(start_timestamp), known_gap["start_timestamp"])
+        overlap_end = min(int(end_timestamp), gap_end)
+        return {
+            "valid": False,
+            "max_gap_seconds": max(0, overlap_end - overlap_start),
+            "allowed_gap_seconds": 0,
+            "method": "known-collection-gap",
+            "reason": known_gap["reason"],
+            "gap_start_timestamp": known_gap["start_timestamp"],
+            "gap_end_timestamp": known_gap["end_timestamp"],
+        }
+
+    poll_cycle_start = _get_poll_cycle_start_timestamp()
+
+    # Entire interval predates reliable per-poll heartbeats.
+    if poll_cycle_start is None or end_timestamp < poll_cycle_start:
+        timestamps = _historical_observation_timestamps(start_timestamp, end_timestamp)
+        gap = _max_gap_from_timestamps(start_timestamp, end_timestamp, timestamps)
+        return {
+            "valid": gap <= 3 * 60 * 60,
+            "max_gap_seconds": gap,
+            "allowed_gap_seconds": 3 * 60 * 60,
+            "method": "historical-fallback",
+        }
+
+    # Interval is fully covered by modern heartbeat data.
+    if start_timestamp >= poll_cycle_start:
+        timestamps = _get_successful_poll_timestamps(start_timestamp, end_timestamp)
+        gap = _max_gap_from_timestamps(start_timestamp, end_timestamp, timestamps)
+        return {
+            "valid": gap <= 180,
+            "max_gap_seconds": gap,
+            "allowed_gap_seconds": 180,
+            "method": "poll-heartbeat",
+        }
+
+    # Interval crosses the migration boundary: validate each side by its own rule.
+    old_timestamps = _historical_observation_timestamps(start_timestamp, poll_cycle_start)
+    old_gap = _max_gap_from_timestamps(start_timestamp, poll_cycle_start, old_timestamps)
+    new_timestamps = _get_successful_poll_timestamps(poll_cycle_start, end_timestamp)
+    new_gap = _max_gap_from_timestamps(poll_cycle_start, end_timestamp, new_timestamps)
+    return {
+        "valid": old_gap <= 3 * 60 * 60 and new_gap <= 180,
+        "max_gap_seconds": max(old_gap, new_gap),
+        "allowed_gap_seconds": None,
+        "method": "mixed-heartbeat/fallback",
+        "historical_max_gap_seconds": old_gap,
+        "heartbeat_max_gap_seconds": new_gap,
+    }
 
 
 def _max_collection_gap_seconds(start_timestamp: int, end_timestamp: int):
-    timestamps = _get_observation_timestamps(start_timestamp, end_timestamp)
-    if len(timestamps) < 2:
-        return max(0, end_timestamp - start_timestamp)
-
-    return max(
-        timestamps[i] - timestamps[i - 1]
-        for i in range(1, len(timestamps))
-    )
-
+    return _collection_coverage(start_timestamp, end_timestamp)["max_gap_seconds"]
 
 def _leave_one_out_mean(values, index):
     others = [value for i, value in enumerate(values) if i != index]
@@ -526,21 +1100,16 @@ def _leave_one_out_mean(values, index):
     return statistics.mean(others)
 
 
-def _build_validated_cycles(rows, max_collection_gap_seconds=3 * 60 * 60):
+def _build_validated_cycles(rows):
     """
     Convert raw stock changes into restock cycles and qualify each cycle for use
     in prediction statistics.
 
-    A completed cycle is excluded when:
-      1. the collector has an observation gap greater than 3 hours anywhere
-         between restock and depletion, or
-      2. its observed peak is less than 10% of the leave-one-out average peak
-         quantity for the other completed cycles.
+    A completed cycle is excluded when collector heartbeat coverage shows a
+    genuine collection outage, or when its observed peak is a tiny anomaly.
 
-    Zero->restock wait samples are validated separately because they span the gap
-    between two cycles. They are excluded if the collector was down for >3 hours
-    during the wait, if the previous depletion was unreliable, or if the incoming
-    restock is a tiny/anomalous cycle.
+    Long refill/zero periods are valid. Duration itself is never an exclusion
+    reason; only missing collector coverage is.
     """
     cycles = []
     current = None
@@ -608,15 +1177,18 @@ def _build_validated_cycles(rows, max_collection_gap_seconds=3 * 60 * 60):
         if not cycle.get("complete"):
             continue
 
-        gap = _max_collection_gap_seconds(
+        coverage = _collection_coverage(
             cycle["restock_time"],
             cycle["depletion_time"],
         )
-        cycle["max_collection_gap_seconds"] = gap
+        cycle["max_collection_gap_seconds"] = coverage["max_gap_seconds"]
+        cycle["coverage_method"] = coverage["method"]
 
-        if gap > max_collection_gap_seconds:
+        if not coverage["valid"]:
+            detail = coverage.get("reason") or f"failed {coverage['method']} continuity"
             cycle["exclusion_reasons"].append(
-                f"collector gap {_format_duration(gap)} exceeded 3h"
+                f"collector coverage invalid ({detail}); "
+                f"overlap/gap {_format_duration(coverage['max_gap_seconds'])}"
             )
 
         cycle["valid_lifetime"] = not cycle["exclusion_reasons"]
@@ -636,10 +1208,11 @@ def _build_validated_cycles(rows, max_collection_gap_seconds=3 * 60 * 60):
         current_cycle = normal_cycles[i]
 
         wait_seconds = current_cycle["restock_time"] - previous["depletion_time"]
-        gap = _max_collection_gap_seconds(
+        coverage = _collection_coverage(
             previous["depletion_time"],
             current_cycle["restock_time"],
         )
+        gap = coverage["max_gap_seconds"]
 
         # Count any tiny cycles that occurred between these two normal boundaries.
         bridged_tiny_count = sum(
@@ -650,8 +1223,10 @@ def _build_validated_cycles(rows, max_collection_gap_seconds=3 * 60 * 60):
         )
 
         reasons = []
-        if gap > max_collection_gap_seconds:
-            reasons.append(f"collector gap {_format_duration(gap)} exceeded 3h")
+        if not coverage["valid"]:
+            reasons.append(
+                f"collector coverage gap {_format_duration(gap)} failed {coverage['method']} continuity"
+            )
 
         # The outgoing depletion must itself be trustworthy. A later collection
         # gap inside the incoming cycle does not invalidate the restock timestamp.
@@ -663,6 +1238,7 @@ def _build_validated_cycles(rows, max_collection_gap_seconds=3 * 60 * 60):
             "to_restock": current_cycle["restock_time"],
             "seconds": wait_seconds,
             "max_collection_gap_seconds": gap,
+            "coverage_method": coverage["method"],
             "bridged_tiny_restock_count": bridged_tiny_count,
             "valid": not reasons,
             "exclusion_reasons": reasons,
@@ -677,7 +1253,9 @@ def get_stock_graph_analysis(country: str, item_name: str, window_hours: float =
     samples. Raw graph events are never deleted; validation only controls which
     cycles are allowed to influence averages, medians, confidence, and prediction.
     """
-    rows = get_all_item_rows(country, item_name)
+    raw_rows_with_source = _get_all_item_rows_with_source(country, item_name)
+    cleaned_rows_with_source, provider_bounces = _suppress_provider_bounces(raw_rows_with_source)
+    rows = [(ts, qty) for ts, qty, _source in cleaned_rows_with_source]
     if not rows:
         return None
 
@@ -740,13 +1318,16 @@ def get_stock_graph_analysis(country: str, item_name: str, window_hours: float =
     for i in range(1, len(normal_completed_cycles)):
         previous = normal_completed_cycles[i - 1]
         current_cycle = normal_completed_cycles[i]
-        gap = _max_collection_gap_seconds(
+        coverage = _collection_coverage(
             previous["restock_time"],
             current_cycle["restock_time"],
         )
+        gap = coverage["max_gap_seconds"]
         reasons = []
-        if gap > 3 * 60 * 60:
-            reasons.append(f"collector gap {_format_duration(gap)} exceeded 3h")
+        if not coverage["valid"]:
+            reasons.append(
+                f"collector coverage gap {_format_duration(gap)} failed {coverage['method']} continuity"
+            )
 
         bridged_tiny_count = sum(
             1
@@ -760,6 +1341,7 @@ def get_stock_graph_analysis(country: str, item_name: str, window_hours: float =
             "to_restock": current_cycle["restock_time"],
             "seconds": current_cycle["restock_time"] - previous["restock_time"],
             "max_collection_gap_seconds": gap,
+            "coverage_method": coverage["method"],
             "bridged_tiny_restock_count": bridged_tiny_count,
             "valid": not reasons,
             "exclusion_reasons": reasons,
@@ -805,6 +1387,10 @@ def get_stock_graph_analysis(country: str, item_name: str, window_hours: float =
 
     prediction = {
         "method": None,
+        "model_name": "baseline_median",
+        "model_version": "v1",
+        "anchor_type": None,
+        "anchor_timestamp": None,
         "estimate_timestamp": None,
         "window_start_timestamp": None,
         "window_end_timestamp": None,
@@ -824,21 +1410,49 @@ def get_stock_graph_analysis(country: str, item_name: str, window_hours: float =
         anchor = last_depletion
         typical = median_zero_wait
         prediction["method"] = "validated depletion-anchored median"
+        prediction["anchor_type"] = "depletion"
         prediction["excluded_sample_count"] = len(wait_samples) - len(valid_zero_waits)
         prediction["note"] = (
-            "Uses only qualified depletion→restock waits. Cycles with >3h collection gaps "
-            "or tiny restocks are excluded from the baseline."
+            "Uses qualified depletion→restock waits. Long refill periods are allowed; "
+            "only heartbeat-proven collection outages or tiny anomalous restocks are excluded."
         )
     elif current_stock > 0 and last_restock is not None and valid_restock_intervals:
         samples = valid_restock_intervals
         anchor = last_restock
         typical = median_restock_interval
         prediction["method"] = "validated restock-interval median"
+        prediction["anchor_type"] = "restock"
         prediction["excluded_sample_count"] = len(restock_interval_samples) - len(valid_restock_intervals)
         prediction["note"] = (
             "Item is still in stock, so the baseline uses intervals between qualified restocks. "
             "It will switch to depletion-anchored timing after sellout."
         )
+
+    # Historical samples may be perfectly valid while the CURRENT live anchor is
+    # no longer trustworthy because a known collection outage happened after it.
+    # Never display a stale countdown/leave-by time in that situation.
+    if samples and anchor is not None and typical is not None:
+        anchor_valid, anchor_reason = _prediction_anchor_is_currently_trustworthy(anchor, now)
+        if not anchor_valid:
+            prediction.update({
+                "method": "waiting for clean post-outage anchor",
+                "anchor_type": prediction.get("anchor_type"),
+                "anchor_timestamp": None,
+                "estimate_timestamp": None,
+                "window_start_timestamp": None,
+                "window_end_timestamp": None,
+                "second_estimate_timestamp": None,
+                "sample_count": len(samples),
+                "confidence": "unavailable",
+                "note": (
+                    "Historical timing samples are still usable, but the latest live "
+                    f"anchor is not trustworthy: {anchor_reason}. Wait for the next "
+                    "clean restock/depletion event before using a departure countdown."
+                ),
+            })
+            samples = None
+            anchor = None
+            typical = None
 
     if samples and anchor is not None and typical is not None:
         mad = _median_absolute_deviation(samples) or 0
@@ -846,6 +1460,7 @@ def get_stock_graph_analysis(country: str, item_name: str, window_hours: float =
         estimate = int(anchor + typical)
 
         prediction.update({
+            "anchor_timestamp": int(anchor),
             "estimate_timestamp": estimate,
             "window_start_timestamp": estimate - spread,
             "window_end_timestamp": estimate + spread,
@@ -877,8 +1492,11 @@ def get_stock_graph_analysis(country: str, item_name: str, window_hours: float =
         "bridged_tiny_restock_count": sum(
             sample.get("bridged_tiny_restock_count", 0) for sample in wait_samples
         ),
-        "max_allowed_collection_gap_seconds": 3 * 60 * 60,
+        "heartbeat_gap_tolerance_seconds": 180,
+        "historical_fallback_gap_tolerance_seconds": 3 * 60 * 60,
         "tiny_restock_threshold_fraction": 0.10,
+        "suppressed_provider_bounce_count": len(provider_bounces),
+        "provider_bounces": provider_bounces[-20:],
         "excluded_cycle_details": [
             {
                 "restock_timestamp": cycle["restock_time"],
@@ -901,7 +1519,23 @@ def get_stock_graph_analysis(country: str, item_name: str, window_hours: float =
         ][-10:],
     }
 
+    with _connect() as conn:
+        latest_successful_poll = conn.execute(
+            """
+            SELECT timestamp, source
+            FROM poll_heartbeats
+            WHERE success = 1
+            ORDER BY timestamp DESC
+            LIMIT 1
+            """
+        ).fetchone()
+
+    collector_last_success_timestamp = int(latest_successful_poll[0]) if latest_successful_poll else None
+    collector_last_success_source = latest_successful_poll[1] if latest_successful_poll else None
+
     return {
+        "collector_last_success_timestamp": collector_last_success_timestamp,
+        "collector_last_success_source": collector_last_success_source,
         "current_stock": current_stock,
         "latest_timestamp": latest_timestamp,
         "latest_time_str": _format_datetime(latest_timestamp),
@@ -934,6 +1568,246 @@ def get_stock_graph_analysis(country: str, item_name: str, window_hours: float =
         "events": visible_events,
         "prediction": prediction,
         "diagnostics": diagnostics,
+    }
+
+
+def _normal_completed_cycles_for_audit(country: str, item_name: str):
+    raw = _get_all_item_rows_with_source(country, item_name)
+    cleaned, _ = _suppress_provider_bounces(raw)
+    rows = [(ts, qty) for ts, qty, _source in cleaned]
+    if not rows:
+        return []
+    cycles, _, _ = _build_validated_cycles(rows)
+    return [
+        cycle for cycle in cycles
+        if cycle.get("complete") and not cycle.get("tiny_restock")
+    ]
+
+
+def resolve_prediction_audits(country: str, item_name: str):
+    """
+    Resolve frozen predictions against the next qualified real restock.
+
+    Exact error and window-hit are only considered trustworthy when successful
+    poll-heartbeat coverage is continuous from prediction creation through the
+    actual restock. Long item refill times are allowed; elapsed duration itself
+    is never a reason to reject a result.
+    """
+    init_db()
+    cycles = _normal_completed_cycles_for_audit(country, item_name)
+    if not cycles:
+        return 0
+
+    with _connect() as conn:
+        pending = conn.execute(
+            """
+            SELECT id, created_at, anchor_timestamp, estimate_timestamp,
+                   window_start_timestamp, window_end_timestamp
+            FROM prediction_audits
+            WHERE country = ?
+              AND LOWER(item_name) = LOWER(?)
+              AND status = 'pending'
+            ORDER BY created_at ASC
+            """,
+            (country, item_name),
+        ).fetchall()
+
+        resolved = 0
+        for audit_id, created_at, anchor_timestamp, estimate, window_start, window_end in pending:
+            threshold = max(int(created_at), int(anchor_timestamp))
+            actual_cycle = next(
+                (cycle for cycle in cycles if cycle["restock_time"] > threshold),
+                None,
+            )
+            if actual_cycle is None:
+                continue
+
+            actual = int(actual_cycle["restock_time"])
+            signed_error = actual - int(estimate)
+            absolute_error = abs(signed_error)
+            window_hit = int(int(window_start) <= actual <= int(window_end))
+            outside_window = 0
+            if actual < int(window_start):
+                outside_window = int(window_start) - actual
+            elif actual > int(window_end):
+                outside_window = actual - int(window_end)
+
+            # The prediction depends on its anchor.  Validate from the earlier
+            # of anchor creation and audit creation so a recovery-stamped anchor
+            # cannot be scored as trustworthy merely because the audit row was
+            # written a few seconds after the collector recovered.
+            coverage_start = min(int(created_at), int(anchor_timestamp))
+            coverage = _collection_coverage(coverage_start, actual)
+            data_valid = int(bool(coverage["valid"]))
+            validation_reason = (
+                f"coverage valid via {coverage['method']} (max gap {_format_duration(coverage['max_gap_seconds'])})"
+                if data_valid
+                else f"coverage invalid via {coverage['method']} (max gap {_format_duration(coverage['max_gap_seconds'])})"
+            )
+
+            conn.execute(
+                """
+                UPDATE prediction_audits
+                SET status = 'resolved',
+                    actual_restock_timestamp = ?,
+                    signed_error_seconds = ?,
+                    absolute_error_seconds = ?,
+                    window_hit = ?,
+                    outside_window_seconds = ?,
+                    data_valid = ?,
+                    validation_reason = ?,
+                    resolved_at = ?
+                WHERE id = ?
+                """,
+                (
+                    actual,
+                    signed_error,
+                    absolute_error,
+                    window_hit,
+                    outside_window,
+                    data_valid,
+                    validation_reason,
+                    int(time.time()),
+                    audit_id,
+                ),
+            )
+            resolved += 1
+
+    return resolved
+
+
+def record_prediction_audit(country: str, item_name: str):
+    """Freeze the currently displayed baseline prediction for later scoring."""
+    init_db()
+    analysis = get_stock_graph_analysis(country, item_name, window_hours=24)
+    if not analysis:
+        return False
+
+    prediction = analysis.get("prediction") or {}
+    required = (
+        prediction.get("anchor_timestamp"),
+        prediction.get("estimate_timestamp"),
+        prediction.get("window_start_timestamp"),
+        prediction.get("window_end_timestamp"),
+    )
+    if any(value is None for value in required):
+        return False
+
+    model_name = prediction.get("model_name") or "baseline_median"
+    model_version = prediction.get("model_version") or "v1"
+    anchor_type = prediction.get("anchor_type") or "unknown"
+
+    # Do not freeze a new audit if its anchor crosses a known collection gap.
+    # We can still display the best available prediction to the user, but it is
+    # not suitable as accuracy ground truth.
+    anchor_coverage = _collection_coverage(
+        int(prediction["anchor_timestamp"]),
+        int(time.time()),
+    )
+    if not anchor_coverage["valid"]:
+        return False
+
+    with _connect() as conn:
+        cursor = conn.execute(
+            """
+            INSERT OR IGNORE INTO prediction_audits (
+                created_at, country, item_name, method, model_name, model_version,
+                anchor_type, anchor_timestamp, estimate_timestamp,
+                window_start_timestamp, window_end_timestamp,
+                sample_count, excluded_sample_count, confidence
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                int(time.time()),
+                country,
+                item_name,
+                prediction.get("method") or model_name,
+                model_name,
+                model_version,
+                anchor_type,
+                int(prediction["anchor_timestamp"]),
+                int(prediction["estimate_timestamp"]),
+                int(prediction["window_start_timestamp"]),
+                int(prediction["window_end_timestamp"]),
+                int(prediction.get("sample_count") or 0),
+                int(prediction.get("excluded_sample_count") or 0),
+                prediction.get("confidence"),
+            ),
+        )
+        return cursor.rowcount > 0
+
+
+def update_prediction_audits_for_item(country: str, item_name: str):
+    resolved = resolve_prediction_audits(country, item_name)
+    recorded = record_prediction_audit(country, item_name)
+    return {"resolved": resolved, "recorded": recorded}
+
+
+def seed_prediction_audits():
+    """Seed one current prediction snapshot for known items if the audit table is empty."""
+    init_db()
+    with _connect() as conn:
+        existing = conn.execute("SELECT COUNT(*) FROM prediction_audits").fetchone()[0]
+        if existing:
+            return 0
+        items = conn.execute(
+            """
+            SELECT DISTINCT country, item_name
+            FROM stock_history
+            ORDER BY country, item_name
+            """
+        ).fetchall()
+
+    recorded = 0
+    for country, item_name in items:
+        try:
+            if record_prediction_audit(country, item_name):
+                recorded += 1
+        except Exception as exc:
+            print(f"Prediction audit seed skipped {country}/{item_name}: {exc}")
+    return recorded
+
+
+def get_prediction_accuracy_summary(country: str, item_name: str):
+    init_db()
+    with _connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT absolute_error_seconds, window_hit, outside_window_seconds,
+                   signed_error_seconds
+            FROM prediction_audits
+            WHERE country = ?
+              AND LOWER(item_name) = LOWER(?)
+              AND status = 'resolved'
+              AND data_valid = 1
+            """,
+            (country, item_name),
+        ).fetchall()
+
+    if not rows:
+        return {
+            "resolved_valid_predictions": 0,
+            "median_absolute_error_seconds": None,
+            "mean_absolute_error_seconds": None,
+            "window_hit_rate": None,
+            "median_outside_window_seconds": None,
+            "early_predictions": 0,
+            "late_predictions": 0,
+        }
+
+    errors = [row[0] for row in rows]
+    hits = [row[1] for row in rows]
+    misses = [row[2] for row in rows if not row[1]]
+    signed = [row[3] for row in rows]
+    return {
+        "resolved_valid_predictions": len(rows),
+        "median_absolute_error_seconds": statistics.median(errors),
+        "mean_absolute_error_seconds": statistics.mean(errors),
+        "window_hit_rate": sum(hits) / len(hits),
+        "median_outside_window_seconds": statistics.median(misses) if misses else 0,
+        "early_predictions": sum(1 for value in signed if value < 0),
+        "late_predictions": sum(1 for value in signed if value > 0),
     }
 
 def predict_restock(country: str, item_name: str):

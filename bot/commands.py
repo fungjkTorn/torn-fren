@@ -1,9 +1,11 @@
 from typing import Literal
 
+import asyncio
 import discord
 
 from bot import alerts, config
 from modules import stock, travel
+from modules.prediction_v2_discord import build_prediction_v2_embed
 
 CountryCode = Literal[
     "mex",
@@ -59,11 +61,34 @@ def setup_commands(bot):
         message = stock.format_stock_message(country)
         await interaction.response.send_message(message)
 
-    @bot.tree.command(name="predict", description="Predict the next restock time for an item")
+    @bot.tree.command(
+        name="predict",
+        description="Prediction v2: restock, leave-by, arrival, and travel reliability",
+    )
     @discord.app_commands.autocomplete(item_name=item_name_autocomplete)
-    async def predict_command(interaction: discord.Interaction, country: CountryCode, item_name: str):
-        message = stock.format_restock_message(country, item_name)
-        await interaction.response.send_message(message)
+    async def predict_command(
+        interaction: discord.Interaction,
+        country: CountryCode,
+        item_name: str,
+    ):
+        # A first-time model profile can take several seconds. Defer immediately
+        # so Discord does not time the slash command out, and keep CPU-heavy
+        # walk-forward work off the asyncio gateway loop.
+        await interaction.response.defer(thinking=True)
+
+        try:
+            embed = await asyncio.to_thread(
+                build_prediction_v2_embed,
+                country,
+                item_name,
+            )
+            await interaction.followup.send(embed=embed)
+        except Exception as exc:
+            print(f"/predict failed for {country}/{item_name}: {exc}")
+            await interaction.followup.send(
+                "⚠️ Prediction v2 could not be calculated right now. "
+                "The stock collector can continue running; try `/predict` again shortly."
+            )
 
     @bot.tree.command(name="history", description="Show recent stock history for an item")
     @discord.app_commands.autocomplete(item_name=item_name_autocomplete)
@@ -107,7 +132,7 @@ def setup_commands(bot):
             "• `/help` - List available commands\n\n"
             "**Travel Stock**\n"
             "• `/stock <country>` - Show current abroad stock for a country\n"
-            "• `/predict <country> <item_name>` - Estimate the next restock time\n"
+            "• `/predict <country> <item_name>` - Prediction v2: restock window, leave-by, arrival, reliability, and P2 fallback\n"
             "• `/history <country> <item_name>` - Show recent recorded stock changes\n\n"
         )
 

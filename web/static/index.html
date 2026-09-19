@@ -29,7 +29,7 @@
 
     body {
       margin: 0;
-      padding: 14px;
+      padding: 8px 10px;
       background: var(--bg);
       color: var(--text);
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -44,16 +44,16 @@
 
     #subtitle {
       color: var(--muted);
-      margin-bottom: 12px;
-      font-size: 0.9rem;
+      margin-bottom: 6px;
+      font-size: 0.86rem;
     }
 
     .controls {
       display: flex;
       align-items: center;
       gap: 10px;
-      flex-wrap: wrap;
-      margin-bottom: 12px;
+      flex-wrap: nowrap;
+      margin-bottom: 6px;
     }
 
     .timeframes {
@@ -76,6 +76,48 @@
     button:hover { border-color: #5b5d65; }
     button.active { background: var(--accent); border-color: var(--accent); }
 
+
+    .toolbar-target {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      min-width: 0;
+      margin-left: 4px;
+      padding: 5px 9px;
+      border: 1px solid #353840;
+      border-radius: 7px;
+      background: rgba(255,255,255,0.018);
+      color: var(--muted);
+      font-size: 0.74rem;
+      white-space: nowrap;
+      overflow: hidden;
+    }
+
+    .toolbar-target strong {
+      color: var(--text);
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .toolbar-target .toolbar-pill {
+      flex: 0 0 auto;
+      border-radius: 999px;
+      padding: 2px 7px;
+      font-size: 0.66rem;
+      font-weight: 800;
+      letter-spacing: 0.035em;
+      text-transform: uppercase;
+      border: 1px solid rgba(88, 101, 242, 0.55);
+      color: #c7ccff;
+      background: rgba(88, 101, 242, 0.14);
+    }
+
+    .toolbar-target .toolbar-pill.projected {
+      border-color: rgba(250, 166, 26, 0.55);
+      color: #ffd38a;
+      background: rgba(250, 166, 26, 0.12);
+    }
+
     .right-controls {
       display: flex;
       gap: 8px;
@@ -86,16 +128,31 @@
 
     #insights-panel {
       display: grid;
-      grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr);
+      grid-template-columns: minmax(470px, 1.2fr) minmax(520px, 1.5fr) minmax(300px, 0.9fr);
+      grid-template-areas: "history prediction flight";
       gap: 10px;
-      margin-bottom: 12px;
+      margin-bottom: 8px;
+      align-items: start;
     }
+
+    #history-section {
+      grid-area: history;
+      align-self: stretch;
+      display: flex;
+      flex-direction: column;
+    }
+    #history-section .metrics {
+      margin-top: auto;
+      margin-bottom: auto;
+    }
+    #prediction-section { grid-area: prediction; }
+    #flight-section { grid-area: flight; }
 
     .insight-section {
       background: var(--panel);
       border: 1px solid #303238;
       border-radius: 8px;
-      padding: 10px 12px;
+      padding: 8px 10px;
       min-width: 0;
     }
 
@@ -156,6 +213,204 @@
       line-height: 1.35;
     }
 
+
+    .prediction-header-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+
+    .prediction-header-row .insight-title { margin: 0; }
+
+    .target-badge,
+    .reliability-badge,
+    .evidence-badge {
+      display: inline-flex;
+      align-items: center;
+      border-radius: 999px;
+      padding: 3px 8px;
+      font-size: 0.68rem;
+      font-weight: 800;
+      letter-spacing: 0.035em;
+      text-transform: uppercase;
+      border: 1px solid var(--border);
+      white-space: nowrap;
+    }
+
+    .target-badge {
+      background: rgba(88, 101, 242, 0.16);
+      border-color: rgba(88, 101, 242, 0.55);
+      color: #c7ccff;
+    }
+
+    .target-badge.projected {
+      background: rgba(250, 166, 26, 0.12);
+      border-color: rgba(250, 166, 26, 0.55);
+      color: #ffd38a;
+    }
+
+    .reliability-badge.excellent {
+      background: rgba(59, 165, 93, 0.14);
+      border-color: rgba(59, 165, 93, 0.58);
+      color: #75d895;
+    }
+
+    .reliability-badge.good {
+      background: rgba(88, 101, 242, 0.14);
+      border-color: rgba(88, 101, 242, 0.55);
+      color: #aeb6ff;
+    }
+
+    .reliability-badge.marginal {
+      background: rgba(250, 166, 26, 0.13);
+      border-color: rgba(250, 166, 26, 0.55);
+      color: #ffd38a;
+    }
+
+    .reliability-badge.unreliable,
+    .reliability-badge.insufficient {
+      background: rgba(237, 66, 69, 0.12);
+      border-color: rgba(237, 66, 69, 0.55);
+      color: #ff9b9d;
+    }
+
+    .prediction-primary-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 6px;
+      margin: 6px 0;
+    }
+
+    .prediction-kpi {
+      padding: 6px 8px;
+      border-radius: 7px;
+      border: 1px solid #34363c;
+      background: rgba(255, 255, 255, 0.018);
+      min-width: 0;
+    }
+
+    .prediction-kpi-label {
+      color: var(--subtle);
+      font-size: 0.67rem;
+      margin-bottom: 3px;
+    }
+
+    .prediction-kpi-value {
+      color: var(--text);
+      font-size: 0.84rem;
+      font-weight: 700;
+      overflow-wrap: anywhere;
+    }
+
+    .success-row {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 6px;
+      margin-top: 6px;
+    }
+
+    .success-box {
+      border: 1px solid #34363c;
+      border-radius: 7px;
+      padding: 6px 8px;
+      background: rgba(255,255,255,0.018);
+    }
+
+    .success-label {
+      color: var(--subtle);
+      font-size: 0.67rem;
+      margin-bottom: 2px;
+    }
+
+    .success-value {
+      font-size: 0.9rem;
+      font-weight: 800;
+    }
+
+    .success-help {
+      color: var(--subtle);
+      font-size: 0.66rem;
+      line-height: 1.3;
+      margin-top: 2px;
+    }
+
+    .prediction-detail-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px 10px;
+      color: var(--muted);
+      font-size: 0.72rem;
+      margin-top: 8px;
+    }
+
+    .prediction-callout {
+      margin-top: 6px;
+      padding: 6px 8px;
+      border-radius: 7px;
+      border-left: 3px solid var(--accent);
+      background: rgba(88, 101, 242, 0.07);
+      color: var(--muted);
+      font-size: 0.70rem;
+      line-height: 1.25;
+    }
+
+    .prediction-callout.warning {
+      border-left-color: var(--gold);
+      background: rgba(250, 166, 26, 0.07);
+    }
+
+    .prediction-callout.danger {
+      border-left-color: var(--red);
+      background: rgba(237, 66, 69, 0.07);
+    }
+
+    @media (max-width: 760px) {
+      .prediction-primary-grid { grid-template-columns: 1fr; }
+      .success-row { grid-template-columns: 1fr 1fr; }
+    }
+
+    .flight-card {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      min-height: 100%;
+    }
+
+    .flight-deadline {
+      font-size: 1.25rem;
+      font-weight: 800;
+      line-height: 1.1;
+      margin-bottom: 4px;
+    }
+
+    .flight-countdown {
+      font-size: 1.7rem;
+      font-weight: 800;
+      font-variant-numeric: tabular-nums;
+      line-height: 1.1;
+      margin: 4px 0 8px;
+    }
+
+    .flight-status {
+      color: var(--muted);
+      font-size: 0.83rem;
+      margin-bottom: 6px;
+    }
+
+    .flight-meta {
+      color: var(--subtle);
+      font-size: 0.74rem;
+      line-height: 1.4;
+    }
+
+    .flight-urgent .flight-countdown,
+    .flight-urgent .flight-deadline { color: #faa61a; }
+
+    .flight-missed .flight-countdown,
+    .flight-missed .flight-deadline { color: #ed4245; }
+
     #chart-scroll {
       width: 100%;
       overflow-x: auto;
@@ -180,7 +435,8 @@
 
     #chart-stage {
       position: relative;
-      height: 520px;
+      height: min(520px, calc(100vh - 445px));
+      min-height: 300px;
       min-width: 100%;
     }
 
@@ -221,7 +477,57 @@
     .legend .depletion::before { background: var(--red); }
     .legend .prediction::before { background: var(--accent); }
 
-    @media (max-width: 1050px) {
+
+    .flight-card {
+      padding-top: 8px;
+      padding-bottom: 8px;
+    }
+
+    .flight-card .insight-title { margin-bottom: 5px; }
+    .flight-deadline { margin-top: 2px; }
+    .flight-countdown { margin-top: 2px; margin-bottom: 2px; }
+    .flight-status { line-height: 1.25; }
+    .flight-meta { line-height: 1.25; margin-top: 5px; }
+
+    #prediction-section .prediction-main { margin-top: 0; }
+    #prediction-section .prediction-window { margin-top: 2px; }
+
+
+    @media (min-width: 761px) {
+      html, body { height: 100%; }
+      body { overflow-y: hidden; }
+      .page { height: 100%; }
+      #status, #hint { line-height: 1.1; }
+    }
+
+    @media (max-height: 820px) and (min-width: 761px) {
+      #chart-stage {
+        height: max(270px, calc(100vh - 420px));
+      }
+      .success-help { display: none; }
+      .prediction-callout { font-size: 0.67rem; }
+    }
+
+    @media (max-width: 1300px) {
+      #insights-panel {
+        grid-template-columns: minmax(0, 1.05fr) minmax(380px, 1.2fr);
+        grid-template-areas:
+          "history prediction"
+          "flight flight";
+      }
+
+      .metrics { grid-template-columns: repeat(3, minmax(110px, 1fr)); }
+      .flight-card { min-height: 0; }
+    }
+
+    @media (max-width: 900px) {
+      #insights-panel {
+        grid-template-columns: 1fr;
+        grid-template-areas:
+          "flight"
+          "history"
+          "prediction";
+      }
       .metrics { grid-template-columns: repeat(2, minmax(120px, 1fr)); }
     }
 
@@ -242,13 +548,29 @@
       #insights-toggle { display: inline-flex; }
 
       #insights-panel {
-        display: none;
+        display: grid;
         grid-template-columns: 1fr;
+        grid-template-areas: "flight";
       }
 
-      #insights-panel.open { display: grid; }
+      #history-section,
+      #prediction-section { display: none; }
+
+      #insights-panel.open {
+        grid-template-areas:
+          "flight"
+          "history"
+          "prediction";
+      }
+
+      #insights-panel.open #history-section,
+      #insights-panel.open #prediction-section { display: block; }
+
       .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .flight-countdown { font-size: 1.5rem; }
       #chart-stage { height: 410px; }
+      .toolbar-target { display: none; }
+      body { overflow-y: auto; }
     }
   </style>
 </head>
@@ -259,16 +581,17 @@
 
     <div class="controls">
       <div class="timeframes" id="timeframes">
-        <button data-minutes="5">5m</button>
-        <button data-minutes="15">15m</button>
-        <button data-minutes="30">30m</button>
-        <button data-minutes="60">1h</button>
         <button data-minutes="180">3h</button>
         <button data-minutes="360" class="active">6h</button>
         <button data-minutes="720">12h</button>
         <button data-minutes="1440">24h</button>
         <button data-minutes="4320">72h</button>
         <button data-minutes="10080">7d</button>
+      </div>
+
+      <div class="toolbar-target" id="toolbarTarget" aria-live="polite">
+        <span class="toolbar-pill" id="toolbarTargetPill">No target</span>
+        <strong id="toolbarTargetText">Waiting for Prediction v2</strong>
       </div>
 
       <div class="right-controls">
@@ -278,7 +601,7 @@
     </div>
 
     <section id="insights-panel" aria-live="polite">
-      <div class="insight-section">
+      <div class="insight-section" id="history-section">
         <div class="insight-title">Observed history</div>
         <div class="metrics">
           <div class="metric"><div class="metric-label">Current stock</div><div class="metric-value" id="currentStock">—</div></div>
@@ -291,22 +614,62 @@
           <div class="metric"><div class="metric-label">Median zero → restock</div><div class="metric-value" id="medianZeroWait">—</div></div>
           <div class="metric"><div class="metric-label">Valid cycles</div><div class="metric-value" id="validCycles">—</div></div>
           <div class="metric"><div class="metric-label">Excluded cycles</div><div class="metric-value" id="excludedCycles">—</div></div>
+          <div class="metric"><div class="metric-label">Collector last verified</div><div class="metric-value" id="collectorFreshness">—</div></div>
         </div>
       </div>
 
-      <div class="insight-section">
-        <div class="insight-title">Baseline prediction</div>
+      <div class="insight-section" id="prediction-section">
+        <div class="prediction-header-row">
+          <div class="insight-title">Prediction v2</div>
+        </div>
+
         <div class="prediction-main" id="predictionEstimate">Not enough data</div>
         <div class="prediction-window" id="predictionWindow">—</div>
-        <div class="prediction-meta">
-          <span id="predictionConfidence">Confidence: —</span>
-          <span id="predictionSamples">Samples: —</span>
-          <span id="predictionExcluded">Excluded: —</span>
-          <span id="predictionMethod">Method: —</span>
+
+        <div class="prediction-primary-grid">
+          <div class="prediction-kpi">
+            <div class="prediction-kpi-label">Recommended arrival</div>
+            <div class="prediction-kpi-value" id="predictionArrivalValue">—</div>
+          </div>
+          <div class="prediction-kpi">
+            <div class="prediction-kpi-label">Recommended leave by</div>
+            <div class="prediction-kpi-value" id="predictionLeaveByValue">—</div>
+          </div>
+          <div class="prediction-kpi">
+            <div class="prediction-kpi-label">Travel reliability</div>
+            <div class="prediction-kpi-value"><span class="reliability-badge insufficient" id="predictionReliabilityBadge">—</span></div>
+          </div>
         </div>
-        <div class="prediction-note" id="predictionNote">
-          This is still the baseline model. We will replace it with the item-specific drought/depletion-aware predictor after validating the event data.
+
+        <div class="success-row">
+          <div class="success-box">
+            <div class="success-label">Historical trip success</div>
+            <div class="success-value" id="predictionLifetimeSuccess">—</div>
+            <div class="success-help">All resolved trips</div>
+          </div>
+          <div class="success-box">
+            <div class="success-label">Recent 10 trip success</div>
+            <div class="success-value" id="predictionRecent10Success">—</div>
+            <div class="success-help">Latest 10 resolved trips</div>
+          </div>
         </div>
+
+        <div class="prediction-detail-row">
+          <span id="predictionSamples">Model evidence: —</span>
+          <span id="predictionMethod">Model: —</span>
+        </div>
+
+        <div class="prediction-callout" id="predictionNote">
+          Prediction v2 is waiting for enough clean history.
+        </div>
+      </div>
+
+      <div class="insight-section flight-card" id="flight-section">
+        <div class="insight-title">Fly by · PI + pilot</div>
+        <div class="flight-deadline" id="flightDeadline">Waiting for prediction</div>
+        <div class="flight-countdown" id="flightCountdown">--:--:--</div>
+        <div class="flight-status" id="flightStatus">Flight timing will appear when a prediction is available.</div>
+        <div class="flight-meta" id="flightMeta">—</div>
       </div>
     </section>
 
@@ -320,7 +683,7 @@
       <span class="restock">Restock</span>
       <span class="peak">Observed peak</span>
       <span class="depletion">Depletion</span>
-      <span class="prediction">Prediction window</span>
+      <span class="prediction">Active prediction window</span>
     </div>
 
     <div id="status"></div>
@@ -340,13 +703,55 @@
     const latestButton = document.getElementById("latestButton");
     const insightsToggle = document.getElementById("insights-toggle");
     const insightsPanel = document.getElementById("insights-panel");
+    const flightSection = document.getElementById("flight-section");
+    const flightDeadlineEl = document.getElementById("flightDeadline");
+    const flightCountdownEl = document.getElementById("flightCountdown");
+    const flightStatusEl = document.getElementById("flightStatus");
+    const flightMetaEl = document.getElementById("flightMeta");
+
+    const PI_PILOT_FLIGHT_MINUTES = {
+      mex: 17,
+      cay: 23,
+      can: 27,
+      haw: 89,
+      uni: 106,
+      arg: 111,
+      swi: 116,
+      jap: 149,
+      chi: 160,
+      uae: 180,
+      sou: 197,
+    };
+
+    const COUNTRY_NAMES = {
+      mex: "Mexico", cay: "Cayman Islands", can: "Canada", haw: "Hawaii",
+      uni: "United Kingdom", arg: "Argentina", swi: "Switzerland", jap: "Japan",
+      chi: "China", uae: "UAE", sou: "South Africa"
+    };
 
     titleEl.textContent = item || "No item specified";
     subtitleEl.textContent = "Country: " + country.toUpperCase();
 
     let chart = null;
     let currentMinutes = 360;
+    let currentFetchMinutes = 2880;
     let currentAnalysis = null;
+
+    // The selected timeframe is the amount of time visible per screen.
+    // We deliberately load more history so the user can scroll left without
+    // having to switch to a more compressed timeframe.
+    const HISTORY_LOAD_MINUTES = {
+      180: 1440,   // 3h visible, load 24h
+      360: 2880,   // 6h visible, load 48h
+      720: 4320,   // 12h visible, load 72h
+      1440: 10080, // 24h visible, load 7d
+      4320: 10080, // 72h visible, load 7d
+      10080: 10080 // 7d visible, load 7d
+    };
+
+    function getFetchMinutes(minutes) {
+      return HISTORY_LOAD_MINUTES[minutes] || minutes;
+    }
 
     const predictionOverlayPlugin = {
       id: "predictionOverlay",
@@ -385,6 +790,23 @@
           ctx.moveTo(estimateX, area.top);
           ctx.lineTo(estimateX, area.bottom);
           ctx.stroke();
+
+          ctx.setLineDash([]);
+          ctx.font = "700 11px -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif";
+          ctx.textBaseline = "top";
+          const number = prediction.prediction_number || 1;
+          const label = `P${number}${prediction.projected ? " · projected" : ""}`;
+          const padX = 6;
+          const textWidth = ctx.measureText(label).width;
+          let labelX = estimateX + 6;
+          if (labelX + textWidth + padX * 2 > area.right) {
+            labelX = estimateX - textWidth - padX * 2 - 6;
+          }
+          const labelY = area.top + 7;
+          ctx.fillStyle = "rgba(20, 21, 24, 0.92)";
+          ctx.fillRect(labelX, labelY, textWidth + padX * 2, 20);
+          ctx.fillStyle = prediction.projected ? "#ffd38a" : "#c7ccff";
+          ctx.fillText(label, labelX + padX, labelY + 4);
         }
 
         ctx.restore();
@@ -431,18 +853,32 @@
         }));
     }
 
-    function getStageWidth(minutes) {
+    function getHistoryWidth(minutes, fetchMinutes = getFetchMinutes(minutes)) {
       const viewportWidth = Math.max(scrollEl.clientWidth, 320);
-      const hours = minutes / 60;
 
-      let pixelsPerHour;
-      if (minutes <= 360) pixelsPerHour = 180;
-      else if (minutes <= 720) pixelsPerHour = 145;
-      else if (minutes <= 1440) pixelsPerHour = 120;
-      else if (minutes <= 4320) pixelsPerHour = 70;
-      else pixelsPerHour = 35;
+      // One viewport represents exactly the selected timeframe. Loading more
+      // history adds whole extra viewport-width chunks to the left.
+      const historyScreens = fetchMinutes / minutes;
+      return Math.max(viewportWidth, Math.round(viewportWidth * historyScreens));
+    }
 
-      return Math.max(viewportWidth, Math.round(hours * pixelsPerHour));
+    function getStageWidth(minutes, analysis = currentAnalysis, fetchMinutes = currentFetchMinutes) {
+      const viewportWidth = Math.max(scrollEl.clientWidth, 320);
+      const historyWidth = getHistoryWidth(minutes, fetchMinutes);
+      const predictionEnd = analysis?.prediction?.window_end_timestamp;
+
+      if (!predictionEnd) return historyWidth;
+
+      const futureMilliseconds = Math.max(0, predictionEnd * 1000 - Date.now());
+      if (futureMilliseconds <= 0) return historyWidth;
+
+      // Future time uses the same visual scale: one selected timeframe equals
+      // one viewport width. It is appended to the right rather than stealing
+      // space from historical data.
+      const visibleMilliseconds = minutes * 60 * 1000;
+      const futureWidth = viewportWidth * (futureMilliseconds / visibleMilliseconds);
+
+      return Math.round(historyWidth + futureWidth);
     }
 
     function getTimeScale(minutes) {
@@ -456,20 +892,133 @@
       return { unit: "hour", stepSize: 12, format: "MMM d, h a" };
     }
 
-    function getDisplayBounds(minutes, analysis) {
+    function getDisplayBounds(minutes, analysis, fetchMinutes = currentFetchMinutes) {
       const now = Date.now();
-      const min = now - minutes * 60 * 1000;
-      let max = now;
-
+      const min = now - fetchMinutes * 60 * 1000;
       const predictionEnd = analysis?.prediction?.window_end_timestamp;
-      if (predictionEnd) {
-        const allowanceMinutes = Math.min(minutes * 0.15, 180);
-        const allowanceEnd = now + allowanceMinutes * 60 * 1000;
-        const predictionEndMs = predictionEnd * 1000;
-        if (predictionEndMs <= allowanceEnd) max = Math.max(max, predictionEndMs);
-      }
+      const max = predictionEnd
+        ? Math.max(now, predictionEnd * 1000)
+        : now;
 
       return { min, max };
+    }
+
+    function formatDurationSeconds(totalSeconds) {
+      const seconds = Math.max(0, Math.floor(totalSeconds));
+      const hours = Math.floor(seconds / 3600);
+      const minutes = Math.floor((seconds % 3600) / 60);
+      const secs = seconds % 60;
+      return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
+    }
+
+    function formatFlightMinutes(minutes) {
+      const hours = Math.floor(minutes / 60);
+      const mins = minutes % 60;
+      if (!hours) return `${mins}m`;
+      return `${hours}h ${String(mins).padStart(2, "0")}m`;
+    }
+
+    function updateFlightTicker() {
+      const flightMinutes = PI_PILOT_FLIGHT_MINUTES[country];
+      const prediction = currentAnalysis?.prediction;
+
+      flightSection.classList.remove("flight-urgent", "flight-missed");
+
+      if (!flightMinutes) {
+        flightDeadlineEl.textContent = "No flight time configured";
+        flightCountdownEl.textContent = "--:--:--";
+        flightStatusEl.textContent = `No PI + pilot flight time is configured for ${country.toUpperCase()}.`;
+        flightMetaEl.textContent = "—";
+        return;
+      }
+
+      const countryName = COUNTRY_NAMES[country] || country.toUpperCase();
+      const flightSeconds = flightMinutes * 60;
+
+      if (!prediction?.estimate_timestamp) {
+        flightDeadlineEl.textContent = "Waiting for prediction";
+        flightCountdownEl.textContent = "--:--:--";
+        flightStatusEl.textContent = `${countryName} · ${formatFlightMinutes(flightMinutes)} flight`;
+        flightMetaEl.textContent = "Travel timing appears when Prediction v2 has a usable target.";
+        return;
+      }
+
+      const nowSeconds = Date.now() / 1000;
+      const etaIfLeavingNow = nowSeconds + flightSeconds;
+      const recommendedLeave = prediction.recommended_leave_by_timestamp;
+      const recommendedArrival = prediction.recommended_arrival_timestamp;
+      const latestWindowLeave = prediction.window_end_timestamp
+        ? prediction.window_end_timestamp - flightSeconds
+        : null;
+      const targetNumber = prediction.prediction_number || 1;
+      const reliability = prediction.travel_reliability || "insufficient";
+
+      if (!recommendedLeave) {
+        flightDeadlineEl.textContent = `Prediction #${targetNumber}`;
+        flightCountdownEl.textContent = "--:--:--";
+        flightStatusEl.textContent = "Prediction available · no calibrated departure recommendation yet";
+      } else if (nowSeconds < recommendedLeave) {
+        const remaining = recommendedLeave - nowSeconds;
+        flightDeadlineEl.textContent = `LEAVE BY ${formatClock(recommendedLeave)}`;
+        flightCountdownEl.textContent = formatDurationSeconds(remaining);
+        flightStatusEl.textContent = reliability === "unreliable"
+          ? `Estimate only · low-confidence Prediction #${targetNumber}`
+          : targetNumber > 1
+            ? `Next reachable cycle: Prediction #${targetNumber}`
+            : `Recommended departure for Prediction #${targetNumber}`;
+        if (remaining <= 15 * 60) flightSection.classList.add("flight-urgent");
+      } else if (latestWindowLeave && nowSeconds <= latestWindowLeave) {
+        const remaining = latestWindowLeave - nowSeconds;
+        flightSection.classList.add("flight-urgent");
+        flightDeadlineEl.textContent = "Leave now";
+        flightCountdownEl.textContent = formatDurationSeconds(remaining);
+        flightStatusEl.textContent = `Past ideal departure · still within estimated reachable window for #${targetNumber}`;
+      } else {
+        flightSection.classList.add("flight-missed");
+        flightDeadlineEl.textContent = `Prediction #${targetNumber} not reachable`;
+        flightCountdownEl.textContent = latestWindowLeave
+          ? `+${formatDurationSeconds(nowSeconds - latestWindowLeave)}`
+          : "--:--:--";
+        flightStatusEl.textContent = "Prediction v2 will promote/update the next usable target when available";
+      }
+
+      flightMetaEl.textContent =
+        `${countryName} · PI + pilot ${formatFlightMinutes(flightMinutes)} · ` +
+        `ETA if leaving now ${formatClock(etaIfLeavingNow)} · ` +
+        `target arrival ${formatClock(recommendedArrival)} · ` +
+        `Prediction #${targetNumber}${prediction.projected ? " projected" : ""}`;
+    }
+
+    function setReliabilityBadge(label) {
+      const badge = document.getElementById("predictionReliabilityBadge");
+      const value = (label || "insufficient").toLowerCase();
+      badge.className = `reliability-badge ${value}`;
+      badge.textContent = value.toUpperCase();
+    }
+
+    function setPredictionTargetBadge(prediction, v2) {
+      const pill = document.getElementById("toolbarTargetPill");
+      const text = document.getElementById("toolbarTargetText");
+
+      if (!prediction?.estimate_timestamp) {
+        pill.className = "toolbar-pill";
+        pill.textContent = "No target";
+        text.textContent = "Waiting for Prediction v2";
+        return;
+      }
+
+      const number = prediction.prediction_number || 1;
+      const projected = Boolean(prediction.projected);
+      pill.className = `toolbar-pill${projected ? " projected" : ""}`;
+      pill.textContent = number > 1
+        ? `P${number} reachable${projected ? " · projected" : ""}`
+        : `P${number}${projected ? " projected" : ""}`;
+
+      const leave = prediction.recommended_leave_by_timestamp
+        ? `LEAVE ${formatClock(prediction.recommended_leave_by_timestamp)}${prediction.arrival_offset_source === "mid-stock fallback" ? " est." : ""}`
+        : "no leave estimate";
+      const ahead = number > 1 ? ` · ${number - 1} cycle${number - 1 === 1 ? "" : "s"} before target` : "";
+      text.textContent = `${leave} · ${formatClock(prediction.estimate_timestamp)} restock${ahead}`;
     }
 
     function updateInsights(analysis) {
@@ -488,33 +1037,101 @@
       document.getElementById("medianZeroWait").textContent = analysis.median_zero_to_restock_str || "—";
       document.getElementById("validCycles").textContent = analysis.valid_cycles ?? "—";
       document.getElementById("excludedCycles").textContent = analysis.excluded_cycles ?? "—";
+      document.getElementById("collectorFreshness").textContent = analysis.collector_last_success_timestamp
+        ? `${formatClock(analysis.collector_last_success_timestamp)} · ${(analysis.collector_last_success_source || "unknown").toUpperCase()}`
+        : "—";
 
       const prediction = analysis.prediction || {};
+      const v2 = analysis.prediction_v2 || {};
       const estimateEl = document.getElementById("predictionEstimate");
       const windowEl = document.getElementById("predictionWindow");
 
+      setPredictionTargetBadge(prediction, v2);
+      setReliabilityBadge(prediction.travel_reliability || v2.travel_reliability);
+
       if (prediction.estimate_timestamp) {
         estimateEl.textContent = formatTimestamp(prediction.estimate_timestamp);
-        windowEl.textContent = `Window: ${formatClock(prediction.window_start_timestamp)} – ${formatClock(prediction.window_end_timestamp)}`;
+        if (prediction.window_start_timestamp && prediction.window_end_timestamp) {
+          windowEl.textContent =
+            `Estimated restock window: ${formatClock(prediction.window_start_timestamp)} – ${formatClock(prediction.window_end_timestamp)}`;
+        } else {
+          windowEl.textContent = "Estimated restock window: not enough calibrated history";
+        }
       } else {
-        estimateEl.textContent = "Not enough data";
+        const waitingClean = v2.status === "waiting_for_clean_anchor";
+        estimateEl.textContent = waitingClean ? "Waiting for clean live anchor" : "No active restock target";
         windowEl.textContent = "—";
       }
 
-      document.getElementById("predictionConfidence").textContent = `Confidence: ${prediction.confidence || "—"}`;
-      document.getElementById("predictionSamples").textContent = `Samples: ${prediction.sample_count ?? "—"}`;
-      document.getElementById("predictionExcluded").textContent = `Excluded: ${prediction.excluded_sample_count ?? "—"}`;
-      document.getElementById("predictionMethod").textContent = `Method: ${prediction.method || "—"}`;
-      document.getElementById("predictionNote").textContent = prediction.note ||
-        "This is still the baseline model. We will replace it with the item-specific drought/depletion-aware predictor after validating the event data.";
+      const fallbackArrival = prediction.arrival_offset_source === "mid-stock fallback";
+      document.getElementById("predictionArrivalValue").textContent =
+        prediction.recommended_arrival_timestamp
+          ? `${formatClock(prediction.recommended_arrival_timestamp)}${fallbackArrival ? " · est." : ""}`
+          : "—";
+      document.getElementById("predictionLeaveByValue").textContent =
+        prediction.recommended_leave_by_timestamp
+          ? `${formatClock(prediction.recommended_leave_by_timestamp)}${fallbackArrival ? " · est." : ""}`
+          : "—";
+
+      const life = v2.arrival_success_rate;
+      const r10 = v2.recent10_arrival_success_rate;
+      document.getElementById("predictionLifetimeSuccess").textContent =
+        life == null ? "—" : `${(life * 100).toFixed(1)}%`;
+      document.getElementById("predictionRecent10Success").textContent =
+        r10 == null ? "—" : `${(r10 * 100).toFixed(1)}%`;
+
+      document.getElementById("predictionSamples").textContent =
+        `Model evidence: ${(v2.model_evidence_tier || prediction.model_evidence_tier || "—").toUpperCase()}`;
+      document.getElementById("predictionMethod").textContent =
+        `Model: ${prediction.model_name || v2.model_name || "—"}`;
+
+      const noteEl = document.getElementById("predictionNote");
+      let note = v2.note || prediction.note || "Prediction v2 is waiting for enough clean history.";
+
+      if ((prediction.prediction_number || 1) > 1) {
+        const n = prediction.prediction_number;
+        note = `P${n} is the earliest reachable cycle. ${n - 1} earlier cycle${n - 1 === 1 ? "" : "s"} are expected first. This target automatically re-anchors as real cycles resolve.`;
+      }
+
+      if (prediction.arrival_offset_source === "mid-stock fallback") {
+        note += " Arrival and leave-by are best-effort estimates using the midpoint of typical stock lifetime until enough resolved trips exist to learn a travel offset.";
+      }
+
+      if (v2.current_stock > 0 && v2.current_stock_estimated_reachable === true) {
+        note += ` Current stock may still survive until an ETA of ${formatClock(v2.current_stock_eta_if_leave_now_timestamp)}.`;
+      } else if (v2.current_stock > 0 && v2.current_stock_estimated_reachable === false) {
+        note += " Current stock is expected to sell out before arrival.";
+      }
+
+      const reliability = (prediction.travel_reliability || v2.travel_reliability || "").toLowerCase();
+      noteEl.className = "prediction-callout";
+      if (reliability === "unreliable" || reliability === "insufficient") {
+        noteEl.classList.add("danger");
+      } else if (prediction.projected || reliability === "marginal") {
+        noteEl.classList.add("warning");
+      }
+      noteEl.textContent = note;
+
+      updateFlightTicker();
     }
 
     function jumpToLatest() {
-      scrollEl.scrollLeft = Math.max(0, scrollEl.scrollWidth - scrollEl.clientWidth);
+      if (!chart?.scales?.x) {
+        scrollEl.scrollLeft = Math.max(0, scrollEl.scrollWidth - scrollEl.clientWidth);
+        return;
+      }
+
+      // "Latest" means now, not the end of the future prediction window.
+      // This keeps the blue prediction area off to the right on short views,
+      // while still allowing the user to scroll into it deliberately.
+      const nowX = chart.scales.x.getPixelForValue(Date.now());
+      const target = nowX - scrollEl.clientWidth + 80;
+      const maxScroll = Math.max(0, scrollEl.scrollWidth - scrollEl.clientWidth);
+      scrollEl.scrollLeft = Math.min(maxScroll, Math.max(0, target));
     }
 
-    function updateChartSize(minutes) {
-      stageEl.style.width = `${getStageWidth(minutes)}px`;
+    function updateChartSize(minutes, analysis = currentAnalysis, fetchMinutes = currentFetchMinutes) {
+      stageEl.style.width = `${getStageWidth(minutes, analysis, fetchMinutes)}px`;
       if (chart) chart.resize();
     }
 
@@ -579,7 +1196,7 @@
     function makeChart(stockPoints, analysis, minutes) {
       const ctx = document.getElementById("stockChart").getContext("2d");
       const timeScale = getTimeScale(minutes);
-      const bounds = getDisplayBounds(minutes, analysis);
+      const bounds = getDisplayBounds(minutes, analysis, currentFetchMinutes);
 
       chart = new Chart(ctx, {
         type: "line",
@@ -645,7 +1262,7 @@
 
     function updateExistingChart(stockPoints, analysis, minutes) {
       const timeScale = getTimeScale(minutes);
-      const bounds = getDisplayBounds(minutes, analysis);
+      const bounds = getDisplayBounds(minutes, analysis, currentFetchMinutes);
 
       chart.data.datasets = datasetConfig(stockPoints, analysis?.events || []);
       chart.options.scales.x.min = bounds.min;
@@ -661,16 +1278,17 @@
 
     async function loadData(minutes) {
       currentMinutes = minutes;
+      currentFetchMinutes = getFetchMinutes(minutes);
       statusEl.textContent = "Loading...";
-      updateChartSize(minutes);
 
       try {
-        const url = `/api/history?country=${encodeURIComponent(country)}&item=${encodeURIComponent(item)}&minutes=${minutes}`;
-        const response = await fetch(url);
+        const url = `/api/history?country=${encodeURIComponent(country)}&item=${encodeURIComponent(item)}&minutes=${currentFetchMinutes}`;
+        const response = await fetch(url, { cache: "no-store" });
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
         const data = await response.json();
         updateInsights(data.analysis);
+        updateChartSize(minutes, data.analysis, currentFetchMinutes);
 
         if (!data.rows || data.rows.length === 0) {
           statusEl.textContent = "No stock history is available for this range.";
@@ -685,7 +1303,7 @@
         const actualChanges = data.rows.filter((row) => !row.anchor).length;
         const latestActual = [...data.rows].reverse().find((row) => !row.anchor) || data.rows[data.rows.length - 1];
 
-        statusEl.textContent = `${actualChanges.toLocaleString()} plotted stock changes · latest recorded change: ${new Date(latestActual.timestamp * 1000).toLocaleString()}`;
+        statusEl.textContent = `${actualChanges.toLocaleString()} plotted stock changes · ${currentMinutes / 60}h visible per screen · ${currentFetchMinutes / 60}h history loaded · latest recorded change: ${new Date(latestActual.timestamp * 1000).toLocaleString()}`;
 
         if (!chart) makeChart(stockPoints, data.analysis, minutes);
         else updateExistingChart(stockPoints, data.analysis, minutes);
@@ -751,7 +1369,9 @@
     scrollEl.addEventListener("pointerup", stopDragging);
     scrollEl.addEventListener("pointercancel", stopDragging);
 
-    window.addEventListener("resize", () => updateChartSize(currentMinutes));
+    window.addEventListener("resize", () => updateChartSize(currentMinutes, currentAnalysis, currentFetchMinutes));
+
+    setInterval(updateFlightTicker, 1000);
 
     if (!item) {
       statusEl.textContent = "Add ?country=uni&item=Red%20Fox%20Plushie to the URL.";
