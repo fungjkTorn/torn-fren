@@ -15,7 +15,7 @@
       margin:0; background:var(--bg); color:var(--text);
       font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
     }
-    .wrap { max-width:1180px; margin:0 auto; padding:20px; }
+    .wrap { max-width:1220px; margin:0 auto; padding:20px; }
     .top {
       display:flex; justify-content:space-between; align-items:center; gap:12px;
       margin-bottom:16px;
@@ -67,10 +67,24 @@
     }
     .gap:last-child { border-bottom:0; }
     .err { color:#ffb3b5; }
+    .service-grid {
+      display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px;
+    }
+    .service {
+      background:var(--panel2); border:1px solid var(--border); border-radius:7px;
+      padding:10px;
+    }
+    .service-head { display:flex; align-items:center; gap:7px; font-weight:750; font-size:.85rem; }
+    .dot { width:8px; height:8px; border-radius:50%; background:var(--muted); flex:0 0 auto; }
+    .dot.ok { background:var(--green); }
+    .dot.bad { background:var(--red); }
+    .dot.warn { background:var(--gold); }
+    .service-meta { color:var(--muted); font-size:.74rem; margin-top:5px; }
     @media (max-width:850px) {
       .grid { grid-template-columns:1fr; }
       .wide,.full { grid-column:auto; }
       .top { align-items:flex-start; flex-direction:column; }
+      .service-grid { grid-template-columns:1fr; }
     }
   </style>
 </head>
@@ -79,7 +93,7 @@
   <div class="top">
     <div>
       <h1>Torn Fren · Admin Health</h1>
-      <div class="sub">Operational status for collector, database, prediction audits and runtime.</div>
+      <div class="sub">Operational status for collector, services, backups, database, prediction audits and runtime.</div>
     </div>
     <div class="actions">
       <span id="statusPill" class="status">Loading</span>
@@ -105,6 +119,16 @@
       <h2>Disk</h2>
       <div id="diskFree" class="metric">—</div>
       <div id="diskMeta" class="small">—</div>
+    </section>
+
+    <section class="card wide">
+      <h2>Services</h2>
+      <div id="services" class="service-grid"></div>
+    </section>
+
+    <section class="card">
+      <h2>Backups</h2>
+      <div id="backups" class="rows"></div>
     </section>
 
     <section class="card wide">
@@ -148,8 +172,10 @@
   function fmtDuration(seconds) {
     if (seconds == null) return "—";
     let s = Math.max(0, Math.floor(Number(seconds)));
+    const d = Math.floor(s / 86400); s %= 86400;
     const h = Math.floor(s / 3600); s %= 3600;
     const m = Math.floor(s / 60); s %= 60;
+    if (d) return `${d}d ${h}h`;
     if (h) return `${h}h ${m}m`;
     if (m) return `${m}m ${s}s`;
     return `${s}s`;
@@ -163,6 +189,28 @@
     target.innerHTML = rows.map(([k,v]) =>
       `<div class="row"><span>${k}</span><span>${v ?? "—"}</span></div>`
     ).join("");
+  }
+
+  function renderServices(services) {
+    const labels = {
+      poller: "Poller",
+      discord: "Discord",
+      web: "Web",
+      nginx: "Nginx",
+    };
+    $("services").innerHTML = Object.entries(labels).map(([key, label]) => {
+      const svc = services?.[key] || {};
+      const dotClass = svc.active === true ? "ok" : (svc.active === false ? "bad" : "warn");
+      const state = `${svc.active_state || "unknown"}${svc.sub_state ? ` / ${svc.sub_state}` : ""}`;
+      const uptime = svc.uptime_seconds == null ? "uptime unknown" : `up ${fmtDuration(svc.uptime_seconds)}`;
+      const pid = svc.main_pid ? ` · PID ${svc.main_pid}` : "";
+      return `
+        <div class="service">
+          <div class="service-head"><span class="dot ${dotClass}"></span>${label}</div>
+          <div class="service-meta">${state} · ${uptime}${pid}</div>
+        </div>
+      `;
+    }).join("");
   }
 
   async function loadHealth() {
@@ -203,12 +251,24 @@
         ["Profile cache age", fmtDuration(a.profile_cache_age_seconds)],
       ]);
 
+      renderServices(data.services || {});
+
+      const backups = data.backups || {};
+      addRows($("backups"), [
+        ["Last backup", backups.last_backup_timestamp ? `${fmtDuration(backups.last_backup_age_seconds)} ago` : "None"],
+        ["Last size", fmtBytes(backups.last_backup_size_bytes)],
+        ["Backup count", backups.count],
+        ["Backup storage", fmtBytes(backups.total_bytes)],
+        ["Timer", backups.timer_active === true ? "ACTIVE" : (backups.timer_active === false ? "INACTIVE" : "UNKNOWN")],
+        ["Next scheduled", backups.next_backup || "—"],
+      ]);
+
       const runtime = data.runtime || {};
       const disk = runtime.disk || {};
       $("diskFree").textContent = fmtBytes(disk.free_bytes);
       $("diskMeta").textContent = disk.used_percent == null
         ? "Disk usage unavailable"
-        : `${disk.used_percent}% used · ${fmtBytes(disk.total_bytes)} total`;
+        : `${disk.used_percent}% used · ${fmtBytes(disk.used_bytes)} used / ${fmtBytes(disk.total_bytes)} total`;
 
       addRows($("runtime"), [
         ["Python", runtime.python],

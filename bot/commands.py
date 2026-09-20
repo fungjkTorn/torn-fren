@@ -1,6 +1,8 @@
 from typing import Literal
 
 import asyncio
+from urllib.parse import urlencode
+
 import discord
 
 from bot import alerts, config
@@ -86,6 +88,30 @@ def _history_pct(value):
     return f"{value:.1f}%"
 
 
+
+def _graph_url(country: str, item_name: str):
+    base = (getattr(config, "PUBLIC_BASE_URL", "") or "").rstrip("/")
+    if not base:
+        return None
+    return f"{base}/?{urlencode({'country': country.lower(), 'item': item_name})}"
+
+
+def _graph_view(country: str, item_name: str, label: str = "📈 Open Graph"):
+    url = _graph_url(country, item_name)
+    if not url:
+        return None
+
+    view = discord.ui.View()
+    view.add_item(
+        discord.ui.Button(
+            label=label,
+            style=discord.ButtonStyle.link,
+            url=url,
+        )
+    )
+    return view
+
+
 def setup_commands(bot):
 
     @bot.tree.command(name="stock", description="Show current abroad stock for a country")
@@ -114,7 +140,8 @@ def setup_commands(bot):
                 country,
                 item_name,
             )
-            await interaction.followup.send(embed=embed)
+            view = _graph_view(country, item_name, "📈 Open Graph")
+            await interaction.followup.send(embed=embed, view=view)
         except Exception as exc:
             print(f"/predict failed for {country}/{item_name}: {exc}")
             await interaction.followup.send(
@@ -232,9 +259,10 @@ def setup_commands(bot):
         )
 
         embed.set_footer(
-            text="Use /predict for the next trip decision · open the graph for deeper history"
+            text="Use /predict for the next trip decision · use the graph button for deeper history"
         )
-        await interaction.followup.send(embed=embed)
+        view = _graph_view(country, item_name, "📈 Open Full History")
+        await interaction.followup.send(embed=embed, view=view)
 
     @bot.tree.command(name="ping", description="Check if the bot is responsive")
     async def ping(interaction: discord.Interaction):
@@ -261,8 +289,8 @@ def setup_commands(bot):
             "• `/help` - List available commands\n\n"
             "**Travel Stock**\n"
             "• `/stock <country>` - Show current abroad stock for a country\n"
-            "• `/predict <country> <item_name>` - Prediction v2: restock window, leave-by, arrival, reliability, and P2 fallback\n"
-            "• `/history <country> <item_name>` - Show the 3 most recent completed stock cycles\n\n"
+            "• `/predict <country> <item_name>` - Prediction v2 + direct graph link\n"
+            "• `/history <country> <item_name>` - Show 3 recent cycles + full graph link\n\n"
         )
 
         await interaction.response.send_message(message)
