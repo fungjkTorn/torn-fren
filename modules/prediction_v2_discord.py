@@ -181,11 +181,23 @@ def build_prediction_v2_embed(country_code: str, item_name: str) -> discord.Embe
             inline=False,
         )
 
+        target_depletion = active.get("target_depletion_timestamp")
+        arrival_cushion = active.get("expected_arrival_cushion_seconds")
+        depletion_line = (
+            f"\n📉 Expected depletion: {_discord_time(target_depletion, 't')}"
+            if target_depletion else ""
+        )
+        cushion_line = (
+            f" · arrival cushion **{_duration(arrival_cushion)}**"
+            if arrival_cushion is not None and arrival_cushion >= 0 else ""
+        )
+
         embed.add_field(
             name="🎯 Estimated restock",
             value=(
                 f"**{_discord_time(active.get('estimate_timestamp'), 'F')}**\n"
                 f"Window: {window_text}"
+                f"{depletion_line}{cushion_line}"
             ),
             inline=False,
         )

@@ -40,12 +40,12 @@ def main():
         print("\nNo resolved projected-cycle audits yet.")
         print("That is normal immediately after installing this patch.")
     else:
-        print("\nResolved accuracy by forecast depth:")
+        print("\nResolved accuracy by true projection depth:")
         print(f"{'depth':>6} {'n':>5} {'mean err':>12} {'window hit':>12} {'arrival hit':>13}")
         print("-" * 56)
         for row in summary:
             print(
-                f"P{row['prediction_number']:<5} "
+                f"D{row.get('projection_depth', row['prediction_number'] - 1):<5} "
                 f"{row['n']:>5} "
                 f"{dur(row['mean_absolute_error_seconds']):>12} "
                 f"{pct(row['window_hit_rate']):>12} "

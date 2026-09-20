@@ -124,6 +124,56 @@
       margin-left: auto;
     }
 
+
+    .browser-controls {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      min-width: 0;
+    }
+
+    .browser-controls select {
+      min-height: 36px;
+      max-width: 210px;
+      padding: 6px 28px 6px 9px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--panel-2);
+      color: var(--text);
+      font-size: 0.82rem;
+    }
+
+    .live-state {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      min-height: 36px;
+      padding: 6px 9px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--muted);
+      background: rgba(255,255,255,0.015);
+      font-size: 0.75rem;
+      white-space: nowrap;
+    }
+
+    .live-state::before {
+      content: "";
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--subtle);
+    }
+
+    .live-state.live::before { background: var(--green); }
+    .live-state.stale::before { background: var(--gold); }
+    .live-state.offline::before { background: var(--red); }
+
+    #refreshButton.refreshing {
+      opacity: 0.65;
+      cursor: wait;
+    }
+
     #insights-toggle { display: none; }
 
     #insights-panel {
@@ -570,6 +620,9 @@
       .flight-countdown { font-size: 1.5rem; }
       #chart-stage { height: 410px; }
       .toolbar-target { display: none; }
+      .browser-controls { width: 100%; order: 3; }
+      .browser-controls select { flex: 1 1 0; max-width: none; min-width: 0; }
+      .live-state { display: none; }
       body { overflow-y: auto; }
     }
   </style>
@@ -594,7 +647,14 @@
         <strong id="toolbarTargetText">Waiting for Prediction v2</strong>
       </div>
 
+      <div class="browser-controls">
+        <select id="countrySelect" aria-label="Country"></select>
+        <select id="itemSelect" aria-label="Item"></select>
+      </div>
+
       <div class="right-controls">
+        <span class="live-state" id="liveState">Loading…</span>
+        <button id="refreshButton" type="button">↻ Refresh</button>
         <button id="insights-toggle" type="button" aria-expanded="false">Stats & prediction</button>
         <button id="latestButton" type="button">Jump to latest</button>
       </div>
@@ -692,8 +752,8 @@
 
   <script>
     const params = new URLSearchParams(window.location.search);
-    const country = (params.get("country") || "uni").toLowerCase();
-    const item = params.get("item") || "";
+    let country = (params.get("country") || "uni").toLowerCase();
+    let item = params.get("item") || "";
 
     const titleEl = document.getElementById("title");
     const subtitleEl = document.getElementById("subtitle");
@@ -708,6 +768,10 @@
     const flightCountdownEl = document.getElementById("flightCountdown");
     const flightStatusEl = document.getElementById("flightStatus");
     const flightMetaEl = document.getElementById("flightMeta");
+    const countrySelect = document.getElementById("countrySelect");
+    const itemSelect = document.getElementById("itemSelect");
+    const refreshButton = document.getElementById("refreshButton");
+    const liveStateEl = document.getElementById("liveState");
 
     const PI_PILOT_FLIGHT_MINUTES = {
       mex: 17,
@@ -736,6 +800,11 @@
     let currentMinutes = 360;
     let currentFetchMinutes = 2880;
     let currentAnalysis = null;
+    let catalog = { countries: [] };
+    let autoRefreshTimer = null;
+    let loadingData = false;
+    let previousActivePrediction = null;
+    let lastFetchCompletedAt = null;
 
     // The selected timeframe is the amount of time visible per screen.
     // We deliberately load more history so the user can scroll left without
@@ -756,57 +825,96 @@
     const predictionOverlayPlugin = {
       id: "predictionOverlay",
       beforeDatasetsDraw(chartInstance) {
-        const prediction = chartInstance.$prediction;
-        if (!prediction || !prediction.estimate_timestamp) return;
+        const active = chartInstance.$prediction;
+        const predictions = chartInstance.$predictions || (active ? [active] : []);
+        const previous = chartInstance.$previousPrediction;
+        if (!predictions.length && !previous?.estimate_timestamp) return;
 
         const xScale = chartInstance.scales.x;
         const area = chartInstance.chartArea;
-        const start = prediction.window_start_timestamp * 1000;
-        const end = prediction.window_end_timestamp * 1000;
-        const estimate = prediction.estimate_timestamp * 1000;
-
-        const left = xScale.getPixelForValue(start);
-        const right = xScale.getPixelForValue(end);
-        const estimateX = xScale.getPixelForValue(estimate);
-
         const ctx = chartInstance.ctx;
         ctx.save();
 
-        if (right >= area.left && left <= area.right) {
-          ctx.fillStyle = "rgba(88, 101, 242, 0.10)";
-          ctx.fillRect(
-            Math.max(left, area.left),
-            area.top,
-            Math.min(right, area.right) - Math.max(left, area.left),
-            area.bottom - area.top
-          );
+        // Only the active target gets the shaded calibrated window.
+        if (active?.estimate_timestamp && active.window_start_timestamp && active.window_end_timestamp) {
+          const left = xScale.getPixelForValue(active.window_start_timestamp * 1000);
+          const right = xScale.getPixelForValue(active.window_end_timestamp * 1000);
+          if (right >= area.left && left <= area.right) {
+            ctx.fillStyle = "rgba(88, 101, 242, 0.10)";
+            ctx.fillRect(
+              Math.max(left, area.left),
+              area.top,
+              Math.min(right, area.right) - Math.max(left, area.left),
+              area.bottom - area.top
+            );
+          }
         }
 
-        if (estimateX >= area.left && estimateX <= area.right) {
-          ctx.strokeStyle = "rgba(88, 101, 242, 0.95)";
-          ctx.lineWidth = 1.5;
-          ctx.setLineDash([6, 5]);
+        // Show the full P1..Pn chain. Earlier/unreachable cycles are subtle;
+        // the current actionable target remains the strongest line.
+        predictions.forEach((prediction, index) => {
+          if (!prediction?.estimate_timestamp) return;
+          const x = xScale.getPixelForValue(prediction.estimate_timestamp * 1000);
+          if (x < area.left || x > area.right) return;
+
+          const isActive = active &&
+            prediction.prediction_number === active.prediction_number &&
+            prediction.estimate_timestamp === active.estimate_timestamp;
+
+          ctx.strokeStyle = isActive
+            ? "rgba(88, 101, 242, 0.98)"
+            : prediction.usable_for_departure
+              ? "rgba(250, 166, 26, 0.72)"
+              : "rgba(181, 186, 193, 0.48)";
+          ctx.lineWidth = isActive ? 1.8 : 1.0;
+          ctx.setLineDash(isActive ? [7, 5] : [3, 6]);
           ctx.beginPath();
-          ctx.moveTo(estimateX, area.top);
-          ctx.lineTo(estimateX, area.bottom);
+          ctx.moveTo(x, area.top);
+          ctx.lineTo(x, area.bottom);
           ctx.stroke();
 
           ctx.setLineDash([]);
-          ctx.font = "700 11px -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif";
+          ctx.font = `${isActive ? 800 : 650} 10px -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif`;
           ctx.textBaseline = "top";
-          const number = prediction.prediction_number || 1;
-          const label = `P${number}${prediction.projected ? " · projected" : ""}`;
-          const padX = 6;
+          const number = prediction.prediction_number || index + 1;
+          const state = isActive ? "target" : (prediction.usable_for_departure ? "reachable" : "unreachable");
+          const label = `P${number} · ${state}`;
+          const padX = 5;
           const textWidth = ctx.measureText(label).width;
-          let labelX = estimateX + 6;
+          let labelX = x + 5;
           if (labelX + textWidth + padX * 2 > area.right) {
-            labelX = estimateX - textWidth - padX * 2 - 6;
+            labelX = x - textWidth - padX * 2 - 5;
           }
-          const labelY = area.top + 7;
-          ctx.fillStyle = "rgba(20, 21, 24, 0.92)";
-          ctx.fillRect(labelX, labelY, textWidth + padX * 2, 20);
-          ctx.fillStyle = prediction.projected ? "#ffd38a" : "#c7ccff";
-          ctx.fillText(label, labelX + padX, labelY + 4);
+          const labelY = area.top + 6 + ((number - 1) % 3) * 18;
+          ctx.fillStyle = isActive ? "rgba(20, 21, 24, 0.95)" : "rgba(20, 21, 24, 0.78)";
+          ctx.fillRect(labelX, labelY, textWidth + padX * 2, 16);
+          ctx.fillStyle = isActive ? "#c7ccff" :
+            (prediction.usable_for_departure ? "#ffd38a" : "#b5bac1");
+          ctx.fillText(label, labelX + padX, labelY + 3);
+        });
+
+        // One-refresh ghost marker: lets the player see that a rolling target
+        // moved after new stock data re-anchored the chain.
+        if (
+          previous?.estimate_timestamp &&
+          active?.estimate_timestamp &&
+          previous.prediction_number === active.prediction_number &&
+          previous.estimate_timestamp !== active.estimate_timestamp
+        ) {
+          const x = xScale.getPixelForValue(previous.estimate_timestamp * 1000);
+          if (x >= area.left && x <= area.right) {
+            ctx.strokeStyle = "rgba(255,255,255,0.28)";
+            ctx.lineWidth = 1;
+            ctx.setLineDash([2, 5]);
+            ctx.beginPath();
+            ctx.moveTo(x, area.top);
+            ctx.lineTo(x, area.bottom);
+            ctx.stroke();
+            ctx.setLineDash([]);
+            ctx.fillStyle = "rgba(181,186,193,0.72)";
+            ctx.font = "600 9px -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif";
+            ctx.fillText(`previous P${previous.prediction_number}`, x + 4, area.bottom - 14);
+          }
         }
 
         ctx.restore();
@@ -832,6 +940,39 @@
     function formatNumber(value) {
       if (value === null || value === undefined) return "—";
       return Number(value).toLocaleString();
+    }
+
+
+    function formatCompactDuration(seconds) {
+      if (seconds === null || seconds === undefined) return "—";
+      const sign = Number(seconds) < 0 ? "-" : "";
+      let total = Math.abs(Math.round(Number(seconds)));
+      const h = Math.floor(total / 3600);
+      total %= 3600;
+      const m = Math.floor(total / 60);
+      if (h) return `${sign}${h}h ${m}m`;
+      return `${sign}${m}m`;
+    }
+
+    function updateLiveState(analysis) {
+      const last = analysis?.collector_last_success_timestamp;
+      if (!last) {
+        liveStateEl.className = "live-state offline";
+        liveStateEl.textContent = "Collector unknown";
+        return;
+      }
+
+      const age = Math.max(0, Math.floor(Date.now() / 1000 - last));
+      if (age <= 90) {
+        liveStateEl.className = "live-state live";
+        liveStateEl.textContent = `Live · ${age}s ago`;
+      } else if (age <= 180) {
+        liveStateEl.className = "live-state stale";
+        liveStateEl.textContent = `Delayed · ${age}s ago`;
+      } else {
+        liveStateEl.className = "live-state offline";
+        liveStateEl.textContent = `Stale · ${formatCompactDuration(age)} ago`;
+      }
     }
 
     function buildStockPoints(rows) {
@@ -1041,6 +1182,8 @@
         ? `${formatClock(analysis.collector_last_success_timestamp)} · ${(analysis.collector_last_success_source || "unknown").toUpperCase()}`
         : "—";
 
+      updateLiveState(analysis);
+
       const prediction = analysis.prediction || {};
       const v2 = analysis.prediction_v2 || {};
       const estimateEl = document.getElementById("predictionEstimate");
@@ -1051,11 +1194,17 @@
 
       if (prediction.estimate_timestamp) {
         estimateEl.textContent = formatTimestamp(prediction.estimate_timestamp);
+        const depletion = prediction.target_depletion_timestamp
+          ? ` · expected depletion ~${formatClock(prediction.target_depletion_timestamp)}`
+          : "";
+        const cushion = prediction.expected_arrival_cushion_seconds != null
+          ? ` · arrival cushion ${formatCompactDuration(prediction.expected_arrival_cushion_seconds)}`
+          : "";
         if (prediction.window_start_timestamp && prediction.window_end_timestamp) {
           windowEl.textContent =
-            `Estimated restock window: ${formatClock(prediction.window_start_timestamp)} – ${formatClock(prediction.window_end_timestamp)}`;
+            `Estimated restock window: ${formatClock(prediction.window_start_timestamp)} – ${formatClock(prediction.window_end_timestamp)}${depletion}${cushion}`;
         } else {
-          windowEl.textContent = "Estimated restock window: not enough calibrated history";
+          windowEl.textContent = `Estimated restock window: not enough calibrated history${depletion}${cushion}`;
         }
       } else {
         const waitingClean = v2.status === "waiting_for_clean_anchor";
@@ -1258,6 +1407,8 @@
       });
 
       chart.$prediction = analysis?.prediction || null;
+      chart.$predictions = analysis?.prediction_v2?.predictions || [];
+      chart.$previousPrediction = previousActivePrediction;
     }
 
     function updateExistingChart(stockPoints, analysis, minutes) {
@@ -1272,14 +1423,34 @@
       chart.options.scales.x.time.displayFormats.minute = timeScale.format;
       chart.options.scales.x.time.displayFormats.hour = timeScale.format;
       chart.$prediction = analysis?.prediction || null;
+      chart.$predictions = analysis?.prediction_v2?.predictions || [];
+      chart.$previousPrediction = previousActivePrediction;
       chart.update("none");
       chart.resize();
     }
 
-    async function loadData(minutes) {
+    function isNearLatest() {
+      if (!chart?.scales?.x) return true;
+      const nowX = chart.scales.x.getPixelForValue(Date.now());
+      const viewportRight = scrollEl.scrollLeft + scrollEl.clientWidth;
+      return Math.abs(viewportRight - nowX) < 140;
+    }
+
+    async function loadData(minutes, { keepView = false, forceLatest = false } = {}) {
+      if (loadingData) return;
+      loadingData = true;
       currentMinutes = minutes;
       currentFetchMinutes = getFetchMinutes(minutes);
-      statusEl.textContent = "Loading...";
+
+      const nearLatestBefore = forceLatest ? true : isNearLatest();
+      const oldScrollLeft = scrollEl.scrollLeft;
+      const oldScrollWidth = scrollEl.scrollWidth;
+      const oldPrediction = currentAnalysis?.prediction
+        ? { ...currentAnalysis.prediction }
+        : null;
+
+      refreshButton.classList.add("refreshing");
+      if (!keepView) statusEl.textContent = "Loading...";
 
       try {
         const url = `/api/history?country=${encodeURIComponent(country)}&item=${encodeURIComponent(item)}&minutes=${currentFetchMinutes}`;
@@ -1287,6 +1458,7 @@
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
         const data = await response.json();
+        previousActivePrediction = oldPrediction;
         updateInsights(data.analysis);
         updateChartSize(minutes, data.analysis, currentFetchMinutes);
 
@@ -1303,17 +1475,114 @@
         const actualChanges = data.rows.filter((row) => !row.anchor).length;
         const latestActual = [...data.rows].reverse().find((row) => !row.anchor) || data.rows[data.rows.length - 1];
 
+        lastFetchCompletedAt = Date.now();
         statusEl.textContent = `${actualChanges.toLocaleString()} plotted stock changes · ${currentMinutes / 60}h visible per screen · ${currentFetchMinutes / 60}h history loaded · latest recorded change: ${new Date(latestActual.timestamp * 1000).toLocaleString()}`;
 
-        if (!chart) makeChart(stockPoints, data.analysis, minutes);
-        else updateExistingChart(stockPoints, data.analysis, minutes);
-
-        requestAnimationFrame(jumpToLatest);
+        if (!chart) {
+          makeChart(stockPoints, data.analysis, minutes);
+          requestAnimationFrame(jumpToLatest);
+        } else {
+          updateExistingChart(stockPoints, data.analysis, minutes);
+          requestAnimationFrame(() => {
+            if (forceLatest || nearLatestBefore) {
+              jumpToLatest();
+            } else if (keepView) {
+              // Preserve where the player was browsing even if new future width
+              // or historical rows changed the total scrollable width.
+              const widthDelta = scrollEl.scrollWidth - oldScrollWidth;
+              scrollEl.scrollLeft = Math.max(0, oldScrollLeft + Math.max(0, widthDelta));
+            }
+          });
+        }
       } catch (error) {
         console.error(error);
+        liveStateEl.className = "live-state offline";
+        liveStateEl.textContent = "Refresh failed";
         statusEl.textContent = "Could not load stock history. Make sure the FastAPI server is running.";
+      } finally {
+        loadingData = false;
+        refreshButton.classList.remove("refreshing");
       }
     }
+
+    async function loadCatalog() {
+      try {
+        const response = await fetch("/api/catalog", { cache: "no-store" });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        catalog = await response.json();
+      } catch (error) {
+        console.error("Catalog load failed", error);
+        catalog = { countries: [] };
+      }
+
+      countrySelect.innerHTML = "";
+      (catalog.countries || []).forEach((entry) => {
+        const option = document.createElement("option");
+        option.value = entry.country;
+        option.textContent = `${COUNTRY_NAMES[entry.country] || entry.country.toUpperCase()} (${entry.country.toUpperCase()})`;
+        countrySelect.appendChild(option);
+      });
+
+      if (![...countrySelect.options].some((o) => o.value === country) && countrySelect.options.length) {
+        country = countrySelect.options[0].value;
+      }
+      countrySelect.value = country;
+      populateItemSelect();
+    }
+
+    function populateItemSelect() {
+      const entry = (catalog.countries || []).find((row) => row.country === country);
+      const items = entry?.items || [];
+      itemSelect.innerHTML = "";
+
+      items.forEach((row) => {
+        const option = document.createElement("option");
+        option.value = row.item_name;
+        option.textContent = row.item_name;
+        itemSelect.appendChild(option);
+      });
+
+      if (!items.some((row) => row.item_name === item) && items.length) {
+        item = items[0].item_name;
+      }
+      itemSelect.value = item;
+    }
+
+    function syncLocationAndTitle() {
+      const url = new URL(window.location.href);
+      url.searchParams.set("country", country);
+      url.searchParams.set("item", item);
+      history.replaceState(null, "", url);
+
+      titleEl.textContent = item || "No item specified";
+      subtitleEl.textContent = `Country: ${COUNTRY_NAMES[country] || country.toUpperCase()}`;
+    }
+
+    async function changeSelection(nextCountry, nextItem = null) {
+      country = nextCountry.toLowerCase();
+      if (nextItem !== null) item = nextItem;
+      populateItemSelect();
+      if (nextItem === null) item = itemSelect.value || "";
+      syncLocationAndTitle();
+
+      previousActivePrediction = null;
+      currentAnalysis = null;
+      if (chart) {
+        chart.destroy();
+        chart = null;
+      }
+      await loadData(currentMinutes, { forceLatest: true });
+    }
+
+    function startAutoRefresh() {
+      if (autoRefreshTimer) clearInterval(autoRefreshTimer);
+      autoRefreshTimer = setInterval(() => {
+        if (!document.hidden && item) {
+          loadData(currentMinutes, { keepView: true });
+        }
+      }, 30000);
+    }
+
 
     document.getElementById("timeframes").addEventListener("click", (event) => {
       const button = event.target.closest("button[data-minutes]");
@@ -1321,7 +1590,20 @@
 
       document.querySelectorAll(".timeframes button").forEach((candidate) => candidate.classList.remove("active"));
       button.classList.add("active");
-      loadData(Number(button.dataset.minutes));
+      loadData(Number(button.dataset.minutes), { forceLatest: true });
+    });
+
+
+    refreshButton.addEventListener("click", () => {
+      loadData(currentMinutes, { keepView: true });
+    });
+
+    countrySelect.addEventListener("change", () => {
+      changeSelection(countrySelect.value);
+    });
+
+    itemSelect.addEventListener("change", () => {
+      changeSelection(country, itemSelect.value);
     });
 
     latestButton.addEventListener("click", jumpToLatest);
@@ -1373,11 +1655,18 @@
 
     setInterval(updateFlightTicker, 1000);
 
-    if (!item) {
-      statusEl.textContent = "Add ?country=uni&item=Red%20Fox%20Plushie to the URL.";
-    } else {
-      loadData(currentMinutes);
-    }
+    (async function boot() {
+      await loadCatalog();
+      syncLocationAndTitle();
+
+      if (!item) {
+        statusEl.textContent = "No collected item is available for this country yet.";
+        return;
+      }
+
+      await loadData(currentMinutes, { forceLatest: true });
+      startAutoRefresh();
+    })();
   </script>
 </body>
 </html>

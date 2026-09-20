@@ -470,19 +470,60 @@ def _annotate_arrival_source(prediction, profile):
 
 
 
-def _projection_reliability(base_label, cycle_number, raw_window_width, median_lifetime):
+
+def _annotate_target_depletion(predictions, median_lifetime):
+    """
+    Add the expected sellout time for each forecasted restock cycle.
+
+    This is intentionally distinct from estimated_current_depletion_timestamp:
+    - current depletion = when stock that is already on shelves may hit zero
+    - target depletion = when the forecasted Pn restock may later hit zero
+
+    For now the target depletion point uses the item's qualified median stock
+    lifetime.  It is a transparent baseline that we can later replace with a
+    richer depletion-rate model without changing the API shape.
+    """
+    if not median_lifetime:
+        return predictions
+
+    lifetime = float(median_lifetime)
+    for prediction in predictions or []:
+        estimate = prediction.get("estimate_timestamp")
+        if estimate is None:
+            continue
+
+        target_depletion = float(estimate) + lifetime
+        prediction["target_depletion_timestamp"] = _safe_int(target_depletion)
+        prediction["expected_stock_lifetime_seconds"] = _safe_int(lifetime)
+
+        arrival = prediction.get("recommended_arrival_timestamp")
+        if arrival is not None:
+            prediction["expected_arrival_cushion_seconds"] = _safe_int(
+                target_depletion - float(arrival)
+            )
+        else:
+            prediction["expected_arrival_cushion_seconds"] = None
+
+    return predictions
+
+
+def _projection_reliability(base_label, projection_depth, raw_window_width, median_lifetime):
     """
     Projection reliability is separate from the item's base travel reliability.
 
-    Each unobserved cycle adds timing uncertainty. We downgrade gradually by
-    projection depth, and force UNRELIABLE if the raw projected restock window
-    becomes as wide as (or wider than) the item's normal stock lifetime.
+    projection_depth counts how many whole, still-unobserved future cycles must
+    be crossed before the target restock:
+      depth 0 = observed depletion -> next restock
+      depth 1 = one full future cycle must be projected
+      depth 2 = two full future cycles must be projected
+      ...
+
+    This matters because "P1" while stock is already active is itself a
+    one-cycle projection, while "P1" from a clean zero-stock depletion anchor
+    is depth 0.
     """
     label = base_label
-    # P1 can be observed-anchor or a one-cycle projection.  Extra future cycles
-    # beyond that get progressively less trustworthy.
-    extra_steps = max(0, int(cycle_number) - 1)
-    for _ in range(extra_steps):
+    for _ in range(max(0, int(projection_depth or 0))):
         label = _downgrade_reliability(label)
 
     if (
@@ -524,6 +565,8 @@ def _project_future_chain(
     if first_prediction is None:
         return []
 
+    first_depth = 1 if first_is_projected else 0
+    first_prediction["projection_depth"] = first_depth
     chain = [first_prediction]
     if not median_lifetime or not median_wait:
         return chain
@@ -581,9 +624,10 @@ def _project_future_chain(
             window_capped = True
 
         number = start_number + len(chain)
+        projection_depth = first_depth + len(chain)
         reliability = _projection_reliability(
             profile["travel_reliability"],
-            number,
+            projection_depth,
             raw_width,
             median_lifetime,
         )
@@ -609,7 +653,7 @@ def _project_future_chain(
             now=now,
         )
         nxt = _annotate_arrival_source(nxt, profile)
-        nxt["projection_depth"] = number - 1
+        nxt["projection_depth"] = projection_depth
         nxt["raw_projected_window_width_seconds"] = _safe_int(raw_width)
         nxt["window_capped_to_stock_lifetime"] = bool(window_capped)
         chain.append(nxt)
@@ -819,6 +863,7 @@ def _build_live_prediction_v2_impl(country, item_name, now_timestamp=None, force
             start_number=1,
             first_is_projected=False,
         )
+        _annotate_target_depletion(chain, median_lifetime)
         base["predictions"] = chain
         base["prediction_1"] = chain[0] if chain else None
         base["prediction_2"] = chain[1] if len(chain) > 1 else None
@@ -907,6 +952,7 @@ def _build_live_prediction_v2_impl(country, item_name, now_timestamp=None, force
             now=now,
         )
         p1["estimated_depletion_timestamp"] = _safe_int(estimated_depletion)
+        p1["projection_depth"] = 1
         p1 = _annotate_arrival_source(p1, profile)
 
         chain = _project_future_chain(
@@ -921,6 +967,7 @@ def _build_live_prediction_v2_impl(country, item_name, now_timestamp=None, force
             start_number=1,
             first_is_projected=True,
         )
+        _annotate_target_depletion(chain, median_lifetime)
         base["predictions"] = chain
         base["prediction_1"] = chain[0] if chain else None
         base["prediction_2"] = chain[1] if len(chain) > 1 else None

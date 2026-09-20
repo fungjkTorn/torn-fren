@@ -93,6 +93,24 @@ def ensure_forecast_audit_schema():
             ON forecast_audit_points(actual_restock_timestamp)
         """)
 
+        # Backfill projection depth for audit rows created before depth was
+        # explicitly populated.  Active-stock P1 is already one projected
+        # cycle; zero-stock observed-anchor P1 is depth 0.
+        conn.execute("""
+            UPDATE forecast_audit_points
+            SET projection_depth = CASE
+                WHEN run_id IN (
+                    SELECT id FROM forecast_audit_runs
+                    WHERE status LIKE 'stock_active%'
+                )
+                    THEN prediction_number
+                WHEN projected = 0
+                    THEN 0
+                ELSE MAX(0, prediction_number - 1)
+            END
+            WHERE projection_depth IS NULL
+        """)
+
 
 def _forecast_signature(result):
     predictions = result.get("predictions") or []
@@ -486,7 +504,15 @@ def resolve_forecast_audits(country, item_name):
 
 
 def forecast_depth_summary(country=None, item_name=None):
-    """Aggregate empirical accuracy by projection depth."""
+    """
+    Aggregate empirical accuracy by true projection depth.
+
+    This intentionally does NOT group only by P-number:
+      - zero-stock observed-anchor P1 is depth 0
+      - active-stock projected-next-cycle P1 is depth 1
+      - a zero-stock P4 is depth 3
+      - an active-stock P4 is depth 4
+    """
     ensure_forecast_audit_schema()
 
     where = ["p.status = 'resolved'", "p.ground_truth_valid = 1"]
@@ -500,7 +526,7 @@ def forecast_depth_summary(country=None, item_name=None):
 
     query = f"""
         SELECT
-            p.prediction_number,
+            COALESCE(p.projection_depth, 0) AS depth,
             COUNT(*) AS n,
             AVG(p.absolute_error_seconds) AS mean_abs_error,
             AVG(CASE WHEN p.window_hit = 1 THEN 1.0 ELSE 0.0 END) AS window_hit_rate,
@@ -508,12 +534,54 @@ def forecast_depth_summary(country=None, item_name=None):
         FROM forecast_audit_points p
         JOIN forecast_audit_runs r ON r.id = p.run_id
         WHERE {' AND '.join(where)}
-        GROUP BY p.prediction_number
-        ORDER BY p.prediction_number
+        GROUP BY COALESCE(p.projection_depth, 0)
+        ORDER BY depth
     """
 
     with _connect() as conn:
         rows = conn.execute(query, args).fetchall()
+
+    return [
+        {
+            "projection_depth": int(row[0]),
+            # compatibility for the existing diagnostic CLI
+            "prediction_number": int(row[0]) + 1,
+            "n": int(row[1]),
+            "mean_absolute_error_seconds": row[2],
+            "window_hit_rate": row[3],
+            "arrival_hit_rate": row[4],
+        }
+        for row in rows
+    ]
+
+
+def forecast_pnumber_summary(country=None, item_name=None):
+    """Diagnostic-only summary grouped by display P-number."""
+    ensure_forecast_audit_schema()
+    where = ["p.status = 'resolved'", "p.ground_truth_valid = 1"]
+    args = []
+    if country is not None:
+        where.append("r.country = ?")
+        args.append(country.lower())
+    if item_name is not None:
+        where.append("LOWER(r.item_name) = LOWER(?)")
+        args.append(item_name)
+
+    with _connect() as conn:
+        rows = conn.execute(
+            f"""
+            SELECT p.prediction_number, COUNT(*),
+                   AVG(p.absolute_error_seconds),
+                   AVG(CASE WHEN p.window_hit = 1 THEN 1.0 ELSE 0.0 END),
+                   AVG(CASE WHEN p.arrival_hit = 1 THEN 1.0 ELSE 0.0 END)
+            FROM forecast_audit_points p
+            JOIN forecast_audit_runs r ON r.id = p.run_id
+            WHERE {' AND '.join(where)}
+            GROUP BY p.prediction_number
+            ORDER BY p.prediction_number
+            """,
+            args,
+        ).fetchall()
 
     return [
         {

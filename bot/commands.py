@@ -6,6 +6,8 @@ import discord
 from bot import alerts, config
 from modules import stock, travel
 from modules.prediction_v2_discord import build_prediction_v2_embed
+from services.history_service import get_recent_completed_cycles
+from services.prediction_v2_live import build_live_prediction_v2
 
 CountryCode = Literal[
     "mex",
@@ -54,6 +56,36 @@ async def item_name_autocomplete(interaction: discord.Interaction, current: str)
         print(f"Autocomplete failed: {e}")
         return []
 
+
+def _history_duration(seconds):
+    if seconds is None:
+        return "—"
+    seconds = max(0, int(round(float(seconds))))
+    hours, rem = divmod(seconds, 3600)
+    minutes, secs = divmod(rem, 60)
+    if hours:
+        return f"{hours}h {minutes}m"
+    if minutes:
+        return f"{minutes}m {secs:02d}s"
+    return f"{secs}s"
+
+
+def _history_clock(timestamp):
+    if timestamp is None:
+        return "—"
+    return f"<t:{int(timestamp)}:t>"
+
+
+def _history_pct(value):
+    if value is None:
+        return "—"
+    value = float(value)
+    # Prediction v2 success rates are stored as fractions (0.979 = 97.9%).
+    if 0.0 <= value <= 1.0:
+        value *= 100.0
+    return f"{value:.1f}%"
+
+
 def setup_commands(bot):
 
     @bot.tree.command(name="stock", description="Show current abroad stock for a country")
@@ -90,22 +122,119 @@ def setup_commands(bot):
                 "The stock collector can continue running; try `/predict` again shortly."
             )
 
-    @bot.tree.command(name="history", description="Show recent stock history for an item")
+    @bot.tree.command(name="history", description="Show the 3 most recent completed stock cycles")
     @discord.app_commands.autocomplete(item_name=item_name_autocomplete)
     async def history_command(
         interaction: discord.Interaction,
         country: CountryCode,
         item_name: str,
-        limit: int = 15,
     ):
-        if limit < 1:
-            limit = 1
+        await interaction.response.defer(thinking=True)
 
-        if limit > 25:
-            limit = 25
+        try:
+            cycle_data, prediction = await asyncio.gather(
+                asyncio.to_thread(
+                    get_recent_completed_cycles,
+                    country,
+                    item_name,
+                    3,
+                ),
+                asyncio.to_thread(
+                    build_live_prediction_v2,
+                    country,
+                    item_name,
+                    None,
+                    False,
+                    "discord-history",
+                    True,
+                ),
+            )
+        except Exception as exc:
+            print(f"/history failed for {country}/{item_name}: {exc}")
+            await interaction.followup.send(
+                "⚠️ Recent cycle history could not be calculated right now."
+            )
+            return
 
-        message = stock.format_history_message(country, item_name, limit=limit)
-        await interaction.response.send_message(message)
+        cycles = cycle_data.get("cycles") or []
+        typical = cycle_data.get("typical") or {}
+
+        country_names = {
+            "mex": "Mexico",
+            "cay": "Cayman Islands",
+            "can": "Canada",
+            "haw": "Hawaii",
+            "uni": "United Kingdom",
+            "arg": "Argentina",
+            "swi": "Switzerland",
+            "jap": "Japan",
+            "chi": "China",
+            "uae": "UAE",
+            "sou": "South Africa",
+        }
+
+        embed = discord.Embed(
+            title=f"📚 {item_name} — {country_names.get(country, country.upper())}",
+            description="Recent completed stock cycles",
+            color=0x5865F2,
+        )
+
+        if not cycles:
+            embed.add_field(
+                name="Recent cycles",
+                value="Not enough clean completed cycles are available yet.",
+                inline=False,
+            )
+        else:
+            number_emoji = ["1️⃣", "2️⃣", "3️⃣"]
+            for index, cycle in enumerate(cycles):
+                peak = cycle.get("peak_quantity")
+                peak_text = f"{int(peak):,}" if peak is not None else "—"
+
+                embed.add_field(
+                    name=f"{number_emoji[index]} Cycle {index + 1}",
+                    value=(
+                        f"**Empty:** {_history_duration(cycle.get('zero_wait_seconds'))}"
+                        f" · **Stock:** {_history_duration(cycle.get('stock_lifetime_seconds'))}"
+                        f" · **Peak:** {peak_text}\n"
+                        f"Depleted {_history_clock(cycle.get('depletion_time'))}"
+                        f" → Restocked {_history_clock(cycle.get('next_restock_time'))}"
+                    ),
+                    inline=False,
+                )
+
+        embed.add_field(
+            name="📊 Typical",
+            value=(
+                f"Empty → restock: **{_history_duration(typical.get('median_zero_wait_seconds'))}**\n"
+                f"Stock lifetime: **{_history_duration(typical.get('median_stock_lifetime_seconds'))}**\n"
+                f"Qualified cycles: **{int(typical.get('valid_cycle_count') or 0):,}**"
+            ),
+            inline=True,
+        )
+
+        active = prediction.get("display_prediction") or {}
+        reliability = (
+            active.get("travel_reliability")
+            or prediction.get("travel_reliability")
+            or "insufficient"
+        ).upper()
+
+        embed.add_field(
+            name="🎯 Prediction",
+            value=(
+                f"Historical trip success: **{_history_pct(prediction.get('arrival_success_rate'))}**\n"
+                f"Recent 10: **{_history_pct(prediction.get('recent10_arrival_success_rate'))}**\n"
+                f"Travel reliability: **{reliability}**\n"
+                f"Model evidence: **{(prediction.get('model_evidence_tier') or '—').upper()}**"
+            ),
+            inline=True,
+        )
+
+        embed.set_footer(
+            text="Use /predict for the next trip decision · open the graph for deeper history"
+        )
+        await interaction.followup.send(embed=embed)
 
     @bot.tree.command(name="ping", description="Check if the bot is responsive")
     async def ping(interaction: discord.Interaction):
@@ -133,7 +262,7 @@ def setup_commands(bot):
             "**Travel Stock**\n"
             "• `/stock <country>` - Show current abroad stock for a country\n"
             "• `/predict <country> <item_name>` - Prediction v2: restock window, leave-by, arrival, reliability, and P2 fallback\n"
-            "• `/history <country> <item_name>` - Show recent recorded stock changes\n\n"
+            "• `/history <country> <item_name>` - Show the 3 most recent completed stock cycles\n\n"
         )
 
         await interaction.response.send_message(message)

@@ -733,6 +733,141 @@ def _suppress_provider_bounces(rows, max_bounce_seconds: int = 180):
     return cleaned, anomalies
 
 
+
+def get_stock_catalog():
+    """
+    Return the countries/items that actually exist in local collected history.
+
+    This intentionally comes from Torn Fren's own database rather than a hard-
+    coded item list so the hosted graph selector always reflects what the poller
+    has seen.
+    """
+    init_db()
+    with _connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT country, item_name, MAX(timestamp) AS latest_timestamp
+            FROM stock_history
+            GROUP BY country, item_name
+            ORDER BY country ASC, item_name COLLATE NOCASE ASC
+            """
+        ).fetchall()
+
+    by_country = {}
+    for country, item_name, latest_timestamp in rows:
+        country = (country or "").lower()
+        if not country or not item_name:
+            continue
+        by_country.setdefault(country, []).append({
+            "item_name": item_name,
+            "latest_timestamp": int(latest_timestamp) if latest_timestamp is not None else None,
+        })
+
+    return {
+        "countries": [
+            {
+                "country": country,
+                "items": items,
+            }
+            for country, items in sorted(by_country.items())
+        ]
+    }
+
+
+def get_recent_completed_cycles(country, item_name, limit=3):
+    """
+    Return the latest qualified completed cycles for player-facing /history.
+
+    A completed stock cycle is restock -> depletion. The empty wait shown for
+    that cycle is the validated depletion -> NEXT restock sample that follows it.
+    Discord intentionally caps this at 3 cycles.
+    """
+    init_db()
+    limit = max(1, min(int(limit or 3), 3))
+
+    raw = _get_all_item_rows_with_source(country, item_name)
+    cleaned, suppressed = _suppress_provider_bounces(raw)
+    rows = [(ts, qty) for ts, qty, _source in cleaned]
+
+    if not rows:
+        return {
+            "country": country.lower(),
+            "item_name": item_name,
+            "cycles": [],
+            "typical": {},
+            "suppressed_provider_bounces": suppressed,
+        }
+
+    cycles, _active_cycle, wait_samples = _build_validated_cycles(rows)
+
+    # Map each VALID zero->restock sample by the depletion that started it.
+    wait_by_depletion = {
+        int(sample["from_depletion"]): sample
+        for sample in wait_samples
+        if sample.get("valid")
+        and sample.get("from_depletion") is not None
+        and sample.get("to_restock") is not None
+        and sample.get("seconds") is not None
+    }
+
+    qualified = []
+    for cycle in cycles:
+        if not cycle.get("complete"):
+            continue
+        if cycle.get("tiny_restock"):
+            continue
+        if not cycle.get("valid_lifetime"):
+            continue
+
+        depletion = cycle.get("depletion_time")
+        lifetime = cycle.get("lifetime_seconds")
+        wait = wait_by_depletion.get(int(depletion)) if depletion is not None else None
+
+        # /history is specifically showing a fully observed completed cycle PLUS
+        # the empty period after it, so require the next valid restock too.
+        if depletion is None or lifetime is None or wait is None:
+            continue
+
+        qualified.append({
+            "restock_time": cycle.get("restock_time"),
+            "depletion_time": depletion,
+            "next_restock_time": wait.get("to_restock"),
+            "zero_wait_seconds": wait.get("seconds"),
+            "stock_lifetime_seconds": lifetime,
+            "peak_quantity": cycle.get("peak_quantity"),
+            "restock_quantity": cycle.get("first_seen_quantity"),
+        })
+
+    recent = list(reversed(qualified[-limit:]))
+
+    def _median(values):
+        vals = sorted(float(v) for v in values if v is not None)
+        if not vals:
+            return None
+        n = len(vals)
+        mid = n // 2
+        return vals[mid] if n % 2 else (vals[mid - 1] + vals[mid]) / 2
+
+    return {
+        "country": country.lower(),
+        "item_name": item_name,
+        "cycles": recent,
+        "typical": {
+            "median_zero_wait_seconds": _median(
+                c.get("zero_wait_seconds") for c in qualified
+            ),
+            "median_stock_lifetime_seconds": _median(
+                c.get("stock_lifetime_seconds") for c in qualified
+            ),
+            "median_peak_quantity": _median(
+                c.get("peak_quantity") for c in qualified
+            ),
+            "valid_cycle_count": len(qualified),
+        },
+        "suppressed_provider_bounces": suppressed,
+    }
+
+
 def get_item_history_since(country: str, item_name: str, hours: float = 24):
     """
     Return cleaned stock history for graphing, oldest -> newest.

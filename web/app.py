@@ -2,9 +2,11 @@ from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 
-from services.history_service import get_item_history_since, get_stock_graph_analysis
+from services.history_service import get_item_history_since, get_stock_catalog, get_stock_graph_analysis
 from services.prediction_v2_live import build_live_prediction_v2
+from services.admin_health import build_admin_health
 
 app = FastAPI(title="Torn Fren Stock Graph")
 
@@ -55,6 +57,21 @@ def api_history(
         "rows": rows,
         "analysis": analysis,
     }
+
+
+@app.get("/api/catalog")
+def api_catalog():
+    return get_stock_catalog()
+
+
+@app.get("/api/admin/health")
+def api_admin_health():
+    return build_admin_health()
+
+
+@app.get("/admin")
+def admin_page():
+    return FileResponse(STATIC_DIR / "admin.html")
 
 
 app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="static")

@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Torn Fren Admin Health</title>
+  <style>
+    :root {
+      --bg:#17181b; --panel:#202226; --panel2:#26292e; --border:#363a40;
+      --text:#f2f3f5; --muted:#aeb3bb; --green:#3ba55d; --gold:#faa61a;
+      --red:#ed4245; --blue:#5865f2;
+    }
+    * { box-sizing:border-box; }
+    body {
+      margin:0; background:var(--bg); color:var(--text);
+      font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    }
+    .wrap { max-width:1180px; margin:0 auto; padding:20px; }
+    .top {
+      display:flex; justify-content:space-between; align-items:center; gap:12px;
+      margin-bottom:16px;
+    }
+    h1 { margin:0; font-size:1.35rem; }
+    .sub { color:var(--muted); font-size:.86rem; margin-top:4px; }
+    .actions { display:flex; gap:8px; align-items:center; }
+    button,a.button {
+      border:1px solid var(--border); background:var(--panel2); color:var(--text);
+      border-radius:7px; padding:8px 11px; cursor:pointer; text-decoration:none;
+      font-size:.84rem;
+    }
+    .status {
+      display:inline-flex; align-items:center; gap:7px; padding:7px 10px;
+      border:1px solid var(--border); border-radius:999px; font-weight:700;
+      font-size:.78rem;
+    }
+    .status::before { content:""; width:8px; height:8px; border-radius:50%; background:var(--muted); }
+    .status.healthy::before { background:var(--green); }
+    .status.delayed::before { background:var(--gold); }
+    .status.stale::before { background:var(--red); }
+    .grid {
+      display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px;
+    }
+    .card {
+      background:var(--panel); border:1px solid var(--border); border-radius:9px;
+      padding:14px; min-width:0;
+    }
+    .card h2 {
+      margin:0 0 10px; font-size:.75rem; color:var(--muted);
+      text-transform:uppercase; letter-spacing:.04em;
+    }
+    .metric { font-size:1.55rem; font-weight:800; line-height:1.15; }
+    .small { color:var(--muted); font-size:.78rem; margin-top:5px; line-height:1.4; }
+    .rows { display:grid; gap:7px; }
+    .row {
+      display:flex; justify-content:space-between; gap:12px;
+      padding-bottom:7px; border-bottom:1px solid rgba(255,255,255,.05);
+      font-size:.83rem;
+    }
+    .row:last-child { border-bottom:0; padding-bottom:0; }
+    .row span:first-child { color:var(--muted); }
+    .row span:last-child { text-align:right; font-weight:650; overflow-wrap:anywhere; }
+    .wide { grid-column:span 2; }
+    .full { grid-column:1/-1; }
+    .gap {
+      padding:8px 0; border-bottom:1px solid rgba(255,255,255,.05);
+      font-size:.8rem;
+    }
+    .gap:last-child { border-bottom:0; }
+    .err { color:#ffb3b5; }
+    @media (max-width:850px) {
+      .grid { grid-template-columns:1fr; }
+      .wide,.full { grid-column:auto; }
+      .top { align-items:flex-start; flex-direction:column; }
+    }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div>
+      <h1>Torn Fren · Admin Health</h1>
+      <div class="sub">Operational status for collector, database, prediction audits and runtime.</div>
+    </div>
+    <div class="actions">
+      <span id="statusPill" class="status">Loading</span>
+      <button id="refreshBtn">↻ Refresh</button>
+      <a class="button" href="/">Open graph</a>
+    </div>
+  </div>
+
+  <div class="grid">
+    <section class="card">
+      <h2>Collector</h2>
+      <div id="collectorAge" class="metric">—</div>
+      <div id="collectorMeta" class="small">—</div>
+    </section>
+
+    <section class="card">
+      <h2>Database</h2>
+      <div id="dbSize" class="metric">—</div>
+      <div id="dbPath" class="small">—</div>
+    </section>
+
+    <section class="card">
+      <h2>Disk</h2>
+      <div id="diskFree" class="metric">—</div>
+      <div id="diskMeta" class="small">—</div>
+    </section>
+
+    <section class="card wide">
+      <h2>Database rows</h2>
+      <div id="counts" class="rows"></div>
+    </section>
+
+    <section class="card">
+      <h2>Forecast auditor</h2>
+      <div id="audits" class="rows"></div>
+    </section>
+
+    <section class="card wide">
+      <h2>Recent collection gaps</h2>
+      <div id="gaps"></div>
+    </section>
+
+    <section class="card">
+      <h2>Runtime</h2>
+      <div id="runtime" class="rows"></div>
+    </section>
+
+    <section class="card full">
+      <h2>Last failed poll</h2>
+      <div id="lastFailure" class="small">No failed poll recorded.</div>
+    </section>
+  </div>
+</div>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+
+  function fmtBytes(bytes) {
+    if (bytes == null) return "—";
+    const units = ["B","KB","MB","GB","TB"];
+    let value = Number(bytes), i = 0;
+    while (value >= 1024 && i < units.length - 1) { value /= 1024; i++; }
+    return `${value >= 10 || i === 0 ? value.toFixed(0) : value.toFixed(1)} ${units[i]}`;
+  }
+
+  function fmtDuration(seconds) {
+    if (seconds == null) return "—";
+    let s = Math.max(0, Math.floor(Number(seconds)));
+    const h = Math.floor(s / 3600); s %= 3600;
+    const m = Math.floor(s / 60); s %= 60;
+    if (h) return `${h}h ${m}m`;
+    if (m) return `${m}m ${s}s`;
+    return `${s}s`;
+  }
+
+  function fmtTime(ts) {
+    return ts ? new Date(ts * 1000).toLocaleString() : "—";
+  }
+
+  function addRows(target, rows) {
+    target.innerHTML = rows.map(([k,v]) =>
+      `<div class="row"><span>${k}</span><span>${v ?? "—"}</span></div>`
+    ).join("");
+  }
+
+  async function loadHealth() {
+    $("refreshBtn").disabled = true;
+    try {
+      const res = await fetch("/api/admin/health", {cache:"no-store"});
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+
+      $("statusPill").className = `status ${data.health || ""}`;
+      $("statusPill").textContent = (data.health || "unknown").toUpperCase();
+
+      const c = data.collector || {};
+      $("collectorAge").textContent = c.last_success_age_seconds == null
+        ? "Unknown"
+        : `${fmtDuration(c.last_success_age_seconds)} ago`;
+      $("collectorMeta").textContent =
+        `${fmtTime(c.last_success_timestamp)} · ${(c.last_success_source || "unknown").toUpperCase()}`;
+
+      const db = data.database || {};
+      $("dbSize").textContent = fmtBytes(db.size_bytes);
+      $("dbPath").textContent = db.path || "—";
+      const counts = db.counts || {};
+      addRows($("counts"), [
+        ["Stock history rows", counts.stock_history?.toLocaleString?.() ?? counts.stock_history],
+        ["Poll heartbeats", counts.poll_heartbeats?.toLocaleString?.() ?? counts.poll_heartbeats],
+        ["Collection gaps", counts.collection_gaps?.toLocaleString?.() ?? counts.collection_gaps],
+        ["Prediction audits", counts.prediction_audits?.toLocaleString?.() ?? counts.prediction_audits],
+        ["Forecast runs", counts.forecast_audit_runs?.toLocaleString?.() ?? counts.forecast_audit_runs],
+        ["Forecast points", counts.forecast_audit_points?.toLocaleString?.() ?? counts.forecast_audit_points],
+      ]);
+
+      const a = data.forecast_auditor || {};
+      addRows($("audits"), [
+        ["Pending", a.pending_points],
+        ["Resolved", a.resolved_points],
+        ["Invalidated", a.invalidated_points],
+        ["Profile cache age", fmtDuration(a.profile_cache_age_seconds)],
+      ]);
+
+      const runtime = data.runtime || {};
+      const disk = runtime.disk || {};
+      $("diskFree").textContent = fmtBytes(disk.free_bytes);
+      $("diskMeta").textContent = disk.used_percent == null
+        ? "Disk usage unavailable"
+        : `${disk.used_percent}% used · ${fmtBytes(disk.total_bytes)} total`;
+
+      addRows($("runtime"), [
+        ["Python", runtime.python],
+        ["Git branch", runtime.git_branch],
+        ["Git commit", runtime.git_commit],
+        ["Web PID", runtime.pid],
+      ]);
+
+      const gaps = data.recent_collection_gaps || [];
+      $("gaps").innerHTML = gaps.length
+        ? gaps.slice().reverse().map(g =>
+            `<div class="gap"><strong>${fmtTime(g.start_timestamp)}</strong> → <strong>${fmtTime(g.end_timestamp)}</strong><div class="small">${g.reason || ""}</div></div>`
+          ).join("")
+        : `<div class="small">No known collection gaps.</div>`;
+
+      const fail = data.last_failed_poll;
+      $("lastFailure").innerHTML = fail
+        ? `<span class="err">${fmtTime(fail.timestamp)} · ${(fail.source || "unknown").toUpperCase()}</span><br>${fail.error || "No error text"}`
+        : "No failed poll recorded.";
+    } catch (err) {
+      $("statusPill").className = "status stale";
+      $("statusPill").textContent = "ERROR";
+      $("lastFailure").textContent = `Admin health API failed: ${err}`;
+    } finally {
+      $("refreshBtn").disabled = false;
+    }
+  }
+
+  $("refreshBtn").addEventListener("click", loadHealth);
+  loadHealth();
+  setInterval(loadHealth, 30000);
+</script>
+</body>
+</html>
