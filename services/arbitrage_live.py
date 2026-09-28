@@ -19,6 +19,8 @@ from services.stock_provider import get_travel_export
 WEAV3R_ITEM_URL = "https://weav3r.dev/item/{item_id}"
 TORNW3B_API_BASE = "https://weav3r.dev/api"
 TORN_EXCHANGE_LISTINGS_URL = "https://www.tornexchange.com/listings"
+TORN_EXCHANGE_BEST_URL = "https://tornexchange.com/api/best_listing"
+TE_MIN_REQUEST_INTERVAL_SECONDS = float(os.getenv("ARBITRAGE_TE_REQUEST_INTERVAL", "6.2"))
 DEFAULT_CACHE_SECONDS = int(os.getenv("ARBITRAGE_CACHE_SECONDS", "900"))
 DEFAULT_MAX_WORKERS = max(1, min(int(os.getenv("ARBITRAGE_MAX_WORKERS", "2")), 4))
 HTTP_TIMEOUT_SECONDS = float(os.getenv("ARBITRAGE_HTTP_TIMEOUT", "12"))
@@ -54,6 +56,8 @@ class ForeignItem:
 
 
 _cache_lock = threading.Lock()
+_te_rate_lock = threading.Lock()
+_te_last_call_monotonic = 0.0
 _snapshot_cache = {
     "timestamp": 0.0,
     "catalog": [],
@@ -441,34 +445,75 @@ def parse_tornexchange_listings_html(
     return sorted(offers, key=lambda row: row.unit_price, reverse=True)
 
 
+def _wait_for_tornexchange_slot() -> None:
+    """
+    Torn Exchange's public best-listing API is documented by community scripts
+    as a maximum of 10 calls/minute. Serialize calls at a 6.2 second interval
+    to stay just under that ceiling even when the foreign scan uses workers.
+    """
+    global _te_last_call_monotonic
+
+    with _te_rate_lock:
+        now = time.monotonic()
+        wait = TE_MIN_REQUEST_INTERVAL_SECONDS - (now - _te_last_call_monotonic)
+        if wait > 0:
+            time.sleep(wait)
+        _te_last_call_monotonic = time.monotonic()
+
+
 def fetch_tornexchange_buy_offers(
     item: ForeignItem,
     *,
     session: Optional[requests.Session] = None,
 ) -> list[BuyOffer]:
+    """
+    Fetch Torn Exchange's best active trader for one item using its public API.
+
+    Response fields used by existing Torn community scripts include:
+      price, trader, trader_id, item, te_price, vote.
+    """
     session = session or _session()
+    _wait_for_tornexchange_slot()
+
     response = session.get(
-        TORN_EXCHANGE_LISTINGS_URL,
-        params={
-            "model_name_contains": item.item_name,
-            "active_traders_only": "on",
-            "page": 1,
-        },
+        TORN_EXCHANGE_BEST_URL,
+        params={"item_id": item.item_id},
         timeout=HTTP_TIMEOUT_SECONDS,
     )
     response.raise_for_status()
+    payload = response.json()
 
-    offers = parse_tornexchange_listings_html(
-        response.text,
-        item_id=item.item_id,
-        item_name=item.item_name,
-        observed_at=time.time(),
-    )
+    if payload.get("status") != "success" or not payload.get("data"):
+        return []
 
-    # A fuzzy item search can include similarly named items. The parser already
-    # requires the requested name to appear in the card; keep only positive bids.
-    return [row for row in offers if row.unit_price > 0]
+    data = payload["data"]
+    try:
+        price = int(round(float(data.get("price") or 0)))
+    except (TypeError, ValueError):
+        return []
 
+    trader_name = str(data.get("trader") or "").strip()
+    trader_id = str(data.get("trader_id") or "").strip() or None
+
+    if price <= 0 or not trader_name:
+        return []
+
+    # Torn Exchange usernames map directly to public /prices/<name>/ pages.
+    trader_slug = quote_plus(trader_name).replace("+", "%20")
+    trader_url = f"https://www.tornexchange.com/prices/{trader_slug}/"
+
+    return [
+        BuyOffer(
+            item_name=item.item_name,
+            item_id=item.item_id,
+            unit_price=price,
+            source="torn_exchange",
+            buyer_name=trader_name,
+            buyer_id=trader_id,
+            url=trader_url,
+            observed_at=time.time(),
+        )
+    ]
 
 
 def fetch_torn_item_market(
