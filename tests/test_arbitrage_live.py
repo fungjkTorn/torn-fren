@@ -5,6 +5,7 @@ from unittest.mock import patch
 from services.arbitrage_live import (
     ForeignItem,
     fetch_torn_item_market,
+    fetch_tornexchange_buy_offers,
     fetch_tornw3b_bazaar,
     fetch_tornw3b_buy_offers,
     parse_tornexchange_listings_html,
@@ -13,10 +14,11 @@ from services.arbitrage_live import (
 
 
 class _FakeResponse:
-    def __init__(self, payload, status_code=200, headers=None):
+    def __init__(self, payload=None, status_code=200, headers=None, text=""):
         self._payload = payload
         self.status_code = status_code
         self.headers = headers or {}
+        self.text = text
 
     def raise_for_status(self):
         return None
@@ -172,6 +174,46 @@ class LiveArbitrageParserTests(unittest.TestCase):
         self.assertEqual(rows[0].unit_price, 108_000)
         self.assertEqual(rows[0].quantity, 14)
         self.assertEqual(rows[0].source, "torn_item_market")
+
+    def test_tornexchange_listings_page_beats_api_style_price(self):
+        item = ForeignItem("1488", "Meteorite Fragment", ("Argentina",), (400_904,))
+        html = """
+        <html><body>
+          <div class="listing-card">
+            <div>EVETINE [2231549]</div>
+            <div>Artifact: Meteorite Fragment</div>
+            <div>$505,000</div>
+            <a href="/prices/EVETINE/">Price List</a>
+            <a href="#">Trade Now</a>
+          </div>
+          <div class="listing-card">
+            <div>Qfiffle [2557282]</div>
+            <div>Artifact: Meteorite Fragment</div>
+            <div>$460,944</div>
+            <a href="/prices/Qfiffle/">Price List</a>
+            <a href="#">Trade Now</a>
+          </div>
+        </body></html>
+        """
+
+        class ListingsSession:
+            def get(self, url, **kwargs):
+                return _FakeResponse(text=html)
+
+        with patch("services.arbitrage_live._read_te_cache", return_value=None), \
+             patch("services.arbitrage_live._write_te_cache") as write_cache, \
+             patch("services.arbitrage_live._wait_for_tornexchange_listings_slot"):
+            rows = fetch_tornexchange_buy_offers(
+                item,
+                session=ListingsSession(),
+                force=True,
+            )
+
+        self.assertEqual(len(rows), 2)
+        self.assertEqual(rows[0].buyer_name, "EVETINE")
+        self.assertEqual(rows[0].unit_price, 505_000)
+        write_cache.assert_called_once()
+        self.assertEqual(write_cache.call_args.kwargs["price"], 505_000)
 
 
 if __name__ == "__main__":
