@@ -121,6 +121,29 @@ def _graph_view(country: str, item_name: str, label: str = "📈 Open Graph"):
     return view
 
 
+def _arbitrage_url():
+    base = (getattr(config, "PUBLIC_BASE_URL", "") or "").rstrip("/")
+    if not base:
+        return None
+    return f"{base}/arbitrage"
+
+
+def _arbitrage_view():
+    url = _arbitrage_url()
+    if not url:
+        return None
+
+    view = discord.ui.View()
+    view.add_item(
+        discord.ui.Button(
+            label="Open Arbitrage Scanner",
+            style=discord.ButtonStyle.link,
+            url=url,
+        )
+    )
+    return view
+
+
 def setup_commands(bot):
 
     @bot.tree.command(name="stock", description="Show current abroad stock for a country")
@@ -275,6 +298,41 @@ def setup_commands(bot):
         view = _graph_view(country, item_name, "📈 Open Full History")
         await interaction.followup.send(embed=embed, view=view)
 
+    @bot.tree.command(
+        name="arbitrage",
+        description="Open the foreign-item arbitrage scanner",
+    )
+    async def arbitrage_command(interaction: discord.Interaction):
+        url = _arbitrage_url()
+        if not url:
+            await interaction.response.send_message(
+                "⚠️ Arbitrage scanner URL is not configured yet.",
+                ephemeral=True,
+            )
+            return
+
+        embed = discord.Embed(
+            title="💱 Arbitrage Scanner",
+            description=(
+                "Foreign-purchasable item arbitrage scanner. "
+                "Compare current buy listings against TornW3B / Torn Exchange trader bids."
+            ),
+            color=0x48D597,
+        )
+        embed.add_field(
+            name="Testing build",
+            value=(
+                "Prices are scanner leads, not guaranteed trades. "
+                "Verify unusually large spreads with the trader before committing capital."
+            ),
+            inline=False,
+        )
+
+        await interaction.response.send_message(
+            embed=embed,
+            view=_arbitrage_view(),
+        )
+
     @bot.tree.command(name="ping", description="Check if the bot is responsive")
     async def ping(interaction: discord.Interaction):
         await interaction.response.send_message("pong!")
@@ -302,6 +360,8 @@ def setup_commands(bot):
             "• `/stock <country>` - Show current abroad stock for a country\n"
             "• `/predict <country> <item_name>` - Prediction v2 + direct graph link\n"
             "• `/history <country> <item_name>` - Show 3 recent cycles + full graph link\n\n"
+            "**Tools**\n"
+            "• `/arbitrage` - Open the foreign-item arbitrage scanner\n\n"
         )
 
         await interaction.response.send_message(message)
