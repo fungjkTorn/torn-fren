@@ -8,6 +8,7 @@ import discord
 from bot import alerts, config
 from modules import stock, travel
 from modules.prediction_v2_discord import build_prediction_v2_embed
+from modules.arbitrage_discord import build_arbitrage_embed
 from services.history_service import get_recent_completed_cycles
 from services.prediction_v2_live import build_live_prediction_v2
 from services.arbitrage_live import build_arbitrage_report
@@ -362,6 +363,47 @@ def setup_commands(bot):
 
         await interaction.followup.send(embed=embed, view=_arbitrage_view())
 
+    @bot.tree.command(
+        name="arbitrage",
+        description="Show current foreign-item arbitrage opportunities",
+    )
+    async def arbitrage_command(
+        interaction: discord.Interaction,
+        min_profit: int = 20_000,
+        min_roi_percent: float = 0.0,
+        min_quantity: int = 1,
+    ):
+        await interaction.response.defer(thinking=True)
+
+        try:
+            embed = await asyncio.to_thread(
+                build_arbitrage_embed,
+                min_profit_per_item=max(0, min_profit),
+                min_roi=max(0.0, min_roi_percent) / 100.0,
+                min_quantity=max(1, min_quantity),
+                limit=8,
+            )
+
+            view = None
+            base = (getattr(config, "PUBLIC_BASE_URL", "") or "").rstrip("/")
+            if base:
+                view = discord.ui.View()
+                view.add_item(
+                    discord.ui.Button(
+                        label="Open Arbitrage Scanner",
+                        style=discord.ButtonStyle.link,
+                        url=f"{base}/arbitrage",
+                    )
+                )
+
+            await interaction.followup.send(embed=embed, view=view)
+        except Exception as exc:
+            print(f"/arbitrage failed: {exc}")
+            await interaction.followup.send(
+                "⚠️ Arbitrage scan could not be calculated right now. "
+                "Try again shortly or open the web scanner for source diagnostics."
+            )
+
     @bot.tree.command(name="ping", description="Check if the bot is responsive")
     async def ping(interaction: discord.Interaction):
         await interaction.response.send_message("pong!")
@@ -389,6 +431,8 @@ def setup_commands(bot):
             "• `/stock <country>` - Show current abroad stock for a country\n"
             "• `/predict <country> <item_name>` - Prediction v2 + direct graph link\n"
             "• `/history <country> <item_name>` - Show 3 recent cycles + full graph link\n\n"
+            "**Arbitrage**\n"
+            "• `/arbitrage` - Foreign-item bazaar/market → trader opportunities\n\n"
             "**Arbitrage**\n"
             "• `/arbitrage [min_profit] [min_quantity]` - Top foreign-item bazaar → trader spreads\n\n"
         )
