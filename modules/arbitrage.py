@@ -209,11 +209,22 @@ def scan_arbitrage(
         raise ValueError("min_quantity must be positive.")
 
     listing_rows = list(listings)
+    listings_by_item: dict[str, list[BazaarListing]] = {}
+    for listing in listing_rows:
+        _validate_listing(listing)
+        key = _item_key(listing.item_name, listing.item_id)
+        listings_by_item.setdefault(key, []).append(listing)
+
     best_by_item: dict[str, ArbitrageOpportunity] = {}
 
     for offer in offers:
+        offer_key = _item_key(offer.item_name, offer.item_id)
+        item_listings = listings_by_item.get(offer_key)
+        if not item_listings:
+            continue
+
         opportunity = evaluate_offer(
-            listing_rows,
+            item_listings,
             offer,
             min_profit_per_item=min_profit_per_item,
             min_roi=min_roi,
