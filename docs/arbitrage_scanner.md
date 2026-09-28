@@ -83,7 +83,7 @@ full Torn item universe.
 
 - `python arbitrage_scan.py --force` provides a terminal smoke test.
 - `GET /api/arbitrage` returns the normalized report.
-- `/arbitrage` is a sortable web table.
+- `/arbitrage` is a sortable/searchable web table with item diagnostics and anomaly labels.
 - Discord `/arbitrage [min_profit] [min_roi_percent] [min_quantity]` returns the top eight
   opportunities and links to the trader pricelist and TornW3B item page.
 
@@ -140,3 +140,66 @@ Successful refreshes are persisted to `data/arbitrage_snapshot.json`, so an
 application restart can immediately serve the last known scanner state while a
 new refresh runs. CLI calls remain synchronous by default so smoke tests can
 fail loudly and report the completed source state.
+
+
+## Staging deployment
+
+The scanner is intentionally deployed separately from the production Torn Fren
+web process while v0 is being validated.
+
+Current layout:
+
+- production repo: `/opt/torn-fren`
+- arbitrage staging repo: `/opt/torn-fren-arbitrage`
+- production web: `127.0.0.1:8000`
+- arbitrage staging web: `127.0.0.1:8001`
+- staging service: `torn-fren-arbitrage.service`
+- public page: `https://tornfren.duckdns.org/arbitrage`
+
+Nginx routes the arbitrage page/API to port 8001 while the rest of Torn Fren
+continues to use port 8000.
+
+Normal staging update:
+
+```bash
+cd /opt/torn-fren-arbitrage
+git pull
+source venv/bin/activate
+pip install -r requirements.txt
+sudo systemctl restart torn-fren-arbitrage.service
+sudo systemctl status torn-fren-arbitrage.service --no-pager
+```
+
+After an API/UI route is added beneath `/api/arbitrage`, Nginx should route
+the whole prefix to staging rather than only the exact base endpoint:
+
+```nginx
+location ^~ /api/arbitrage {
+    proxy_pass http://127.0.0.1:8001;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+}
+```
+
+Always run `sudo nginx -t` before reloading Nginx.
+
+## Scanner UX / trust metadata
+
+The web scanner now:
+
+- defaults to total-profit descending and shows the active sort direction;
+- searches across the full foreign-item catalog;
+- exposes an item diagnostic view with cheapest buy listings and highest trader
+  bids even when the item does not currently qualify;
+- reports quantity contributed by each buy source;
+- labels extreme/high spreads and buyer-price outliers without suppressing them.
+
+Anomaly labels are warnings only. They are deliberately not filters because
+mispriced trader lists can be real opportunities, but the user should verify
+the trader before committing meaningful capital.
+
+The official Torn Item Market source uses Torn's API, not background scraping
+of Torn web pages.
