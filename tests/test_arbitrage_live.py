@@ -7,6 +7,7 @@ from services.arbitrage_live import (
     ForeignItem,
     _anomaly_labels_for_item,
     build_arbitrage_report,
+    build_trader_finder,
     fetch_torn_item_market,
     fetch_tornexchange_buy_offers,
     fetch_tornw3b_bazaar,
@@ -392,6 +393,36 @@ class LiveArbitrageParserTests(unittest.TestCase):
         self.assertEqual(row["buyer_name"], "TE Buyer")
         self.assertEqual(row["quantity"], 3)
         self.assertEqual(row["buy_source_quantities"], {"torn_item_market": 3})
+
+    def test_trader_finder_ranks_and_deduplicates_buyers(self):
+        snapshot = {
+            "timestamp": 123.0,
+            "refreshing": False,
+            "catalog": [ForeignItem("1", "Item X", ("Argentina",), (50,))],
+            "listings": [],
+            "offers": [
+                BuyOffer("Item X", 150, "tornw3b_trader", "Buyer A", item_id="1", buyer_id="10"),
+                BuyOffer("Item X", 160, "tornw3b_trader", "Buyer A", item_id="1", buyer_id="10"),
+                BuyOffer("Item X", 170, "torn_exchange", "Buyer B", item_id="1", buyer_id="20"),
+            ],
+            "errors": [],
+        }
+
+        with patch("services.arbitrage_live.get_source_snapshot", return_value=snapshot):
+            result = build_trader_finder("Item X")
+
+        self.assertTrue(result["found"])
+        self.assertEqual(result["buyer_count"], 2)
+        self.assertEqual(result["buyers"][0]["buyer_name"], "Buyer B")
+        self.assertEqual(result["buyers"][0]["price"], 170)
+        self.assertEqual(result["buyers"][1]["buyer_name"], "Buyer A")
+        self.assertEqual(result["buyers"][1]["price"], 160)
+
+        with patch("services.arbitrage_live.get_source_snapshot", return_value=snapshot):
+            result = build_trader_finder("Item X", buyer_source="torn_exchange")
+
+        self.assertEqual(result["buyer_count"], 1)
+        self.assertEqual(result["buyers"][0]["buyer_name"], "Buyer B")
 
 
 if __name__ == "__main__":
