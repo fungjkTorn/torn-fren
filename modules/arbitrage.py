@@ -36,6 +36,8 @@ class ArbitrageOpportunity:
     buyer_name: str
     buyer_source: str
     buyer_price: int
+    buyer_url: Optional[str]
+    item_id: Optional[str]
     quantity: int
     total_cost: int
     total_revenue: int
@@ -164,6 +166,8 @@ def evaluate_offer(
         buyer_name=offer.buyer_name,
         buyer_source=offer.source,
         buyer_price=offer.unit_price,
+        buyer_url=offer.url,
+        item_id=offer.item_id,
         quantity=total_quantity,
         total_cost=total_cost,
         total_revenue=total_revenue,
