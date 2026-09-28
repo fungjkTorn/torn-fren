@@ -330,7 +330,6 @@ def fetch_tornexchange_buy_offers(
         TORN_EXCHANGE_LISTINGS_URL,
         params={
             "model_name_contains": item.item_name,
-            "order_by": "-effective_price",
             "active_traders_only": "on",
             "page": 1,
         },
