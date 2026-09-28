@@ -215,6 +215,78 @@ class LiveArbitrageParserTests(unittest.TestCase):
         write_cache.assert_called_once()
         self.assertEqual(write_cache.call_args.kwargs["price"], 505_000)
 
+    def test_tornexchange_rejects_fuzzy_similar_item_names(self):
+        html = """
+        <html><body>
+          <div class="listing-card">
+            <div>Juki11 [4194497]</div>
+            <div>$15,345,000,000</div>
+            <div>Current market: $15,500,000,000</div>
+            <div>Primary: Gold Plated AK-47</div>
+            <a href="/prices/Juki11/">Price List</a>
+            <a href="#">Trade Now</a>
+          </div>
+          <div class="listing-card">
+            <div>Trader Axe [123456]</div>
+            <div>$5,841,000,000</div>
+            <div>Current market: $5,900,000,000</div>
+            <div>Melee: Dual Axes</div>
+            <a href="/prices/Trader-Axe/">Price List</a>
+            <a href="#">Trade Now</a>
+          </div>
+        </body></html>
+        """
+
+        ak_rows = parse_tornexchange_listings_html(
+            html,
+            item_id="26",
+            item_name="AK-47",
+            observed_at=123.0,
+        )
+        axe_rows = parse_tornexchange_listings_html(
+            html,
+            item_id="8",
+            item_name="Axe",
+            observed_at=123.0,
+        )
+
+        self.assertEqual(ak_rows, [])
+        self.assertEqual(axe_rows, [])
+
+    def test_tornexchange_ignores_generic_prices_navigation_link(self):
+        html = """
+        <html><body>
+          <div>
+            <a href="/prices/">Price List</a>
+            <div>$999,999</div>
+            <div>Artifact: Basalt Point</div>
+          </div>
+          <div class="listing-card">
+            <div>Shinsengumi [2097185]</div>
+            <div>$134,000</div>
+            <div>Current market: $108,829</div>
+            <div>Artifact: Basalt Point</div>
+            <a href="/prices/Shinsengumi/">Price List</a>
+            <a href="#">Trade Now</a>
+          </div>
+        </body></html>
+        """
+
+        rows = parse_tornexchange_listings_html(
+            html,
+            item_id="1502",
+            item_name="Basalt Point",
+            observed_at=123.0,
+        )
+
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0].buyer_name, "Shinsengumi")
+        self.assertEqual(rows[0].unit_price, 134_000)
+        self.assertEqual(
+            rows[0].url,
+            "https://www.tornexchange.com/prices/Shinsengumi/",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
