@@ -112,6 +112,25 @@ class ArbitrageEngineTests(unittest.TestCase):
         self.assertEqual(results[0].buyer_name, "Buyer B")
         self.assertEqual(results[0].total_profit, 550_000)
 
+    def test_tracks_buy_source_quantities_and_costs(self):
+        listings = [
+            BazaarListing("Item X", 100, 3, "tornw3b_bazaar", seller_name="A"),
+            BazaarListing("Item X", 110, 2, "torn_item_market", seller_name="Market"),
+        ]
+        offer = BuyOffer("Item X", 150, "buyers", "Trader")
+
+        result = evaluate_offer(listings, offer, min_profit_per_item=20)
+
+        self.assertIsNotNone(result)
+        self.assertEqual(
+            result.buy_source_quantities,
+            {"torn_item_market": 2, "tornw3b_bazaar": 3},
+        )
+        self.assertEqual(
+            result.buy_source_costs,
+            {"torn_item_market": 220, "tornw3b_bazaar": 300},
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
