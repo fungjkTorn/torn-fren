@@ -1288,6 +1288,7 @@ def build_arbitrage_report(
         "min_roi": min_roi,
         "min_quantity": min_quantity,
         "catalog_count": len(snapshot["catalog"]),
+        "catalog_items": [item.item_name for item in snapshot["catalog"]],
         "listing_count": len(snapshot["listings"]),
         "offer_count": len(snapshot["offers"]),
         "opportunity_count": len(output),
