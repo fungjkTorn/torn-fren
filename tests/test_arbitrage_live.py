@@ -1,9 +1,11 @@
+from modules.arbitrage import ArbitrageOpportunity, BuyOffer
 import os
 import unittest
 from unittest.mock import patch
 
 from services.arbitrage_live import (
     ForeignItem,
+    _anomaly_labels_for_item,
     fetch_torn_item_market,
     fetch_tornexchange_buy_offers,
     fetch_tornw3b_bazaar,
@@ -319,6 +321,40 @@ class LiveArbitrageParserTests(unittest.TestCase):
                     observed_at=123.0,
                 )
                 self.assertEqual(rows, [])
+
+    def test_anomaly_labels_do_not_hide_extreme_offer(self):
+        opportunity = ArbitrageOpportunity(
+            item_name="Fire Hydrant",
+            buyer_name="Trader A",
+            buyer_source="tornw3b_trader",
+            buyer_price=2_400_000,
+            buyer_url=None,
+            item_id="410",
+            quantity=100,
+            total_cost=1_600_000,
+            total_revenue=240_000_000,
+            total_profit=238_400_000,
+            average_buy_price=16_000,
+            average_profit_per_item=2_384_000,
+            roi=149.0,
+            cheapest_buy_price=15_000,
+            highest_accepted_buy_price=17_000,
+            seller_count=20,
+            listing_count=20,
+            buy_sources=("tornw3b_bazaar",),
+            buy_source_quantities={"tornw3b_bazaar": 100},
+            buy_source_costs={"tornw3b_bazaar": 1_600_000},
+        )
+        offers = [
+            BuyOffer("Fire Hydrant", 2_400_000, "tornw3b_trader", "Trader A", item_id="410"),
+            BuyOffer("Fire Hydrant", 20_000, "tornw3b_trader", "Trader B", item_id="410"),
+        ]
+
+        labels, meta = _anomaly_labels_for_item(opportunity, offers)
+
+        self.assertIn("Extreme spread — verify trader", labels)
+        self.assertIn("Top buyer far above next bid", labels)
+        self.assertEqual(meta["second_best_buyer_price"], 20_000)
 
 
 if __name__ == "__main__":
