@@ -15,7 +15,7 @@ from urllib.parse import quote_plus, urljoin
 import requests
 from bs4 import BeautifulSoup
 
-from modules.arbitrage import BazaarListing, BuyOffer, scan_arbitrage
+from modules.arbitrage import BazaarListing, BuyOffer, build_arbitrage_candidates, scan_arbitrage
 from services.stock_provider import get_travel_export
 
 
@@ -1330,6 +1330,9 @@ def build_arbitrage_report(
     buy_source: str = "all",
     buyer_source: str = "all",
     country: Optional[str] = None,
+    excluded_traders: Optional[list[str]] = None,
+    max_opportunities_per_trader: Optional[int] = None,
+    diversified: bool = False,
 ) -> dict:
     snapshot = get_source_snapshot(force=force, background=background)
 
@@ -1350,12 +1353,30 @@ def build_arbitrage_report(
     elif buyer_source == "torn_exchange":
         offers = [row for row in offers if row.source == "torn_exchange"]
 
+    excluded_set = {
+        name.strip()
+        for name in (excluded_traders or [])
+        if name and name.strip()
+    }
+
     opportunities = scan_arbitrage(
         listings,
         offers,
         min_profit_per_item=min_profit_per_item,
         min_roi=min_roi,
         min_quantity=min_quantity,
+        excluded_buyers=excluded_set,
+        max_opportunities_per_buyer=max_opportunities_per_trader,
+        diversified=diversified,
+    )
+
+    candidates_by_item = build_arbitrage_candidates(
+        listings,
+        offers,
+        min_profit_per_item=min_profit_per_item,
+        min_roi=min_roi,
+        min_quantity=min_quantity,
+        excluded_buyers=excluded_set,
     )
 
     catalog_by_id = {item.item_id: item for item in snapshot["catalog"]}
@@ -1381,7 +1402,45 @@ def build_arbitrage_report(
         )
         row["anomaly_labels"] = labels
         row.update(buyer_meta)
+
+        item_key = f"id:{opportunity.item_id}" if opportunity.item_id else f"name:{opportunity.item_name.strip().casefold()}"
+        alternatives = [
+            alt for alt in candidates_by_item.get(item_key, [])
+            if not (
+                alt.buyer_name == opportunity.buyer_name
+                and alt.buyer_source == opportunity.buyer_source
+                and alt.buyer_price == opportunity.buyer_price
+            )
+        ]
+        second = alternatives[0] if alternatives else None
+        row["second_best_buyer_name"] = second.buyer_name if second else None
+        row["second_best_buyer_source"] = second.buyer_source if second else None
+        row["second_best_buyer_price"] = second.buyer_price if second else None
+        row["second_best_total_profit"] = second.total_profit if second else None
+        row["second_best_buyer_url"] = second.buyer_url if second else None
+        row["buyer_price_gap"] = (
+            opportunity.buyer_price - second.buyer_price
+            if second else None
+        )
+        row["buyer_profit_gap"] = (
+            opportunity.total_profit - second.total_profit
+            if second else None
+        )
         output.append(row)
+
+    selected_profit = sum(int(row.get("total_profit") or 0) for row in output)
+    concentration_rows = []
+    by_buyer: dict[str, dict] = {}
+    for row in output:
+        name = str(row.get("buyer_name") or "Unknown")
+        entry = by_buyer.setdefault(name, {"buyer_name": name, "opportunity_count": 0, "total_profit": 0})
+        entry["opportunity_count"] += 1
+        entry["total_profit"] += int(row.get("total_profit") or 0)
+    for entry in by_buyer.values():
+        entry["profit_share"] = (entry["total_profit"] / selected_profit) if selected_profit else 0.0
+        entry["opportunity_share"] = (entry["opportunity_count"] / len(output)) if output else 0.0
+        concentration_rows.append(entry)
+    concentration_rows.sort(key=lambda row: (row["opportunity_count"], row["total_profit"]), reverse=True)
 
     generated_at = float(snapshot.get("timestamp") or 0)
     return {
@@ -1397,6 +1456,9 @@ def build_arbitrage_report(
         "buy_source_filter": buy_source,
         "buyer_source_filter": buyer_source,
         "country_filter": country or None,
+        "excluded_traders": sorted(excluded_set, key=str.casefold),
+        "max_opportunities_per_trader": max_opportunities_per_trader,
+        "diversified": diversified,
         "catalog_count": len(snapshot["catalog"]),
         "catalog_items": [item.item_name for item in snapshot["catalog"]],
         "catalog_options": [
@@ -1406,6 +1468,11 @@ def build_arbitrage_report(
         "listing_count": len(snapshot["listings"]),
         "offer_count": len(snapshot["offers"]),
         "opportunity_count": len(output),
+        "trader_options": sorted(
+            {offer.buyer_name for offer in offers if offer.buyer_name},
+            key=str.casefold,
+        ),
+        "buyer_concentration": concentration_rows,
         "errors": snapshot["errors"],
         "opportunities": output,
     }
