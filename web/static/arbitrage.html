@@ -10,7 +10,7 @@
     .wrap{max-width:1500px;margin:0 auto;padding:28px} h1{margin:0 0 6px;font-size:30px}.sub{color:var(--muted);margin-bottom:20px}
     .toolbar,.stats{display:flex;gap:12px;flex-wrap:wrap;align-items:end}.toolbar{background:var(--panel);border:1px solid var(--line);padding:14px;border-radius:14px}
     label{display:flex;flex-direction:column;gap:6px;color:var(--muted);font-size:12px}input,select,button{background:#0d131b;color:var(--text);border:1px solid var(--line);border-radius:9px;padding:9px 10px}
-    input[type="search"]{min-width:220px}button{cursor:pointer;font-weight:700}button.primary{background:var(--accent);color:#07111d;border-color:transparent}.stats{margin:14px 0}
+    #itemSearch{min-width:220px}button{cursor:pointer;font-weight:700}button.primary{background:var(--accent);color:#07111d;border-color:transparent}.stats{margin:14px 0}
     .stat{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:11px 14px;min-width:140px}.stat b{display:block;font-size:18px}.stat span{color:var(--muted);font-size:12px}
     .notice{margin:10px 0;color:var(--muted)}.error{color:var(--bad)}.table-shell{overflow-x:hidden;border:1px solid var(--line);border-radius:14px;background:var(--panel)}
     table{width:100%;border-collapse:collapse;table-layout:fixed}th,td{padding:10px 8px;border-bottom:1px solid var(--line);text-align:right;overflow-wrap:anywhere}
@@ -38,8 +38,9 @@
     <label>Minimum ROI %<input id="minRoi" type="number" value="0" min="0" step="0.5"></label>
     <label>Minimum quantity<input id="minQty" type="number" value="1" min="1" step="1"></label>
     <label>Item
-      <input id="itemSearch" type="search" list="itemOptions" placeholder="Meteorite Fragment">
-      <datalist id="itemOptions"></datalist>
+      <select id="itemSearch">
+        <option value="">Choose an item…</option>
+      </select>
     </label>
     <label>Country
       <select id="countryFilter">
@@ -112,10 +113,25 @@ const ageText=ts=>{if(!ts)return "age ?";const s=Math.max(0,Date.now()/1000-Numb
 
 function refreshItemOptions(){
   const country=document.getElementById("countryFilter").value;
-  const options=(catalogOptions||[]).filter(row=>!country || (row.countries||[]).includes(country));
-  document.getElementById("itemOptions").innerHTML=options.map(x=>'<option value="'+safe(x.item_name)+'"></option>').join("");
-  const current=document.getElementById("itemSearch").value.trim();
-  if(current && !options.some(x=>x.item_name===current)) document.getElementById("itemSearch").value="";
+  const select=document.getElementById("itemSearch");
+  const current=select.value;
+  const options=(catalogOptions||[])
+    .filter(row=>!country || (row.countries||[]).includes(country))
+    .sort((a,b)=>a.item_name.localeCompare(b.item_name));
+
+  select.innerHTML='<option value="">Choose an item…</option>'+
+    options.map(x=>'<option value="'+safe(x.item_name)+'">'+safe(x.item_name)+'</option>').join("");
+
+  if(current && options.some(x=>x.item_name===current)) select.value=current;
+  else select.value="";
+
+  updateItemActionState();
+}
+
+function updateItemActionState(){
+  const hasItem=Boolean(document.getElementById("itemSearch").value);
+  document.getElementById("inspectBtn").disabled=!hasItem;
+  document.getElementById("traderBtn").disabled=!hasItem;
 }
 
 function updateSortIndicators(){
@@ -129,7 +145,7 @@ function updateSortIndicators(){
 
 function render(){
   const q=document.getElementById("itemSearch").value.trim().toLowerCase();
-  const rows=[...currentRows].filter(r=>!q || String(r.item_name||"").toLowerCase().includes(q));
+  const rows=[...currentRows].filter(r=>!q || String(r.item_name||"").toLowerCase()===q);
   rows.sort((a,b)=>{
     let av=a[activeSort],bv=b[activeSort];
     if(activeSort==="countries"){av=(av||[]).join(",");bv=(bv||[]).join(",");}
@@ -237,8 +253,7 @@ document.getElementById("scan").onclick=()=>load(false);
 document.getElementById("force").onclick=()=>load(true);
 document.getElementById("inspectBtn").onclick=()=>inspectItem();
 document.getElementById("traderBtn").onclick=()=>findTraders();
-document.getElementById("itemSearch").addEventListener("input",render);
-document.getElementById("itemSearch").addEventListener("keydown",e=>{if(e.key==="Enter") inspectItem();});
+document.getElementById("itemSearch").addEventListener("change",()=>{updateItemActionState();render();});
 document.getElementById("sortBy").onchange=e=>{activeSort=e.target.value;descending=true;render();};
 document.getElementById("countryFilter").onchange=()=>{refreshItemOptions();load(false);};
 document.getElementById("buySource").onchange=()=>load(false);
@@ -247,6 +262,7 @@ document.querySelectorAll("th[data-key]").forEach(th=>th.onclick=()=>{
   const key=th.dataset.key;if(activeSort===key)descending=!descending;else{activeSort=key;descending=true;}
   const opt=[...document.getElementById("sortBy").options].find(o=>o.value===key);if(opt)document.getElementById("sortBy").value=key;render();
 });
+updateItemActionState();
 load(false);
 </script>
 </body></html>
