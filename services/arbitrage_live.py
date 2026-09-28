@@ -31,6 +31,7 @@ TE_CACHE_DB = Path(os.getenv("ARBITRAGE_TE_CACHE_DB", "data/arbitrage_cache.db")
 SNAPSHOT_FILE = Path(os.getenv("ARBITRAGE_SNAPSHOT_FILE", "data/arbitrage_snapshot.json"))
 STALE_SNAPSHOT_MAX_SECONDS = int(os.getenv("ARBITRAGE_STALE_SNAPSHOT_SECONDS", "21600"))
 DEFAULT_CACHE_SECONDS = int(os.getenv("ARBITRAGE_CACHE_SECONDS", "900"))
+FORCE_REFRESH_COOLDOWN_SECONDS = int(os.getenv("ARBITRAGE_FORCE_REFRESH_COOLDOWN", "300"))
 DEFAULT_MAX_WORKERS = max(1, min(int(os.getenv("ARBITRAGE_MAX_WORKERS", "2")), 4))
 HTTP_TIMEOUT_SECONDS = float(os.getenv("ARBITRAGE_HTTP_TIMEOUT", "12"))
 ENABLE_TORN_EXCHANGE = os.getenv("ARBITRAGE_ENABLE_TORN_EXCHANGE", "1").strip().lower() not in {"0", "false", "no", "off"}
@@ -82,6 +83,7 @@ _snapshot_cache = {
 }
 _refresh_thread: Optional[threading.Thread] = None
 _refresh_thread_lock = threading.Lock()
+_last_forced_refresh_started = 0.0
 
 
 def _snapshot_copy(*, refreshing: bool = False) -> dict:
@@ -179,11 +181,18 @@ def _background_refresh_worker(force: bool) -> None:
 
 
 def _start_background_refresh(*, force: bool = False) -> bool:
-    global _refresh_thread
+    global _refresh_thread, _last_forced_refresh_started
 
     with _refresh_thread_lock:
         if _refresh_thread is not None and _refresh_thread.is_alive():
             return False
+
+        now = time.time()
+        if force and now - _last_forced_refresh_started < FORCE_REFRESH_COOLDOWN_SECONDS:
+            return False
+        if force:
+            _last_forced_refresh_started = now
+
         _refresh_thread = threading.Thread(
             target=_background_refresh_worker,
             kwargs={"force": force},
@@ -1310,6 +1319,7 @@ def build_arbitrage_report(
         "source_age_seconds": max(0.0, time.time() - generated_at) if generated_at else None,
         "refreshing": bool(snapshot.get("refreshing")),
         "cache_seconds": DEFAULT_CACHE_SECONDS,
+        "force_refresh_cooldown_seconds": FORCE_REFRESH_COOLDOWN_SECONDS,
         "scope": "foreign_items_only",
         "min_profit_per_item": min_profit_per_item,
         "min_roi": min_roi,
