@@ -15,11 +15,11 @@
     .notice{margin:12px 0;color:var(--muted)}.error{color:var(--bad)}.table-shell{overflow-x:hidden;border:1px solid var(--line);border-radius:14px;background:var(--panel)}
     table{width:100%;border-collapse:collapse;table-layout:fixed}th,td{padding:10px 8px;border-bottom:1px solid var(--line);text-align:right;white-space:normal;overflow-wrap:anywhere}
     th:first-child,td:first-child,th:nth-child(2),td:nth-child(2),th:nth-child(10),td:nth-child(10){text-align:left}
-    th:nth-child(1){width:10%}th:nth-child(2){width:9%}th:nth-child(3){width:9%}th:nth-child(4){width:8%}th:nth-child(5){width:9%}th:nth-child(6){width:5%}th:nth-child(7){width:5%}th:nth-child(8){width:10%}th:nth-child(9){width:10%}th:nth-child(10){width:9%}th:nth-child(11){width:9%}th:nth-child(12){width:7%}
+    th:nth-child(1){width:12%}th:nth-child(2){width:10%}th:nth-child(3){width:9%}th:nth-child(4){width:9%}th:nth-child(5){width:10%}th:nth-child(6){width:6%}th:nth-child(7){width:5%}th:nth-child(8){width:11%}th:nth-child(9){width:11%}th:nth-child(10){width:10%}th:nth-child(11){width:7%}
     td:nth-child(3),td:nth-child(4),td:nth-child(5),td:nth-child(6),td:nth-child(7),td:nth-child(8),td:nth-child(9){white-space:nowrap}
     th{position:sticky;top:0;background:var(--panel2);color:#b9c8d8;font-size:12px;cursor:pointer;user-select:none}tr:hover td{background:#141c26}
     .good{color:var(--good);font-weight:700}.muted{color:var(--muted)}.pill{display:inline-block;padding:3px 7px;border-radius:999px;background:#1b2633;color:#bcd0e5;font-size:11px;margin-right:4px}
-    a{color:#8ab6ff;text-decoration:none}a:hover{text-decoration:underline}.tiny{font-size:12px}.actions{display:flex;gap:7px}
+    a{color:#8ab6ff;text-decoration:none}a:hover{text-decoration:underline}.tiny{font-size:12px}.row-link{color:inherit;font-weight:700}.row-link:hover{color:#8ab6ff}.source-link{color:inherit}
     @media(max-width:1050px){.table-shell{overflow-x:auto}table{min-width:1050px;table-layout:auto}th,td{white-space:nowrap}}
     @media(max-width:700px){.wrap{padding:14px}h1{font-size:24px}}
   </style>
@@ -75,7 +75,6 @@
           <th data-key="total_profit">Total profit</th>
           <th data-key="buyer_name">Trader</th>
           <th>Buy source</th>
-          <th>Links</th>
         </tr>
       </thead>
       <tbody id="rows"></tbody>
@@ -104,10 +103,14 @@ function render() {
 
   document.getElementById("rows").innerHTML = rows.map(row => {
     const countries = (row.countries || []).map(x => '<span class="pill">'+safe(x)+'</span>').join("");
-    const buyLink = row.buy_url ? '<a href="'+safe(row.buy_url)+'" target="_blank" rel="noreferrer">Buy listings</a>' : "—";
-    const traderLink = row.buyer_url ? '<a href="'+safe(row.buyer_url)+'" target="_blank" rel="noreferrer">Trader list</a>' : "—";
+    const itemHtml = row.buy_url
+      ? '<a class="row-link" href="'+safe(row.buy_url)+'" target="_blank" rel="noreferrer">'+safe(row.item_name)+'</a>'
+      : '<b>'+safe(row.item_name)+'</b>';
+    const traderHtml = row.buyer_url
+      ? '<a class="row-link" href="'+safe(row.buyer_url)+'" target="_blank" rel="noreferrer">'+safe(row.buyer_name)+'</a>'
+      : '<b>'+safe(row.buyer_name)+'</b>';
     return '<tr>'+
-      '<td><b>'+safe(row.item_name)+'</b></td>'+
+      '<td>'+itemHtml+'</td>'+
       '<td>'+countries+'</td>'+
       '<td>'+money(row.average_buy_price)+'</td>'+
       '<td>'+money(row.buyer_price)+'</td>'+
@@ -116,14 +119,13 @@ function render() {
       '<td>'+Number(row.quantity||0).toLocaleString()+'</td>'+
       '<td>'+money(row.total_cost)+'</td>'+
       '<td class="good">'+money(row.total_profit)+'</td>'+
-      '<td><b>'+safe(row.buyer_name)+'</b><div class="tiny muted">'+safe(row.buyer_source)+'</div></td>'+ 
-      '<td>'+((row.buy_sources||[]).map(x=>'<span class="pill">'+safe(x.replace("tornw3b_bazaar","TornW3B bazaar").replace("torn_item_market","Item market"))+'</span>').join('') || '—')+'</td>'+ 
-      '<td><div class="actions">'+buyLink+' · '+traderLink+'</div></td>'+
+      '<td>'+traderHtml+'<div class="tiny muted">'+safe(row.buyer_source)+'</div></td>'+ 
+      '<td>'+((row.buy_sources||[]).map(x=>'<span class="pill">'+safe(x.replace("tornw3b_bazaar","TornW3B").replace("torn_item_market","Item market"))+'</span>').join('') || '—')+'</td>'+ 
       '</tr>';
   }).join("");
 
   if (!rows.length) {
-    document.getElementById("rows").innerHTML = '<tr><td colspan="12" class="muted" style="text-align:center;padding:30px">No qualifying opportunities for these filters.</td></tr>';
+    document.getElementById("rows").innerHTML = '<tr><td colspan="11" class="muted" style="text-align:center;padding:30px">No qualifying opportunities for these filters.</td></tr>';
   }
 }
 
