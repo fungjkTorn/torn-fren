@@ -12,12 +12,15 @@
     label{display:flex;flex-direction:column;gap:6px;color:var(--muted);font-size:12px}input,select,button{background:#0d131b;color:var(--text);border:1px solid var(--line);border-radius:9px;padding:10px 11px}
     button{cursor:pointer;font-weight:700}button.primary{background:var(--accent);color:#07111d;border-color:transparent}.stats{margin:14px 0}
     .stat{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 15px;min-width:150px}.stat b{display:block;font-size:19px}.stat span{color:var(--muted);font-size:12px}
-    .notice{margin:12px 0;color:var(--muted)}.error{color:var(--bad)}.table-shell{overflow:auto;border:1px solid var(--line);border-radius:14px;background:var(--panel)}
-    table{width:100%;border-collapse:collapse;min-width:1240px}th,td{padding:12px 13px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+    .notice{margin:12px 0;color:var(--muted)}.error{color:var(--bad)}.table-shell{overflow-x:hidden;border:1px solid var(--line);border-radius:14px;background:var(--panel)}
+    table{width:100%;border-collapse:collapse;table-layout:fixed}th,td{padding:10px 8px;border-bottom:1px solid var(--line);text-align:right;white-space:normal;overflow-wrap:anywhere}
     th:first-child,td:first-child,th:nth-child(2),td:nth-child(2),th:nth-child(10),td:nth-child(10){text-align:left}
+    th:nth-child(1){width:10%}th:nth-child(2){width:9%}th:nth-child(3){width:9%}th:nth-child(4){width:8%}th:nth-child(5){width:9%}th:nth-child(6){width:5%}th:nth-child(7){width:5%}th:nth-child(8){width:10%}th:nth-child(9){width:10%}th:nth-child(10){width:9%}th:nth-child(11){width:9%}th:nth-child(12){width:7%}
+    td:nth-child(3),td:nth-child(4),td:nth-child(5),td:nth-child(6),td:nth-child(7),td:nth-child(8),td:nth-child(9){white-space:nowrap}
     th{position:sticky;top:0;background:var(--panel2);color:#b9c8d8;font-size:12px;cursor:pointer;user-select:none}tr:hover td{background:#141c26}
     .good{color:var(--good);font-weight:700}.muted{color:var(--muted)}.pill{display:inline-block;padding:3px 7px;border-radius:999px;background:#1b2633;color:#bcd0e5;font-size:11px;margin-right:4px}
     a{color:#8ab6ff;text-decoration:none}a:hover{text-decoration:underline}.tiny{font-size:12px}.actions{display:flex;gap:7px}
+    @media(max-width:1050px){.table-shell{overflow-x:auto}table{min-width:1050px;table-layout:auto}th,td{white-space:nowrap}}
     @media(max-width:700px){.wrap{padding:14px}h1{font-size:24px}}
   </style>
 </head>
@@ -53,7 +56,7 @@
     <div class="stat"><b id="opportunityCount">—</b><span>opportunities</span></div>
     <div class="stat"><b id="listingCount">—</b><span>bazaar listings</span></div>
     <div class="stat"><b id="offerCount">—</b><span>trader bids</span></div>
-    <div class="stat"><b id="catalogCount">—</b><span>foreign items scanned</span></div>
+    <div class="stat"><b id="catalogCount">—</b><span>foreign items in scope</span></div>
   </div>
 
   <div id="status" class="notice">Ready.</div>
