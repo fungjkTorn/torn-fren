@@ -1,0 +1,22 @@
+name: Arbitrage Scanner Tests
+
+on:
+  push:
+    branches:
+      - arbitrage-scanner-v0
+  workflow_dispatch:
+
+jobs:
+  test-arbitrage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Compile arbitrage integration
+        run: python -m py_compile modules/arbitrage.py services/arbitrage_sources.py services/arbitrage_live.py bot/commands.py web/app.py
+      - name: Run arbitrage tests
+        run: python -m unittest tests.test_arbitrage tests.test_arbitrage_live -v
