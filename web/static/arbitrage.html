@@ -31,13 +31,13 @@
 <body>
 <div class="wrap">
   <h1>Arbitrage Scanner</h1>
-  <div class="sub">Foreign-purchasable items only · TornW3B bazaars + official Torn item market → best TornW3B / Torn Exchange trader bid</div>
+  <div class="sub">Foreign-purchasable items only · Weav3r.dev/TornW3B bazaars + official Torn Item Market API → best Weav3r.dev/TornW3B or Torn Exchange trader bid</div>
 
   <div class="toolbar">
     <label>Minimum profit / item<input id="minProfit" type="number" value="20000" min="0" step="1000"></label>
     <label>Minimum ROI %<input id="minRoi" type="number" value="0" min="0" step="0.5"></label>
     <label>Minimum quantity<input id="minQty" type="number" value="1" min="1" step="1"></label>
-    <label>Search / inspect item
+    <label>Item
       <input id="itemSearch" type="search" list="itemOptions" placeholder="Meteorite Fragment">
       <datalist id="itemOptions"></datalist>
     </label>
@@ -49,10 +49,10 @@
       </select>
     </label>
     <label>Buy from
-      <select id="buySource"><option value="all">All buy sources</option><option value="tornw3b">TornW3B bazaars</option><option value="item_market">Torn Item Market API</option></select>
+      <select id="buySource"><option value="all">All buy sources</option><option value="tornw3b">Weav3r.dev / TornW3B bazaars</option><option value="item_market">Official Torn Item Market API</option></select>
     </label>
     <label>Sell to
-      <select id="buyerSource"><option value="all">All traders</option><option value="tornw3b">TornW3B traders</option><option value="torn_exchange">Torn Exchange</option></select>
+      <select id="buyerSource"><option value="all">All trader sources</option><option value="tornw3b">Weav3r.dev / TornW3B traders</option><option value="torn_exchange">Torn Exchange traders</option></select>
     </label>
     <label>Sort by
       <select id="sortBy">
@@ -65,7 +65,8 @@
       </select>
     </label>
     <button id="scan" class="primary">Scan</button>
-    <button id="inspectBtn">Inspect</button>
+    <button id="inspectBtn">Item Details</button>
+    <button id="traderBtn">Trader Finder</button>
     <button id="force">Force refresh sources</button>
   </div>
 
@@ -91,18 +92,31 @@
 </div>
 
 <dialog id="diagDialog">
-  <div class="modal-head"><div><b id="diagTitle">Item diagnostics</b><div class="tiny muted" id="diagMeta"></div></div><button class="close" onclick="document.getElementById('diagDialog').close()">Close</button></div>
+  <div class="modal-head"><div><b id="diagTitle">Item details</b><div class="tiny muted" id="diagMeta"></div></div><button class="close" onclick="document.getElementById('diagDialog').close()">Close</button></div>
   <div class="modal-body" id="diagBody">Loading…</div>
 </dialog>
 
+<dialog id="traderDialog">
+  <div class="modal-head"><div><b id="traderTitle">Trader Finder</b><div class="tiny muted" id="traderMeta"></div></div><button class="close" onclick="document.getElementById('traderDialog').close()">Close</button></div>
+  <div class="modal-body" id="traderBody">Choose an item to rank trader bids.</div>
+</dialog>
+
 <script>
-let currentRows=[], catalogItems=[], activeSort="total_profit", descending=true;
+let currentRows=[], catalogItems=[], catalogOptions=[], activeSort="total_profit", descending=true;
 
 const money=v=>"$"+Math.round(Number(v||0)).toLocaleString();
 const pct=v=>(Number(v||0)*100).toFixed(1)+"%";
 const safe=v=>String(v??"").replace(/[&<>"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;"}[ch]));
-const sourceLabel=s=>({"tornw3b_bazaar":"TornW3B","torn_item_market":"Item market","tornw3b_trader":"TornW3B trader","torn_exchange":"Torn Exchange"}[s]||s);
+const sourceLabel=s=>({"tornw3b_bazaar":"Weav3r.dev / TornW3B","torn_item_market":"Official Torn Item Market","tornw3b_trader":"Weav3r.dev / TornW3B trader","torn_exchange":"Torn Exchange"}[s]||s);
 const ageText=ts=>{if(!ts)return "age ?";const s=Math.max(0,Date.now()/1000-Number(ts));if(s<60)return Math.round(s)+"s old";if(s<3600)return Math.round(s/60)+"m old";return (s/3600).toFixed(1)+"h old";};
+
+function refreshItemOptions(){
+  const country=document.getElementById("countryFilter").value;
+  const options=(catalogOptions||[]).filter(row=>!country || (row.countries||[]).includes(country));
+  document.getElementById("itemOptions").innerHTML=options.map(x=>'<option value="'+safe(x.item_name)+'"></option>').join("");
+  const current=document.getElementById("itemSearch").value.trim();
+  if(current && !options.some(x=>x.item_name===current)) document.getElementById("itemSearch").value="";
+}
 
 function updateSortIndicators(){
   document.querySelectorAll("th[data-key]").forEach(th=>{
@@ -132,7 +146,7 @@ function render(){
     const sources=(row.buy_sources||[]).map(x=>'<span class="pill">'+safe(sourceLabel(x))+(sq[x]!=null?' · '+Number(sq[x]).toLocaleString():'')+'</span>').join("")||"—";
     const anomalies=(row.anomaly_labels||[]).map((x,i)=>'<span class="pill '+(i===0&&row.roi>=1?'badpill':'warnpill')+'">'+safe(x)+'</span>').join("")||'<span class="muted tiny">Normal</span>';
     return '<tr>'+
-      '<td>'+itemHtml+'<div class="inspect" onclick="inspectItem('+JSON.stringify(String(row.item_name))+')">Inspect details</div></td>'+
+      '<td>'+itemHtml+'<div class="inspect" onclick="inspectItem('+JSON.stringify(String(row.item_name))+')">Item details</div></td>'+
       '<td>'+countries+'</td><td>'+money(row.average_buy_price)+'</td><td>'+money(row.buyer_price)+'</td>'+
       '<td class="good">'+money(row.average_profit_per_item)+'</td><td class="good">'+pct(row.roi)+'</td>'+
       '<td>'+Number(row.quantity||0).toLocaleString()+'</td><td>'+money(row.total_cost)+'</td><td class="good">'+money(row.total_profit)+'</td>'+
@@ -164,6 +178,33 @@ async function inspectItem(name){
   }
 }
 
+
+async function findTraders(name){
+  name=(name||document.getElementById("itemSearch").value||"").trim();
+  if(!name) return;
+  const dlg=document.getElementById("traderDialog"); dlg.showModal();
+  document.getElementById("traderTitle").textContent="Trader Finder · "+name;
+  document.getElementById("traderMeta").textContent="Loading ranked trader bids…";
+  document.getElementById("traderBody").innerHTML="Loading…";
+  try{
+    const params=new URLSearchParams({
+      item:name,
+      mode:"traders",
+      buyer_source:document.getElementById("buyerSource").value
+    });
+    const r=await fetch("/api/arbitrage?"+params.toString());
+    if(!r.ok) throw new Error("HTTP "+r.status);
+    const d=await r.json();
+    document.getElementById("traderTitle").textContent="Trader Finder · "+d.item_name;
+    document.getElementById("traderMeta").textContent=(d.countries||[]).join(", ")+" · "+d.buyer_count+" trader"+(d.buyer_count===1?"":"s")+" · highest price first";
+    const buyers=(d.buyers||[]).map(x=>'<div class="diag-row"><span><b>#'+x.rank+'</b> · '+(x.url?'<a href="'+safe(x.url)+'" target="_blank">'+safe(x.buyer_name)+'</a>':safe(x.buyer_name))+'<div class="tiny muted">'+safe(sourceLabel(x.source))+' · '+safe(ageText(x.observed_at))+'</div></span><span><b>'+money(x.price)+'</b></span></div>').join("")||'<div class="muted">No trader bids in the current snapshot.</div>';
+    document.getElementById("traderBody").innerHTML='<div class="diag-card"><b>Best buyers</b>'+buyers+'</div>';
+  }catch(e){
+    document.getElementById("traderMeta").textContent="";
+    document.getElementById("traderBody").innerHTML='<div class="error">Could not load trader finder: '+safe(e.message)+'</div>';
+  }
+}
+
 async function load(force=false){
   const params=new URLSearchParams({
     min_profit:Number(document.getElementById("minProfit").value||0),
@@ -178,8 +219,8 @@ async function load(force=false){
   document.getElementById("scan").disabled=true; document.getElementById("force").disabled=true;
   try{
     const response=await fetch("/api/arbitrage?"+params); if(!response.ok) throw new Error("HTTP "+response.status);
-    const data=await response.json(); currentRows=data.opportunities||[]; catalogItems=data.catalog_items||[];
-    document.getElementById("itemOptions").innerHTML=catalogItems.map(x=>'<option value="'+safe(x)+'"></option>').join("");
+    const data=await response.json(); currentRows=data.opportunities||[]; catalogItems=data.catalog_items||[]; catalogOptions=data.catalog_options||catalogItems.map(x=>({item_name:x,countries:[]}));
+    refreshItemOptions();
     opportunityCount.textContent=Number(data.opportunity_count||0).toLocaleString(); listingCount.textContent=Number(data.listing_count||0).toLocaleString();
     offerCount.textContent=Number(data.offer_count||0).toLocaleString(); catalogCount.textContent=Number(data.catalog_count||0).toLocaleString();
     const when=data.generated_at?new Date(data.generated_at*1000).toLocaleTimeString():"not ready yet", errs=(data.errors||[]).length;
@@ -195,10 +236,11 @@ async function load(force=false){
 document.getElementById("scan").onclick=()=>load(false);
 document.getElementById("force").onclick=()=>load(true);
 document.getElementById("inspectBtn").onclick=()=>inspectItem();
+document.getElementById("traderBtn").onclick=()=>findTraders();
 document.getElementById("itemSearch").addEventListener("input",render);
 document.getElementById("itemSearch").addEventListener("keydown",e=>{if(e.key==="Enter") inspectItem();});
 document.getElementById("sortBy").onchange=e=>{activeSort=e.target.value;descending=true;render();};
-document.getElementById("countryFilter").onchange=()=>load(false);
+document.getElementById("countryFilter").onchange=()=>{refreshItemOptions();load(false);};
 document.getElementById("buySource").onchange=()=>load(false);
 document.getElementById("buyerSource").onchange=()=>load(false);
 document.querySelectorAll("th[data-key]").forEach(th=>th.onclick=()=>{
