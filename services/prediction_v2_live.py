@@ -997,7 +997,8 @@ def _build_live_prediction_v2_impl(country, item_name, now_timestamp=None, force
             window_end = estimate + hi_err
         else:
             # Fallback is deliberately labelled as uncalibrated below.
-            abs_errors = []            analysis = analyze_advanced_item(country, item_name)
+            abs_errors = []
+            analysis = analyze_advanced_item(country, item_name)
             recs = analysis.get("records_by_model", {}).get(profile["model_name"], [])
             abs_errors = [r["absolute_error_seconds"] for r in recs]
             spread = _pctl(abs_errors, 0.90) if len(abs_errors) >= 5 else None
