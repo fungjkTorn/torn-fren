@@ -30,6 +30,7 @@ def build_arbitrage_embed(
         min_profit_per_item=min_profit_per_item,
         min_roi=min_roi,
         min_quantity=min_quantity,
+        background=True,
     )
     rows = (report.get("opportunities") or [])[: max(1, min(limit, 10))]
 
@@ -43,11 +44,21 @@ def build_arbitrage_embed(
     )
 
     if not rows:
-        embed.add_field(
-            name="No qualifying opportunities",
-            value="No currently ingested bazaar/trader pair clears these filters.",
-            inline=False,
-        )
+        if report.get("refreshing"):
+            embed.add_field(
+                name="Scanner warming up",
+                value=(
+                    "A source refresh is running in the background. "
+                    "Run `/arbitrage` again shortly or open the web scanner."
+                ),
+                inline=False,
+            )
+        else:
+            embed.add_field(
+                name="No qualifying opportunities",
+                value="No currently ingested bazaar/trader pair clears these filters.",
+                inline=False,
+            )
     else:
         for index, row in enumerate(rows, start=1):
             trader = _safe_link(
@@ -74,12 +85,13 @@ def build_arbitrage_embed(
             )
 
     error_count = len(report.get("errors") or [])
+    refresh_note = " · refreshing" if report.get("refreshing") else ""
     embed.set_footer(
         text=(
             f"{report.get('catalog_count', 0)} foreign items · "
             f"{report.get('listing_count', 0)} buy listings · "
             f"{report.get('offer_count', 0)} trader offers · "
-            f"{error_count} source errors"
+            f"{error_count} source errors{refresh_note}"
         )
     )
     return embed
