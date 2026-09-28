@@ -69,6 +69,17 @@
     <button id="inspectBtn">Item Details</button>
     <button id="traderBtn">Trader Finder</button>
     <button id="force">Force refresh sources</button>
+
+    <label>Exclude traders
+      <select id="excludeTraders" multiple size="3" title="Ctrl/Cmd-click to select multiple"></select>
+    </label>
+    <label>Max rows / trader
+      <input id="maxPerTrader" type="number" min="1" step="1" placeholder="Unlimited">
+    </label>
+    <label style="flex-direction:row;align-items:center;gap:8px;padding-bottom:8px">
+      <input id="diversified" type="checkbox">
+      Diversified mode
+    </label>
   </div>
 
   <div class="stats">
@@ -76,6 +87,7 @@
     <div class="stat"><b id="listingCount">—</b><span>buy listings</span></div>
     <div class="stat"><b id="offerCount">—</b><span>trader bids</span></div>
     <div class="stat"><b id="catalogCount">—</b><span>foreign items in scope</span></div>
+    <div class="stat"><b id="topBuyerConcentration">—</b><span>top buyer concentration</span></div>
   </div>
 
   <div id="status" class="notice">Ready.</div>
@@ -103,7 +115,7 @@
 </dialog>
 
 <script>
-let currentRows=[], catalogItems=[], catalogOptions=[], activeSort="total_profit", descending=true;
+let currentRows=[], catalogItems=[], catalogOptions=[], traderOptions=[], activeSort="total_profit", descending=true;
 
 const money=v=>"$"+Math.round(Number(v||0)).toLocaleString();
 const pct=v=>(Number(v||0)*100).toFixed(1)+"%";
@@ -132,6 +144,13 @@ function updateItemActionState(){
   const hasItem=Boolean(document.getElementById("itemSearch").value);
   document.getElementById("inspectBtn").disabled=!hasItem;
   document.getElementById("traderBtn").disabled=!hasItem;
+}
+
+function refreshTraderOptions(selectedNames=[]){
+  const select=document.getElementById("excludeTraders");
+  const selected=new Set(selectedNames.length?selectedNames:[...select.selectedOptions].map(o=>o.value));
+  select.innerHTML=(traderOptions||[]).map(name=>'<option value="'+safe(name)+'">'+safe(name)+'</option>').join("");
+  [...select.options].forEach(o=>{if(selected.has(o.value))o.selected=true;});
 }
 
 function updateSortIndicators(){
@@ -166,7 +185,9 @@ function render(){
       '<td>'+countries+'</td><td>'+money(row.average_buy_price)+'</td><td>'+money(row.buyer_price)+'</td>'+
       '<td class="good">'+money(row.average_profit_per_item)+'</td><td class="good">'+pct(row.roi)+'</td>'+
       '<td>'+Number(row.quantity||0).toLocaleString()+'</td><td>'+money(row.total_cost)+'</td><td class="good">'+money(row.total_profit)+'</td>'+
-      '<td>'+traderHtml+'<div class="tiny muted">'+safe(sourceLabel(row.buyer_source))+'</div></td><td>'+sources+'</td><td>'+anomalies+'</td></tr>';
+      '<td>'+traderHtml+'<div class="tiny muted">'+safe(sourceLabel(row.buyer_source))+'</div>'+
+      (row.second_best_buyer_name?'<div class="tiny muted">#2 '+safe(row.second_best_buyer_name)+' · '+money(row.second_best_buyer_price)+' · gap '+money(row.buyer_price_gap)+'</div>':'')+
+      '</td><td>'+sources+'</td><td>'+anomalies+'</td></tr>';
   }).join("");
 
   if(!rows.length) document.getElementById("rows").innerHTML='<tr><td colspan="12" class="muted" style="text-align:center;padding:30px">No qualifying opportunities match these filters/search.</td></tr>';
@@ -228,17 +249,26 @@ async function load(force=false){
     min_quantity:Number(document.getElementById("minQty").value||1),
     force:String(force),
     buy_source:document.getElementById("buySource").value,
-    buyer_source:document.getElementById("buyerSource").value
+    buyer_source:document.getElementById("buyerSource").value,
+    diversified:String(document.getElementById("diversified").checked)
   });
+  const excluded=[...document.getElementById("excludeTraders").selectedOptions].map(o=>o.value);
+  if(excluded.length)params.set("exclude_traders",excluded.join(","));
+  const maxPer=Number(document.getElementById("maxPerTrader").value||0);
+  if(maxPer>0)params.set("max_per_trader",String(maxPer));
   const country=document.getElementById("countryFilter").value;if(country)params.set("country",country);
   const status=document.getElementById("status"); status.className="notice"; status.textContent=force?"Refreshing live sources…":"Loading scanner…";
   document.getElementById("scan").disabled=true; document.getElementById("force").disabled=true;
   try{
     const response=await fetch("/api/arbitrage?"+params); if(!response.ok) throw new Error("HTTP "+response.status);
     const data=await response.json(); currentRows=data.opportunities||[]; catalogItems=data.catalog_items||[]; catalogOptions=data.catalog_options||catalogItems.map(x=>({item_name:x,countries:[]}));
+    traderOptions=data.trader_options||[];
     refreshItemOptions();
+    refreshTraderOptions(data.excluded_traders||[]);
     opportunityCount.textContent=Number(data.opportunity_count||0).toLocaleString(); listingCount.textContent=Number(data.listing_count||0).toLocaleString();
     offerCount.textContent=Number(data.offer_count||0).toLocaleString(); catalogCount.textContent=Number(data.catalog_count||0).toLocaleString();
+    const concentration=(data.buyer_concentration||[])[0];
+    topBuyerConcentration.textContent=concentration?(concentration.buyer_name+" · "+(Number(concentration.opportunity_share||0)*100).toFixed(0)+"%"):"—";
     const when=data.generated_at?new Date(data.generated_at*1000).toLocaleTimeString():"not ready yet", errs=(data.errors||[]).length;
     const age=data.source_age_seconds==null?"":" · age "+Math.round(data.source_age_seconds/60)+"m", refreshing=data.refreshing?" · refresh running in background":"";
     status.textContent="Source snapshot: "+when+age+refreshing+" · "+errs+" source error"+(errs===1?"":"s")+". Results are opportunities, not guaranteed inventory.";
@@ -263,6 +293,9 @@ document.getElementById("sortBy").onchange=e=>{activeSort=e.target.value;descend
 document.getElementById("countryFilter").onchange=()=>{refreshItemOptions();load(false);};
 document.getElementById("buySource").onchange=()=>load(false);
 document.getElementById("buyerSource").onchange=()=>load(false);
+document.getElementById("excludeTraders").onchange=()=>load(false);
+document.getElementById("maxPerTrader").addEventListener("change",()=>load(false));
+document.getElementById("diversified").onchange=()=>load(false);
 document.querySelectorAll("th[data-key]").forEach(th=>th.onclick=()=>{
   const key=th.dataset.key;if(activeSort===key)descending=!descending;else{activeSort=key;descending=true;}
   const opt=[...document.getElementById("sortBy").options].find(o=>o.value===key);if(opt)document.getElementById("sortBy").value=key;render();
