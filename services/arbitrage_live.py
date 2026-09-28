@@ -21,6 +21,17 @@ TORN_EXCHANGE_LISTINGS_URL = "https://www.tornexchange.com/listings"
 DEFAULT_CACHE_SECONDS = int(os.getenv("ARBITRAGE_CACHE_SECONDS", "300"))
 DEFAULT_MAX_WORKERS = max(1, min(int(os.getenv("ARBITRAGE_MAX_WORKERS", "4")), 8))
 HTTP_TIMEOUT_SECONDS = float(os.getenv("ARBITRAGE_HTTP_TIMEOUT", "12"))
+TORN_API_BASE = "https://api.torn.com/v2"
+ARBITRAGE_MARKET_ITEMS = {
+    "Basalt Point",
+    "Quartzite Point",
+    "Chalcedony Point",
+    "Chert Point",
+    "Quartz Point",
+    "Obsidian Point",
+    "Meteorite Fragment",
+    "Patagonian Fossil",
+}
 
 _COUNTRY_NAMES = {
     "mex": "Mexico",
@@ -349,6 +360,95 @@ def fetch_tornexchange_buy_offers(
     return [row for row in offers if row.unit_price > 0]
 
 
+
+def fetch_torn_item_market(
+    item: ForeignItem,
+    *,
+    session: Optional[requests.Session] = None,
+) -> list[BazaarListing]:
+    """
+    Pull the first page of official Torn item-market listings for selected
+    foreign artifacts. Torn returns the cheapest listings first, so page one is
+    sufficient for the initial arbitrage pass without burning API calls.
+    """
+    api_key = (os.getenv("TORN_API_KEY") or "").strip()
+    if not api_key:
+        return []
+
+    session = session or _session()
+    response = session.get(
+        f"{TORN_API_BASE}/market/{item.item_id}/itemmarket",
+        params={"key": api_key, "offset": 0},
+        timeout=HTTP_TIMEOUT_SECONDS,
+    )
+    response.raise_for_status()
+    data = response.json()
+
+    if data.get("error"):
+        raise RuntimeError(str(data["error"]))
+
+    market = data.get("itemmarket") or {}
+    rows = []
+    observed_at = time.time()
+
+    for listing in market.get("listings") or []:
+        try:
+            price = int(listing.get("price") or 0)
+            quantity = int(listing.get("amount") or 0)
+        except (TypeError, ValueError):
+            continue
+
+        if price <= 0 or quantity <= 0:
+            continue
+
+        rows.append(
+            BazaarListing(
+                item_name=item.item_name,
+                item_id=item.item_id,
+                unit_price=price,
+                quantity=quantity,
+                source="torn_item_market",
+                seller_name="Item Market",
+                seller_id=None,
+                url=None,
+                observed_at=observed_at,
+            )
+        )
+
+    return rows
+
+
+def _collect_priority_item_market(catalog: list[ForeignItem]) -> tuple[list[BazaarListing], list[dict]]:
+    """
+    Keep official API usage deliberately small in v0: only the foreign artifact
+    group being tested right now. This can be widened later after measuring
+    request volume and usefulness.
+    """
+    listings = []
+    errors = []
+    session = _session()
+
+    for item in catalog:
+        if item.item_name not in ARBITRAGE_MARKET_ITEMS:
+            continue
+
+        try:
+            listings.extend(fetch_torn_item_market(item, session=session))
+        except Exception as exc:
+            errors.append(
+                {
+                    "item": item.item_name,
+                    "source": "torn_item_market",
+                    "error": str(exc),
+                }
+            )
+
+        # Stay comfortably below Torn's per-minute API ceiling.
+        time.sleep(0.7)
+
+    return listings, errors
+
+
 def _refresh_snapshot() -> dict:
     catalog = get_foreign_item_catalog()
     listings: list[BazaarListing] = []
@@ -392,6 +492,10 @@ def _refresh_snapshot() -> dict:
             listings.extend(item_listings)
             offers.extend(item_offers)
             errors.extend(item_errors)
+
+    market_listings, market_errors = _collect_priority_item_market(catalog)
+    listings.extend(market_listings)
+    errors.extend(market_errors)
 
     snapshot = {
         "timestamp": time.time(),
