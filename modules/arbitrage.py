@@ -50,6 +50,8 @@ class ArbitrageOpportunity:
     seller_count: int
     listing_count: int
     buy_sources: tuple[str, ...]
+    buy_source_quantities: dict[str, int]
+    buy_source_costs: dict[str, int]
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -134,6 +136,8 @@ def evaluate_offer(
     sellers = set()
     accepted_listing_count = 0
     buy_sources = set()
+    buy_source_quantities: dict[str, int] = {}
+    buy_source_costs: dict[str, int] = {}
 
     for listing in candidates:
         take = listing.quantity
@@ -151,6 +155,8 @@ def evaluate_offer(
         sellers.add((listing.source, listing.seller_id or listing.seller_name or "unknown"))
         accepted_listing_count += 1
         buy_sources.add(listing.source)
+        buy_source_quantities[listing.source] = buy_source_quantities.get(listing.source, 0) + take
+        buy_source_costs[listing.source] = buy_source_costs.get(listing.source, 0) + (take * listing.unit_price)
 
         if remaining is not None:
             remaining -= take
@@ -183,6 +189,8 @@ def evaluate_offer(
         seller_count=len(sellers),
         listing_count=accepted_listing_count,
         buy_sources=tuple(sorted(buy_sources)),
+        buy_source_quantities=dict(sorted(buy_source_quantities.items())),
+        buy_source_costs=dict(sorted(buy_source_costs.items())),
     )
 
 
