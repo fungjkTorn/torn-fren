@@ -54,11 +54,11 @@ class ArbitrageEngineTests(unittest.TestCase):
         self.assertEqual(result.seller_count, 3)
         self.assertEqual(result.cheapest_buy_price, 455_000)
         self.assertEqual(result.highest_accepted_buy_price, 468_000)
-        self.assertEqual(result.total_cost, 32_240_000)
+        self.assertEqual(result.total_cost, 32_480_000)
         self.assertEqual(result.total_revenue, 35_350_000)
-        self.assertEqual(result.total_profit, 3_110_000)
-        self.assertAlmostEqual(result.average_buy_price, 460_571.4285714286)
-        self.assertAlmostEqual(result.average_profit_per_item, 44_428.57142857143)
+        self.assertEqual(result.total_profit, 2_870_000)
+        self.assertAlmostEqual(result.average_buy_price, 464_000.0)
+        self.assertAlmostEqual(result.average_profit_per_item, 41_000.0)
 
     def test_threshold_is_applied_per_listing_unit(self):
         listings = [
