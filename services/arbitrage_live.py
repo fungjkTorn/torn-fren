@@ -24,6 +24,7 @@ TORNW3B_API_BASE = "https://weav3r.dev/api"
 TORN_EXCHANGE_LISTINGS_URL = "https://www.tornexchange.com/listings"
 TORN_EXCHANGE_BEST_URL = "https://tornexchange.com/api/best_listing"
 TE_MIN_REQUEST_INTERVAL_SECONDS = float(os.getenv("ARBITRAGE_TE_REQUEST_INTERVAL", "6.2"))
+TE_LISTINGS_MIN_REQUEST_INTERVAL_SECONDS = float(os.getenv("ARBITRAGE_TE_LISTINGS_REQUEST_INTERVAL", "1.0"))
 W3B_MIN_REQUEST_INTERVAL_SECONDS = float(os.getenv("ARBITRAGE_W3B_REQUEST_INTERVAL", "0.8"))
 TE_CACHE_SECONDS = int(os.getenv("ARBITRAGE_TE_CACHE_SECONDS", "1800"))
 TE_CACHE_DB = Path(os.getenv("ARBITRAGE_TE_CACHE_DB", "data/arbitrage_cache.db"))
@@ -68,6 +69,8 @@ class ForeignItem:
 _cache_lock = threading.Lock()
 _te_rate_lock = threading.Lock()
 _te_last_call_monotonic = 0.0
+_te_listings_rate_lock = threading.Lock()
+_te_listings_last_call_monotonic = 0.0
 _w3b_rate_lock = threading.Lock()
 _w3b_last_call_monotonic = 0.0
 _snapshot_cache = {
@@ -697,6 +700,20 @@ def _write_te_cache(
         pass
 
 
+def _wait_for_tornexchange_listings_slot() -> None:
+    """Serialize public Torn Exchange listings-page requests."""
+    global _te_listings_last_call_monotonic
+
+    with _te_listings_rate_lock:
+        now = time.monotonic()
+        wait = TE_LISTINGS_MIN_REQUEST_INTERVAL_SECONDS - (
+            now - _te_listings_last_call_monotonic
+        )
+        if wait > 0:
+            time.sleep(wait)
+        _te_listings_last_call_monotonic = time.monotonic()
+
+
 def _wait_for_tornexchange_slot() -> None:
     """
     Torn Exchange's public best-listing API is documented by community scripts
@@ -720,10 +737,16 @@ def fetch_tornexchange_buy_offers(
     force: bool = False,
 ) -> list[BuyOffer]:
     """
-    Fetch Torn Exchange's best active trader for one item using its public API.
+    Fetch Torn Exchange active trader offers for one item.
 
-    Response fields used by existing Torn community scripts include:
-      price, trader, trader_id, item, te_price, vote.
+    Important: Torn Exchange's public best_listing API can omit a higher-priced
+    active trader that is visible on the site's listings search. Therefore the
+    human-facing active-trader listings search is the primary source here. The
+    public API is retained only as a fallback when the search page yields no
+    matching cards.
+
+    Results are cached by best price/trader so routine scans do not repeatedly
+    request the same item page.
     """
     if not force:
         cached = _read_te_cache(item)
@@ -731,8 +754,42 @@ def fetch_tornexchange_buy_offers(
             return cached
 
     session = session or _session()
-    _wait_for_tornexchange_slot()
+    fetched_at = time.time()
 
+    # Primary source: the same active-trader item search users see on TE.
+    # model_name_contains is the site's working item-name filter.
+    try:
+        _wait_for_tornexchange_listings_slot()
+        response = session.get(
+            TORN_EXCHANGE_LISTINGS_URL,
+            params={"model_name_contains": item.item_name},
+            timeout=HTTP_TIMEOUT_SECONDS,
+        )
+        response.raise_for_status()
+
+        page_offers = parse_tornexchange_listings_html(
+            response.text,
+            item_id=item.item_id,
+            item_name=item.item_name,
+            observed_at=fetched_at,
+        )
+        if page_offers:
+            best = max(page_offers, key=lambda row: row.unit_price)
+            _write_te_cache(
+                item,
+                price=best.unit_price,
+                trader=best.buyer_name,
+                trader_id=best.buyer_id,
+                fetched_at=fetched_at,
+            )
+            return page_offers
+    except requests.RequestException:
+        # Fall through to the supported public API below.
+        pass
+
+    # Fallback: public best_listing API. Community scripts document a 10/min
+    # ceiling, so this path remains separately throttled.
+    _wait_for_tornexchange_slot()
     response = session.get(
         TORN_EXCHANGE_BEST_URL,
         params={"item_id": item.item_id},
@@ -741,7 +798,6 @@ def fetch_tornexchange_buy_offers(
     response.raise_for_status()
     payload = response.json()
 
-    fetched_at = time.time()
     if payload.get("status") != "success" or not payload.get("data"):
         _write_te_cache(
             item,
@@ -779,10 +835,7 @@ def fetch_tornexchange_buy_offers(
         fetched_at=fetched_at,
     )
 
-    # Torn Exchange usernames map directly to public /prices/<name>/ pages.
     trader_slug = quote_plus(trader_name).replace("+", "%20")
-    trader_url = f"https://www.tornexchange.com/prices/{trader_slug}/"
-
     return [
         BuyOffer(
             item_name=item.item_name,
@@ -791,7 +844,7 @@ def fetch_tornexchange_buy_offers(
             source="torn_exchange",
             buyer_name=trader_name,
             buyer_id=trader_id,
-            url=trader_url,
+            url=f"https://www.tornexchange.com/prices/{trader_slug}/",
             observed_at=fetched_at,
         )
     ]
