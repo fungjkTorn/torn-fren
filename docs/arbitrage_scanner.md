@@ -73,7 +73,7 @@ Current acquisition sources:
 Current buyer sources:
 
 - TornW3B's supported marketplace trader API.
-- Torn Exchange active-trader listings, filtered by item name.
+- Torn Exchange's public `api/best_listing` endpoint for the best active trader per item, cached locally to respect its request ceiling.
 
 The foreign-item universe is generated from the same YATA/Prometheus travel
 export Torn Fren already uses. This keeps v0 intentionally smaller than the
@@ -84,7 +84,7 @@ full Torn item universe.
 - `python arbitrage_scan.py --force` provides a terminal smoke test.
 - `GET /api/arbitrage` returns the normalized report.
 - `/arbitrage` is a sortable web table.
-- Discord `/arbitrage [min_profit] [min_quantity]` returns the top six
+- Discord `/arbitrage [min_profit] [min_roi_percent] [min_quantity]` returns the top eight
   opportunities and links to the trader pricelist and TornW3B item page.
 
 ## Refresh policy
@@ -101,3 +101,25 @@ The scanner treats public trader prices as offers and does not assume a trader
 has unlimited cash or will accept unlimited quantity. The UI therefore reports
 the currently visible profitable inventory, but a user should still confirm the
 trader's pricelist/status before moving a large stack.
+
+
+### Source controls
+
+For diagnostics and CI, individual slower sources can be disabled without
+changing the calculation engine:
+
+- `ARBITRAGE_ENABLE_TORN_EXCHANGE=0`
+- `ARBITRAGE_ENABLE_TORN_ITEM_MARKET=0`
+
+Production defaults both sources on. Torn Exchange responses are cached in
+`data/arbitrage_cache.db` for 30 minutes by default and calls are serialized
+at roughly 6.2 seconds apart. The file is covered by the repository's existing
+`data/*.db` ignore rule.
+
+## Validation
+
+The branch test workflow compiles the integration, runs deterministic unit and
+parser tests, performs a live Basalt Point smoke test against TornW3B and Torn
+Exchange, and performs a full foreign-item TornW3B-only smoke scan. The
+key-dependent official Torn item-market path is covered by mocked parser tests;
+live use requires the runtime `TORN_API_KEY`.
