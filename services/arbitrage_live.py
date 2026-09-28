@@ -1162,7 +1162,10 @@ def _anomaly_labels_for_item(opportunity, item_offers: list[BuyOffer]) -> tuple[
         labels.append("Large projected volume/profit")
 
     return labels, {
-        "buyer_count": len({_offer_key(row) for row in item_offers}),
+        "buyer_count": len({
+            (row.source, row.buyer_id or row.buyer_name)
+            for row in item_offers
+        }),
         "second_best_buyer_price": second,
         "top_buyer_price": top,
     }
