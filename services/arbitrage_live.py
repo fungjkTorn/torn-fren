@@ -28,6 +28,8 @@ TE_CACHE_DB = Path(os.getenv("ARBITRAGE_TE_CACHE_DB", "data/arbitrage_cache.db")
 DEFAULT_CACHE_SECONDS = int(os.getenv("ARBITRAGE_CACHE_SECONDS", "900"))
 DEFAULT_MAX_WORKERS = max(1, min(int(os.getenv("ARBITRAGE_MAX_WORKERS", "2")), 4))
 HTTP_TIMEOUT_SECONDS = float(os.getenv("ARBITRAGE_HTTP_TIMEOUT", "12"))
+ENABLE_TORN_EXCHANGE = os.getenv("ARBITRAGE_ENABLE_TORN_EXCHANGE", "1").strip().lower() not in {"0", "false", "no", "off"}
+ENABLE_TORN_ITEM_MARKET = os.getenv("ARBITRAGE_ENABLE_TORN_ITEM_MARKET", "1").strip().lower() not in {"0", "false", "no", "off"}
 TORN_API_BASE = "https://api.torn.com/v2"
 _COUNTRY_NAMES = {
     "mex": "Mexico",
@@ -709,7 +711,7 @@ def _collect_foreign_item_market(catalog: list[ForeignItem]) -> tuple[list[Bazaa
     listings = []
     errors = []
 
-    if not (os.getenv("TORN_API_KEY") or "").strip():
+    if not ENABLE_TORN_ITEM_MARKET or not (os.getenv("TORN_API_KEY") or "").strip():
         return listings, errors
 
     session = _session()
@@ -766,16 +768,17 @@ def _refresh_snapshot(*, force: bool = False) -> dict:
                 }
             )
 
-        try:
-            item_offers.extend(fetch_tornexchange_buy_offers(item, session=local_session, force=force))
-        except Exception as exc:
-            item_errors.append(
-                {
-                    "item": item.item_name,
-                    "source": "torn_exchange",
-                    "error": str(exc),
-                }
-            )
+        if ENABLE_TORN_EXCHANGE:
+            try:
+                item_offers.extend(fetch_tornexchange_buy_offers(item, session=local_session, force=force))
+            except Exception as exc:
+                item_errors.append(
+                    {
+                        "item": item.item_name,
+                        "source": "torn_exchange",
+                        "error": str(exc),
+                    }
+                )
 
         return item_listings, item_offers, item_errors
 
