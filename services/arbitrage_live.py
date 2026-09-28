@@ -935,6 +935,7 @@ def _refresh_snapshot(*, force: bool = False) -> dict:
 
         return item_listings, item_offers, item_errors
 
+    completed = 0
     with ThreadPoolExecutor(max_workers=DEFAULT_MAX_WORKERS) as executor:
         futures = {executor.submit(collect, item): item for item in catalog}
         for future in as_completed(futures):
@@ -942,6 +943,23 @@ def _refresh_snapshot(*, force: bool = False) -> dict:
             listings.extend(item_listings)
             offers.extend(item_offers)
             errors.extend(item_errors)
+            completed += 1
+
+            # Publish partial progress so the web page and Discord can become
+            # useful during a cold, rate-limited refresh instead of waiting for
+            # the entire foreign catalog to finish.
+            partial = {
+                "timestamp": time.time(),
+                "catalog": catalog,
+                "listings": list(listings),
+                "offers": list(offers),
+                "errors": list(errors),
+            }
+            with _cache_lock:
+                _snapshot_cache.clear()
+                _snapshot_cache.update(partial)
+            if completed % 10 == 0:
+                _persist_snapshot(partial)
 
     market_listings, market_errors = _collect_foreign_item_market(catalog)
     listings.extend(market_listings)
