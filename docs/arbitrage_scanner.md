@@ -67,13 +67,12 @@ The UI should eventually expose a freshness/status indicator instead of implying
 
 Current acquisition sources:
 
-- TornW3B public bazaar listings for every item in the travel-stock catalog.
-- Official Torn v2 item-market listings for the initial foreign artifact group:
-  Basalt, Quartzite, Chalcedony, Chert, Quartz, Obsidian, Meteorite Fragment,
-  and Patagonian Fossil.
+- TornW3B's supported marketplace API for bazaar listings across the foreign-item catalog.
+- Official Torn v2 item-market listings across that same foreign-item catalog when a Torn API key is available.
 
-Current buyer source:
+Current buyer sources:
 
+- TornW3B's supported marketplace trader API.
 - Torn Exchange active-trader listings, filtered by item name.
 
 The foreign-item universe is generated from the same YATA/Prometheus travel
@@ -96,10 +95,9 @@ cache. Third-party collection defaults to only two workers. The priority
 official Torn item-market requests are intentionally sequential and rate
 limited.
 
-## Known v0 limitation
+## Current limitation
 
-TornW3B also exposes buyer pricelists / Search Deals. The calculation model
-already supports multiple buyer sources, but the automated TornW3B buyer
-collector is not enabled until its supported public/API query path is confirmed.
-We do not guess at an internal endpoint or hammer the site. Torn Exchange is the
-live automated buyer feed in this branch.
+The scanner treats public trader prices as offers and does not assume a trader
+has unlimited cash or will accept unlimited quantity. The UI therefore reports
+the currently visible profitable inventory, but a user should still confirm the
+trader's pricelist/status before moving a large stack.
