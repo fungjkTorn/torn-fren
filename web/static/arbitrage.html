@@ -162,7 +162,7 @@ function render(){
     const sources=(row.buy_sources||[]).map(x=>'<span class="pill">'+safe(sourceLabel(x))+(sq[x]!=null?' · '+Number(sq[x]).toLocaleString():'')+'</span>').join("")||"—";
     const anomalies=(row.anomaly_labels||[]).map((x,i)=>'<span class="pill '+(i===0&&row.roi>=1?'badpill':'warnpill')+'">'+safe(x)+'</span>').join("")||'<span class="muted tiny">Normal</span>';
     return '<tr>'+
-      '<td>'+itemHtml+'<div class="inspect" onclick="inspectItem('+JSON.stringify(String(row.item_name))+')">Item details</div></td>'+
+      '<td>'+itemHtml+'<div class="inspect row-item-details" data-item="'+safe(row.item_name)+'">Item details</div></td>'+
       '<td>'+countries+'</td><td>'+money(row.average_buy_price)+'</td><td>'+money(row.buyer_price)+'</td>'+
       '<td class="good">'+money(row.average_profit_per_item)+'</td><td class="good">'+pct(row.roi)+'</td>'+
       '<td>'+Number(row.quantity||0).toLocaleString()+'</td><td>'+money(row.total_cost)+'</td><td class="good">'+money(row.total_profit)+'</td>'+
@@ -253,6 +253,11 @@ document.getElementById("scan").onclick=()=>load(false);
 document.getElementById("force").onclick=()=>load(true);
 document.getElementById("inspectBtn").onclick=()=>inspectItem();
 document.getElementById("traderBtn").onclick=()=>findTraders();
+document.getElementById("rows").addEventListener("click",e=>{
+  const target=e.target.closest(".row-item-details");
+  if(!target) return;
+  inspectItem(target.dataset.item);
+});
 document.getElementById("itemSearch").addEventListener("change",()=>{updateItemActionState();render();});
 document.getElementById("sortBy").onchange=e=>{activeSort=e.target.value;descending=true;render();};
 document.getElementById("countryFilter").onchange=()=>{refreshItemOptions();load(false);};
