@@ -997,7 +997,8 @@ def get_stock_catalog():
         if not country or not item_name:
             continue
         by_country.setdefault(country, []).append({
-            "item_id": int(item_id) if item_id is not None else None,            "item_name": item_name,
+            "item_id": int(item_id) if item_id is not None else None,
+            "item_name": item_name,
             "foreign_price": cost,
             "latest_timestamp": int(latest_timestamp) if latest_timestamp is not None else None,
             "source": source,
@@ -1996,7 +1997,8 @@ def resolve_prediction_audits(country: str, item_name: str):
     actual restock. Long item refill times are allowed; elapsed duration itself
     is never a reason to reject a result.
     """
-    init_db()    cycles = _normal_completed_cycles_for_audit(country, item_name)
+    init_db()
+    cycles = _normal_completed_cycles_for_audit(country, item_name)
     if not cycles:
         return 0
 
