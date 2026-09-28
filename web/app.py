@@ -81,6 +81,9 @@ def api_arbitrage(
     buyer_source: str = Query("all"),
     country: str | None = Query(None),
     mode: str = Query("arbitrage"),
+    exclude_traders: str | None = Query(None),
+    max_per_trader: int | None = Query(None, ge=1, le=1000),
+    diversified: bool = Query(False),
 ):
     if item and mode == "traders":
         result = build_trader_finder(
@@ -112,6 +115,13 @@ def api_arbitrage(
         buy_source=buy_source,
         buyer_source=buyer_source,
         country=country,
+        excluded_traders=[
+            name.strip()
+            for name in (exclude_traders or "").split(",")
+            if name.strip()
+        ],
+        max_opportunities_per_trader=max_per_trader,
+        diversified=diversified,
     )
 
 
