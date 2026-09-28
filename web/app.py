@@ -7,6 +7,7 @@ from fastapi.responses import FileResponse
 from services.history_service import get_item_history_since, get_stock_catalog, get_stock_graph_analysis
 from services.prediction_v2_live import build_live_prediction_v2
 from services.admin_health import build_admin_health
+from services.arbitrage_live import build_arbitrage_report
 
 app = FastAPI(title="Torn Fren Stock Graph")
 
@@ -67,6 +68,26 @@ def api_catalog():
 @app.get("/api/admin/health")
 def api_admin_health():
     return build_admin_health()
+
+
+@app.get("/api/arbitrage")
+def api_arbitrage(
+    min_profit: int = Query(20_000, ge=0, le=1_000_000_000),
+    min_roi: float = Query(0.0, ge=0.0, le=100.0),
+    min_quantity: int = Query(1, ge=1, le=1_000_000),
+    force: bool = Query(False),
+):
+    return build_arbitrage_report(
+        min_profit_per_item=min_profit,
+        min_roi=min_roi,
+        min_quantity=min_quantity,
+        force=force,
+    )
+
+
+@app.get("/arbitrage")
+def arbitrage_page():
+    return FileResponse(STATIC_DIR / "arbitrage.html")
 
 
 @app.get("/admin")
