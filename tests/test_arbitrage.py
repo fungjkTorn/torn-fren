@@ -131,6 +131,70 @@ class ArbitrageEngineTests(unittest.TestCase):
             {"torn_item_market": 220, "tornw3b_bazaar": 300},
         )
 
+    def test_excluded_buyer_reselects_next_best(self):
+        listings = [BazaarListing("Item X", 100, 5, "source", seller_name="A")]
+        offers = [
+            BuyOffer("Item X", 180, "buyers", "EVETINE"),
+            BuyOffer("Item X", 170, "buyers", "Trader B"),
+        ]
+
+        results = scan_arbitrage(
+            listings,
+            offers,
+            min_profit_per_item=20,
+            excluded_buyers={"EVETINE"},
+        )
+
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0].buyer_name, "Trader B")
+        self.assertEqual(results[0].buyer_price, 170)
+
+    def test_max_opportunities_per_buyer_reallocates_rows(self):
+        listings = [
+            BazaarListing("Item A", 100, 5, "source", item_id="1"),
+            BazaarListing("Item B", 100, 5, "source", item_id="2"),
+        ]
+        offers = [
+            BuyOffer("Item A", 200, "buyers", "EVETINE", item_id="1"),
+            BuyOffer("Item A", 190, "buyers", "Trader A", item_id="1"),
+            BuyOffer("Item B", 180, "buyers", "EVETINE", item_id="2"),
+            BuyOffer("Item B", 170, "buyers", "Trader B", item_id="2"),
+        ]
+
+        results = scan_arbitrage(
+            listings,
+            offers,
+            min_profit_per_item=20,
+            max_opportunities_per_buyer=1,
+        )
+
+        self.assertEqual(len(results), 2)
+        self.assertEqual(sum(r.buyer_name == "EVETINE" for r in results), 1)
+        self.assertEqual({r.buyer_name for r in results}, {"EVETINE", "Trader B"})
+
+    def test_diversified_mode_uses_near_best_alternate(self):
+        listings = [
+            BazaarListing("Item A", 100, 5, "source", item_id="1"),
+            BazaarListing("Item B", 100, 5, "source", item_id="2"),
+        ]
+        offers = [
+            BuyOffer("Item A", 200, "buyers", "EVETINE", item_id="1"),
+            BuyOffer("Item A", 150, "buyers", "Trader A", item_id="1"),
+            BuyOffer("Item B", 190, "buyers", "EVETINE", item_id="2"),
+            BuyOffer("Item B", 185, "buyers", "Trader B", item_id="2"),
+        ]
+
+        results = scan_arbitrage(
+            listings,
+            offers,
+            min_profit_per_item=20,
+            diversified=True,
+        )
+
+        by_item = {r.item_name: r for r in results}
+        self.assertEqual(by_item["Item A"].buyer_name, "EVETINE")
+        self.assertEqual(by_item["Item B"].buyer_name, "Trader B")
+
 
 if __name__ == "__main__":
     unittest.main()
