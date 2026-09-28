@@ -191,5 +191,13 @@ Anomaly labels are warnings only. They are deliberately not filters because
 mispriced trader lists can be real opportunities, but the user should verify
 the trader before committing meaningful capital.
 
+The UI also supports country, acquisition-source, and buyer-source filters.
+Source filtering recomputes the opportunity instead of merely hiding source
+badges, so weighted cost and quantity stay consistent with the selected data.
+
+Force refresh is server-side throttled (five minutes by default) in addition to
+preventing concurrent refresh threads. This keeps a public testing page from
+accidentally hammering third-party sources.
+
 The official Torn Item Market source uses Torn's API, not background scraping
 of Torn web pages.
