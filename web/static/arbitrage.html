@@ -136,7 +136,7 @@ async function inspectItem(name){
   document.getElementById("diagMeta").textContent="Loading item diagnostics…";
   document.getElementById("diagBody").innerHTML="Loading…";
   try{
-    const r=await fetch("/api/arbitrage/item?item="+encodeURIComponent(name));
+    const r=await fetch("/api/arbitrage?item="+encodeURIComponent(name));
     if(!r.ok) throw new Error("HTTP "+r.status);
     const d=await r.json();
     document.getElementById("diagTitle").textContent=d.item_name;
