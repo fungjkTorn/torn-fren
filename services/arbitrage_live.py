@@ -17,6 +17,7 @@ from services.stock_provider import get_travel_export
 
 
 WEAV3R_ITEM_URL = "https://weav3r.dev/item/{item_id}"
+TORNW3B_API_BASE = "https://weav3r.dev/api"
 TORN_EXCHANGE_LISTINGS_URL = "https://www.tornexchange.com/listings"
 DEFAULT_CACHE_SECONDS = int(os.getenv("ARBITRAGE_CACHE_SECONDS", "900"))
 DEFAULT_MAX_WORKERS = max(1, min(int(os.getenv("ARBITRAGE_MAX_WORKERS", "2")), 4))
@@ -217,21 +218,131 @@ def parse_weav3r_bazaar_html(
     return rows
 
 
-def fetch_weav3r_bazaar(
+def _unix_or_now(value) -> float:
+    try:
+        parsed = float(value)
+        return parsed if parsed > 0 else time.time()
+    except (TypeError, ValueError):
+        return time.time()
+
+
+def fetch_tornw3b_bazaar(
     item: ForeignItem,
     *,
     session: Optional[requests.Session] = None,
+    limit: int = 100,
 ) -> list[BazaarListing]:
+    """
+    Fetch TornW3B's supported marketplace JSON feed.
+
+    TornW3B's own Bazaars-in-Item-Market userscript calls:
+      GET /api/marketplace/{item_id}?limit=...
+    and maps player_id/player_name/quantity/price/last_checked from listings.
+
+    Using this API avoids scraping the human-facing item page, which can be
+    Cloudflare-protected on server/cloud IPs.
+    """
     session = session or _session()
-    url = item.weav3r_url
-    response = session.get(url, timeout=HTTP_TIMEOUT_SECONDS)
-    response.raise_for_status()
-    return parse_weav3r_bazaar_html(
-        response.text,
-        item_id=item.item_id,
-        item_name=item.item_name,
-        observed_at=time.time(),
+    response = session.get(
+        f"{TORNW3B_API_BASE}/marketplace/{item.item_id}",
+        params={"limit": max(1, min(int(limit), 100))},
+        timeout=HTTP_TIMEOUT_SECONDS,
     )
+    response.raise_for_status()
+    data = response.json()
+
+    rows: list[BazaarListing] = []
+    for listing in data.get("listings") or []:
+        try:
+            player_id = str(listing.get("player_id") or "").strip()
+            price = int(listing.get("price") or 0)
+            quantity = int(listing.get("quantity") or 0)
+        except (TypeError, ValueError):
+            continue
+
+        if not player_id or price <= 0 or quantity <= 0:
+            continue
+
+        rows.append(
+            BazaarListing(
+                item_name=item.item_name,
+                item_id=item.item_id,
+                unit_price=price,
+                quantity=quantity,
+                source="tornw3b_bazaar",
+                seller_name=listing.get("player_name") or None,
+                seller_id=player_id,
+                url=f"https://www.torn.com/profiles.php?XID={player_id}",
+                observed_at=_unix_or_now(
+                    listing.get("last_checked") or listing.get("content_updated")
+                ),
+            )
+        )
+
+    return rows
+
+
+def fetch_tornw3b_buy_offers(
+    item: ForeignItem,
+    *,
+    session: Optional[requests.Session] = None,
+    limit: int = 100,
+    traded_within_hours: Optional[int] = 168,
+) -> list[BuyOffer]:
+    """
+    Fetch TornW3B trader buy offers from its supported marketplace trader feed.
+
+    The official userscript supports sort=price and tradedWithinHours. We ask
+    for highest-price candidates and still sort locally before evaluation.
+    """
+    session = session or _session()
+    params = {
+        "limit": max(1, min(int(limit), 100)),
+        "sort": "price",
+    }
+    if traded_within_hours is not None:
+        params["tradedWithinHours"] = max(1, min(int(traded_within_hours), 168))
+
+    response = session.get(
+        f"{TORNW3B_API_BASE}/marketplace/{item.item_id}/traders",
+        params=params,
+        timeout=HTTP_TIMEOUT_SECONDS,
+    )
+    response.raise_for_status()
+    data = response.json()
+
+    generated_at = _unix_or_now(data.get("generated_at"))
+    offers: list[BuyOffer] = []
+
+    for trader in data.get("traders") or []:
+        try:
+            player_id = str(trader.get("player_id") or "").strip()
+            price = int(trader.get("price") or 0)
+        except (TypeError, ValueError):
+            continue
+
+        player_name = str(trader.get("player_name") or "").strip()
+        if not player_id or not player_name or price <= 0:
+            continue
+
+        offers.append(
+            BuyOffer(
+                item_name=item.item_name,
+                item_id=item.item_id,
+                unit_price=price,
+                source="tornw3b_trader",
+                buyer_name=player_name,
+                buyer_id=player_id,
+                url=f"https://weav3r.dev/pricelist/{player_id}",
+                observed_at=generated_at,
+            )
+        )
+
+    return sorted(offers, key=lambda row: row.unit_price, reverse=True)
+
+
+# Kept as an alias so older callers/tests do not break while the branch evolves.
+fetch_weav3r_bazaar = fetch_tornw3b_bazaar
 
 
 def _candidate_card(anchor):
@@ -472,7 +583,7 @@ def _refresh_snapshot() -> dict:
         item_errors = []
 
         try:
-            item_listings = fetch_weav3r_bazaar(item, session=local_session)
+            item_listings.extend(fetch_tornw3b_bazaar(item, session=local_session))
         except Exception as exc:
             item_errors.append(
                 {
@@ -483,7 +594,18 @@ def _refresh_snapshot() -> dict:
             )
 
         try:
-            item_offers = fetch_tornexchange_buy_offers(item, session=local_session)
+            item_offers.extend(fetch_tornw3b_buy_offers(item, session=local_session))
+        except Exception as exc:
+            item_errors.append(
+                {
+                    "item": item.item_name,
+                    "source": "tornw3b_trader",
+                    "error": str(exc),
+                }
+            )
+
+        try:
+            item_offers.extend(fetch_tornexchange_buy_offers(item, session=local_session))
         except Exception as exc:
             item_errors.append(
                 {
