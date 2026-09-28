@@ -71,6 +71,7 @@
           <th data-key="total_cost">Capital</th>
           <th data-key="total_profit">Total profit</th>
           <th data-key="buyer_name">Trader</th>
+          <th>Buy source</th>
           <th>Links</th>
         </tr>
       </thead>
@@ -112,13 +113,14 @@ function render() {
       '<td>'+Number(row.quantity||0).toLocaleString()+'</td>'+
       '<td>'+money(row.total_cost)+'</td>'+
       '<td class="good">'+money(row.total_profit)+'</td>'+
-      '<td><b>'+safe(row.buyer_name)+'</b><div class="tiny muted">'+safe(row.buyer_source)+'</div></td>'+
+      '<td><b>'+safe(row.buyer_name)+'</b><div class="tiny muted">'+safe(row.buyer_source)+'</div></td>'+ 
+      '<td>'+((row.buy_sources||[]).map(x=>'<span class="pill">'+safe(x.replace("tornw3b_bazaar","TornW3B bazaar").replace("torn_item_market","Item market"))+'</span>').join('') || '—')+'</td>'+ 
       '<td><div class="actions">'+buyLink+' · '+traderLink+'</div></td>'+
       '</tr>';
   }).join("");
 
   if (!rows.length) {
-    document.getElementById("rows").innerHTML = '<tr><td colspan="11" class="muted" style="text-align:center;padding:30px">No qualifying opportunities for these filters.</td></tr>';
+    document.getElementById("rows").innerHTML = '<tr><td colspan="12" class="muted" style="text-align:center;padding:30px">No qualifying opportunities for these filters.</td></tr>';
   }
 }
 
