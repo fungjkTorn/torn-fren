@@ -23,6 +23,7 @@ TORNW3B_API_BASE = "https://weav3r.dev/api"
 TORN_EXCHANGE_LISTINGS_URL = "https://www.tornexchange.com/listings"
 TORN_EXCHANGE_BEST_URL = "https://tornexchange.com/api/best_listing"
 TE_MIN_REQUEST_INTERVAL_SECONDS = float(os.getenv("ARBITRAGE_TE_REQUEST_INTERVAL", "6.2"))
+W3B_MIN_REQUEST_INTERVAL_SECONDS = float(os.getenv("ARBITRAGE_W3B_REQUEST_INTERVAL", "0.8"))
 TE_CACHE_SECONDS = int(os.getenv("ARBITRAGE_TE_CACHE_SECONDS", "1800"))
 TE_CACHE_DB = Path(os.getenv("ARBITRAGE_TE_CACHE_DB", "data/arbitrage_cache.db"))
 DEFAULT_CACHE_SECONDS = int(os.getenv("ARBITRAGE_CACHE_SECONDS", "900"))
@@ -64,6 +65,8 @@ class ForeignItem:
 _cache_lock = threading.Lock()
 _te_rate_lock = threading.Lock()
 _te_last_call_monotonic = 0.0
+_w3b_rate_lock = threading.Lock()
+_w3b_last_call_monotonic = 0.0
 _snapshot_cache = {
     "timestamp": 0.0,
     "catalog": [],
@@ -82,6 +85,45 @@ def _session() -> requests.Session:
         }
     )
     return s
+
+
+def _wait_for_w3b_slot() -> None:
+    """Serialize TornW3B requests so a full foreign scan does not hammer the API."""
+    global _w3b_last_call_monotonic
+
+    with _w3b_rate_lock:
+        now = time.monotonic()
+        wait = W3B_MIN_REQUEST_INTERVAL_SECONDS - (now - _w3b_last_call_monotonic)
+        if wait > 0:
+            time.sleep(wait)
+        _w3b_last_call_monotonic = time.monotonic()
+
+
+def _w3b_get_json(
+    session: requests.Session,
+    url: str,
+    *,
+    params: Optional[dict] = None,
+) -> dict:
+    """Rate-limited TornW3B GET with one respectful retry for 429 responses."""
+    for attempt in range(2):
+        _wait_for_w3b_slot()
+        response = session.get(url, params=params, timeout=HTTP_TIMEOUT_SECONDS)
+
+        if response.status_code != 429:
+            response.raise_for_status()
+            return response.json()
+
+        if attempt == 0:
+            retry_after = response.headers.get("Retry-After")
+            try:
+                delay = max(2.0, min(float(retry_after), 30.0))
+            except (TypeError, ValueError):
+                delay = 5.0
+            time.sleep(delay)
+
+    response.raise_for_status()
+    return {}
 
 
 def _money(text: str) -> Optional[int]:
@@ -242,13 +284,11 @@ def fetch_tornw3b_bazaar(
     Cloudflare-protected on server/cloud IPs.
     """
     session = session or _session()
-    response = session.get(
+    data = _w3b_get_json(
+        session,
         f"{TORNW3B_API_BASE}/marketplace/{item.item_id}",
         params={"limit": max(1, min(int(limit), 100))},
-        timeout=HTTP_TIMEOUT_SECONDS,
     )
-    response.raise_for_status()
-    data = response.json()
 
     rows: list[BazaarListing] = []
     for listing in data.get("listings") or []:
@@ -302,13 +342,11 @@ def fetch_tornw3b_buy_offers(
     if traded_within_hours is not None:
         params["tradedWithinHours"] = max(1, min(int(traded_within_hours), 168))
 
-    response = session.get(
+    data = _w3b_get_json(
+        session,
         f"{TORNW3B_API_BASE}/marketplace/{item.item_id}/traders",
         params=params,
-        timeout=HTTP_TIMEOUT_SECONDS,
     )
-    response.raise_for_status()
-    data = response.json()
 
     generated_at = _unix_or_now(data.get("generated_at"))
     offers: list[BuyOffer] = []
