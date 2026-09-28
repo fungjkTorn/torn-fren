@@ -25,3 +25,8 @@ jobs:
         run: python -m unittest tests.test_arbitrage tests.test_arbitrage_live -v
       - name: Live public-source smoke test
         run: python live_arbitrage_smoke.py
+      - name: Full foreign-catalog TornW3B smoke
+        env:
+          ARBITRAGE_ENABLE_TORN_EXCHANGE: "0"
+          ARBITRAGE_ENABLE_TORN_ITEM_MARKET: "0"
+        run: python foreign_arbitrage_smoke.py
