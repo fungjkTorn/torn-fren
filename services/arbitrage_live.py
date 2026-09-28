@@ -893,6 +893,20 @@ def _refresh_snapshot(*, force: bool = False) -> dict:
     offers: list[BuyOffer] = []
     errors: list[dict] = []
 
+    market_holder: dict[str, list] = {"listings": [], "errors": []}
+
+    def collect_market():
+        market_listings, market_errors = _collect_foreign_item_market(catalog)
+        market_holder["listings"] = market_listings
+        market_holder["errors"] = market_errors
+
+    market_thread = threading.Thread(
+        target=collect_market,
+        name="arbitrage-item-market-refresh",
+        daemon=True,
+    )
+    market_thread.start()
+
     def collect(item: ForeignItem):
         local_session = _session()
         item_listings = []
@@ -961,9 +975,9 @@ def _refresh_snapshot(*, force: bool = False) -> dict:
             if completed % 10 == 0:
                 _persist_snapshot(partial)
 
-    market_listings, market_errors = _collect_foreign_item_market(catalog)
-    listings.extend(market_listings)
-    errors.extend(market_errors)
+    market_thread.join()
+    listings.extend(market_holder["listings"])
+    errors.extend(market_holder["errors"])
 
     snapshot = {
         "timestamp": time.time(),
