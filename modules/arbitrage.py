@@ -194,28 +194,24 @@ def evaluate_offer(
     )
 
 
-def scan_arbitrage(
+def _buyer_key(name: str) -> str:
+    return (name or "").strip().casefold()
+
+
+def build_arbitrage_candidates(
     listings: Iterable[BazaarListing],
     offers: Iterable[BuyOffer],
     *,
     min_profit_per_item: int = 20_000,
     min_roi: float = 0.0,
     min_quantity: int = 1,
-) -> list[ArbitrageOpportunity]:
-    """
-    Find the strongest opportunity for each item.
-
-    Every buyer is evaluated independently against the same bazaar inventory.
-    We then keep the best buyer for that item, ranked by:
-      1) total profit
-      2) average profit per item
-      3) ROI
-
-    This avoids double-counting inventory across multiple buyers in the output.
-    """
+    excluded_buyers: Optional[set[str]] = None,
+) -> dict[str, list[ArbitrageOpportunity]]:
+    """Evaluate every qualifying buyer and return ranked candidates per item."""
     if min_quantity <= 0:
         raise ValueError("min_quantity must be positive.")
 
+    excluded = {_buyer_key(name) for name in (excluded_buyers or set()) if name}
     listing_rows = list(listings)
     listings_by_item: dict[str, list[BazaarListing]] = {}
     for listing in listing_rows:
@@ -223,9 +219,11 @@ def scan_arbitrage(
         key = _item_key(listing.item_name, listing.item_id)
         listings_by_item.setdefault(key, []).append(listing)
 
-    best_by_item: dict[str, ArbitrageOpportunity] = {}
-
+    candidates_by_item: dict[str, list[ArbitrageOpportunity]] = {}
     for offer in offers:
+        if _buyer_key(offer.buyer_name) in excluded:
+            continue
+
         offer_key = _item_key(offer.item_name, offer.item_id)
         item_listings = listings_by_item.get(offer_key)
         if not item_listings:
@@ -240,29 +238,102 @@ def scan_arbitrage(
         if opportunity is None or opportunity.quantity < min_quantity:
             continue
 
-        key = _item_key(offer.item_name, offer.item_id)
-        current = best_by_item.get(key)
+        candidates_by_item.setdefault(offer_key, []).append(opportunity)
 
-        if current is None:
-            best_by_item[key] = opportunity
+    for rows in candidates_by_item.values():
+        rows.sort(
+            key=lambda row: (
+                row.total_profit,
+                row.average_profit_per_item,
+                row.roi,
+                row.buyer_price,
+            ),
+            reverse=True,
+        )
+    return candidates_by_item
+
+
+def scan_arbitrage(
+    listings: Iterable[BazaarListing],
+    offers: Iterable[BuyOffer],
+    *,
+    min_profit_per_item: int = 20_000,
+    min_roi: float = 0.0,
+    min_quantity: int = 1,
+    excluded_buyers: Optional[set[str]] = None,
+    max_opportunities_per_buyer: Optional[int] = None,
+    diversified: bool = False,
+    diversification_tolerance: float = 0.10,
+) -> list[ArbitrageOpportunity]:
+    """
+    Select one buyer per item while supporting exclusions and buyer concentration
+    controls.
+
+    With diversified=True, if the highest-profit buyer is already represented,
+    a less-used alternate may be selected when it preserves at least
+    (1 - diversification_tolerance) of the best candidate's total profit.
+    """
+    if max_opportunities_per_buyer is not None and max_opportunities_per_buyer <= 0:
+        raise ValueError("max_opportunities_per_buyer must be positive when supplied.")
+    if not 0 <= diversification_tolerance < 1:
+        raise ValueError("diversification_tolerance must be between 0 and 1.")
+
+    candidates_by_item = build_arbitrage_candidates(
+        listings,
+        offers,
+        min_profit_per_item=min_profit_per_item,
+        min_roi=min_roi,
+        min_quantity=min_quantity,
+        excluded_buyers=excluded_buyers,
+    )
+
+    # Process the most valuable items first so a hard buyer cap preserves the
+    # strongest opportunities before allocating that buyer to smaller rows.
+    item_groups = sorted(
+        candidates_by_item.values(),
+        key=lambda rows: rows[0].total_profit if rows else 0,
+        reverse=True,
+    )
+
+    selected: list[ArbitrageOpportunity] = []
+    buyer_counts: dict[str, int] = {}
+
+    for candidates in item_groups:
+        allowed = []
+        for candidate in candidates:
+            key = _buyer_key(candidate.buyer_name)
+            if (
+                max_opportunities_per_buyer is not None
+                and buyer_counts.get(key, 0) >= max_opportunities_per_buyer
+            ):
+                continue
+            allowed.append(candidate)
+
+        if not allowed:
             continue
 
-        current_rank = (
-            current.total_profit,
-            current.average_profit_per_item,
-            current.roi,
-        )
-        new_rank = (
-            opportunity.total_profit,
-            opportunity.average_profit_per_item,
-            opportunity.roi,
-        )
+        chosen = allowed[0]
 
-        if new_rank > current_rank:
-            best_by_item[key] = opportunity
+        if diversified and buyer_counts.get(_buyer_key(chosen.buyer_name), 0) > 0:
+            floor = chosen.total_profit * (1.0 - diversification_tolerance)
+            near_best = [row for row in allowed if row.total_profit >= floor]
+            if near_best:
+                near_best.sort(
+                    key=lambda row: (
+                        -buyer_counts.get(_buyer_key(row.buyer_name), 0),
+                        row.total_profit,
+                        row.average_profit_per_item,
+                    ),
+                    reverse=True,
+                )
+                chosen = near_best[0]
+
+        selected.append(chosen)
+        key = _buyer_key(chosen.buyer_name)
+        buyer_counts[key] = buyer_counts.get(key, 0) + 1
 
     return sorted(
-        best_by_item.values(),
+        selected,
         key=lambda row: (
             row.total_profit,
             row.average_profit_per_item,
