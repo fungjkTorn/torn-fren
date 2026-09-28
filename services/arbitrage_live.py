@@ -1399,6 +1399,10 @@ def build_arbitrage_report(
         "country_filter": country or None,
         "catalog_count": len(snapshot["catalog"]),
         "catalog_items": [item.item_name for item in snapshot["catalog"]],
+        "catalog_options": [
+            {"item_name": item.item_name, "countries": list(item.countries)}
+            for item in snapshot["catalog"]
+        ],
         "listing_count": len(snapshot["listings"]),
         "offer_count": len(snapshot["offers"]),
         "opportunity_count": len(output),
