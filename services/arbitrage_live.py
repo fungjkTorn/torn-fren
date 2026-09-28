@@ -632,7 +632,7 @@ def _te_cache_connection() -> sqlite3.Connection:
     conn = sqlite3.connect(TE_CACHE_DB, timeout=10)
     conn.execute(
         """
-        CREATE TABLE IF NOT EXISTS tornexchange_best_v2 (
+        CREATE TABLE IF NOT EXISTS tornexchange_best_v3 (
             item_id TEXT PRIMARY KEY,
             item_name TEXT NOT NULL,
             price INTEGER NOT NULL,
@@ -651,7 +651,7 @@ def _read_te_cache(item: ForeignItem, *, allow_stale: bool = False) -> Optional[
             row = conn.execute(
                 """
                 SELECT price, trader, trader_id, fetched_at
-                FROM tornexchange_best_v2
+                FROM tornexchange_best_v3
                 WHERE item_id = ?
                 """,
                 (item.item_id,),
@@ -697,7 +697,7 @@ def _write_te_cache(
         with _te_cache_connection() as conn:
             conn.execute(
                 """
-                INSERT INTO tornexchange_best_v2 (
+                INSERT INTO tornexchange_best_v3 (
                     item_id, item_name, price, trader, trader_id, fetched_at
                 ) VALUES (?, ?, ?, ?, ?, ?)
                 ON CONFLICT(item_id) DO UPDATE SET
