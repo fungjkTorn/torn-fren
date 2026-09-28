@@ -424,6 +424,46 @@ class LiveArbitrageParserTests(unittest.TestCase):
         self.assertEqual(result["buyer_count"], 1)
         self.assertEqual(result["buyers"][0]["buyer_name"], "Buyer B")
 
+    def test_report_exclusions_second_best_and_concentration(self):
+        snapshot = {
+            "timestamp": 123.0,
+            "refreshing": False,
+            "catalog": [
+                ForeignItem("1", "Item X", ("Argentina",), (50,)),
+                ForeignItem("2", "Item Y", ("Japan",), (50,)),
+            ],
+            "listings": [
+                BazaarListing("Item X", 100, 5, "tornw3b_bazaar", item_id="1"),
+                BazaarListing("Item Y", 100, 5, "tornw3b_bazaar", item_id="2"),
+            ],
+            "offers": [
+                BuyOffer("Item X", 200, "torn_exchange", "EVETINE", item_id="1"),
+                BuyOffer("Item X", 190, "tornw3b_trader", "Trader B", item_id="1"),
+                BuyOffer("Item Y", 180, "torn_exchange", "EVETINE", item_id="2"),
+                BuyOffer("Item Y", 175, "tornw3b_trader", "Trader C", item_id="2"),
+            ],
+            "errors": [],
+        }
+
+        with patch("services.arbitrage_live.get_source_snapshot", return_value=snapshot):
+            report = build_arbitrage_report(
+                min_profit_per_item=20,
+                excluded_traders=["EVETINE"],
+            )
+
+        self.assertEqual(report["opportunity_count"], 2)
+        self.assertEqual({row["buyer_name"] for row in report["opportunities"]}, {"Trader B", "Trader C"})
+        self.assertEqual(report["excluded_traders"], ["EVETINE"])
+        self.assertEqual(len(report["buyer_concentration"]), 2)
+
+        with patch("services.arbitrage_live.get_source_snapshot", return_value=snapshot):
+            report = build_arbitrage_report(min_profit_per_item=20)
+
+        row_x = next(row for row in report["opportunities"] if row["item_name"] == "Item X")
+        self.assertEqual(row_x["second_best_buyer_name"], "Trader B")
+        self.assertEqual(row_x["second_best_buyer_price"], 190)
+        self.assertEqual(row_x["buyer_price_gap"], 10)
+
 
 if __name__ == "__main__":
     unittest.main()
