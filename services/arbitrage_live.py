@@ -500,6 +500,23 @@ def fetch_tornw3b_buy_offers(
 fetch_weav3r_bazaar = fetch_tornw3b_bazaar
 
 
+def _card_has_exact_item_name(text: str, item_name: str) -> bool:
+    """
+    Torn Exchange fuzzy-searches item names. Require the result card's own
+    category/item label to exactly equal the requested item name.
+
+    Examples:
+      "Primary: Gold Plated AK-47 Price List" must NOT match "AK-47"
+      "Melee: Dual Axes Price List" must NOT match "Axe"
+      "Artifact: Meteorite Fragment Price List" must match exactly.
+    """
+    pattern = re.compile(
+        r":\s*" + re.escape(item_name.strip()) + r"\s+Price\s+List\b",
+        re.IGNORECASE,
+    )
+    return bool(pattern.search(text or ""))
+
+
 def _candidate_card(anchor):
     node = anchor
     for _ in range(7):
@@ -535,7 +552,10 @@ def parse_tornexchange_listings_html(
     for price_link in soup.find_all("a", href=True):
         href = str(price_link.get("href") or "")
         link_text = price_link.get_text(" ", strip=True).casefold()
-        if "/prices/" not in href and "price list" not in link_text:
+        # Only actual trader pricelist links are valid. Ignore the generic
+        # /prices/ navigation link, which can otherwise cause us to climb into
+        # a page-sized container and parse unrelated items/prices.
+        if not re.search(r"/prices/[^/?#]+/?$", href):
             continue
 
         card = _candidate_card(price_link)
@@ -543,7 +563,7 @@ def parse_tornexchange_listings_html(
             continue
 
         text = card.get_text(" ", strip=True)
-        if item_cf not in text.casefold():
+        if not _card_has_exact_item_name(text, item_name):
             continue
 
         price = _money(text)
