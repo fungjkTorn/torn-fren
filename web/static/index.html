@@ -997,7 +997,8 @@
       let total = Math.abs(Math.round(Number(seconds)));
       const h = Math.floor(total / 3600);
       total %= 3600;
-      const m = Math.floor(total / 60);      if (h) return `${sign}${h}h ${m}m`;
+      const m = Math.floor(total / 60);
+      if (h) return `${sign}${h}h ${m}m`;
       return `${sign}${m}m`;
     }
 
