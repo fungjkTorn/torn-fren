@@ -34,7 +34,6 @@ _PROFILE_REFRESHING = set()
 _PROFILE_LOCK = threading.Lock()
 PROFILE_TTL_SECONDS = 10 * 60
 DISK_PROFILE_SOFT_TTL_SECONDS = 60 * 60
-DISK_PROFILE_MAX_STALE_SECONDS = 24 * 60 * 60
 PROFILE_SCHEMA_VERSION = "v2.4"
 _PROFILE_CACHE_FILE = Path(__file__).parent.parent / "data" / "prediction_v2_profiles.json"
 
@@ -346,35 +345,36 @@ def _profile(country, item_name, force=False):
     ):
         return cached["value"]
 
-    # Persistent cache prevents a browser refresh from waiting ~10-20 seconds
-    # for the full walk-forward selector after every server restart.
+    # Persistent cache prevents a browser request from ever paying the full
+    # historical model-selection cost merely because a profile is old.
+    #
+    # Historical profiles are safe to serve stale: live stock state, anchors,
+    # projected cycles, and departure timing are still recalculated separately.
+    # When a profile is older than the soft TTL, return it immediately and
+    # refresh it asynchronously for the next request.
     if not force:
         disk = _read_disk_profiles().get(disk_key)
         if disk and disk.get("value"):
             age = now - float(disk.get("generated_at") or 0)
-            if age <= DISK_PROFILE_MAX_STALE_SECONDS:
-                value = disk["value"]
-                _PROFILE_CACHE[mem_key] = {
-                    "cached_at": now,
-                    "value": value,
-                }
+            value = disk["value"]
+            _PROFILE_CACHE[mem_key] = {
+                "cached_at": now,
+                "value": value,
+            }
 
-                # Serve the known-good profile immediately, then refresh it in
-                # the background when it is over an hour old. This lets rolling
-                # metrics improve without making the graph request block.
-                if age > DISK_PROFILE_SOFT_TTL_SECONDS:
-                    with _PROFILE_LOCK:
-                        if disk_key not in _PROFILE_REFRESHING:
-                            _PROFILE_REFRESHING.add(disk_key)
-                            threading.Thread(
-                                target=_background_refresh_profile,
-                                args=(country, item_name, disk_key),
-                                daemon=True,
-                            ).start()
-                return value
+            if age > DISK_PROFILE_SOFT_TTL_SECONDS:
+                with _PROFILE_LOCK:
+                    if disk_key not in _PROFILE_REFRESHING:
+                        _PROFILE_REFRESHING.add(disk_key)
+                        threading.Thread(
+                            target=_background_refresh_profile,
+                            args=(country, item_name, disk_key),
+                            daemon=True,
+                        ).start()
+            return value
 
-    # First-ever calculation for an item is necessarily slower. The result is
-    # persisted so subsequent graph/bot processes can reuse it immediately.
+    # Only a genuinely missing/schema-new profile must pay the expensive first
+    # calculation. The profile warmer seeds these ahead of user traffic.
     value = _calculate_profile(country, item_name)
     _PROFILE_CACHE[mem_key] = {"cached_at": now, "value": value}
     _write_disk_profile(disk_key, value)
