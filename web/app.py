@@ -77,6 +77,9 @@ def api_arbitrage(
     min_quantity: int = Query(1, ge=1, le=1_000_000),
     force: bool = Query(False),
     item: str | None = Query(None),
+    buy_source: str = Query("all"),
+    buyer_source: str = Query("all"),
+    country: str | None = Query(None),
 ):
     if item:
         result = build_arbitrage_item_diagnostic(
@@ -94,6 +97,9 @@ def api_arbitrage(
         min_quantity=min_quantity,
         force=force,
         background=True,
+        buy_source=buy_source,
+        buyer_source=buyer_source,
+        country=country,
     )
 
 
