@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 import re
 import sqlite3
@@ -26,6 +27,8 @@ TE_MIN_REQUEST_INTERVAL_SECONDS = float(os.getenv("ARBITRAGE_TE_REQUEST_INTERVAL
 W3B_MIN_REQUEST_INTERVAL_SECONDS = float(os.getenv("ARBITRAGE_W3B_REQUEST_INTERVAL", "0.8"))
 TE_CACHE_SECONDS = int(os.getenv("ARBITRAGE_TE_CACHE_SECONDS", "1800"))
 TE_CACHE_DB = Path(os.getenv("ARBITRAGE_TE_CACHE_DB", "data/arbitrage_cache.db"))
+SNAPSHOT_FILE = Path(os.getenv("ARBITRAGE_SNAPSHOT_FILE", "data/arbitrage_snapshot.json"))
+STALE_SNAPSHOT_MAX_SECONDS = int(os.getenv("ARBITRAGE_STALE_SNAPSHOT_SECONDS", "21600"))
 DEFAULT_CACHE_SECONDS = int(os.getenv("ARBITRAGE_CACHE_SECONDS", "900"))
 DEFAULT_MAX_WORKERS = max(1, min(int(os.getenv("ARBITRAGE_MAX_WORKERS", "2")), 4))
 HTTP_TIMEOUT_SECONDS = float(os.getenv("ARBITRAGE_HTTP_TIMEOUT", "12"))
@@ -74,6 +77,118 @@ _snapshot_cache = {
     "offers": [],
     "errors": [],
 }
+_refresh_thread: Optional[threading.Thread] = None
+_refresh_thread_lock = threading.Lock()
+
+
+def _snapshot_copy(*, refreshing: bool = False) -> dict:
+    with _cache_lock:
+        return {
+            "timestamp": float(_snapshot_cache.get("timestamp") or 0),
+            "catalog": list(_snapshot_cache.get("catalog") or []),
+            "listings": list(_snapshot_cache.get("listings") or []),
+            "offers": list(_snapshot_cache.get("offers") or []),
+            "errors": list(_snapshot_cache.get("errors") or []),
+            "refreshing": bool(refreshing),
+        }
+
+
+def _persist_snapshot(snapshot: dict) -> None:
+    try:
+        SNAPSHOT_FILE.parent.mkdir(parents=True, exist_ok=True)
+        payload = {
+            "timestamp": float(snapshot.get("timestamp") or 0),
+            "catalog": [asdict(row) for row in snapshot.get("catalog") or []],
+            "listings": [asdict(row) for row in snapshot.get("listings") or []],
+            "offers": [asdict(row) for row in snapshot.get("offers") or []],
+            "errors": list(snapshot.get("errors") or []),
+        }
+        temp = SNAPSHOT_FILE.with_suffix(SNAPSHOT_FILE.suffix + ".tmp")
+        temp.write_text(json.dumps(payload, separators=(",", ":")), encoding="utf-8")
+        temp.replace(SNAPSHOT_FILE)
+    except (OSError, TypeError, ValueError):
+        pass
+
+
+def _load_persisted_snapshot() -> bool:
+    if not SNAPSHOT_FILE.exists():
+        return False
+
+    try:
+        payload = json.loads(SNAPSHOT_FILE.read_text(encoding="utf-8"))
+        timestamp = float(payload.get("timestamp") or 0)
+        if timestamp <= 0:
+            return False
+
+        catalog = [
+            ForeignItem(
+                item_id=str(row["item_id"]),
+                item_name=str(row["item_name"]),
+                countries=tuple(row.get("countries") or ()),
+                abroad_costs=tuple(int(v) for v in (row.get("abroad_costs") or ())),
+            )
+            for row in payload.get("catalog") or []
+        ]
+        listings = [BazaarListing(**row) for row in payload.get("listings") or []]
+        offers = [BuyOffer(**row) for row in payload.get("offers") or []]
+        errors = list(payload.get("errors") or [])
+    except (OSError, ValueError, TypeError, KeyError, json.JSONDecodeError):
+        return False
+
+    with _cache_lock:
+        if float(_snapshot_cache.get("timestamp") or 0) < timestamp:
+            _snapshot_cache.clear()
+            _snapshot_cache.update(
+                {
+                    "timestamp": timestamp,
+                    "catalog": catalog,
+                    "listings": listings,
+                    "offers": offers,
+                    "errors": errors,
+                }
+            )
+    return True
+
+
+def _background_refresh_running() -> bool:
+    with _refresh_thread_lock:
+        return _refresh_thread is not None and _refresh_thread.is_alive()
+
+
+def _background_refresh_worker(force: bool) -> None:
+    try:
+        _refresh_snapshot(force=force)
+    except Exception as exc:
+        with _cache_lock:
+            existing = list(_snapshot_cache.get("errors") or [])
+            existing.append(
+                {
+                    "item": None,
+                    "source": "arbitrage_refresh",
+                    "error": str(exc),
+                }
+            )
+            _snapshot_cache["errors"] = existing[-100:]
+    finally:
+        global _refresh_thread
+        with _refresh_thread_lock:
+            _refresh_thread = None
+
+
+def _start_background_refresh(*, force: bool = False) -> bool:
+    global _refresh_thread
+
+    with _refresh_thread_lock:
+        if _refresh_thread is not None and _refresh_thread.is_alive():
+            return False
+        _refresh_thread = threading.Thread(
+            target=_background_refresh_worker,
+            kwargs={"force": force},
+            name="arbitrage-refresh",
+            daemon=True,
+        )
+        _refresh_thread.start()
+        return True
 
 
 def _session() -> requests.Session:
@@ -844,23 +959,49 @@ def _refresh_snapshot(*, force: bool = False) -> dict:
         _snapshot_cache.clear()
         _snapshot_cache.update(snapshot)
 
+    _persist_snapshot(snapshot)
     return snapshot
 
 
-def get_source_snapshot(*, force: bool = False) -> dict:
-    with _cache_lock:
-        age = time.time() - float(_snapshot_cache.get("timestamp") or 0)
-        has_data = bool(_snapshot_cache.get("catalog"))
-        if not force and has_data and age < DEFAULT_CACHE_SECONDS:
-            return {
-                "timestamp": _snapshot_cache["timestamp"],
-                "catalog": list(_snapshot_cache["catalog"]),
-                "listings": list(_snapshot_cache["listings"]),
-                "offers": list(_snapshot_cache["offers"]),
-                "errors": list(_snapshot_cache["errors"]),
-            }
+def get_source_snapshot(
+    *,
+    force: bool = False,
+    background: bool = False,
+) -> dict:
+    """
+    Return a source snapshot without making web/Discord requests wait on a full
+    cold scan.
 
-    return _refresh_snapshot(force=force)
+    CLI callers keep background=False and can request a synchronous refresh.
+    Interactive surfaces use background=True: they get the newest cached
+    snapshot immediately while one daemon refresh runs in the background.
+    """
+    with _cache_lock:
+        has_memory = bool(_snapshot_cache.get("catalog"))
+    if not has_memory:
+        _load_persisted_snapshot()
+
+    snapshot = _snapshot_copy(refreshing=_background_refresh_running())
+    age = time.time() - float(snapshot.get("timestamp") or 0)
+    has_data = bool(snapshot.get("catalog"))
+
+    if not force and has_data and age < DEFAULT_CACHE_SECONDS:
+        return snapshot
+
+    if not background:
+        refreshed = _refresh_snapshot(force=force)
+        return {
+            **refreshed,
+            "refreshing": False,
+        }
+
+    _start_background_refresh(force=force)
+    snapshot = _snapshot_copy(refreshing=True)
+
+    # A persisted snapshot can remain useful while a fresh scan is running. If
+    # it is extremely old we still return it, but surface its age so the UI can
+    # clearly label it stale instead of pretending it is live.
+    return snapshot
 
 
 def build_arbitrage_report(
@@ -869,8 +1010,9 @@ def build_arbitrage_report(
     min_roi: float = 0.0,
     min_quantity: int = 1,
     force: bool = False,
+    background: bool = False,
 ) -> dict:
-    snapshot = get_source_snapshot(force=force)
+    snapshot = get_source_snapshot(force=force, background=background)
 
     opportunities = scan_arbitrage(
         snapshot["listings"],
@@ -891,8 +1033,11 @@ def build_arbitrage_report(
         row["buy_url"] = foreign_item.weav3r_url if foreign_item else None
         output.append(row)
 
+    generated_at = float(snapshot.get("timestamp") or 0)
     return {
-        "generated_at": snapshot["timestamp"],
+        "generated_at": generated_at,
+        "source_age_seconds": max(0.0, time.time() - generated_at) if generated_at else None,
+        "refreshing": bool(snapshot.get("refreshing")),
         "cache_seconds": DEFAULT_CACHE_SECONDS,
         "scope": "foreign_items_only",
         "min_profit_per_item": min_profit_per_item,
