@@ -170,21 +170,11 @@ sudo systemctl restart torn-fren-arbitrage.service
 sudo systemctl status torn-fren-arbitrage.service --no-pager
 ```
 
-After an API/UI route is added beneath `/api/arbitrage`, Nginx should route
-the whole prefix to staging rather than only the exact base endpoint:
+Item diagnostics intentionally reuse the existing `/api/arbitrage?item=...`
+route, so the current exact Nginx API route does not need to change.
 
-```nginx
-location ^~ /api/arbitrage {
-    proxy_pass http://127.0.0.1:8001;
-    proxy_http_version 1.1;
-    proxy_set_header Host $host;
-    proxy_set_header X-Real-IP $remote_addr;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto $scheme;
-}
-```
-
-Always run `sudo nginx -t` before reloading Nginx.
+Always run `sudo nginx -t` before reloading Nginx if the proxy configuration
+is changed for any future scanner route.
 
 ## Scanner UX / trust metadata
 
