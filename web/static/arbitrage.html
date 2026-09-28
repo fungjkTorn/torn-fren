@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Torn Fren · Arbitrage Scanner</title>
+  <style>
+    :root{color-scheme:dark;--bg:#0b0f14;--panel:#121821;--panel2:#161f2a;--text:#e7edf5;--muted:#8fa1b5;--line:#263241;--accent:#6ea8fe;--good:#48d597;--bad:#ff7070}
+    *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,sans-serif}
+    .wrap{max-width:1500px;margin:0 auto;padding:28px} h1{margin:0 0 6px;font-size:30px}.sub{color:var(--muted);margin-bottom:22px}
+    .toolbar,.stats{display:flex;gap:12px;flex-wrap:wrap;align-items:end}.toolbar{background:var(--panel);border:1px solid var(--line);padding:16px;border-radius:14px}
+    label{display:flex;flex-direction:column;gap:6px;color:var(--muted);font-size:12px}input,select,button{background:#0d131b;color:var(--text);border:1px solid var(--line);border-radius:9px;padding:10px 11px}
+    button{cursor:pointer;font-weight:700}button.primary{background:var(--accent);color:#07111d;border-color:transparent}.stats{margin:14px 0}
+    .stat{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 15px;min-width:150px}.stat b{display:block;font-size:19px}.stat span{color:var(--muted);font-size:12px}
+    .notice{margin:12px 0;color:var(--muted)}.error{color:var(--bad)}.table-shell{overflow:auto;border:1px solid var(--line);border-radius:14px;background:var(--panel)}
+    table{width:100%;border-collapse:collapse;min-width:1240px}th,td{padding:12px 13px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+    th:first-child,td:first-child,th:nth-child(2),td:nth-child(2),th:nth-child(10),td:nth-child(10){text-align:left}
+    th{position:sticky;top:0;background:var(--panel2);color:#b9c8d8;font-size:12px;cursor:pointer;user-select:none}tr:hover td{background:#141c26}
+    .good{color:var(--good);font-weight:700}.muted{color:var(--muted)}.pill{display:inline-block;padding:3px 7px;border-radius:999px;background:#1b2633;color:#bcd0e5;font-size:11px;margin-right:4px}
+    a{color:#8ab6ff;text-decoration:none}a:hover{text-decoration:underline}.tiny{font-size:12px}.actions{display:flex;gap:7px}
+    @media(max-width:700px){.wrap{padding:14px}h1{font-size:24px}}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Arbitrage Scanner</h1>
+  <div class="sub">Foreign-purchasable items only · TornW3B bazaar inventory → Torn Exchange trader bids</div>
+
+  <div class="toolbar">
+    <label>Minimum profit / item
+      <input id="minProfit" type="number" value="20000" min="0" step="1000">
+    </label>
+    <label>Minimum ROI %
+      <input id="minRoi" type="number" value="0" min="0" step="0.5">
+    </label>
+    <label>Minimum quantity
+      <input id="minQty" type="number" value="1" min="1" step="1">
+    </label>
+    <label>Sort by
+      <select id="sortBy">
+        <option value="total_profit">Total profit</option>
+        <option value="average_profit_per_item">Profit / item</option>
+        <option value="roi">ROI</option>
+        <option value="quantity">Quantity</option>
+        <option value="average_buy_price">Average buy price</option>
+      </select>
+    </label>
+    <button id="scan" class="primary">Scan</button>
+    <button id="force">Force refresh sources</button>
+  </div>
+
+  <div class="stats">
+    <div class="stat"><b id="opportunityCount">—</b><span>opportunities</span></div>
+    <div class="stat"><b id="listingCount">—</b><span>bazaar listings</span></div>
+    <div class="stat"><b id="offerCount">—</b><span>trader bids</span></div>
+    <div class="stat"><b id="catalogCount">—</b><span>foreign items scanned</span></div>
+  </div>
+
+  <div id="status" class="notice">Ready.</div>
+  <div class="table-shell">
+    <table>
+      <thead>
+        <tr>
+          <th data-key="item_name">Item</th>
+          <th data-key="countries">Foreign source</th>
+          <th data-key="average_buy_price">Avg buy</th>
+          <th data-key="buyer_price">Trader buy</th>
+          <th data-key="average_profit_per_item">Profit / item</th>
+          <th data-key="roi">ROI</th>
+          <th data-key="quantity">Qty</th>
+          <th data-key="total_cost">Capital</th>
+          <th data-key="total_profit">Total profit</th>
+          <th data-key="buyer_name">Trader</th>
+          <th>Links</th>
+        </tr>
+      </thead>
+      <tbody id="rows"></tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+let currentRows = [];
+let activeSort = "total_profit";
+let descending = true;
+
+const money = value => "$" + Math.round(Number(value || 0)).toLocaleString();
+const pct = value => (Number(value || 0) * 100).toFixed(1) + "%";
+const safe = value => String(value ?? "").replace(/[&<>"']/g, ch => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;"}[ch]));
+
+function render() {
+  const rows = [...currentRows];
+  rows.sort((a,b) => {
+    let av = a[activeSort], bv = b[activeSort];
+    if (activeSort === "countries") { av=(av||[]).join(","); bv=(bv||[]).join(","); }
+    if (typeof av === "string") return descending ? bv.localeCompare(av) : av.localeCompare(bv);
+    av = Number(av || 0); bv = Number(bv || 0);
+    return descending ? bv-av : av-bv;
+  });
+
+  document.getElementById("rows").innerHTML = rows.map(row => {
+    const countries = (row.countries || []).map(x => '<span class="pill">'+safe(x)+'</span>').join("");
+    const buyLink = row.buy_url ? '<a href="'+safe(row.buy_url)+'" target="_blank" rel="noreferrer">Buy listings</a>' : "—";
+    const traderLink = row.buyer_url ? '<a href="'+safe(row.buyer_url)+'" target="_blank" rel="noreferrer">Trader list</a>' : "—";
+    return '<tr>'+
+      '<td><b>'+safe(row.item_name)+'</b></td>'+
+      '<td>'+countries+'</td>'+
+      '<td>'+money(row.average_buy_price)+'</td>'+
+      '<td>'+money(row.buyer_price)+'</td>'+
+      '<td class="good">'+money(row.average_profit_per_item)+'</td>'+
+      '<td class="good">'+pct(row.roi)+'</td>'+
+      '<td>'+Number(row.quantity||0).toLocaleString()+'</td>'+
+      '<td>'+money(row.total_cost)+'</td>'+
+      '<td class="good">'+money(row.total_profit)+'</td>'+
+      '<td><b>'+safe(row.buyer_name)+'</b><div class="tiny muted">'+safe(row.buyer_source)+'</div></td>'+
+      '<td><div class="actions">'+buyLink+' · '+traderLink+'</div></td>'+
+      '</tr>';
+  }).join("");
+
+  if (!rows.length) {
+    document.getElementById("rows").innerHTML = '<tr><td colspan="11" class="muted" style="text-align:center;padding:30px">No qualifying opportunities for these filters.</td></tr>';
+  }
+}
+
+async function load(force=false) {
+  const minProfit = Number(document.getElementById("minProfit").value || 0);
+  const minRoi = Number(document.getElementById("minRoi").value || 0) / 100;
+  const minQty = Number(document.getElementById("minQty").value || 1);
+  const params = new URLSearchParams({min_profit:minProfit,min_roi:minRoi,min_quantity:minQty,force:String(force)});
+  const status = document.getElementById("status");
+  status.className = "notice";
+  status.textContent = force ? "Refreshing live sources…" : "Loading scanner…";
+  document.getElementById("scan").disabled = true;
+  document.getElementById("force").disabled = true;
+  try {
+    const response = await fetch("/api/arbitrage?"+params.toString());
+    if (!response.ok) throw new Error("HTTP "+response.status);
+    const data = await response.json();
+    currentRows = data.opportunities || [];
+    document.getElementById("opportunityCount").textContent = Number(data.opportunity_count||0).toLocaleString();
+    document.getElementById("listingCount").textContent = Number(data.listing_count||0).toLocaleString();
+    document.getElementById("offerCount").textContent = Number(data.offer_count||0).toLocaleString();
+    document.getElementById("catalogCount").textContent = Number(data.catalog_count||0).toLocaleString();
+    const when = data.generated_at ? new Date(data.generated_at*1000).toLocaleTimeString() : "unknown";
+    const errs = (data.errors || []).length;
+    status.textContent = "Source snapshot: "+when+" · "+errs+" source error"+(errs===1?"":"s")+". Results are opportunities, not guaranteed inventory.";
+    if (errs) status.classList.add("error");
+    activeSort = document.getElementById("sortBy").value;
+    descending = true;
+    render();
+  } catch (err) {
+    status.className = "notice error";
+    status.textContent = "Scanner failed: "+err.message;
+  } finally {
+    document.getElementById("scan").disabled = false;
+    document.getElementById("force").disabled = false;
+  }
+}
+
+document.getElementById("scan").addEventListener("click", () => load(false));
+document.getElementById("force").addEventListener("click", () => load(true));
+document.getElementById("sortBy").addEventListener("change", e => {activeSort=e.target.value;descending=true;render();});
+document.querySelectorAll("th[data-key]").forEach(th => th.addEventListener("click", () => {
+  const key = th.dataset.key;
+  if (activeSort === key) descending = !descending; else {activeSort=key;descending=true;}
+  document.getElementById("sortBy").value = [...document.getElementById("sortBy").options].some(o=>o.value===key) ? key : document.getElementById("sortBy").value;
+  render();
+}));
+load(false);
+</script>
+</body>
+</html>
