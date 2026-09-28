@@ -125,3 +125,18 @@ Torn Exchange. A deliberate full-catalog diagnostic remains available via
 hammer third-party services. TornW3B calls in production are serialized and
 retry once on HTTP 429. The key-dependent official Torn item-market path is
 covered by mocked parser tests; live use requires the runtime `TORN_API_KEY`.
+
+
+### Non-blocking interactive refresh
+
+A full foreign-item refresh can take time because third-party rate limits are
+respected. Web and Discord requests therefore do not sit open waiting for a
+cold full scan. They return the newest persisted snapshot immediately and start
+one daemon refresh in the background when the cache is stale. The web page
+shows the snapshot age, indicates when a refresh is running, and polls again
+while that refresh is active.
+
+Successful refreshes are persisted to `data/arbitrage_snapshot.json`, so an
+application restart can immediately serve the last known scanner state while a
+new refresh runs. CLI calls remain synchronous by default so smoke tests can
+fail loudly and report the completed source state.
