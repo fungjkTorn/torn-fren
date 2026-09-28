@@ -61,3 +61,45 @@ For each trader buy offer:
 Source freshness must remain attached to the normalized row. TornW3B listings can be scan/cache based, so a displayed opportunity is not proof that the item still exists in the seller's bazaar.
 
 The UI should eventually expose a freshness/status indicator instead of implying inventory is guaranteed.
+
+
+## Live v0 integration
+
+Current acquisition sources:
+
+- TornW3B public bazaar listings for every item in the travel-stock catalog.
+- Official Torn v2 item-market listings for the initial foreign artifact group:
+  Basalt, Quartzite, Chalcedony, Chert, Quartz, Obsidian, Meteorite Fragment,
+  and Patagonian Fossil.
+
+Current buyer source:
+
+- Torn Exchange active-trader listings, filtered by item name.
+
+The foreign-item universe is generated from the same YATA/Prometheus travel
+export Torn Fren already uses. This keeps v0 intentionally smaller than the
+full Torn item universe.
+
+## User surfaces
+
+- `python arbitrage_scan.py --force` provides a terminal smoke test.
+- `GET /api/arbitrage` returns the normalized report.
+- `/arbitrage` is a sortable web table.
+- Discord `/arbitrage [min_profit] [min_quantity]` returns the top six
+  opportunities and links to the trader pricelist and TornW3B item page.
+
+## Refresh policy
+
+A source snapshot is cached for 15 minutes by default. A force refresh is
+available for manual testing, but the normal UI and Discord command reuse the
+cache. Third-party collection defaults to only two workers. The priority
+official Torn item-market requests are intentionally sequential and rate
+limited.
+
+## Known v0 limitation
+
+TornW3B also exposes buyer pricelists / Search Deals. The calculation model
+already supports multiple buyer sources, but the automated TornW3B buyer
+collector is not enabled until its supported public/API query path is confirmed.
+We do not guess at an internal endpoint or hammer the site. Torn Exchange is the
+live automated buyer feed in this branch.
