@@ -7,7 +7,7 @@ from fastapi.responses import FileResponse
 from services.history_service import get_item_history_since, get_stock_catalog, get_stock_graph_analysis
 from services.prediction_v2_live import build_live_prediction_v2
 from services.admin_health import build_admin_health
-from services.arbitrage_live import build_arbitrage_report
+from services.arbitrage_live import build_arbitrage_report, build_arbitrage_item_diagnostic
 
 app = FastAPI(title="Torn Fren Stock Graph")
 
@@ -84,6 +84,21 @@ def api_arbitrage(
         force=force,
         background=True,
     )
+
+
+@app.get("/api/arbitrage/item")
+def api_arbitrage_item(
+    item: str = Query(..., min_length=1),
+    force: bool = Query(False),
+):
+    result = build_arbitrage_item_diagnostic(
+        item,
+        force=force,
+        background=True,
+    )
+    if not result.get("found"):
+        raise HTTPException(status_code=404, detail=f"Unknown foreign item: {item}")
+    return result
 
 
 @app.get("/arbitrage")
