@@ -82,6 +82,7 @@ def api_arbitrage(
         min_roi=min_roi,
         min_quantity=min_quantity,
         force=force,
+        background=True,
     )
 
 
