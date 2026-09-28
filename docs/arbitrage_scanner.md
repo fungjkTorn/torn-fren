@@ -119,7 +119,9 @@ at roughly 6.2 seconds apart. The file is covered by the repository's existing
 ## Validation
 
 The branch test workflow compiles the integration, runs deterministic unit and
-parser tests, performs a live Basalt Point smoke test against TornW3B and Torn
-Exchange, and performs a full foreign-item TornW3B-only smoke scan. The
-key-dependent official Torn item-market path is covered by mocked parser tests;
-live use requires the runtime `TORN_API_KEY`.
+parser tests, and performs one live Basalt Point smoke test against TornW3B and
+Torn Exchange. A deliberate full-catalog diagnostic remains available via
+`foreign_arbitrage_smoke.py`, but it is not run on every CI push so we do not
+hammer third-party services. TornW3B calls in production are serialized and
+retry once on HTTP 429. The key-dependent official Torn item-market path is
+covered by mocked parser tests; live use requires the runtime `TORN_API_KEY`.
