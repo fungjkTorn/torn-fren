@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import os
 import re
+import sqlite3
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import asdict, dataclass
+from pathlib import Path
 from typing import Optional
 from urllib.parse import quote_plus, urljoin
 
@@ -21,6 +23,8 @@ TORNW3B_API_BASE = "https://weav3r.dev/api"
 TORN_EXCHANGE_LISTINGS_URL = "https://www.tornexchange.com/listings"
 TORN_EXCHANGE_BEST_URL = "https://tornexchange.com/api/best_listing"
 TE_MIN_REQUEST_INTERVAL_SECONDS = float(os.getenv("ARBITRAGE_TE_REQUEST_INTERVAL", "6.2"))
+TE_CACHE_SECONDS = int(os.getenv("ARBITRAGE_TE_CACHE_SECONDS", "1800"))
+TE_CACHE_DB = Path(os.getenv("ARBITRAGE_TE_CACHE_DB", "data/arbitrage_cache.db"))
 DEFAULT_CACHE_SECONDS = int(os.getenv("ARBITRAGE_CACHE_SECONDS", "900"))
 DEFAULT_MAX_WORKERS = max(1, min(int(os.getenv("ARBITRAGE_MAX_WORKERS", "2")), 4))
 HTTP_TIMEOUT_SECONDS = float(os.getenv("ARBITRAGE_HTTP_TIMEOUT", "12"))
@@ -445,6 +449,99 @@ def parse_tornexchange_listings_html(
     return sorted(offers, key=lambda row: row.unit_price, reverse=True)
 
 
+def _te_cache_connection() -> sqlite3.Connection:
+    TE_CACHE_DB.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(TE_CACHE_DB, timeout=10)
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS tornexchange_best (
+            item_id TEXT PRIMARY KEY,
+            item_name TEXT NOT NULL,
+            price INTEGER NOT NULL,
+            trader TEXT,
+            trader_id TEXT,
+            fetched_at REAL NOT NULL
+        )
+        """
+    )
+    return conn
+
+
+def _read_te_cache(item: ForeignItem, *, allow_stale: bool = False) -> Optional[list[BuyOffer]]:
+    try:
+        with _te_cache_connection() as conn:
+            row = conn.execute(
+                """
+                SELECT price, trader, trader_id, fetched_at
+                FROM tornexchange_best
+                WHERE item_id = ?
+                """,
+                (item.item_id,),
+            ).fetchone()
+    except sqlite3.Error:
+        return None
+
+    if row is None:
+        return None
+
+    price, trader, trader_id, fetched_at = row
+    age = time.time() - float(fetched_at or 0)
+    if not allow_stale and age > TE_CACHE_SECONDS:
+        return None
+
+    if int(price or 0) <= 0 or not trader:
+        return []
+
+    trader_slug = quote_plus(str(trader)).replace("+", "%20")
+    return [
+        BuyOffer(
+            item_name=item.item_name,
+            item_id=item.item_id,
+            unit_price=int(price),
+            source="torn_exchange",
+            buyer_name=str(trader),
+            buyer_id=str(trader_id) if trader_id else None,
+            url=f"https://www.tornexchange.com/prices/{trader_slug}/",
+            observed_at=float(fetched_at),
+        )
+    ]
+
+
+def _write_te_cache(
+    item: ForeignItem,
+    *,
+    price: int,
+    trader: Optional[str],
+    trader_id: Optional[str],
+    fetched_at: float,
+) -> None:
+    try:
+        with _te_cache_connection() as conn:
+            conn.execute(
+                """
+                INSERT INTO tornexchange_best (
+                    item_id, item_name, price, trader, trader_id, fetched_at
+                ) VALUES (?, ?, ?, ?, ?, ?)
+                ON CONFLICT(item_id) DO UPDATE SET
+                    item_name = excluded.item_name,
+                    price = excluded.price,
+                    trader = excluded.trader,
+                    trader_id = excluded.trader_id,
+                    fetched_at = excluded.fetched_at
+                """,
+                (
+                    item.item_id,
+                    item.item_name,
+                    int(price),
+                    trader,
+                    trader_id,
+                    float(fetched_at),
+                ),
+            )
+    except sqlite3.Error:
+        pass
+
+
 def _wait_for_tornexchange_slot() -> None:
     """
     Torn Exchange's public best-listing API is documented by community scripts
@@ -465,6 +562,7 @@ def fetch_tornexchange_buy_offers(
     item: ForeignItem,
     *,
     session: Optional[requests.Session] = None,
+    force: bool = False,
 ) -> list[BuyOffer]:
     """
     Fetch Torn Exchange's best active trader for one item using its public API.
@@ -472,6 +570,11 @@ def fetch_tornexchange_buy_offers(
     Response fields used by existing Torn community scripts include:
       price, trader, trader_id, item, te_price, vote.
     """
+    if not force:
+        cached = _read_te_cache(item)
+        if cached is not None:
+            return cached
+
     session = session or _session()
     _wait_for_tornexchange_slot()
 
@@ -483,7 +586,15 @@ def fetch_tornexchange_buy_offers(
     response.raise_for_status()
     payload = response.json()
 
+    fetched_at = time.time()
     if payload.get("status") != "success" or not payload.get("data"):
+        _write_te_cache(
+            item,
+            price=0,
+            trader=None,
+            trader_id=None,
+            fetched_at=fetched_at,
+        )
         return []
 
     data = payload["data"]
@@ -496,7 +607,22 @@ def fetch_tornexchange_buy_offers(
     trader_id = str(data.get("trader_id") or "").strip() or None
 
     if price <= 0 or not trader_name:
+        _write_te_cache(
+            item,
+            price=0,
+            trader=None,
+            trader_id=None,
+            fetched_at=fetched_at,
+        )
         return []
+
+    _write_te_cache(
+        item,
+        price=price,
+        trader=trader_name,
+        trader_id=trader_id,
+        fetched_at=fetched_at,
+    )
 
     # Torn Exchange usernames map directly to public /prices/<name>/ pages.
     trader_slug = quote_plus(trader_name).replace("+", "%20")
@@ -511,7 +637,7 @@ def fetch_tornexchange_buy_offers(
             buyer_name=trader_name,
             buyer_id=trader_id,
             url=trader_url,
-            observed_at=time.time(),
+            observed_at=fetched_at,
         )
     ]
 
@@ -602,7 +728,7 @@ def _collect_foreign_item_market(catalog: list[ForeignItem]) -> tuple[list[Bazaa
     return listings, errors
 
 
-def _refresh_snapshot() -> dict:
+def _refresh_snapshot(*, force: bool = False) -> dict:
     catalog = get_foreign_item_catalog()
     listings: list[BazaarListing] = []
     offers: list[BuyOffer] = []
@@ -637,7 +763,7 @@ def _refresh_snapshot() -> dict:
             )
 
         try:
-            item_offers.extend(fetch_tornexchange_buy_offers(item, session=local_session))
+            item_offers.extend(fetch_tornexchange_buy_offers(item, session=local_session, force=force))
         except Exception as exc:
             item_errors.append(
                 {
@@ -689,7 +815,7 @@ def get_source_snapshot(*, force: bool = False) -> dict:
                 "errors": list(_snapshot_cache["errors"]),
             }
 
-    return _refresh_snapshot()
+    return _refresh_snapshot(force=force)
 
 
 def build_arbitrage_report(
