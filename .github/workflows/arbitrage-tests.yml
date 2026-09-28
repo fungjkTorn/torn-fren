@@ -25,5 +25,3 @@ jobs:
         run: python -m unittest tests.test_arbitrage tests.test_arbitrage_live -v
       - name: Live public-source smoke test
         run: python live_arbitrage_smoke.py
-      - name: Expanded Torn Exchange matching diagnostics
-        run: python diagnose_te_targets.py
