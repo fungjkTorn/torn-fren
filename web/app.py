@@ -76,7 +76,18 @@ def api_arbitrage(
     min_roi: float = Query(0.0, ge=0.0, le=100.0),
     min_quantity: int = Query(1, ge=1, le=1_000_000),
     force: bool = Query(False),
+    item: str | None = Query(None),
 ):
+    if item:
+        result = build_arbitrage_item_diagnostic(
+            item,
+            force=force,
+            background=True,
+        )
+        if not result.get("found"):
+            raise HTTPException(status_code=404, detail=f"Unknown foreign item: {item}")
+        return result
+
     return build_arbitrage_report(
         min_profit_per_item=min_profit,
         min_roi=min_roi,
@@ -84,21 +95,6 @@ def api_arbitrage(
         force=force,
         background=True,
     )
-
-
-@app.get("/api/arbitrage/item")
-def api_arbitrage_item(
-    item: str = Query(..., min_length=1),
-    force: bool = Query(False),
-):
-    result = build_arbitrage_item_diagnostic(
-        item,
-        force=force,
-        background=True,
-    )
-    if not result.get("found"):
-        raise HTTPException(status_code=404, detail=f"Unknown foreign item: {item}")
-    return result
 
 
 @app.get("/arbitrage")
