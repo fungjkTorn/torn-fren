@@ -648,9 +648,9 @@ def fetch_torn_item_market(
     session: Optional[requests.Session] = None,
 ) -> list[BazaarListing]:
     """
-    Pull the first page of official Torn item-market listings for selected
-    foreign artifacts. Torn returns the cheapest listings first, so page one is
-    sufficient for the initial arbitrage pass without burning API calls.
+    Pull the first page of official Torn item-market listings for one foreign
+    item. Torn returns the cheapest listings first, so page one is sufficient
+    for the initial arbitrage pass without burning API calls.
     """
     api_key = (os.getenv("TORN_API_KEY") or "").strip()
     if not api_key:
@@ -708,6 +708,10 @@ def _collect_foreign_item_market(catalog: list[ForeignItem]) -> tuple[list[Bazaa
     """
     listings = []
     errors = []
+
+    if not (os.getenv("TORN_API_KEY") or "").strip():
+        return listings, errors
+
     session = _session()
 
     for item in catalog:
@@ -723,7 +727,7 @@ def _collect_foreign_item_market(catalog: list[ForeignItem]) -> tuple[list[Bazaa
             )
 
         # Stay comfortably below Torn's per-minute API ceiling.
-        time.sleep(0.7)
+        time.sleep(1.0)
 
     return listings, errors
 
