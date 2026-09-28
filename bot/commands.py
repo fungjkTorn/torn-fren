@@ -346,7 +346,7 @@ def setup_commands(bot):
                         f"profit/item $" + f"{row.get('average_profit_per_item', 0):,.0f}" + " · "
                         f"total $" + f"{row.get('total_profit', 0):,.0f}" + "\n"
                         f"ROI **{row.get('roi', 0) * 100:.1f}%** · "
-                        f"{row.get('seller_count', 0)} seller(s) · "
+                        f"{row.get('listing_count', 0)} qualifying listing(s) · "
                         f"{buy_text} · sell to {trader_text}"
                     ),
                     inline=False,
