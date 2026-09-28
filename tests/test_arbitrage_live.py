@@ -290,6 +290,36 @@ class LiveArbitrageParserTests(unittest.TestCase):
             "https://www.tornexchange.com/prices/Shinsengumi/",
         )
 
+    def test_tornexchange_rejects_more_fuzzy_item_variants(self):
+        cases = [
+            ("Lighter", "Enhancer: Windproof Lighter", 6_774_104),
+            ("Samurai Sword", "Melee: Dual Samurai Swords", 1_657_837_500),
+            ("Grenade", "Temporary: Concussion Grenade", 3_100_000),
+            ("Paper Weight", "Other: Spooky Paper Weight", 3_462_920),
+        ]
+
+        for requested, displayed, price in cases:
+            with self.subTest(requested=requested):
+                html = f"""
+                <html><body>
+                  <div class="listing-card">
+                    <div>Trader [123456]</div>
+                    <div>${price:,}</div>
+                    <div>Current market: ${price:,}</div>
+                    <div>{displayed}</div>
+                    <a href="/prices/Trader/">Price List</a>
+                    <a href="#">Trade Now</a>
+                  </div>
+                </body></html>
+                """
+                rows = parse_tornexchange_listings_html(
+                    html,
+                    item_id="1",
+                    item_name=requested,
+                    observed_at=123.0,
+                )
+                self.assertEqual(rows, [])
+
 
 if __name__ == "__main__":
     unittest.main()
