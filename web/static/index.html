@@ -236,6 +236,13 @@
       overflow-wrap: anywhere;
     }
 
+    .metric-subvalue {
+      margin-top: 3px;
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.25;
+    }
+
     .prediction-main {
       font-size: 1.05rem;
       font-weight: 700;
@@ -635,9 +642,9 @@
     <div class="controls">
       <div class="timeframes" id="timeframes">
         <button data-minutes="180">3h</button>
-        <button data-minutes="360" class="active">6h</button>
+        <button data-minutes="360">6h</button>
         <button data-minutes="720">12h</button>
-        <button data-minutes="1440">24h</button>
+        <button data-minutes="1440" class="active">24h</button>
         <button data-minutes="4320">72h</button>
         <button data-minutes="10080">7d</button>
       </div>
@@ -665,6 +672,11 @@
         <div class="insight-title">Observed history</div>
         <div class="metrics">
           <div class="metric"><div class="metric-label">Current stock</div><div class="metric-value" id="currentStock">—</div></div>
+          <div class="metric"><div class="metric-label">Foreign buy price</div><div class="metric-value" id="currentCost">—</div><div class="metric-subvalue" id="currentCostMeta"></div></div>
+          <div class="metric"><div class="metric-label">Market price</div><div class="metric-value" id="marketPrice">—</div><div class="metric-subvalue">Torn market value</div></div>
+          <div class="metric"><div class="metric-label">Net profit / item</div><div class="metric-value" id="netProfitPerItem">—</div><div class="metric-subvalue">After 5% Item Market fee</div></div>
+          <div class="metric"><div class="metric-label">Profit / slot / hr</div><div class="metric-value" id="profitPerSlotHour">—</div><div class="metric-subvalue">PI + pilot round trip</div></div>
+          <div class="metric"><div class="metric-label">ROI</div><div class="metric-value" id="profitRoi">—</div><div class="metric-subvalue">Net profit ÷ foreign cost</div></div>
           <div class="metric"><div class="metric-label">Last restock</div><div class="metric-value" id="lastRestock">—</div></div>
           <div class="metric"><div class="metric-label">Observed peak</div><div class="metric-value" id="lastPeak">—</div></div>
           <div class="metric"><div class="metric-label">Last depletion</div><div class="metric-value" id="lastDepletion">—</div></div>
@@ -688,11 +700,11 @@
 
         <div class="prediction-primary-grid">
           <div class="prediction-kpi">
-            <div class="prediction-kpi-label">Recommended arrival</div>
+            <div class="prediction-kpi-label">Target arrival window</div>
             <div class="prediction-kpi-value" id="predictionArrivalValue">—</div>
           </div>
           <div class="prediction-kpi">
-            <div class="prediction-kpi-label">Recommended leave by</div>
+            <div class="prediction-kpi-label">Best departure window</div>
             <div class="prediction-kpi-value" id="predictionLeaveByValue">—</div>
           </div>
           <div class="prediction-kpi">
@@ -797,23 +809,34 @@
     subtitleEl.textContent = "Country: " + country.toUpperCase();
 
     let chart = null;
-    let currentMinutes = 360;
+    let currentMinutes = 1440;
     let currentFetchMinutes = 2880;
     let currentAnalysis = null;
     let catalog = { countries: [] };
     let autoRefreshTimer = null;
     let loadingData = false;
+    let loadGeneration = 0;
     let previousActivePrediction = null;
     let lastFetchCompletedAt = null;
+    let cachedRows = [];
+    let cachedAnalysis = null;
+    let cachedFetchMinutes = 0;
+    let cachedSelectionKey = "";
+    let warmRefreshTimer = null;
+    let warmRefreshAttempts = 0;
+
+    function selectionKey(countryValue = country, itemValue = item) {
+      return `${String(countryValue || "").toLowerCase()}|${String(itemValue || "")}`;
+    }
 
     // The selected timeframe is the amount of time visible per screen.
     // We deliberately load more history so the user can scroll left without
     // having to switch to a more compressed timeframe.
     const HISTORY_LOAD_MINUTES = {
       180: 1440,   // 3h visible, load 24h
-      360: 2880,   // 6h visible, load 48h
-      720: 4320,   // 12h visible, load 72h
-      1440: 10080, // 24h visible, load 7d
+      360: 2880,   // 6h visible, reuse default 48h cache
+      720: 2880,   // 12h visible, reuse default 48h cache
+      1440: 2880,  // 24h default, load 48h for responsive zooming
       4320: 10080, // 72h visible, load 7d
       10080: 10080 // 7d visible, load 7d
     };
@@ -828,7 +851,8 @@
         const active = chartInstance.$prediction;
         const predictions = chartInstance.$predictions || (active ? [active] : []);
         const previous = chartInstance.$previousPrediction;
-        if (!predictions.length && !previous?.estimate_timestamp) return;
+        const forecastHistory = chartInstance.$forecastHistory || [];
+        if (!predictions.length && !previous?.estimate_timestamp && !forecastHistory.length) return;
 
         const xScale = chartInstance.scales.x;
         const area = chartInstance.chartArea;
@@ -849,6 +873,30 @@
             );
           }
         }
+
+        // Persisted forecast history: these are forecasts that actually existed
+        // at the shown issued-at time, not timestamps invented on page refresh.
+        // Keep them faint so they provide accountability without overpowering
+        // the current actionable chain.
+        forecastHistory.slice().reverse().forEach((forecast, index) => {
+          if (!forecast?.estimate_timestamp) return;
+          const isCurrent = active &&
+            forecast.prediction_number === active.prediction_number &&
+            forecast.estimate_timestamp === active.estimate_timestamp;
+          if (isCurrent) return;
+          const x = xScale.getPixelForValue(forecast.estimate_timestamp * 1000);
+          if (x < area.left || x > area.right) return;
+
+          ctx.strokeStyle = "rgba(181, 186, 193, 0.20)";
+          ctx.lineWidth = 0.8;
+          ctx.setLineDash([2, 6]);
+          ctx.beginPath();
+          ctx.moveTo(x, area.top);
+          ctx.lineTo(x, area.bottom);
+          ctx.stroke();
+          ctx.setLineDash([]);
+
+        });
 
         // Show the full P1..Pn chain. Earlier/unreachable cycles are subtle;
         // the current actionable target remains the strongest line.
@@ -878,7 +926,10 @@
           ctx.textBaseline = "top";
           const number = prediction.prediction_number || index + 1;
           const state = isActive ? "target" : (prediction.usable_for_departure ? "reachable" : "unreachable");
-          const label = `P${number} · ${state}`;
+          const issuedAt = prediction.issued_at_timestamp || currentAnalysis?.prediction_v2?.forecast_snapshot_created_at;
+          const dropLabel = ` · drop ${formatClock(prediction.estimate_timestamp)}`;
+          const issuedLabel = issuedAt ? ` · issued ${formatClock(issuedAt)}` : "";
+          const label = `P${number} · ${state}${dropLabel}${issuedLabel}`;
           const padX = 5;
           const textWidth = ctx.measureText(label).width;
           let labelX = x + 5;
@@ -911,9 +962,6 @@
             ctx.lineTo(x, area.bottom);
             ctx.stroke();
             ctx.setLineDash([]);
-            ctx.fillStyle = "rgba(181,186,193,0.72)";
-            ctx.font = "600 9px -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif";
-            ctx.fillText(`previous P${previous.prediction_number}`, x + 4, area.bottom - 14);
           }
         }
 
@@ -949,16 +997,15 @@
       let total = Math.abs(Math.round(Number(seconds)));
       const h = Math.floor(total / 3600);
       total %= 3600;
-      const m = Math.floor(total / 60);
-      if (h) return `${sign}${h}h ${m}m`;
+      const m = Math.floor(total / 60);      if (h) return `${sign}${h}h ${m}m`;
       return `${sign}${m}m`;
     }
 
     function updateLiveState(analysis) {
       const last = analysis?.collector_last_success_timestamp;
       if (!last) {
-        liveStateEl.className = "live-state offline";
-        liveStateEl.textContent = "Collector unknown";
+        liveStateEl.className = analysis?.analysis_warming ? "live-state stale" : "live-state offline";
+        liveStateEl.textContent = analysis?.analysis_warming ? "Loading stats…" : "Collector unknown";
         return;
       }
 
@@ -1059,6 +1106,43 @@
       return `${hours}h ${String(mins).padStart(2, "0")}m`;
     }
 
+    function departureWindowForPrediction(prediction, flightSeconds) {
+      if (!prediction || !flightSeconds) return null;
+
+      const estimate = prediction.estimate_timestamp;
+      const calibratedArrival = prediction.recommended_arrival_timestamp;
+      const lateRestockBound = prediction.window_end_timestamp;
+      const depletion = prediction.target_depletion_timestamp;
+      const lifetime = prediction.expected_stock_lifetime_seconds;
+
+      // Earliest arrival should not intentionally place the player before the
+      // late side of the restock window. If the calibrated travel policy already
+      // aims later, preserve that more conservative target.
+      const earliestArrival = Math.max(
+        calibratedArrival || estimate || 0,
+        lateRestockBound || estimate || 0
+      );
+      if (!earliestArrival) return null;
+
+      // Keep a small buffer ahead of predicted depletion. This is intentionally
+      // provisional; the travel-outcome tournament will learn a better bound.
+      const depletionBuffer = lifetime
+        ? Math.max(60, Math.min(300, Math.round(lifetime * 0.10)))
+        : 60;
+      let latestArrival = depletion ? depletion - depletionBuffer : null;
+      if (!latestArrival || latestArrival <= earliestArrival) {
+        latestArrival = prediction.window_end_timestamp || calibratedArrival || estimate;
+      }
+      if (!latestArrival || latestArrival < earliestArrival) latestArrival = earliestArrival;
+
+      return {
+        earliestArrival,
+        latestArrival,
+        earliestLeave: earliestArrival - flightSeconds,
+        latestLeave: latestArrival - flightSeconds,
+      };
+    }
+
     function updateFlightTicker() {
       const flightMinutes = PI_PILOT_FLIGHT_MINUTES[country];
       const prediction = currentAnalysis?.prediction;
@@ -1077,7 +1161,7 @@
       const flightSeconds = flightMinutes * 60;
 
       if (!prediction?.estimate_timestamp) {
-        flightDeadlineEl.textContent = "Waiting for prediction";
+        flightDeadlineEl.textContent = "WAITING FOR PREDICTION";
         flightCountdownEl.textContent = "--:--:--";
         flightStatusEl.textContent = `${countryName} · ${formatFlightMinutes(flightMinutes)} flight`;
         flightMetaEl.textContent = "Travel timing appears when Prediction v2 has a usable target.";
@@ -1086,48 +1170,58 @@
 
       const nowSeconds = Date.now() / 1000;
       const etaIfLeavingNow = nowSeconds + flightSeconds;
-      const recommendedLeave = prediction.recommended_leave_by_timestamp;
-      const recommendedArrival = prediction.recommended_arrival_timestamp;
-      const latestWindowLeave = prediction.window_end_timestamp
-        ? prediction.window_end_timestamp - flightSeconds
-        : null;
       const targetNumber = prediction.prediction_number || 1;
-      const reliability = prediction.travel_reliability || "insufficient";
+      const window = departureWindowForPrediction(prediction, flightSeconds);
 
-      if (!recommendedLeave) {
-        flightDeadlineEl.textContent = `Prediction #${targetNumber}`;
+      if (!window) {
+        flightDeadlineEl.textContent = `P${targetNumber} · NO DEPARTURE WINDOW`;
         flightCountdownEl.textContent = "--:--:--";
-        flightStatusEl.textContent = "Prediction available · no calibrated departure recommendation yet";
-      } else if (nowSeconds < recommendedLeave) {
-        const remaining = recommendedLeave - nowSeconds;
-        flightDeadlineEl.textContent = `LEAVE BY ${formatClock(recommendedLeave)}`;
-        flightCountdownEl.textContent = formatDurationSeconds(remaining);
-        flightStatusEl.textContent = reliability === "unreliable"
-          ? `Estimate only · low-confidence Prediction #${targetNumber}`
-          : targetNumber > 1
-            ? `Next reachable cycle: Prediction #${targetNumber}`
-            : `Recommended departure for Prediction #${targetNumber}`;
-        if (remaining <= 15 * 60) flightSection.classList.add("flight-urgent");
-      } else if (latestWindowLeave && nowSeconds <= latestWindowLeave) {
-        const remaining = latestWindowLeave - nowSeconds;
+        flightStatusEl.textContent = "Prediction exists, but travel timing is not calibrated yet.";
+      } else if (nowSeconds < window.earliestLeave) {
+        const wait = window.earliestLeave - nowSeconds;
+        flightDeadlineEl.textContent = "TOO EARLY";
+        flightCountdownEl.textContent = formatDurationSeconds(wait);
+        flightStatusEl.textContent = `Wait ~${formatCompactDuration(wait)} before the current safe departure range opens.`;
+        if (wait <= 15 * 60) flightSection.classList.add("flight-urgent");
+      } else if (nowSeconds <= window.latestLeave) {
+        const remaining = window.latestLeave - nowSeconds;
         flightSection.classList.add("flight-urgent");
-        flightDeadlineEl.textContent = "Leave now";
+        flightDeadlineEl.textContent = "GOOD TO LEAVE";
         flightCountdownEl.textContent = formatDurationSeconds(remaining);
-        flightStatusEl.textContent = `Past ideal departure · still within estimated reachable window for #${targetNumber}`;
+        flightStatusEl.textContent = `ETA is inside the current modeled stock-available window for P${targetNumber}.`;
       } else {
+        const late = nowSeconds - window.latestLeave;
         flightSection.classList.add("flight-missed");
-        flightDeadlineEl.textContent = `Prediction #${targetNumber} not reachable`;
-        flightCountdownEl.textContent = latestWindowLeave
-          ? `+${formatDurationSeconds(nowSeconds - latestWindowLeave)}`
-          : "--:--:--";
-        flightStatusEl.textContent = "Prediction v2 will promote/update the next usable target when available";
+        flightDeadlineEl.textContent = "LATE";
+        flightCountdownEl.textContent = `+${formatDurationSeconds(late)}`;
+        flightStatusEl.textContent = `Leaving now is past the modeled safe departure range for P${targetNumber}; depletion risk is rising.`;
       }
 
+      const windowText = window
+        ? `${formatClock(window.earliestLeave)}–${formatClock(window.latestLeave)}`
+        : "—";
+      let etaRelation = "";
+      if (window) {
+        if (etaIfLeavingNow < window.earliestArrival) {
+          etaRelation = ` · ${formatCompactDuration(window.earliestArrival - etaIfLeavingNow)} early`;
+        } else if (etaIfLeavingNow > window.latestArrival) {
+          etaRelation = ` · ${formatCompactDuration(etaIfLeavingNow - window.latestArrival)} late`;
+        } else {
+          etaRelation = " · inside target window";
+        }
+      }
+      const arrivalWindowText = window
+        ? `${formatClock(window.earliestArrival)}–${formatClock(window.latestArrival)}`
+        : "—";
+      const projectionCue = targetNumber > 1
+        ? ` · ${targetNumber - 1} cycle${targetNumber - 1 === 1 ? "" : "s"} ahead · planning only`
+        : "";
       flightMetaEl.textContent =
         `${countryName} · PI + pilot ${formatFlightMinutes(flightMinutes)} · ` +
-        `ETA if leaving now ${formatClock(etaIfLeavingNow)} · ` +
-        `target arrival ${formatClock(recommendedArrival)} · ` +
-        `Prediction #${targetNumber}${prediction.projected ? " projected" : ""}`;
+        `predicted drop ${formatClock(prediction.estimate_timestamp)} · ` +
+        `ETA now ${formatClock(etaIfLeavingNow)}${etaRelation} · ` +
+        `target arrival ${arrivalWindowText} · departure ${windowText} · ` +
+        `P${targetNumber}${prediction.projected ? " projected" : ""}${projectionCue}`;
     }
 
     function setReliabilityBadge(label) {
@@ -1155,9 +1249,11 @@
         ? `P${number} reachable${projected ? " · projected" : ""}`
         : `P${number}${projected ? " projected" : ""}`;
 
-      const leave = prediction.recommended_leave_by_timestamp
-        ? `LEAVE ${formatClock(prediction.recommended_leave_by_timestamp)}${prediction.arrival_offset_source === "mid-stock fallback" ? " est." : ""}`
-        : "no leave estimate";
+      const flightMinutes = PI_PILOT_FLIGHT_MINUTES[country];
+      const dep = flightMinutes ? departureWindowForPrediction(prediction, flightMinutes * 60) : null;
+      const leave = dep
+        ? `DEPART ${formatClock(dep.earliestLeave)}–${formatClock(dep.latestLeave)}`
+        : "no departure range";
       const ahead = number > 1 ? ` · ${number - 1} cycle${number - 1 === 1 ? "" : "s"} before target` : "";
       text.textContent = `${leave} · ${formatClock(prediction.estimate_timestamp)} restock${ahead}`;
     }
@@ -1167,6 +1263,32 @@
       if (!analysis) return;
 
       document.getElementById("currentStock").textContent = formatNumber(analysis.current_stock);
+      const costEl = document.getElementById("currentCost");
+      const costMetaEl = document.getElementById("currentCostMeta");
+      costEl.textContent = analysis.current_cost == null
+        ? "—"
+        : `$${Number(analysis.current_cost).toLocaleString()}`;
+      if (analysis.current_cost_timestamp) {
+        const source = (analysis.current_cost_source || "stored").toUpperCase();
+        costMetaEl.textContent = `Last change via ${source} · ${formatClock(analysis.current_cost_timestamp)}`;
+      } else {
+        costMetaEl.textContent = "";
+      }
+
+      const profit = analysis.profitability || {};
+      document.getElementById("marketPrice").textContent = profit.market_price == null
+        ? "—"
+        : `$${Number(profit.market_price).toLocaleString()}`;
+      document.getElementById("netProfitPerItem").textContent = profit.net_profit_per_item == null
+        ? "—"
+        : formatSignedMoney(profit.net_profit_per_item);
+      document.getElementById("profitPerSlotHour").textContent = profit.profit_per_slot_per_hour == null
+        ? "—"
+        : `${formatSignedMoney(profit.profit_per_slot_per_hour)}/hr`;
+      document.getElementById("profitRoi").textContent = profit.roi_percent == null
+        ? "—"
+        : `${Number(profit.roi_percent).toFixed(1)}%`;
+
       document.getElementById("lastRestock").textContent = formatClock(analysis.last_restock_timestamp);
       document.getElementById("lastPeak").textContent = analysis.last_peak_quantity == null
         ? "—"
@@ -1208,19 +1330,26 @@
         }
       } else {
         const waitingClean = v2.status === "waiting_for_clean_anchor";
-        estimateEl.textContent = waitingClean ? "Waiting for clean live anchor" : "No active restock target";
-        windowEl.textContent = "—";
+        const warming = v2.status === "warming";
+        estimateEl.textContent = warming
+          ? "Calculating prediction…"
+          : waitingClean
+            ? "Waiting for clean live anchor"
+            : "No active restock target";
+        windowEl.textContent = warming ? "Stock history is ready; Prediction v2 is warming in the background." : "—";
       }
 
       const fallbackArrival = prediction.arrival_offset_source === "mid-stock fallback";
-      document.getElementById("predictionArrivalValue").textContent =
-        prediction.recommended_arrival_timestamp
-          ? `${formatClock(prediction.recommended_arrival_timestamp)}${fallbackArrival ? " · est." : ""}`
-          : "—";
-      document.getElementById("predictionLeaveByValue").textContent =
-        prediction.recommended_leave_by_timestamp
-          ? `${formatClock(prediction.recommended_leave_by_timestamp)}${fallbackArrival ? " · est." : ""}`
-          : "—";
+      const flightMinutes = PI_PILOT_FLIGHT_MINUTES[country];
+      const depWindow = flightMinutes
+        ? departureWindowForPrediction(prediction, flightMinutes * 60)
+        : null;
+      document.getElementById("predictionArrivalValue").textContent = depWindow
+        ? `${formatClock(depWindow.earliestArrival)}–${formatClock(depWindow.latestArrival)}${fallbackArrival ? " · est." : ""}`
+        : "—";
+      document.getElementById("predictionLeaveByValue").textContent = depWindow
+        ? `${formatClock(depWindow.earliestLeave)}–${formatClock(depWindow.latestLeave)}${fallbackArrival ? " · est." : ""}`
+        : "—";
 
       const life = v2.arrival_success_rate;
       const r10 = v2.recent10_arrival_success_rate;
@@ -1409,6 +1538,7 @@
       chart.$prediction = analysis?.prediction || null;
       chart.$predictions = analysis?.prediction_v2?.predictions || [];
       chart.$previousPrediction = previousActivePrediction;
+      chart.$forecastHistory = analysis?.forecast_history || [];
     }
 
     function updateExistingChart(stockPoints, analysis, minutes) {
@@ -1425,6 +1555,7 @@
       chart.$prediction = analysis?.prediction || null;
       chart.$predictions = analysis?.prediction_v2?.predictions || [];
       chart.$previousPrediction = previousActivePrediction;
+      chart.$forecastHistory = analysis?.forecast_history || [];
       chart.update("none");
       chart.resize();
     }
@@ -1436,11 +1567,67 @@
       return Math.abs(viewportRight - nowX) < 140;
     }
 
+    function renderFromCache(minutes, { forceLatest = true } = {}) {
+      const requiredFetchMinutes = getFetchMinutes(minutes);
+      if (cachedSelectionKey !== selectionKey()) return false;
+      if (!cachedRows.length || !cachedAnalysis || cachedFetchMinutes < requiredFetchMinutes) return false;
+
+      currentMinutes = minutes;
+      currentFetchMinutes = requiredFetchMinutes;
+      const cutoff = (Date.now() / 1000) - requiredFetchMinutes * 60;
+      const priorRows = cachedRows.filter((row) => row.timestamp < cutoff);
+      const inRangeRows = cachedRows.filter((row) => row.timestamp >= cutoff);
+      const rows = [];
+      if (priorRows.length) {
+        const prior = priorRows[priorRows.length - 1];
+        rows.push({ ...prior, timestamp: Math.floor(cutoff), anchor: true });
+      }
+      rows.push(...inRangeRows.map((row) => ({ ...row, anchor: false })));
+      const stockPoints = buildStockPoints(rows);
+
+      updateInsights(cachedAnalysis);
+      scheduleWarmRefresh(cachedAnalysis);
+      updateChartSize(minutes, cachedAnalysis, requiredFetchMinutes);
+      if (!chart) {
+        makeChart(stockPoints, cachedAnalysis, minutes);
+      } else {
+        updateExistingChart(stockPoints, cachedAnalysis, minutes);
+      }
+
+      const actualChanges = rows.filter((row) => !row.anchor).length;
+      const latestActual = [...rows].reverse().find((row) => !row.anchor) || rows[rows.length - 1];
+      statusEl.textContent = `${actualChanges.toLocaleString()} plotted stock changes · ${minutes / 60}h visible per screen · ${requiredFetchMinutes / 60}h history cached · latest recorded change: ${latestActual ? new Date(latestActual.timestamp * 1000).toLocaleString() : "—"}`;
+      if (forceLatest) requestAnimationFrame(jumpToLatest);
+      return true;
+    }
+
+    function scheduleWarmRefresh(analysis) {
+      const warming = Boolean(analysis?.analysis_warming) || analysis?.prediction_v2?.status === "warming";
+      if (!warming) {
+        warmRefreshAttempts = 0;
+        if (warmRefreshTimer) {
+          clearTimeout(warmRefreshTimer);
+          warmRefreshTimer = null;
+        }
+        return;
+      }
+      if (warmRefreshAttempts >= 5 || warmRefreshTimer) return;
+      warmRefreshAttempts += 1;
+      warmRefreshTimer = setTimeout(() => {
+        warmRefreshTimer = null;
+        if (!document.hidden && item) loadData(currentMinutes, { keepView: true });
+      }, 3000);
+    }
+
     async function loadData(minutes, { keepView = false, forceLatest = false } = {}) {
-      if (loadingData) return;
+      const requestId = ++loadGeneration;
+      const requestedCountry = country;
+      const requestedItem = item;
+      const requestedSelectionKey = selectionKey(requestedCountry, requestedItem);
       loadingData = true;
       currentMinutes = minutes;
       currentFetchMinutes = getFetchMinutes(minutes);
+      const requestedFetchMinutes = currentFetchMinutes;
 
       const nearLatestBefore = forceLatest ? true : isNearLatest();
       const oldScrollLeft = scrollEl.scrollLeft;
@@ -1453,13 +1640,19 @@
       if (!keepView) statusEl.textContent = "Loading...";
 
       try {
-        const url = `/api/history?country=${encodeURIComponent(country)}&item=${encodeURIComponent(item)}&minutes=${currentFetchMinutes}`;
+        const url = `/api/history?country=${encodeURIComponent(requestedCountry)}&item=${encodeURIComponent(requestedItem)}&minutes=${requestedFetchMinutes}`;
         const response = await fetch(url, { cache: "no-store" });
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
         const data = await response.json();
+        if (requestId !== loadGeneration || requestedSelectionKey !== selectionKey()) return;
+        cachedRows = data.rows || [];
+        cachedAnalysis = data.analysis || null;
+        cachedFetchMinutes = requestedFetchMinutes;
+        cachedSelectionKey = requestedSelectionKey;
         previousActivePrediction = oldPrediction;
         updateInsights(data.analysis);
+        scheduleWarmRefresh(data.analysis);
         updateChartSize(minutes, data.analysis, currentFetchMinutes);
 
         if (!data.rows || data.rows.length === 0) {
@@ -1495,14 +1688,33 @@
           });
         }
       } catch (error) {
+        if (requestId !== loadGeneration || requestedSelectionKey !== selectionKey()) return;
         console.error(error);
         liveStateEl.className = "live-state offline";
         liveStateEl.textContent = "Refresh failed";
         statusEl.textContent = "Could not load stock history. Make sure the FastAPI server is running.";
       } finally {
-        loadingData = false;
-        refreshButton.classList.remove("refreshing");
+        if (requestId === loadGeneration) {
+          loadingData = false;
+          refreshButton.classList.remove("refreshing");
+        }
       }
+    }
+
+    function formatCompactMoney(value) {
+      if (value == null || !Number.isFinite(Number(value))) return "—";
+      const n = Number(value);
+      const abs = Math.abs(n);
+      if (abs >= 1_000_000_000) return `$${(n / 1_000_000_000).toFixed(abs >= 10_000_000_000 ? 0 : 1)}b`;
+      if (abs >= 1_000_000) return `$${(n / 1_000_000).toFixed(abs >= 10_000_000 ? 0 : 1)}m`;
+      if (abs >= 1_000) return `$${(n / 1_000).toFixed(abs >= 100_000 ? 0 : 1)}k`;
+      return `$${Math.round(n).toLocaleString()}`;
+    }
+
+    function formatSignedMoney(value) {
+      if (value == null || !Number.isFinite(Number(value))) return "—";
+      const n = Math.round(Number(value));
+      return `${n < 0 ? "−" : ""}$${Math.abs(n).toLocaleString()}`;
     }
 
     async function loadCatalog() {
@@ -1538,7 +1750,9 @@
       items.forEach((row) => {
         const option = document.createElement("option");
         option.value = row.item_name;
-        option.textContent = row.item_name;
+        option.textContent = row.profit_per_slot_per_hour == null
+          ? `${row.item_name} — —`
+          : `${row.item_name} — ${formatCompactMoney(row.profit_per_slot_per_hour)}/slot/hr`;
         itemSelect.appendChild(option);
       });
 
@@ -1567,6 +1781,17 @@
 
       previousActivePrediction = null;
       currentAnalysis = null;
+      loadGeneration += 1;
+      loadingData = false;
+      cachedRows = [];
+      cachedAnalysis = null;
+      cachedFetchMinutes = 0;
+      cachedSelectionKey = "";
+      warmRefreshAttempts = 0;
+      if (warmRefreshTimer) {
+        clearTimeout(warmRefreshTimer);
+        warmRefreshTimer = null;
+      }
       if (chart) {
         chart.destroy();
         chart = null;
@@ -1590,7 +1815,10 @@
 
       document.querySelectorAll(".timeframes button").forEach((candidate) => candidate.classList.remove("active"));
       button.classList.add("active");
-      loadData(Number(button.dataset.minutes), { forceLatest: true });
+      const minutes = Number(button.dataset.minutes);
+      if (!renderFromCache(minutes, { forceLatest: true })) {
+        loadData(minutes, { forceLatest: true });
+      }
     });
 
 

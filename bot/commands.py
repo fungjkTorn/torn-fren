@@ -8,7 +8,7 @@ import discord
 from bot import alerts, config
 from modules import stock, travel
 from modules.prediction_v2_discord import build_prediction_v2_embed
-from services.history_service import get_recent_completed_cycles
+from services.history_service import get_recent_completed_cycles, get_latest_item_snapshot
 from services.prediction_v2_live import build_live_prediction_v2
 
 CountryCode = Literal[
@@ -87,6 +87,15 @@ def _history_pct(value):
         value *= 100.0
     return f"{value:.1f}%"
 
+
+
+def _money(value):
+    if value is None:
+        return "—"
+    try:
+        return f"${int(value):,}"
+    except (TypeError, ValueError):
+        return "—"
 
 
 def _graph_url(country: str, item_name: str):
@@ -185,6 +194,7 @@ def setup_commands(bot):
 
         cycles = cycle_data.get("cycles") or []
         typical = cycle_data.get("typical") or {}
+        item_state = get_latest_item_snapshot(country, item_name) or {}
 
         country_names = {
             "mex": "Mexico",
@@ -235,7 +245,8 @@ def setup_commands(bot):
             value=(
                 f"Empty → restock: **{_history_duration(typical.get('median_zero_wait_seconds'))}**\n"
                 f"Stock lifetime: **{_history_duration(typical.get('median_stock_lifetime_seconds'))}**\n"
-                f"Qualified cycles: **{int(typical.get('valid_cycle_count') or 0):,}**"
+                f"Qualified cycles: **{int(typical.get('valid_cycle_count') or 0):,}**\n"
+                f"Foreign buy price: **{_money(item_state.get('cost'))}**"
             ),
             inline=True,
         )

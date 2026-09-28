@@ -1,8 +1,10 @@
 import sqlite3
+import math
 import time
 import statistics
 import threading
 from pathlib import Path
+from functools import lru_cache
 
 from services.yata_api import get_country_stock
 
@@ -418,7 +420,195 @@ def _collection_gap_overlap(start_timestamp: int, end_timestamp: int):
 
 
 
-def _prediction_anchor_is_currently_trustworthy(anchor_timestamp: int, now_timestamp: int):
+
+
+def _collection_gaps_overlapping(start_timestamp: int, end_timestamp: int):
+    """Return every persisted collection gap overlapping [start, end]."""
+    init_db()
+    now = int(time.time())
+    with _connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT start_timestamp, end_timestamp, reason
+            FROM collection_gaps
+            WHERE start_timestamp <= ?
+              AND COALESCE(end_timestamp, ?) >= ?
+            ORDER BY start_timestamp ASC
+            """,
+            (int(end_timestamp), now, int(start_timestamp)),
+        ).fetchall()
+    return [
+        {
+            "start_timestamp": int(row[0]),
+            "end_timestamp": int(row[1]) if row[1] is not None else None,
+            "reason": row[2],
+        }
+        for row in rows
+    ]
+
+
+def _event_boundary_is_clean(event_timestamp: int):
+    """
+    True when a restock/depletion timestamp was observed outside a known outage.
+
+    The recovery snapshot is intentionally part of a recorded collection gap,
+    so a transition first seen exactly at recovery is NOT considered an exact
+    event boundary.
+    """
+    if event_timestamp is None:
+        return False
+    return _collection_gap_overlap(int(event_timestamp), int(event_timestamp)) is None
+
+
+@lru_cache(maxsize=8192)
+def _item_quantity_at_or_before(country: str, item_name: str, timestamp: int):
+    init_db()
+    with _connect() as conn:
+        row = conn.execute(
+            """
+            SELECT timestamp, quantity
+            FROM stock_history
+            WHERE country = ? AND LOWER(item_name) = LOWER(?) AND timestamp <= ?
+            ORDER BY timestamp DESC
+            LIMIT 1
+            """,
+            (country.lower(), item_name, int(timestamp)),
+        ).fetchone()
+    if row is None:
+        return None
+    return {"timestamp": int(row[0]), "quantity": int(row[1])}
+
+
+@lru_cache(maxsize=512)
+def _observed_restock_interval_floor_seconds(country: str, item_name: str):
+    """
+    Conservative empirical floor for how quickly a NORMAL full cycle can recur.
+
+    Tiny restocks/blips are excluded using the same basic 10%-of-typical-size
+    idea as cycle qualification. This avoids a 100-second anomalous blip making
+    every ordinary 3-5 minute collector gap look capable of hiding a full Japan
+    Xanax cycle.
+    """
+    raw = _get_all_item_rows_with_source(country, item_name)
+    cleaned, _ = _suppress_provider_bounces(raw)
+    rows = [(ts, qty) for ts, qty, _source in cleaned]
+    if len(rows) < 3:
+        return None
+
+    cycles = []
+    current = None
+    for i in range(1, len(rows)):
+        prev_ts, prev_qty = rows[i - 1]
+        ts, qty = rows[i]
+        if prev_qty == 0 and qty > 0:
+            if current is not None:
+                cycles.append(current)
+            current = {"restock_time": int(ts), "peak_quantity": int(qty)}
+            continue
+        if current is not None and qty > current["peak_quantity"]:
+            current["peak_quantity"] = int(qty)
+        if current is not None and prev_qty > 0 and qty == 0:
+            cycles.append(current)
+            current = None
+    if current is not None:
+        cycles.append(current)
+
+    peaks = [c["peak_quantity"] for c in cycles if c["peak_quantity"] > 0]
+    if len(peaks) < 4:
+        return None
+    typical_peak = statistics.median(peaks)
+    normal = [c for c in cycles if c["peak_quantity"] >= typical_peak * 0.10]
+    restocks = [c["restock_time"] for c in normal]
+    intervals = [b - a for a, b in zip(restocks, restocks[1:]) if b > a]
+    if len(intervals) < 3:
+        return None
+
+    # Use a robust lower-tail estimate rather than the literal minimum; even
+    # normal-sized cycles can contain provider/anomaly artifacts. Half of the
+    # 10th-percentile interval is deliberately conservative while ignoring a
+    # handful of implausibly short outliers.
+    ordered = sorted(intervals)
+    p10_index = max(0, int(math.floor((len(ordered) - 1) * 0.10)))
+    p10 = ordered[p10_index]
+    return max(60, int(p10 * 0.50))
+
+def _gap_preserves_item_cycle(country: str, item_name: str, gap):
+    """
+    Decide whether one gap can be bridged for CURRENT-cycle identity.
+
+    If stock state changes across recovery, an event boundary happened somewhere
+    inside the outage and its exact time is unknown.  Same-state gaps can survive
+    when they are shorter than the item's empirical full-cycle floor.
+    """
+    gap_start = int(gap["start_timestamp"])
+    gap_end = int(gap["end_timestamp"] or time.time())
+    before = _item_quantity_at_or_before(country, item_name, gap_start)
+    after = _item_quantity_at_or_before(country, item_name, gap_end)
+    if before is None or after is None:
+        return False, "missing item state around collection gap"
+
+    before_positive = before["quantity"] > 0
+    after_positive = after["quantity"] > 0
+    if before_positive != after_positive:
+        transition = "restock" if after_positive else "depletion"
+        return False, f"{transition} occurred during collection gap; exact boundary is unknown"
+
+    duration = max(0, gap_end - gap_start)
+    floor_seconds = _observed_restock_interval_floor_seconds(country, item_name)
+    if floor_seconds is None:
+        return False, "same-state gap but insufficient cycle history to rule out a hidden full cycle"
+    if duration >= floor_seconds:
+        return False, (
+            f"same-state gap lasted {duration}s, long enough that a hidden full cycle "
+            f"cannot be ruled out (empirical safety floor {floor_seconds}s)"
+        )
+    return True, (
+        f"same-state gap bridged ({duration}s < empirical hidden-cycle floor {floor_seconds}s)"
+    )
+
+
+def _interval_gaps_preserve_item_cycle(country: str, item_name: str, start_timestamp: int, end_timestamp: int):
+    """
+    Event-aware continuity check for an item-specific interval.
+
+    Returns valid when every overlapping outage can be bridged without changing
+    the item's observed zero/positive state and is too short to plausibly hide a
+    complete cycle based on that item's own history.
+    """
+    overlaps = _collection_gaps_overlapping(int(start_timestamp), int(end_timestamp))
+    if not overlaps:
+        return {
+            "valid": True,
+            "gaps": 0,
+            "max_gap_seconds": 0,
+            "reason": "no overlapping collection gaps",
+        }
+
+    max_gap = 0
+    for gap in overlaps:
+        gap_end = int(gap["end_timestamp"] or time.time())
+        duration = max(0, gap_end - int(gap["start_timestamp"]))
+        max_gap = max(max_gap, duration)
+        preserves, detail = _gap_preserves_item_cycle(country, item_name, gap)
+        if not preserves:
+            return {
+                "valid": False,
+                "gaps": len(overlaps),
+                "max_gap_seconds": max_gap,
+                "reason": detail,
+                "gap_start_timestamp": int(gap["start_timestamp"]),
+                "gap_end_timestamp": gap_end,
+            }
+
+    return {
+        "valid": True,
+        "gaps": len(overlaps),
+        "max_gap_seconds": max_gap,
+        "reason": "all overlapping gaps preserve item cycle identity",
+    }
+
+
+def _prediction_anchor_is_currently_trustworthy(country: str, item_name: str, anchor_timestamp: int, now_timestamp: int):
     """
     A live prediction anchor must have uninterrupted trustworthy collection
     from the anchor through "now".  Historical samples can remain valid while
@@ -433,13 +623,15 @@ def _prediction_anchor_is_currently_trustworthy(anchor_timestamp: int, now_times
     if anchor_timestamp is None:
         return False, "missing anchor"
 
-    overlap = _collection_gap_overlap(int(anchor_timestamp), int(now_timestamp))
-    if overlap:
-        return False, (
-            "current prediction anchor crosses a known collection outage "
-            f"({_format_datetime(overlap['start_timestamp'])} -> "
-            f"{_format_datetime(overlap['end_timestamp'])})"
-        )
+    overlaps = _collection_gaps_overlapping(int(anchor_timestamp), int(now_timestamp))
+    for overlap in overlaps:
+        preserves_cycle, detail = _gap_preserves_item_cycle(country, item_name, overlap)
+        if not preserves_cycle:
+            return False, (
+                "current prediction anchor crosses an ambiguous collection outage "
+                f"({_format_datetime(overlap['start_timestamp'])} -> "
+                f"{_format_datetime(overlap['end_timestamp'])}): {detail}"
+            )
 
     return True, None
 
@@ -464,13 +656,17 @@ def get_known_items(country: str):
     return [row[0] for row in rows]
 
 
-def get_latest_quantity(conn, country: str, item_id: int):
+def get_latest_item_state(conn, country: str, item_id: int):
     """
-    Return the most recent saved quantity for one country/item.
+    Return the most recently persisted quantity + foreign buy cost.
+
+    Stock history is sparse: a new row is written only when quantity OR cost
+    changes.  Keeping the pair together prevents foreign-price changes from
+    being silently lost when stock quantity stays flat.
     """
     row = conn.execute(
         """
-        SELECT quantity
+        SELECT quantity, cost
         FROM stock_history
         WHERE country = ? AND item_id = ?
         ORDER BY timestamp DESC
@@ -482,7 +678,13 @@ def get_latest_quantity(conn, country: str, item_id: int):
     if row is None:
         return None
 
-    return row[0]
+    return {"quantity": row[0], "cost": row[1]}
+
+
+def get_latest_quantity(conn, country: str, item_id: int):
+    """Backward-compatible quantity-only helper."""
+    state = get_latest_item_state(conn, country, item_id)
+    return None if state is None else state["quantity"]
 
 
 def save_snapshot(country: str):
@@ -490,8 +692,8 @@ def save_snapshot(country: str):
     Save one country snapshot.
 
     Important:
-    This only inserts a new row when an item's quantity changed.
-    It prevents 30-second duplicate spam in the database.
+    This only inserts a new row when an item's quantity OR foreign buy cost changed.
+    It prevents 30-second duplicate spam while preserving price-only updates.
     """
     init_db()
 
@@ -507,11 +709,19 @@ def save_snapshot(country: str):
             item_id = item["id"]
             item_name = item["name"]
             quantity = item["quantity"]
-            cost = item.get("cost")
+            incoming_cost = item.get("cost")
 
-            latest_quantity = get_latest_quantity(conn, country, item_id)
+            latest_state = get_latest_item_state(conn, country, item_id)
+            latest_quantity = latest_state["quantity"] if latest_state else None
+            latest_cost = latest_state["cost"] if latest_state else None
+            # Both providers normally supply cost. If one transiently omits it,
+            # retain the last known foreign buy price instead of erasing it.
+            cost = incoming_cost if incoming_cost is not None else latest_cost
 
-            if latest_quantity == quantity:
+            quantity_changed = latest_state is None or latest_quantity != quantity
+            cost_changed = latest_state is None or latest_cost != cost
+
+            if not quantity_changed and not cost_changed:
                 skipped += 1
                 continue
 
@@ -533,8 +743,11 @@ def save_snapshot(country: str):
 
 def save_snapshot_from_export(country: str, country_data: dict, source: str):
     """
-    Save one country's snapshot from an already-fetched export object,
-    instead of calling any API directly. This is what the poller uses now.
+    Save one country's snapshot from an already-fetched export object.
+
+    A row is inserted when quantity OR foreign buy cost changes. Price-only
+    changes are stored but are not returned as changed_items, so prediction
+    audits remain driven by real stock transitions.
     """
     init_db()
 
@@ -550,11 +763,19 @@ def save_snapshot_from_export(country: str, country_data: dict, source: str):
             item_id = item["id"]
             item_name = item["name"]
             quantity = item["quantity"]
-            cost = item.get("cost")
+            incoming_cost = item.get("cost")
 
-            latest_quantity = get_latest_quantity(conn, country, item_id)
+            latest_state = get_latest_item_state(conn, country, item_id)
+            latest_quantity = latest_state["quantity"] if latest_state else None
+            latest_cost = latest_state["cost"] if latest_state else None
+            # Both providers normally supply cost. If one transiently omits it,
+            # retain the last known foreign buy price instead of erasing it.
+            cost = incoming_cost if incoming_cost is not None else latest_cost
 
-            if latest_quantity == quantity:
+            quantity_changed = latest_state is None or latest_quantity != quantity
+            cost_changed = latest_state is None or latest_cost != cost
+
+            if not quantity_changed and not cost_changed:
                 skipped += 1
                 continue
 
@@ -568,7 +789,11 @@ def save_snapshot_from_export(country: str, country_data: dict, source: str):
             )
 
             inserted += 1
-            changed_items.append(item_name)
+            # Prediction/audit work should react only to stock transitions.
+            # A price-only row is persisted for pricing/profit history but does
+            # not represent a new restock/depletion observation.
+            if quantity_changed:
+                changed_items.append(item_name)
 
     print(f"{country}: inserted {inserted}, skipped {skipped} unchanged")
     return changed_items
@@ -654,6 +879,13 @@ def save_all_snapshots(export: dict):
         if changed:
             changed_by_country[country] = changed
 
+    if changed_by_country:
+        # Item-state/cycle-floor caches are analysis accelerators only. Fresh
+        # stock changes can alter cycle history, so never let them go stale in
+        # a long-running poller/web process.
+        _item_quantity_at_or_before.cache_clear()
+        _observed_restock_interval_floor_seconds.cache_clear()
+
     return changed_by_country
 
 
@@ -736,31 +968,39 @@ def _suppress_provider_bounces(rows, max_bounce_seconds: int = 180):
 
 def get_stock_catalog():
     """
-    Return the countries/items that actually exist in local collected history.
-
-    This intentionally comes from Torn Fren's own database rather than a hard-
-    coded item list so the hosted graph selector always reflects what the poller
-    has seen.
+    Return countries/items that exist in local collected history, including the
+    latest item id, foreign buy price and source. Profitability enrichment is
+    intentionally handled by the web/API layer so this DB helper stays purely
+    local and remains usable when Torn's API is unavailable.
     """
     init_db()
     with _connect() as conn:
         rows = conn.execute(
             """
-            SELECT country, item_name, MAX(timestamp) AS latest_timestamp
-            FROM stock_history
-            GROUP BY country, item_name
-            ORDER BY country ASC, item_name COLLATE NOCASE ASC
+            SELECT sh.country, sh.item_id, sh.item_name, sh.cost, sh.timestamp, sh.source
+            FROM stock_history sh
+            INNER JOIN (
+                SELECT country, item_id, MAX(timestamp) AS max_ts
+                FROM stock_history
+                GROUP BY country, item_id
+            ) latest
+            ON sh.country = latest.country
+               AND sh.item_id = latest.item_id
+               AND sh.timestamp = latest.max_ts
+            ORDER BY sh.country ASC, sh.item_name COLLATE NOCASE ASC
             """
         ).fetchall()
 
     by_country = {}
-    for country, item_name, latest_timestamp in rows:
+    for country, item_id, item_name, cost, latest_timestamp, source in rows:
         country = (country or "").lower()
         if not country or not item_name:
             continue
         by_country.setdefault(country, []).append({
-            "item_name": item_name,
+            "item_id": int(item_id) if item_id is not None else None,            "item_name": item_name,
+            "foreign_price": cost,
             "latest_timestamp": int(latest_timestamp) if latest_timestamp is not None else None,
+            "source": source,
         })
 
     return {
@@ -798,7 +1038,7 @@ def get_recent_completed_cycles(country, item_name, limit=3):
             "suppressed_provider_bounces": suppressed,
         }
 
-    cycles, _active_cycle, wait_samples = _build_validated_cycles(rows)
+    cycles, _active_cycle, wait_samples = _build_validated_cycles(rows, country, item_name)
 
     # Map each VALID zero->restock sample by the depletion that started it.
     wait_by_depletion = {
@@ -883,6 +1123,15 @@ def get_item_history_since(country: str, item_name: str, hours: float = 24):
 
     all_rows = _get_all_item_rows_with_source(country, item_name)
     cleaned_rows, _ = _suppress_provider_bounces(all_rows)
+    # stock_history also records price-only changes. Keep those rows in SQLite
+    # for pricing/profit history, but do not draw duplicate quantity points on
+    # the stock/depletion graph.
+    quantity_rows = []
+    for row in cleaned_rows:
+        if quantity_rows and row[1] == quantity_rows[-1][1]:
+            continue
+        quantity_rows.append(row)
+    cleaned_rows = quantity_rows
 
     previous = None
     visible = []
@@ -1037,6 +1286,10 @@ def get_restock_prediction(country: str, item_name: str):
 
     current_stock = rows[-1][1]
     latest_timestamp = rows[-1][0]
+    latest_item_state = get_latest_item_snapshot(country, item_name)
+    current_cost = latest_item_state.get("cost") if latest_item_state else None
+    current_cost_source = latest_item_state.get("source") if latest_item_state else None
+    current_cost_timestamp = latest_item_state.get("timestamp") if latest_item_state else None
 
     restock_timestamps = []
 
@@ -1052,6 +1305,9 @@ def get_restock_prediction(country: str, item_name: str):
 
     result = {
         "current_stock": current_stock,
+        "current_cost": current_cost,
+        "current_cost_source": current_cost_source,
+        "current_cost_timestamp": current_cost_timestamp,
         "latest_timestamp": latest_timestamp,
         "latest_time_str": time.strftime("%I:%M:%S %p", time.localtime(latest_timestamp)),
         "observed_restocks": len(restock_timestamps),
@@ -1235,7 +1491,7 @@ def _leave_one_out_mean(values, index):
     return statistics.mean(others)
 
 
-def _build_validated_cycles(rows):
+def _build_validated_cycles(rows, country: str = None, item_name: str = None):
     """
     Convert raw stock changes into restock cycles and qualify each cycle for use
     in prediction statistics.
@@ -1318,13 +1574,16 @@ def _build_validated_cycles(rows):
         )
         cycle["max_collection_gap_seconds"] = coverage["max_gap_seconds"]
         cycle["coverage_method"] = coverage["method"]
+        cycle["restock_boundary_clean"] = _event_boundary_is_clean(cycle["restock_time"])
+        cycle["depletion_boundary_clean"] = _event_boundary_is_clean(cycle["depletion_time"])
 
-        if not coverage["valid"]:
-            detail = coverage.get("reason") or f"failed {coverage['method']} continuity"
-            cycle["exclusion_reasons"].append(
-                f"collector coverage invalid ({detail}); "
-                f"overlap/gap {_format_duration(coverage['max_gap_seconds'])}"
-            )
+        # Missing samples in the MIDDLE of an otherwise fully observed cycle do
+        # not change its exact restock/depletion timestamps.  Only an uncertain
+        # boundary invalidates lifetime ground truth.
+        if not cycle["restock_boundary_clean"]:
+            cycle["exclusion_reasons"].append("restock boundary first observed during collector recovery")
+        if not cycle["depletion_boundary_clean"]:
+            cycle["exclusion_reasons"].append("depletion boundary first observed during collector recovery")
 
         cycle["valid_lifetime"] = not cycle["exclusion_reasons"]
 
@@ -1358,15 +1617,24 @@ def _build_validated_cycles(rows):
         )
 
         reasons = []
-        if not coverage["valid"]:
+        if country and item_name:
+            event_aware = _interval_gaps_preserve_item_cycle(
+                country, item_name, previous["depletion_time"], current_cycle["restock_time"]
+            )
+            if not event_aware["valid"]:
+                reasons.append(f"ambiguous collector gap: {event_aware['reason']}")
+        elif not coverage["valid"]:
             reasons.append(
                 f"collector coverage gap {_format_duration(gap)} failed {coverage['method']} continuity"
             )
 
-        # The outgoing depletion must itself be trustworthy. A later collection
-        # gap inside the incoming cycle does not invalidate the restock timestamp.
-        if not previous.get("valid_lifetime"):
-            reasons.append("previous depletion/cycle was not reliable")
+        # For a zero->restock wait we only need the two boundary events to be
+        # clean plus cycle identity preserved between them. A missing middle poll
+        # does not make the observed depletion timestamp itself unreliable.
+        if not previous.get("depletion_boundary_clean", previous.get("valid_lifetime")):
+            reasons.append("outgoing depletion boundary was not cleanly observed")
+        if not current_cycle.get("restock_boundary_clean", current_cycle.get("valid_lifetime")):
+            reasons.append("incoming restock boundary was not cleanly observed")
 
         wait_samples.append({
             "from_depletion": previous["depletion_time"],
@@ -1397,7 +1665,7 @@ def get_stock_graph_analysis(country: str, item_name: str, window_hours: float =
     now = int(time.time())
     cutoff = now - int(max(float(window_hours), 1 / 60) * 3600)
 
-    cycles, active_cycle, wait_samples = _build_validated_cycles(rows)
+    cycles, active_cycle, wait_samples = _build_validated_cycles(rows, country, item_name)
     completed_cycles = [cycle for cycle in cycles if cycle.get("complete")]
     valid_cycles = [cycle for cycle in completed_cycles if cycle.get("valid_lifetime")]
 
@@ -1567,7 +1835,7 @@ def get_stock_graph_analysis(country: str, item_name: str, window_hours: float =
     # no longer trustworthy because a known collection outage happened after it.
     # Never display a stale countdown/leave-by time in that situation.
     if samples and anchor is not None and typical is not None:
-        anchor_valid, anchor_reason = _prediction_anchor_is_currently_trustworthy(anchor, now)
+        anchor_valid, anchor_reason = _prediction_anchor_is_currently_trustworthy(country, item_name, anchor, now)
         if not anchor_valid:
             prediction.update({
                 "method": "waiting for clean post-outage anchor",
@@ -1712,7 +1980,7 @@ def _normal_completed_cycles_for_audit(country: str, item_name: str):
     rows = [(ts, qty) for ts, qty, _source in cleaned]
     if not rows:
         return []
-    cycles, _, _ = _build_validated_cycles(rows)
+    cycles, _, _ = _build_validated_cycles(rows, country, item_name)
     return [
         cycle for cycle in cycles
         if cycle.get("complete") and not cycle.get("tiny_restock")
@@ -1728,8 +1996,7 @@ def resolve_prediction_audits(country: str, item_name: str):
     actual restock. Long item refill times are allowed; elapsed duration itself
     is never a reason to reject a result.
     """
-    init_db()
-    cycles = _normal_completed_cycles_for_audit(country, item_name)
+    init_db()    cycles = _normal_completed_cycles_for_audit(country, item_name)
     if not cycles:
         return 0
 
@@ -1970,6 +2237,32 @@ def predict_restock(country: str, item_name: str):
 
 if __name__ == "__main__":
     save_snapshot("uni")
+
+def get_latest_item_snapshot(country: str, item_name: str):
+    """Return the latest persisted quantity/cost/source for one item."""
+    init_db()
+    with _connect() as conn:
+        row = conn.execute(
+            """
+            SELECT item_id, item_name, quantity, cost, timestamp, source
+            FROM stock_history
+            WHERE country = ? AND LOWER(item_name) = LOWER(?)
+            ORDER BY timestamp DESC
+            LIMIT 1
+            """,
+            (country, item_name),
+        ).fetchone()
+    if row is None:
+        return None
+    return {
+        "id": row[0],
+        "name": row[1],
+        "quantity": row[2],
+        "cost": row[3],
+        "timestamp": row[4],
+        "source": row[5],
+    }
+
 
 def get_latest_stock_snapshot(country: str):
     """
