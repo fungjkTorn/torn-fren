@@ -1,7 +1,8 @@
 from services.arbitrage_live import (
     ForeignItem,
     fetch_tornexchange_buy_offers,
-    fetch_weav3r_bazaar,
+    fetch_tornw3b_bazaar,
+    fetch_tornw3b_buy_offers,
 )
 
 
@@ -13,21 +14,26 @@ def main():
         abroad_costs=(),
     )
 
-    listings = fetch_weav3r_bazaar(item)
-    offers = fetch_tornexchange_buy_offers(item)
+    listings = fetch_tornw3b_bazaar(item)
+    w3b_offers = fetch_tornw3b_buy_offers(item)
+    exchange_offers = fetch_tornexchange_buy_offers(item)
 
     if not listings:
-        raise SystemExit("No TornW3B Basalt Point bazaar listings parsed.")
-    if not offers:
+        raise SystemExit("No TornW3B Basalt Point bazaar listings returned.")
+    if not w3b_offers:
+        raise SystemExit("No TornW3B Basalt Point trader offers returned.")
+    if not exchange_offers:
         raise SystemExit("No Torn Exchange Basalt Point trader offers parsed.")
 
     cheapest = min(listings, key=lambda row: row.unit_price)
-    best = max(offers, key=lambda row: row.unit_price)
+    best_w3b = max(w3b_offers, key=lambda row: row.unit_price)
+    best_exchange = max(exchange_offers, key=lambda row: row.unit_price)
 
     print(
         "LIVE_SMOKE_OK "
         f"bazaar_rows={len(listings)} cheapest={cheapest.unit_price} "
-        f"trader_rows={len(offers)} best={best.unit_price} buyer={best.buyer_name}"
+        f"w3b_traders={len(w3b_offers)} w3b_best={best_w3b.unit_price} "
+        f"exchange_traders={len(exchange_offers)} exchange_best={best_exchange.unit_price}"
     )
 
 
