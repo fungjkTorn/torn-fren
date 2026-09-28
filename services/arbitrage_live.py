@@ -1061,21 +1061,9 @@ def _refresh_snapshot(*, force: bool = False) -> dict:
             errors.extend(item_errors)
             completed += 1
 
-            # Publish partial progress so the web page and Discord can become
-            # useful during a cold, rate-limited refresh instead of waiting for
-            # the entire foreign catalog to finish.
-            partial = {
-                "timestamp": time.time(),
-                "catalog": catalog,
-                "listings": list(listings),
-                "offers": list(offers),
-                "errors": list(errors),
-            }
-            with _cache_lock:
-                _snapshot_cache.clear()
-                _snapshot_cache.update(partial)
-            if completed % 10 == 0:
-                _persist_snapshot(partial)
+            # Keep serving the last complete snapshot while this refresh is
+            # building. Never expose a half-scanned catalog as if it were a
+            # complete market snapshot.
 
     market_thread.join()
     listings.extend(market_holder["listings"])
@@ -1177,6 +1165,88 @@ def _anomaly_labels_for_item(opportunity, item_offers: list[BuyOffer]) -> tuple[
         }),
         "second_best_buyer_price": second,
         "top_buyer_price": top,
+    }
+
+
+def build_trader_finder(
+    item_name: str,
+    *,
+    force: bool = False,
+    background: bool = True,
+    buyer_source: str = "all",
+) -> dict:
+    """
+    Rank public trader buy offers for one foreign item from highest to lowest.
+
+    This mode is intentionally independent of arbitrage acquisition logic. It is
+    useful when the user already owns the item and only wants the best buyer.
+    """
+    target = (item_name or "").strip().casefold()
+    if not target:
+        raise ValueError("item_name is required")
+
+    snapshot = get_source_snapshot(force=force, background=background)
+    catalog_item = next(
+        (row for row in snapshot["catalog"] if row.item_name.casefold() == target),
+        None,
+    )
+    if catalog_item is None:
+        return {
+            "found": False,
+            "item_name": item_name,
+            "refreshing": bool(snapshot.get("refreshing")),
+        }
+
+    source_filter = (buyer_source or "all").strip().casefold()
+    offers = [
+        row for row in snapshot["offers"]
+        if str(row.item_id or "") == str(catalog_item.item_id)
+    ]
+    if source_filter == "tornw3b":
+        offers = [row for row in offers if row.source == "tornw3b_trader"]
+    elif source_filter == "torn_exchange":
+        offers = [row for row in offers if row.source == "torn_exchange"]
+
+    # Keep the best observed price per distinct buyer/source pair.
+    best_by_buyer: dict[tuple[str, str], BuyOffer] = {}
+    for row in offers:
+        key = (row.source, row.buyer_id or row.buyer_name)
+        current = best_by_buyer.get(key)
+        if current is None or row.unit_price > current.unit_price:
+            best_by_buyer[key] = row
+
+    ranked = sorted(
+        best_by_buyer.values(),
+        key=lambda row: (row.unit_price, row.buyer_name.casefold()),
+        reverse=True,
+    )
+
+    return {
+        "found": True,
+        "generated_at": float(snapshot.get("timestamp") or 0),
+        "source_age_seconds": (
+            max(0.0, time.time() - float(snapshot.get("timestamp") or 0))
+            if snapshot.get("timestamp")
+            else None
+        ),
+        "refreshing": bool(snapshot.get("refreshing")),
+        "item_id": catalog_item.item_id,
+        "item_name": catalog_item.item_name,
+        "countries": list(catalog_item.countries),
+        "buyer_source_filter": source_filter,
+        "buyer_count": len(ranked),
+        "buyers": [
+            {
+                "rank": index + 1,
+                "buyer_name": row.buyer_name,
+                "buyer_id": row.buyer_id,
+                "source": row.source,
+                "price": row.unit_price,
+                "url": row.url,
+                "observed_at": row.observed_at,
+            }
+            for index, row in enumerate(ranked)
+        ],
     }
 
 
