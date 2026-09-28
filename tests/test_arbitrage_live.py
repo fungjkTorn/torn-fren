@@ -1,4 +1,4 @@
-from modules.arbitrage import ArbitrageOpportunity, BuyOffer
+from modules.arbitrage import ArbitrageOpportunity, BazaarListing, BuyOffer
 import os
 import unittest
 from unittest.mock import patch
@@ -6,6 +6,7 @@ from unittest.mock import patch
 from services.arbitrage_live import (
     ForeignItem,
     _anomaly_labels_for_item,
+    build_arbitrage_report,
     fetch_torn_item_market,
     fetch_tornexchange_buy_offers,
     fetch_tornw3b_bazaar,
@@ -355,6 +356,42 @@ class LiveArbitrageParserTests(unittest.TestCase):
         self.assertIn("Extreme spread — verify trader", labels)
         self.assertIn("Top buyer far above next bid", labels)
         self.assertEqual(meta["second_best_buyer_price"], 20_000)
+
+    def test_report_filters_buy_and_buyer_sources(self):
+        snapshot = {
+            "timestamp": 123.0,
+            "refreshing": False,
+            "catalog": [
+                ForeignItem("1", "Item X", ("Argentina",), (50,)),
+                ForeignItem("2", "Item Y", ("Japan",), (50,)),
+            ],
+            "listings": [
+                BazaarListing("Item X", 100, 2, "tornw3b_bazaar", item_id="1"),
+                BazaarListing("Item X", 90, 3, "torn_item_market", item_id="1"),
+                BazaarListing("Item Y", 80, 4, "tornw3b_bazaar", item_id="2"),
+            ],
+            "offers": [
+                BuyOffer("Item X", 150, "tornw3b_trader", "W3B Buyer", item_id="1"),
+                BuyOffer("Item X", 170, "torn_exchange", "TE Buyer", item_id="1"),
+                BuyOffer("Item Y", 140, "torn_exchange", "TE Y", item_id="2"),
+            ],
+            "errors": [],
+        }
+
+        with patch("services.arbitrage_live.get_source_snapshot", return_value=snapshot):
+            report = build_arbitrage_report(
+                min_profit_per_item=20,
+                buy_source="item_market",
+                buyer_source="torn_exchange",
+                country="Argentina",
+            )
+
+        self.assertEqual(report["opportunity_count"], 1)
+        row = report["opportunities"][0]
+        self.assertEqual(row["item_name"], "Item X")
+        self.assertEqual(row["buyer_name"], "TE Buyer")
+        self.assertEqual(row["quantity"], 3)
+        self.assertEqual(row["buy_source_quantities"], {"torn_item_market": 3})
 
 
 if __name__ == "__main__":
