@@ -70,8 +70,12 @@
     <button id="traderBtn">Trader Finder</button>
     <button id="force">Force refresh sources</button>
 
-    <label>Exclude traders
-      <select id="excludeTraders" multiple size="3" title="Ctrl/Cmd-click to select multiple"></select>
+    <label>Exclude trader
+      <div style="display:flex;gap:6px">
+        <select id="excludeTraderPicker"><option value="">Choose trader…</option></select>
+        <button type="button" id="addExclusion">Add</button>
+      </div>
+      <div id="excludedTraderChips" class="tiny"></div>
     </label>
     <label>Max rows / trader
       <input id="maxPerTrader" type="number" min="1" step="1" placeholder="Unlimited">
@@ -115,7 +119,7 @@
 </dialog>
 
 <script>
-let currentRows=[], catalogItems=[], catalogOptions=[], traderOptions=[], activeSort="total_profit", descending=true;
+let currentRows=[], catalogItems=[], catalogOptions=[], traderOptions=[], excludedTraderNames=new Set(), activeSort="total_profit", descending=true;
 
 const money=v=>"$"+Math.round(Number(v||0)).toLocaleString();
 const pct=v=>(Number(v||0)*100).toFixed(1)+"%";
@@ -147,10 +151,20 @@ function updateItemActionState(){
 }
 
 function refreshTraderOptions(selectedNames=[]){
-  const select=document.getElementById("excludeTraders");
-  const selected=new Set(selectedNames.length?selectedNames:[...select.selectedOptions].map(o=>o.value));
-  select.innerHTML=(traderOptions||[]).map(name=>'<option value="'+safe(name)+'">'+safe(name)+'</option>').join("");
-  [...select.options].forEach(o=>{if(selected.has(o.value))o.selected=true;});
+  excludedTraderNames=new Set(selectedNames||[]);
+  const picker=document.getElementById("excludeTraderPicker");
+  const current=picker.value;
+  const available=(traderOptions||[]).filter(name=>!excludedTraderNames.has(name));
+  picker.innerHTML='<option value="">Choose trader…</option>'+available.map(name=>'<option value="'+safe(name)+'">'+safe(name)+'</option>').join("");
+  if(current && available.includes(current)) picker.value=current;
+  renderExcludedTraderChips();
+}
+
+function renderExcludedTraderChips(){
+  const wrap=document.getElementById("excludedTraderChips");
+  wrap.innerHTML=[...excludedTraderNames].sort((a,b)=>a.localeCompare(b)).map(name=>
+    '<span class="pill badpill">'+safe(name)+' <button type="button" class="remove-exclusion" data-name="'+safe(name)+'" style="padding:0 4px;border:0;background:transparent;color:inherit">×</button></span>'
+  ).join("") || '<span class="muted">None excluded</span>';
 }
 
 function updateSortIndicators(){
@@ -252,7 +266,7 @@ async function load(force=false){
     buyer_source:document.getElementById("buyerSource").value,
     diversified:String(document.getElementById("diversified").checked)
   });
-  const excluded=[...document.getElementById("excludeTraders").selectedOptions].map(o=>o.value);
+  const excluded=[...excludedTraderNames];
   if(excluded.length)params.set("exclude_traders",excluded.join(","));
   const maxPer=Number(document.getElementById("maxPerTrader").value||0);
   if(maxPer>0)params.set("max_per_trader",String(maxPer));
@@ -293,7 +307,21 @@ document.getElementById("sortBy").onchange=e=>{activeSort=e.target.value;descend
 document.getElementById("countryFilter").onchange=()=>{refreshItemOptions();load(false);};
 document.getElementById("buySource").onchange=()=>load(false);
 document.getElementById("buyerSource").onchange=()=>load(false);
-document.getElementById("excludeTraders").onchange=()=>load(false);
+document.getElementById("addExclusion").onclick=()=>{
+  const picker=document.getElementById("excludeTraderPicker");
+  const name=picker.value;
+  if(!name) return;
+  excludedTraderNames.add(name);
+  renderExcludedTraderChips();
+  load(false);
+};
+document.getElementById("excludedTraderChips").addEventListener("click",e=>{
+  const btn=e.target.closest(".remove-exclusion");
+  if(!btn) return;
+  excludedTraderNames.delete(btn.dataset.name);
+  renderExcludedTraderChips();
+  load(false);
+});
 document.getElementById("maxPerTrader").addEventListener("change",()=>load(false));
 document.getElementById("diversified").onchange=()=>load(false);
 document.querySelectorAll("th[data-key]").forEach(th=>th.onclick=()=>{
