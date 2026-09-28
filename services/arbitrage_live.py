@@ -488,7 +488,8 @@ def fetch_torn_item_market(
     session = session or _session()
     response = session.get(
         f"{TORN_API_BASE}/market/{item.item_id}/itemmarket",
-        params={"key": api_key, "offset": 0},
+        params={"offset": 0},
+        headers={"Authorization": f"ApiKey {api_key}", "accept": "application/json"},
         timeout=HTTP_TIMEOUT_SECONDS,
     )
     response.raise_for_status()
