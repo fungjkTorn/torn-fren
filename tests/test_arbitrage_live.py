@@ -82,9 +82,10 @@ class LiveArbitrageParserTests(unittest.TestCase):
         html = """
         <html><body>
           <div class="listing-card">
-            <h3>Basalt Point</h3>
             <div>Trader One [123456]</div>
             <div>Buy Price $134,000</div>
+            <div>Current market: $108,829</div>
+            <div>Artifact: Basalt Point</div>
             <a href="/prices/Trader-One/">Price List</a>
           </div>
         </body></html>
@@ -181,15 +182,17 @@ class LiveArbitrageParserTests(unittest.TestCase):
         <html><body>
           <div class="listing-card">
             <div>EVETINE [2231549]</div>
-            <div>Artifact: Meteorite Fragment</div>
             <div>$505,000</div>
+            <div>Current market: $458,392</div>
+            <div>Artifact: Meteorite Fragment</div>
             <a href="/prices/EVETINE/">Price List</a>
             <a href="#">Trade Now</a>
           </div>
           <div class="listing-card">
             <div>Qfiffle [2557282]</div>
-            <div>Artifact: Meteorite Fragment</div>
             <div>$460,944</div>
+            <div>Current market: $458,392</div>
+            <div>Artifact: Meteorite Fragment</div>
             <a href="/prices/Qfiffle/">Price List</a>
             <a href="#">Trade Now</a>
           </div>
