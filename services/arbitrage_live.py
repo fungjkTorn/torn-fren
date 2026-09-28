@@ -23,17 +23,6 @@ DEFAULT_CACHE_SECONDS = int(os.getenv("ARBITRAGE_CACHE_SECONDS", "900"))
 DEFAULT_MAX_WORKERS = max(1, min(int(os.getenv("ARBITRAGE_MAX_WORKERS", "2")), 4))
 HTTP_TIMEOUT_SECONDS = float(os.getenv("ARBITRAGE_HTTP_TIMEOUT", "12"))
 TORN_API_BASE = "https://api.torn.com/v2"
-ARBITRAGE_MARKET_ITEMS = {
-    "Basalt Point",
-    "Quartzite Point",
-    "Chalcedony Point",
-    "Chert Point",
-    "Quartz Point",
-    "Obsidian Point",
-    "Meteorite Fragment",
-    "Patagonian Fossil",
-}
-
 _COUNTRY_NAMES = {
     "mex": "Mexico",
     "cay": "Cayman Islands",
@@ -539,20 +528,17 @@ def fetch_torn_item_market(
     return rows
 
 
-def _collect_priority_item_market(catalog: list[ForeignItem]) -> tuple[list[BazaarListing], list[dict]]:
+def _collect_foreign_item_market(catalog: list[ForeignItem]) -> tuple[list[BazaarListing], list[dict]]:
     """
-    Keep official API usage deliberately small in v0: only the foreign artifact
-    group being tested right now. This can be widened later after measuring
-    request volume and usefulness.
+    Check the official Torn item market only for the same foreign-item catalog
+    used by this scanner. This deliberately avoids scanning Torn's full item
+    universe.
     """
     listings = []
     errors = []
     session = _session()
 
     for item in catalog:
-        if item.item_name not in ARBITRAGE_MARKET_ITEMS:
-            continue
-
         try:
             listings.extend(fetch_torn_item_market(item, session=session))
         except Exception as exc:
@@ -625,7 +611,7 @@ def _refresh_snapshot() -> dict:
             offers.extend(item_offers)
             errors.extend(item_errors)
 
-    market_listings, market_errors = _collect_priority_item_market(catalog)
+    market_listings, market_errors = _collect_foreign_item_market(catalog)
     listings.extend(market_listings)
     errors.extend(market_errors)
 
