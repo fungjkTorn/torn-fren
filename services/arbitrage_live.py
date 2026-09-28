@@ -1129,6 +1129,115 @@ def get_source_snapshot(
     return snapshot
 
 
+
+def _offer_key(row: BuyOffer) -> tuple:
+    return (
+        row.source,
+        row.buyer_id or row.buyer_name,
+        int(row.unit_price),
+    )
+
+
+def _anomaly_labels_for_item(opportunity, item_offers: list[BuyOffer]) -> tuple[list[str], dict]:
+    """
+    Label suspicious-looking opportunities without suppressing them.
+
+    Flags are informational only. The user can still inspect and act on the
+    opportunity after independently verifying the trader.
+    """
+    labels: list[str] = []
+    prices = sorted({int(row.unit_price) for row in item_offers if row.unit_price > 0}, reverse=True)
+    top = prices[0] if prices else int(opportunity.buyer_price)
+    second = prices[1] if len(prices) > 1 else None
+
+    if opportunity.roi >= 1.0:
+        labels.append("Extreme spread — verify trader")
+    elif opportunity.roi >= 0.5:
+        labels.append("High spread — verify trader")
+
+    if second and top >= int(second * 1.5):
+        labels.append("Top buyer far above next bid")
+
+    if opportunity.quantity >= 1000 and opportunity.total_profit >= 100_000_000:
+        labels.append("Large projected volume/profit")
+
+    return labels, {
+        "buyer_count": len({_offer_key(row) for row in item_offers}),
+        "second_best_buyer_price": second,
+        "top_buyer_price": top,
+    }
+
+
+def build_arbitrage_item_diagnostic(
+    item_name: str,
+    *,
+    force: bool = False,
+    background: bool = True,
+) -> dict:
+    target = (item_name or "").strip().casefold()
+    if not target:
+        raise ValueError("item_name is required")
+
+    snapshot = get_source_snapshot(force=force, background=background)
+    catalog_item = next(
+        (row for row in snapshot["catalog"] if row.item_name.casefold() == target),
+        None,
+    )
+    if catalog_item is None:
+        return {
+            "found": False,
+            "item_name": item_name,
+            "refreshing": bool(snapshot.get("refreshing")),
+        }
+
+    listings = [
+        row for row in snapshot["listings"]
+        if str(row.item_id or "") == str(catalog_item.item_id)
+    ]
+    offers = [
+        row for row in snapshot["offers"]
+        if str(row.item_id or "") == str(catalog_item.item_id)
+    ]
+
+    listings.sort(key=lambda row: (row.unit_price, -row.quantity))
+    offers.sort(key=lambda row: row.unit_price, reverse=True)
+
+    return {
+        "found": True,
+        "item_id": catalog_item.item_id,
+        "item_name": catalog_item.item_name,
+        "countries": list(catalog_item.countries),
+        "abroad_costs": list(catalog_item.abroad_costs),
+        "buy_url": catalog_item.weav3r_url,
+        "refreshing": bool(snapshot.get("refreshing")),
+        "listing_count": len(listings),
+        "offer_count": len(offers),
+        "listings": [
+            {
+                "source": row.source,
+                "price": row.unit_price,
+                "quantity": row.quantity,
+                "seller_name": row.seller_name,
+                "seller_id": row.seller_id,
+                "url": row.url,
+                "observed_at": row.observed_at,
+            }
+            for row in listings[:25]
+        ],
+        "offers": [
+            {
+                "source": row.source,
+                "price": row.unit_price,
+                "buyer_name": row.buyer_name,
+                "buyer_id": row.buyer_id,
+                "url": row.url,
+                "observed_at": row.observed_at,
+            }
+            for row in offers[:25]
+        ],
+    }
+
+
 def build_arbitrage_report(
     *,
     min_profit_per_item: int = 20_000,
@@ -1148,6 +1257,10 @@ def build_arbitrage_report(
     )
 
     catalog_by_id = {item.item_id: item for item in snapshot["catalog"]}
+    offers_by_item: dict[str, list[BuyOffer]] = {}
+    for offer in snapshot["offers"]:
+        offers_by_item.setdefault(str(offer.item_id or ""), []).append(offer)
+
     output = []
 
     for opportunity in opportunities:
@@ -1156,6 +1269,12 @@ def build_arbitrage_report(
         row["countries"] = list(foreign_item.countries) if foreign_item else []
         row["abroad_costs"] = list(foreign_item.abroad_costs) if foreign_item else []
         row["buy_url"] = foreign_item.weav3r_url if foreign_item else None
+        labels, buyer_meta = _anomaly_labels_for_item(
+            opportunity,
+            offers_by_item.get(str(opportunity.item_id or ""), []),
+        )
+        row["anomaly_labels"] = labels
+        row.update(buyer_meta)
         output.append(row)
 
     generated_at = float(snapshot.get("timestamp") or 0)
