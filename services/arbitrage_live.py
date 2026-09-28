@@ -299,6 +299,16 @@ def parse_tornexchange_listings_html(
                 break
 
         if not trader_name:
+            # Some result layouts render the player label outside an anchor.
+            for text_node in card.stripped_strings:
+                player_match = _PLAYER_ID_RE.search(text_node)
+                if player_match:
+                    trader_id = player_match.group(1)
+                    trader_name = _PLAYER_ID_RE.sub("", text_node).strip()
+                    if trader_name:
+                        break
+
+        if not trader_name:
             # Pricelist URLs are /prices/<username>/ and are a reliable fallback.
             parts = [p for p in price_url.split("/") if p]
             if "prices" in parts:
