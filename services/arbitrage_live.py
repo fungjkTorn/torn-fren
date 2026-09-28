@@ -18,8 +18,8 @@ from services.stock_provider import get_travel_export
 
 WEAV3R_ITEM_URL = "https://weav3r.dev/item/{item_id}"
 TORN_EXCHANGE_LISTINGS_URL = "https://www.tornexchange.com/listings"
-DEFAULT_CACHE_SECONDS = int(os.getenv("ARBITRAGE_CACHE_SECONDS", "300"))
-DEFAULT_MAX_WORKERS = max(1, min(int(os.getenv("ARBITRAGE_MAX_WORKERS", "4")), 8))
+DEFAULT_CACHE_SECONDS = int(os.getenv("ARBITRAGE_CACHE_SECONDS", "900"))
+DEFAULT_MAX_WORKERS = max(1, min(int(os.getenv("ARBITRAGE_MAX_WORKERS", "2")), 4))
 HTTP_TIMEOUT_SECONDS = float(os.getenv("ARBITRAGE_HTTP_TIMEOUT", "12"))
 TORN_API_BASE = "https://api.torn.com/v2"
 ARBITRAGE_MARKET_ITEMS = {
