@@ -632,12 +632,13 @@ def _te_cache_connection() -> sqlite3.Connection:
     conn = sqlite3.connect(TE_CACHE_DB, timeout=10)
     conn.execute(
         """
-        CREATE TABLE IF NOT EXISTS tornexchange_best_v3 (
+        CREATE TABLE IF NOT EXISTS tornexchange_best_v4 (
             item_id TEXT PRIMARY KEY,
             item_name TEXT NOT NULL,
             price INTEGER NOT NULL,
             trader TEXT,
             trader_id TEXT,
+            trader_url TEXT,
             fetched_at REAL NOT NULL
         )
         """
@@ -650,8 +651,8 @@ def _read_te_cache(item: ForeignItem, *, allow_stale: bool = False) -> Optional[
         with _te_cache_connection() as conn:
             row = conn.execute(
                 """
-                SELECT price, trader, trader_id, fetched_at
-                FROM tornexchange_best_v3
+                SELECT price, trader, trader_id, trader_url, fetched_at
+                FROM tornexchange_best_v4
                 WHERE item_id = ?
                 """,
                 (item.item_id,),
@@ -662,7 +663,7 @@ def _read_te_cache(item: ForeignItem, *, allow_stale: bool = False) -> Optional[
     if row is None:
         return None
 
-    price, trader, trader_id, fetched_at = row
+    price, trader, trader_id, trader_url, fetched_at = row
     age = time.time() - float(fetched_at or 0)
     if not allow_stale and age > TE_CACHE_SECONDS:
         return None
@@ -670,7 +671,9 @@ def _read_te_cache(item: ForeignItem, *, allow_stale: bool = False) -> Optional[
     if int(price or 0) <= 0 or not trader:
         return []
 
-    trader_slug = quote_plus(str(trader)).replace("+", "%20")
+    if not trader_url:
+        trader_slug = quote_plus(str(trader)).replace("+", "%20")
+        trader_url = f"https://www.tornexchange.com/prices/{trader_slug}/"
     return [
         BuyOffer(
             item_name=item.item_name,
@@ -679,7 +682,7 @@ def _read_te_cache(item: ForeignItem, *, allow_stale: bool = False) -> Optional[
             source="torn_exchange",
             buyer_name=str(trader),
             buyer_id=str(trader_id) if trader_id else None,
-            url=f"https://www.tornexchange.com/prices/{trader_slug}/",
+            url=str(trader_url),
             observed_at=float(fetched_at),
         )
     ]
@@ -691,20 +694,22 @@ def _write_te_cache(
     price: int,
     trader: Optional[str],
     trader_id: Optional[str],
+    trader_url: Optional[str],
     fetched_at: float,
 ) -> None:
     try:
         with _te_cache_connection() as conn:
             conn.execute(
                 """
-                INSERT INTO tornexchange_best_v3 (
-                    item_id, item_name, price, trader, trader_id, fetched_at
-                ) VALUES (?, ?, ?, ?, ?, ?)
+                INSERT INTO tornexchange_best_v4 (
+                    item_id, item_name, price, trader, trader_id, trader_url, fetched_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(item_id) DO UPDATE SET
                     item_name = excluded.item_name,
                     price = excluded.price,
                     trader = excluded.trader,
                     trader_id = excluded.trader_id,
+                    trader_url = excluded.trader_url,
                     fetched_at = excluded.fetched_at
                 """,
                 (
@@ -713,6 +718,7 @@ def _write_te_cache(
                     int(price),
                     trader,
                     trader_id,
+                    trader_url,
                     float(fetched_at),
                 ),
             )
@@ -800,6 +806,7 @@ def fetch_tornexchange_buy_offers(
                 price=best.unit_price,
                 trader=best.buyer_name,
                 trader_id=best.buyer_id,
+                trader_url=best.url,
                 fetched_at=fetched_at,
             )
             return page_offers
@@ -815,6 +822,16 @@ def fetch_tornexchange_buy_offers(
         params={"item_id": item.item_id},
         timeout=HTTP_TIMEOUT_SECONDS,
     )
+    if response.status_code == 400:
+        _write_te_cache(
+            item,
+            price=0,
+            trader=None,
+            trader_id=None,
+            trader_url=None,
+            fetched_at=fetched_at,
+        )
+        return []
     response.raise_for_status()
     payload = response.json()
 
@@ -824,6 +841,7 @@ def fetch_tornexchange_buy_offers(
             price=0,
             trader=None,
             trader_id=None,
+            trader_url=None,
             fetched_at=fetched_at,
         )
         return []
@@ -843,6 +861,7 @@ def fetch_tornexchange_buy_offers(
             price=0,
             trader=None,
             trader_id=None,
+            trader_url=None,
             fetched_at=fetched_at,
         )
         return []
@@ -852,6 +871,7 @@ def fetch_tornexchange_buy_offers(
         price=price,
         trader=trader_name,
         trader_id=trader_id,
+        trader_url=None,
         fetched_at=fetched_at,
     )
 
