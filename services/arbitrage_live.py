@@ -1248,12 +1248,32 @@ def build_arbitrage_report(
     min_quantity: int = 1,
     force: bool = False,
     background: bool = False,
+    buy_source: str = "all",
+    buyer_source: str = "all",
+    country: Optional[str] = None,
 ) -> dict:
     snapshot = get_source_snapshot(force=force, background=background)
 
+    buy_source = (buy_source or "all").strip().casefold()
+    buyer_source = (buyer_source or "all").strip().casefold()
+    country_filter = (country or "").strip().casefold()
+
+    listings = list(snapshot["listings"])
+    offers = list(snapshot["offers"])
+
+    if buy_source == "tornw3b":
+        listings = [row for row in listings if row.source == "tornw3b_bazaar"]
+    elif buy_source == "item_market":
+        listings = [row for row in listings if row.source == "torn_item_market"]
+
+    if buyer_source == "tornw3b":
+        offers = [row for row in offers if row.source == "tornw3b_trader"]
+    elif buyer_source == "torn_exchange":
+        offers = [row for row in offers if row.source == "torn_exchange"]
+
     opportunities = scan_arbitrage(
-        snapshot["listings"],
-        snapshot["offers"],
+        listings,
+        offers,
         min_profit_per_item=min_profit_per_item,
         min_roi=min_roi,
         min_quantity=min_quantity,
@@ -1261,7 +1281,7 @@ def build_arbitrage_report(
 
     catalog_by_id = {item.item_id: item for item in snapshot["catalog"]}
     offers_by_item: dict[str, list[BuyOffer]] = {}
-    for offer in snapshot["offers"]:
+    for offer in offers:
         offers_by_item.setdefault(str(offer.item_id or ""), []).append(offer)
 
     output = []
@@ -1272,6 +1292,10 @@ def build_arbitrage_report(
         row["countries"] = list(foreign_item.countries) if foreign_item else []
         row["abroad_costs"] = list(foreign_item.abroad_costs) if foreign_item else []
         row["buy_url"] = foreign_item.weav3r_url if foreign_item else None
+        if country_filter and not any(
+            country_filter in name.casefold() for name in row["countries"]
+        ):
+            continue
         labels, buyer_meta = _anomaly_labels_for_item(
             opportunity,
             offers_by_item.get(str(opportunity.item_id or ""), []),
@@ -1290,6 +1314,9 @@ def build_arbitrage_report(
         "min_profit_per_item": min_profit_per_item,
         "min_roi": min_roi,
         "min_quantity": min_quantity,
+        "buy_source_filter": buy_source,
+        "buyer_source_filter": buyer_source,
+        "country_filter": country or None,
         "catalog_count": len(snapshot["catalog"]),
         "catalog_items": [item.item_name for item in snapshot["catalog"]],
         "listing_count": len(snapshot["listings"]),
