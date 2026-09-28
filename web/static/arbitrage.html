@@ -143,13 +143,19 @@ async function load(force=false) {
     document.getElementById("listingCount").textContent = Number(data.listing_count||0).toLocaleString();
     document.getElementById("offerCount").textContent = Number(data.offer_count||0).toLocaleString();
     document.getElementById("catalogCount").textContent = Number(data.catalog_count||0).toLocaleString();
-    const when = data.generated_at ? new Date(data.generated_at*1000).toLocaleTimeString() : "unknown";
+    const when = data.generated_at ? new Date(data.generated_at*1000).toLocaleTimeString() : "not ready yet";
     const errs = (data.errors || []).length;
-    status.textContent = "Source snapshot: "+when+" · "+errs+" source error"+(errs===1?"":"s")+". Results are opportunities, not guaranteed inventory.";
+    const age = data.source_age_seconds == null ? "" : " · age "+Math.round(data.source_age_seconds/60)+"m";
+    const refreshing = data.refreshing ? " · refresh running in background" : "";
+    status.textContent = "Source snapshot: "+when+age+refreshing+" · "+errs+" source error"+(errs===1?"":"s")+". Results are opportunities, not guaranteed inventory.";
     if (errs) status.classList.add("error");
     activeSort = document.getElementById("sortBy").value;
     descending = true;
     render();
+    if (data.refreshing) {
+      window.clearTimeout(window._arbPollTimer);
+      window._arbPollTimer = window.setTimeout(() => load(false), 15000);
+    }
   } catch (err) {
     status.className = "notice error";
     status.textContent = "Scanner failed: "+err.message;
