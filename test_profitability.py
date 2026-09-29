@@ -1,6 +1,6 @@
 import unittest
 
-from services.profitability import calculate_profitability
+from services.profitability import calculate_profitability, MARKET_SALE_FEE_RATE, PI_PILOT_FLIGHT_MINUTES
 
 
 class ProfitabilityTests(unittest.TestCase):
@@ -25,3 +25,21 @@ class ProfitabilityTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+    def test_item_market_fee_is_five_percent(self):
+        self.assertEqual(MARKET_SALE_FEE_RATE, 0.05)
+
+    def test_pi_pilot_flight_times(self):
+        self.assertEqual(PI_PILOT_FLIGHT_MINUTES, {
+            "mex": 17,
+            "cay": 23,
+            "can": 27,
+            "haw": 89,
+            "uni": 106,
+            "arg": 111,
+            "swi": 116,
+            "jap": 149,
+            "chi": 160,
+            "uae": 180,
+            "sou": 197,
+        })
