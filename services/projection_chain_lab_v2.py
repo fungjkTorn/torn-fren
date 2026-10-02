@@ -44,9 +44,14 @@ BASE_METHODS = (
 )
 
 ARRIVAL_POLICIES = (
+    "early35",
     "midpoint",
     "late65",
     "late75",
+    "late85",
+    "adaptive_fraction_all",
+    "adaptive_fraction20",
+    "adaptive_fraction10",
     "adaptive_all",
     "adaptive20",
     "adaptive10",
@@ -261,13 +266,100 @@ def _adaptive_offset(prior_rows, recent_limit=None, max_offset=None):
     return best[-1] if best else None
 
 
+def _adaptive_landing_fraction(prior_rows, recent_limit=None):
+    """
+    Learn WHERE inside the predicted stock lifetime to land.
+
+    Unlike adaptive_offset (absolute seconds), this scales the target to the
+    predicted lifetime at each historical issuance.  Every candidate is scored
+    only on already-resolved prior forecasts at the same projection depth.
+    """
+    usable = [
+        r for r in prior_rows
+        if r.get("actual_restock_timestamp") is not None
+        and r.get("actual_depletion_timestamp") is not None
+        and r.get("predicted_restock_timestamp") is not None
+        and r.get("lifetime_estimate_seconds")
+        and r["lifetime_estimate_seconds"] > 0
+    ]
+    if recent_limit:
+        usable = usable[-recent_limit:]
+    if len(usable) < 5:
+        return None
+
+    # Fine enough to discover the useful region without overfitting to seconds.
+    candidates = [x / 20.0 for x in range(2, 20)]  # 10% .. 95%
+    scored = []
+    for fraction in candidates:
+        hits = 0
+        margins = []
+        early_seconds = []
+        late_seconds = []
+
+        for r in usable:
+            arrival = (
+                float(r["predicted_restock_timestamp"])
+                + float(r["lifetime_estimate_seconds"]) * fraction
+            )
+
+            # Reproduce the same conservative late-window floor that was known
+            # at the time of the historical recommendation.
+            historical_window_end = r.get("window_end_timestamp")
+            if historical_window_end is not None:
+                arrival = max(arrival, float(historical_window_end))
+
+            actual_start = float(r["actual_restock_timestamp"])
+            actual_end = float(r["actual_depletion_timestamp"])
+
+            if actual_start <= arrival < actual_end:
+                hits += 1
+                margins.append(min(arrival - actual_start, actual_end - arrival))
+            elif arrival < actual_start:
+                early_seconds.append(actual_start - arrival)
+            else:
+                late_seconds.append(arrival - actual_end)
+
+        rate = hits / len(usable)
+        median_margin = statistics.median(margins) if margins else -1.0
+        # Tie-break toward lower miss severity and then a central landing point.
+        miss_severity = (
+            (statistics.median(early_seconds) if early_seconds else 0.0)
+            + (statistics.median(late_seconds) if late_seconds else 0.0)
+        )
+        scored.append(
+            (rate, median_margin, -miss_severity, -abs(fraction - 0.5), fraction)
+        )
+
+    return max(scored)[-1] if scored else None
+
+
 def _arrival_offset(policy, life_est, prior_depth_rows):
-    if policy == "midpoint":
-        return life_est * 0.50
-    if policy == "late65":
-        return life_est * 0.65
-    if policy == "late75":
-        return life_est * 0.75
+    fixed_fractions = {
+        "early35": 0.35,
+        "midpoint": 0.50,
+        "late65": 0.65,
+        "late75": 0.75,
+        "late85": 0.85,
+    }
+    if policy in fixed_fractions:
+        return life_est * fixed_fractions[policy]
+
+    if policy.startswith("adaptive_fraction"):
+        recent_limit = None
+        if policy == "adaptive_fraction20":
+            recent_limit = 20
+        elif policy == "adaptive_fraction10":
+            recent_limit = 10
+        elif policy != "adaptive_fraction_all":
+            raise ValueError(f"Unknown arrival policy: {policy}")
+
+        fraction = _adaptive_landing_fraction(
+            prior_depth_rows,
+            recent_limit=recent_limit,
+        )
+        if fraction is None:
+            fraction = 0.50
+        return life_est * fraction
 
     limit = None
     if policy == "adaptive20":
@@ -415,6 +507,27 @@ def _simulate_strategy(
                 "arrival_hit": arrival_hit,
                 "early_arrival": early,
                 "late_arrival": late,
+                "predicted_landing_fraction": (
+                    (recommended_arrival - projected_restock) / life_est
+                    if life_est > 0 else None
+                ),
+                "actual_landing_fraction": (
+                    (recommended_arrival - actual_restock) / actual_lifetime
+                    if actual_lifetime > 0 else None
+                ),
+                "arrival_margin_seconds": (
+                    min(
+                        recommended_arrival - actual_restock,
+                        actual_depletion - recommended_arrival,
+                    )
+                    if arrival_hit else None
+                ),
+                "early_miss_seconds": (
+                    actual_restock - recommended_arrival if early else 0.0
+                ),
+                "late_miss_seconds": (
+                    recommended_arrival - actual_depletion if late else 0.0
+                ),
             }
             rows.append(row)
             anchor_rows.append(row)
@@ -450,6 +563,21 @@ def _summarize_depth(rows):
         "p90_absolute_error_seconds": _percentile(absolute, 0.90),
         "p95_absolute_error_seconds": _percentile(absolute, 0.95),
         "signed_bias_seconds": statistics.median(signed),
+        "median_predicted_landing_fraction": _median(
+            r.get("predicted_landing_fraction") for r in rows
+        ),
+        "median_actual_landing_fraction_on_hits": _median(
+            r.get("actual_landing_fraction") for r in rows if r["arrival_hit"]
+        ),
+        "median_arrival_margin_seconds": _median(
+            r.get("arrival_margin_seconds") for r in rows if r["arrival_hit"]
+        ),
+        "median_early_miss_seconds": _median(
+            r.get("early_miss_seconds") for r in rows if r["early_arrival"]
+        ),
+        "median_late_miss_seconds": _median(
+            r.get("late_miss_seconds") for r in rows if r["late_arrival"]
+        ),
     }
 
 
@@ -578,7 +706,10 @@ def _line(strategy, s):
         f"MedAE={_fmt_minutes(s['median_absolute_error_seconds']):>7} "
         f"P90={_fmt_minutes(s['p90_absolute_error_seconds']):>7} "
         f"P95={_fmt_minutes(s['p95_absolute_error_seconds']):>7} "
-        f"bias={_fmt_minutes(s['signed_bias_seconds']):>7}"
+        f"bias={_fmt_minutes(s['signed_bias_seconds']):>7} "
+        f"landPred={('—' if s['median_predicted_landing_fraction'] is None else f\"{s['median_predicted_landing_fraction']*100:.0f}%\"):>4} "
+        f"landActual={('—' if s['median_actual_landing_fraction_on_hits'] is None else f\"{s['median_actual_landing_fraction_on_hits']*100:.0f}%\"):>4} "
+        f"margin={_fmt_minutes(s['median_arrival_margin_seconds']):>6}"
     )
 
 
@@ -659,11 +790,11 @@ def main():
     parser.add_argument(
         "--fast",
         action="store_true",
-        help="Test only adaptive20 and midpoint arrival policies for quicker iteration.",
+        help="Test adaptive landing-position and midpoint policies for quicker iteration.",
     )
     args = parser.parse_args()
 
-    policies = ("adaptive20", "midpoint") if args.fast else ARRIVAL_POLICIES
+    policies = ("adaptive_fraction20", "adaptive20", "midpoint", "late65", "late75") if args.fast else ARRIVAL_POLICIES
     result = tournament(
         args.country,
         args.item_name,
