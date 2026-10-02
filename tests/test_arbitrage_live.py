@@ -464,6 +464,44 @@ class LiveArbitrageParserTests(unittest.TestCase):
         self.assertEqual(row_x["second_best_buyer_price"], 190)
         self.assertEqual(row_x["buyer_price_gap"], 10)
 
+    def test_report_execution_quality_and_market_reference(self):
+        snapshot = {
+            "timestamp": 123.0,
+            "refreshing": False,
+            "catalog": [ForeignItem("1", "Item X", ("Argentina",), (50,))],
+            "listings": [
+                BazaarListing("Item X", 100, 10, "tornw3b_bazaar", item_id="1"),
+                BazaarListing("Item X", 140, 20, "torn_item_market", item_id="1"),
+            ],
+            "offers": [
+                BuyOffer("Item X", 200, "torn_exchange", "Buyer A", item_id="1", observed_at=122.0),
+                BuyOffer("Item X", 190, "tornw3b_trader", "Buyer B", item_id="1", observed_at=122.0),
+                BuyOffer("Item X", 185, "tornw3b_trader", "Buyer C", item_id="1", observed_at=122.0),
+            ],
+            "errors": [],
+        }
+
+        with patch("services.arbitrage_live.get_source_snapshot", return_value=snapshot), \
+             patch("services.arbitrage_live.time.time", return_value=123.0):
+            report = build_arbitrage_report(
+                min_profit_per_item=20,
+                min_total_profit=100,
+                max_capital=500,
+            )
+
+        self.assertEqual(report["opportunity_count"], 1)
+        row = report["opportunities"][0]
+        self.assertEqual(row["quantity"], 5)
+        self.assertEqual(row["total_cost"], 500)
+        self.assertEqual(row["fallback_buyer_count"], 2)
+        self.assertGreater(row["fallback_profit_retention"], 0)
+        self.assertEqual(row["exit_confidence"], "high")
+        self.assertGreater(row["execution_score"], 0)
+        self.assertEqual(row["market_reference_price"], 140)
+        self.assertEqual(row["market_reference_profit_per_item"], 40)
+        self.assertEqual(report["max_capital"], 500)
+        self.assertEqual(report["min_total_profit"], 100)
+
 
 if __name__ == "__main__":
     unittest.main()
