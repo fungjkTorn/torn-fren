@@ -23,6 +23,7 @@ from services.projection_chain_lab_v3 import (
     conservative_key,
 )
 from services.projection_engine_v4 import (
+    DIRECT_HORIZON_METHODS,
     active_target_rows,
     all_point_pairs,
     apply_policy,
@@ -367,9 +368,10 @@ def run_item(
     # Stage 1: each lifetime/wait point chain is built ONCE.
     point_cache = {}
     stage1 = []
-    stage1_total = (
-        len(tuple(BASE_METHODS) + tuple(EXTRA_LIFETIME_METHODS))
-        * len(tuple(BASE_METHODS) + tuple(EXTRA_WAIT_METHODS))
+    lifetime_count = len(tuple(BASE_METHODS) + tuple(EXTRA_LIFETIME_METHODS))
+    stage1_total = lifetime_count * (
+        len(tuple(BASE_METHODS) + tuple(EXTRA_WAIT_METHODS))
+        + len(DIRECT_HORIZON_METHODS)
     )
     stage1_step = max(1, stage1_total // 10)
     for stage1_index, (life, wait, point_rows) in enumerate(all_point_pairs(ctx), 1):
