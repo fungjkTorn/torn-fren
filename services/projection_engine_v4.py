@@ -123,6 +123,8 @@ def point_forecast_pair(ctx, lifetime_method, wait_method):
             continue
 
         projected_restock = None
+        predicted_wait_total = 0.0
+        predicted_bridge_lifetime_total = 0.0
 
         for depth in range(1, ctx.max_depth + 1):
             target_i = anchor_i + depth
@@ -136,6 +138,7 @@ def point_forecast_pair(ctx, lifetime_method, wait_method):
                 if not wait_est or wait_est <= 0:
                     break
                 projected_restock = float(anchor_ts) + float(wait_est)
+                predicted_wait_total += float(wait_est)
             else:
                 life_bridge = _estimate_lifetime(
                     lifetime_method, known_cycles, projected_restock
@@ -151,6 +154,8 @@ def point_forecast_pair(ctx, lifetime_method, wait_method):
                 if not wait_est or wait_est <= 0:
                     break
 
+                predicted_bridge_lifetime_total += float(life_bridge)
+                predicted_wait_total += float(wait_est)
                 projected_restock += float(life_bridge) + float(wait_est)
 
             target_lifetime = _estimate_lifetime(
@@ -167,6 +172,13 @@ def point_forecast_pair(ctx, lifetime_method, wait_method):
             ):
                 break
 
+            actual_bridge_lifetime_total = sum(
+                float(cycles[j]["lifetime_seconds"])
+                for j in range(anchor_i + 1, target_i)
+            )
+            actual_total = actual_restock - float(anchor_ts)
+            actual_wait_total = actual_total - actual_bridge_lifetime_total
+
             rows.append({
                 "anchor_timestamp": anchor_ts,
                 "depth": depth,
@@ -176,6 +188,14 @@ def point_forecast_pair(ctx, lifetime_method, wait_method):
                 "actual_lifetime_seconds": actual_depletion - actual_restock,
                 "lifetime_estimate_seconds": float(target_lifetime),
                 "wait_estimate_seconds": float(wait_est),
+                "predicted_wait_total_seconds": predicted_wait_total,
+                "predicted_bridge_lifetime_total_seconds": predicted_bridge_lifetime_total,
+                "actual_wait_total_seconds": actual_wait_total,
+                "actual_bridge_lifetime_total_seconds": actual_bridge_lifetime_total,
+                "wait_component_error_seconds": actual_wait_total - predicted_wait_total,
+                "lifetime_component_error_seconds": (
+                    actual_bridge_lifetime_total - predicted_bridge_lifetime_total
+                ),
             })
 
     return rows
@@ -438,6 +458,12 @@ def _summary(rows):
         "p95_absolute_error_seconds": _percentile(errors, 0.95),
         "signed_bias_seconds": statistics.median(
             r["signed_error_seconds"] for r in population
+        ),
+        "median_wait_component_error_seconds": statistics.median(
+            r.get("wait_component_error_seconds", 0.0) for r in population
+        ),
+        "median_lifetime_component_error_seconds": statistics.median(
+            r.get("lifetime_component_error_seconds", 0.0) for r in population
         ),
     }
 
