@@ -1487,7 +1487,7 @@ def build_arbitrage_report(
 
         market_rows = sorted(
             [
-                listing for listing in listings
+                listing for listing in snapshot["listings"]
                 if listing.source == "torn_item_market"
                 and str(listing.item_id or "") == str(opportunity.item_id or "")
             ],
