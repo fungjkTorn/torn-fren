@@ -17,6 +17,7 @@ from services.projection_chain_lab_v3 import (
     _estimate_wait,
     _qualified_series,
     _wilson_lower,
+    _interval_crosses_travel_day,
 )
 
 # Optimized offline research engine.
@@ -49,6 +50,7 @@ def _holdout_split_from_cycles(cycles, holdout_fraction=0.25, min_holdout=20):
         int(c["depletion_time"])
         for c in cycles
         if c.get("depletion_time") is not None
+        and not c.get("_excluded_regime")
     )
     if len(anchors) < min_holdout + 20:
         return None
@@ -102,9 +104,14 @@ def point_forecast_pair(ctx, lifetime_method, wait_method):
     waits = ctx.wait_rows
 
     for anchor_i, anchor in enumerate(cycles):
+        if anchor.get("_excluded_regime"):
+            continue
         anchor_ts = int(anchor["depletion_time"])
 
-        known_cycles = cycles[: anchor_i + 1]
+        known_cycles = [
+            c for c in cycles[: anchor_i + 1]
+            if not c.get("_excluded_regime")
+        ]
         # wait_rows are chronological; avoid rebuilding from SQLite and only
         # select information genuinely available before this anchor.
         known_waits = [r for r in waits if r["from_depletion"] < anchor_ts]
@@ -155,6 +162,10 @@ def point_forecast_pair(ctx, lifetime_method, wait_method):
             target = cycles[target_i]
             actual_restock = float(target["restock_time"])
             actual_depletion = float(target["depletion_time"])
+            if target.get("_excluded_regime") or _interval_crosses_travel_day(
+                anchor_ts, actual_depletion
+            ):
+                break
 
             rows.append({
                 "anchor_timestamp": anchor_ts,
