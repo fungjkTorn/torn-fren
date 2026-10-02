@@ -255,21 +255,22 @@ def _qualified_series(country, item_name, exclude_travel_day=True):
     rows = [(ts, qty) for ts, qty, _source in cleaned]
     cycles, _active, wait_samples = _build_validated_cycles(rows, country, item_name)
 
+    # Preserve every normal completed cycle in chronological position, even
+    # when one cycle is not statistically usable. Filtering invalid cycles out
+    # here would compress the sequence and make a later restock look like P1/P2
+    # when an unscoreable real cycle actually occurred in between.
     valid_cycles = []
     for c in cycles:
         if not (
             c.get("complete")
             and not c.get("tiny_restock")
-            and c.get("valid_lifetime")
             and c.get("restock_time") is not None
             and c.get("depletion_time") is not None
             and c.get("lifetime_seconds") is not None
         ):
             continue
-        # Keep the cycle in chronological position so forecast-depth indexing
-        # cannot stitch the pre-event history directly to the post-event history.
-        # The simulator excludes these rows from training/scoring instead.
         c = dict(c)
+        c["_valid_for_training"] = bool(c.get("valid_lifetime"))
         c["_excluded_regime"] = bool(exclude_travel_day and _cycle_excluded(c))
         valid_cycles.append(c)
 
@@ -500,7 +501,10 @@ def _simulate_strategy(
     prior_by_depth = {depth: [] for depth in range(1, max_depth + 1)}
 
     for anchor_i, anchor_cycle in enumerate(cycles):
-        if anchor_cycle.get("_excluded_regime"):
+        if (
+            anchor_cycle.get("_excluded_regime")
+            or not anchor_cycle.get("_valid_for_training", True)
+        ):
             continue
         anchor_ts = int(anchor_cycle["depletion_time"])
 
@@ -508,6 +512,7 @@ def _simulate_strategy(
             c for c in cycles[: anchor_i + 1]
             if int(c["depletion_time"]) <= anchor_ts
             and not c.get("_excluded_regime")
+            and c.get("_valid_for_training", True)
         ]
         known_lifetimes = [float(c["lifetime_seconds"]) for c in known_cycle_rows]
         known_wait_pairs = [
@@ -561,11 +566,17 @@ def _simulate_strategy(
             actual_restock = float(target_cycle["restock_time"])
             actual_depletion = float(target_cycle["depletion_time"])
 
-            # Never score a frozen chain across Travel Day. Removing event
-            # cycles and joining the surrounding normal cycles created fake
-            # multi-day P2/P3/P4 errors in the earlier tournament.
-            if target_cycle.get("_excluded_regime") or _interval_crosses_travel_day(
-                anchor_ts, actual_depletion
+            # A deeper frozen chain is scoreable only when every real normal
+            # cycle between the anchor and target has clean ground truth. Do
+            # not silently stitch across an invalid collector boundary.
+            chain_cycles = cycles[anchor_i : target_i + 1]
+            if (
+                any(
+                    c.get("_excluded_regime")
+                    or not c.get("_valid_for_training", True)
+                    for c in chain_cycles
+                )
+                or _interval_crosses_travel_day(anchor_ts, actual_depletion)
             ):
                 break
             actual_lifetime = actual_depletion - actual_restock
@@ -783,7 +794,12 @@ def tournament(
     return {
         "country": country.lower(),
         "item_name": item_name,
-        "valid_cycles": len(cycles),
+        "valid_cycles": sum(
+            1 for c in cycles
+            if c.get("_valid_for_training", True)
+            and not c.get("_excluded_regime")
+        ),
+        "sequence_cycles": len(cycles),
         "travel_seconds": travel_seconds,
         "exclude_travel_day": exclude_travel_day,
         "strategies": results,
