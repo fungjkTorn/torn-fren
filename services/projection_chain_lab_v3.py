@@ -41,12 +41,13 @@ class V3Strategy:
     wait: str
     arrival_policy: str
     bias_policy: str = "none"
+    window_policy: str = "end_floor"
 
     @property
     def name(self):
         return (
             f"{self.lifetime} + {self.wait} + {self.arrival_policy}"
-            f" + bias:{self.bias_policy}"
+            f" + bias:{self.bias_policy} + window:{self.window_policy}"
         )
 
 
