@@ -37,6 +37,8 @@
     <label>Minimum profit / item<input id="minProfit" type="number" value="20000" min="0" step="1000"></label>
     <label>Minimum ROI %<input id="minRoi" type="number" value="0" min="0" step="0.5"></label>
     <label>Minimum quantity<input id="minQty" type="number" value="1" min="1" step="1"></label>
+    <label>Minimum total profit<input id="minTotalProfit" type="number" value="0" min="0" step="100000" placeholder="No minimum"></label>
+    <label>Capital budget<input id="maxCapital" type="number" min="1" step="1000000" placeholder="Unlimited"></label>
     <label>Item
       <select id="itemSearch">
         <option value="">Choose an item…</option>
@@ -58,6 +60,7 @@
     <label>Sort by
       <select id="sortBy">
         <option value="total_profit">Total profit</option>
+        <option value="execution_score">Execution score</option>
         <option value="average_profit_per_item">Profit / item</option>
         <option value="roi">ROI</option>
         <option value="quantity">Quantity</option>
@@ -101,6 +104,8 @@
         <th data-key="item_name">Item</th><th data-key="countries">Foreign source</th><th data-key="average_buy_price">Avg buy</th>
         <th data-key="buyer_price">Trader buy</th><th data-key="average_profit_per_item">Profit / item</th><th data-key="roi">ROI</th>
         <th data-key="quantity">Qty</th><th data-key="total_cost">Capital</th><th data-key="total_profit">Total profit</th>
+        <th data-key="execution_score" title="Heuristic based on fallback buyers, fallback profit retention, executable quantity, and bid freshness. Not a response/reliability guarantee.">Execution</th>
+        <th data-key="market_reference_price" title="Lowest current Official Torn Item Market ask. This is a resale reference, not a guaranteed buyer.">Market ref</th>
         <th data-key="buyer_name">Trader</th><th>Buy source</th><th>Anomaly</th>
       </tr></thead>
       <tbody id="rows"></tbody>
@@ -199,12 +204,17 @@ function render(){
       '<td>'+countries+'</td><td>'+money(row.average_buy_price)+'</td><td>'+money(row.buyer_price)+'</td>'+
       '<td class="good">'+money(row.average_profit_per_item)+'</td><td class="good">'+pct(row.roi)+'</td>'+
       '<td>'+Number(row.quantity||0).toLocaleString()+'</td><td>'+money(row.total_cost)+'</td><td class="good">'+money(row.total_profit)+'</td>'+
+      '<td><b>'+Number(row.execution_score||0).toFixed(0)+'/100</b><div class="tiny muted">'+safe(row.exit_confidence||"low")+' exit · '+Number(row.fallback_buyer_count||0)+' fallback'+(Number(row.fallback_buyer_count||0)===1?'':'s')+
+      (row.fallback_buyer_count? ' · '+(Number(row.fallback_profit_retention||0)*100).toFixed(0)+'% retained':'')+'</div></td>'+
+      '<td>'+(row.market_reference_price!=null?money(row.market_reference_price):'—')+
+      (row.market_reference_profit_per_item!=null?'<div class="tiny '+(Number(row.market_reference_profit_per_item)>=0?'good':'muted')+'">gross ref '+money(row.market_reference_profit_per_item)+'/item</div>':'')+
+      '</td>'+
       '<td>'+traderHtml+'<div class="tiny muted">'+safe(sourceLabel(row.buyer_source))+'</div>'+
       (row.second_best_buyer_name?'<div class="tiny muted">#2 '+safe(row.second_best_buyer_name)+' · '+money(row.second_best_buyer_price)+' · gap '+money(row.buyer_price_gap)+'</div>':'')+
       '</td><td>'+sources+'</td><td>'+anomalies+'</td></tr>';
   }).join("");
 
-  if(!rows.length) document.getElementById("rows").innerHTML='<tr><td colspan="12" class="muted" style="text-align:center;padding:30px">No qualifying opportunities match these filters/search.</td></tr>';
+  if(!rows.length) document.getElementById("rows").innerHTML='<tr><td colspan="14" class="muted" style="text-align:center;padding:30px">No qualifying opportunities match these filters/search.</td></tr>';
 }
 
 async function inspectItem(name){
@@ -261,11 +271,14 @@ async function load(force=false){
     min_profit:Number(document.getElementById("minProfit").value||0),
     min_roi:Number(document.getElementById("minRoi").value||0)/100,
     min_quantity:Number(document.getElementById("minQty").value||1),
+    min_total_profit:Number(document.getElementById("minTotalProfit").value||0),
     force:String(force),
     buy_source:document.getElementById("buySource").value,
     buyer_source:document.getElementById("buyerSource").value,
     diversified:String(document.getElementById("diversified").checked)
   });
+  const capital=Number(document.getElementById("maxCapital").value||0);
+  if(capital>0) params.set("max_capital",String(capital));
   const excluded=[...excludedTraderNames];
   if(excluded.length)params.set("exclude_traders",excluded.join(","));
   const maxPer=Number(document.getElementById("maxPerTrader").value||0);
