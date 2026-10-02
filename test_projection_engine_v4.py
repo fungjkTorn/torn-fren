@@ -1,7 +1,13 @@
 import unittest
 
+from services.projection_chain_lab_v2 import (
+    TRAVEL_DAY_END_TS,
+    TRAVEL_DAY_START_TS,
+    _interval_crosses_travel_day,
+)
 from services.projection_engine_v4 import (
     ItemContext,
+    _adaptive_arrival_offset,
     apply_policy,
     point_forecast_pair,
 )
@@ -41,6 +47,43 @@ class ProjectionEngineV4Tests(unittest.TestCase):
             max_depth=3,
             min_history=8,
         )
+
+
+    def test_event_boundary_detection(self):
+        self.assertTrue(
+            _interval_crosses_travel_day(
+                TRAVEL_DAY_START_TS - 60, TRAVEL_DAY_END_TS + 60
+            )
+        )
+        self.assertFalse(
+            _interval_crosses_travel_day(
+                TRAVEL_DAY_START_TS - 600, TRAVEL_DAY_START_TS - 1
+            )
+        )
+
+    def test_arrival_policy_names_have_distinct_semantics(self):
+        life = 600.0
+        self.assertEqual(_adaptive_arrival_offset([], "restock0", life), 0.0)
+        self.assertEqual(_adaptive_arrival_offset([], "plus1m", life), 60.0)
+        self.assertEqual(_adaptive_arrival_offset([], "plus5m", life), 300.0)
+        self.assertEqual(_adaptive_arrival_offset([], "early35", life), 210.0)
+        self.assertEqual(_adaptive_arrival_offset([], "midpoint", life), 300.0)
+        self.assertEqual(_adaptive_arrival_offset([], "late85", life), 510.0)
+
+    def test_direct_horizon_depth_two_matches_stable_cadence(self):
+        ctx = self._context()
+        point = point_forecast_pair(ctx, "all_median", "direct:all_median")
+        anchor = ctx.cycles[10]["depletion_time"]
+        p2 = next(
+            r for r in point
+            if r["anchor_timestamp"] == anchor and r["depth"] == 2
+        )
+        self.assertEqual(p2["forecast_mode"], "direct_horizon")
+        self.assertAlmostEqual(
+            p2["raw_predicted_restock_timestamp"],
+            ctx.cycles[12]["restock_time"],
+        )
+        self.assertAlmostEqual(p2["direct_horizon_error_seconds"], 0.0)
 
     def test_point_chain_is_reusable_across_policies(self):
         ctx = self._context()
