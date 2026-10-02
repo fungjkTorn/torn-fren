@@ -87,6 +87,7 @@ def evaluate_offer(
     *,
     min_profit_per_item: int = 20_000,
     min_roi: float = 0.0,
+    max_capital: Optional[int] = None,
 ) -> Optional[ArbitrageOpportunity]:
     """
     Evaluate one trader buy offer against all available bazaar listings.
@@ -105,6 +106,8 @@ def evaluate_offer(
         raise ValueError("min_profit_per_item cannot be negative.")
     if min_roi < 0:
         raise ValueError("min_roi cannot be negative.")
+    if max_capital is not None and max_capital <= 0:
+        raise ValueError("max_capital must be positive when supplied.")
 
     offer_key = _item_key(offer.item_name, offer.item_id)
     candidates = []
@@ -145,6 +148,10 @@ def evaluate_offer(
             if remaining <= 0:
                 break
             take = min(take, remaining)
+
+        if max_capital is not None:
+            affordable = max(0, (max_capital - total_cost) // listing.unit_price) if listing.unit_price else take
+            take = min(take, affordable)
 
         if take <= 0:
             continue
@@ -205,11 +212,15 @@ def build_arbitrage_candidates(
     min_profit_per_item: int = 20_000,
     min_roi: float = 0.0,
     min_quantity: int = 1,
+    min_total_profit: int = 0,
+    max_capital: Optional[int] = None,
     excluded_buyers: Optional[set[str]] = None,
 ) -> dict[str, list[ArbitrageOpportunity]]:
     """Evaluate every qualifying buyer and return ranked candidates per item."""
     if min_quantity <= 0:
         raise ValueError("min_quantity must be positive.")
+    if min_total_profit < 0:
+        raise ValueError("min_total_profit cannot be negative.")
 
     excluded = {_buyer_key(name) for name in (excluded_buyers or set()) if name}
     listing_rows = list(listings)
@@ -234,8 +245,13 @@ def build_arbitrage_candidates(
             offer,
             min_profit_per_item=min_profit_per_item,
             min_roi=min_roi,
+            max_capital=max_capital,
         )
-        if opportunity is None or opportunity.quantity < min_quantity:
+        if (
+            opportunity is None
+            or opportunity.quantity < min_quantity
+            or opportunity.total_profit < min_total_profit
+        ):
             continue
 
         candidates_by_item.setdefault(offer_key, []).append(opportunity)
@@ -260,6 +276,8 @@ def scan_arbitrage(
     min_profit_per_item: int = 20_000,
     min_roi: float = 0.0,
     min_quantity: int = 1,
+    min_total_profit: int = 0,
+    max_capital: Optional[int] = None,
     excluded_buyers: Optional[set[str]] = None,
     max_opportunities_per_buyer: Optional[int] = None,
     diversified: bool = False,
@@ -284,6 +302,8 @@ def scan_arbitrage(
         min_profit_per_item=min_profit_per_item,
         min_roi=min_roi,
         min_quantity=min_quantity,
+        min_total_profit=min_total_profit,
+        max_capital=max_capital,
         excluded_buyers=excluded_buyers,
     )
 
