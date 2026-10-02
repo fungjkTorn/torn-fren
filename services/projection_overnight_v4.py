@@ -41,29 +41,52 @@ FLOWER_NAMES = {
     "african violet",
 }
 
-DEFAULT_COUNTRIES = ("can", "uni", "jap")
+XANAX_COUNTRIES = ("can", "uni", "jap")
 CHECKPOINT = Path("data/projection_overnight_v4_checkpoint.json")
 REPORT = Path("data/projection_overnight_v4_report.json")
 
 
-def discover_items(countries):
-    placeholders = ",".join("?" for _ in countries)
+def discover_items(countries=None):
+    """
+    Research target set:
+      - every plushie in every country represented in stock_history
+      - every known flower in every country represented in stock_history
+      - Xanax in CAN / UNI / JAP
+
+    If countries is supplied, it acts only as an optional filter for the
+    flower/plushie universe. Xanax remains limited to XANAX_COUNTRIES.
+    """
     with sqlite3.connect(DB_PATH) as conn:
         rows = conn.execute(
-            f"""
+            """
             SELECT DISTINCT LOWER(country), item_name
             FROM stock_history
-            WHERE LOWER(country) IN ({placeholders})
             ORDER BY LOWER(country), item_name COLLATE NOCASE
-            """,
-            tuple(c.lower() for c in countries),
+            """
         ).fetchall()
+
+    allowed = (
+        {c.lower() for c in countries}
+        if countries
+        else None
+    )
 
     out = []
     for country, item in rows:
         lower = item.lower()
-        if "plushie" in lower or lower in FLOWER_NAMES or lower == "xanax":
+
+        is_plushie_or_flower = (
+            "plushie" in lower
+            or lower in FLOWER_NAMES
+        )
+        if is_plushie_or_flower:
+            if allowed is None or country in allowed:
+                out.append((country, item))
+            continue
+
+        if lower == "xanax" and country in XANAX_COUNTRIES:
             out.append((country, item))
+
     return out
 
 
@@ -438,7 +461,14 @@ def main():
         description="Optimized, checkpointed, parallel offline projection tournament."
     )
     parser.add_argument(
-        "--countries", nargs="+", default=list(DEFAULT_COUNTRIES)
+        "--countries",
+        nargs="+",
+        default=None,
+        help=(
+            "Optional filter for flower/plushie countries. "
+            "Omit to test flowers and plushies from every country in the DB. "
+            "Xanax is always limited to CAN/UNI/JAP."
+        ),
     )
     parser.add_argument("--depth", type=int, default=4)
     parser.add_argument("--min-history", type=int, default=8)
@@ -453,7 +483,11 @@ def main():
     args = parser.parse_args()
 
     run_suite(
-        tuple(c.lower() for c in args.countries),
+        (
+            tuple(c.lower() for c in args.countries)
+            if args.countries
+            else None
+        ),
         max_depth=max(1, args.depth),
         min_history=max(3, args.min_history),
         shortlist=max(3, args.shortlist),
