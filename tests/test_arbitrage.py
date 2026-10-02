@@ -195,6 +195,50 @@ class ArbitrageEngineTests(unittest.TestCase):
         self.assertEqual(by_item["Item A"].buyer_name, "EVETINE")
         self.assertEqual(by_item["Item B"].buyer_name, "Trader B")
 
+    def test_capital_budget_limits_executable_quantity(self):
+        listings = [
+            BazaarListing("Item X", 100, 10, "source", seller_name="A"),
+            BazaarListing("Item X", 120, 10, "source", seller_name="B"),
+        ]
+        offer = BuyOffer("Item X", 180, "buyers", "Trader")
+
+        result = evaluate_offer(
+            listings,
+            offer,
+            min_profit_per_item=20,
+            max_capital=650,
+        )
+
+        self.assertIsNotNone(result)
+        self.assertEqual(result.quantity, 6)
+        self.assertEqual(result.total_cost, 600)
+        self.assertEqual(result.total_profit, 480)
+
+    def test_min_total_profit_filters_small_execution(self):
+        listings = [BazaarListing("Item X", 100, 5, "source")]
+        offers = [BuyOffer("Item X", 150, "buyers", "Trader")]
+
+        self.assertEqual(
+            scan_arbitrage(
+                listings,
+                offers,
+                min_profit_per_item=20,
+                min_total_profit=300,
+            ),
+            [],
+        )
+        self.assertEqual(
+            len(
+                scan_arbitrage(
+                    listings,
+                    offers,
+                    min_profit_per_item=20,
+                    min_total_profit=200,
+                )
+            ),
+            1,
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
