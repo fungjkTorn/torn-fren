@@ -13,6 +13,7 @@ from pathlib import Path
 
 from services.country_regime_lab import analyze_country_regime
 from services.history_service import DB_PATH
+from services.projection_chain_lab_v2 import WINDOW_POLICIES
 from services.projection_chain_lab_v3 import (
     ARRIVAL_POLICIES,
     BIAS_POLICIES,
@@ -375,7 +376,7 @@ def run_item(
         point_cache[(life, wait)] = point_rows
         stage1.append(
             evaluate_from_point_rows(
-                ctx, point_rows, life, wait, "midpoint", "none"
+                ctx, point_rows, life, wait, "midpoint", "none", "none"
             )
         )
         if stage1_index == 1 or stage1_index % stage1_step == 0 or stage1_index == stage1_total:
@@ -393,37 +394,45 @@ def run_item(
 
     finalists = _select_finalist_pairs(stage1, shortlist, max_depth)
 
-    # Stage 2: reuse each finalist point chain for all 24 policy combinations.
+    # Stage 2: reuse each finalist point chain across arrival, residual-bias,
+    # and window-floor policies. These are cheap layers over cached point chains.
     stage2 = []
-    stage2_total = len(finalists) * len(ARRIVAL_POLICIES) * len(BIAS_POLICIES)
+    stage2_total = (
+        len(finalists)
+        * len(ARRIVAL_POLICIES)
+        * len(BIAS_POLICIES)
+        * len(WINDOW_POLICIES)
+    )
     stage2_index = 0
     stage2_step = max(1, stage2_total // 10)
     for life, wait in finalists:
         point_rows = point_cache[(life, wait)]
         for arrival in ARRIVAL_POLICIES:
             for bias in BIAS_POLICIES:
-                stage2.append(
-                    evaluate_from_point_rows(
-                        ctx, point_rows, life, wait, arrival, bias
+                for window_policy in WINDOW_POLICIES:
+                    stage2.append(
+                        evaluate_from_point_rows(
+                            ctx, point_rows, life, wait, arrival, bias,
+                            window_policy
+                        )
                     )
-                )
-                stage2_index += 1
-                if (
-                    stage2_index == 1
-                    or stage2_index % stage2_step == 0
-                    or stage2_index == stage2_total
-                ):
-                    _emit_progress(
-                        progress_queue,
-                        kind="progress",
-                        key=progress_key,
-                        country=country,
-                        item_name=item_name,
-                        started_at=started,
-                        stage="stage2-arrival-bias",
-                        percent=100.0 * stage2_index / stage2_total,
-                        detail=f"{stage2_index}/{stage2_total} policy models",
-                    )
+                    stage2_index += 1
+                    if (
+                        stage2_index == 1
+                        or stage2_index % stage2_step == 0
+                        or stage2_index == stage2_total
+                    ):
+                        _emit_progress(
+                            progress_queue,
+                            kind="progress",
+                            key=progress_key,
+                            country=country,
+                            item_name=item_name,
+                            started_at=started,
+                            stage="stage2-arrival-bias-window",
+                            percent=100.0 * stage2_index / stage2_total,
+                            detail=f"{stage2_index}/{stage2_total} policy models",
+                        )
 
     result = {
         "country": country,
