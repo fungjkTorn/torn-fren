@@ -33,6 +33,45 @@ from services.projection_chain_lab_v3 import (
 # reopening / rebuilding the SQLite history for every strategy.
 
 
+DIRECT_HORIZON_METHODS = (
+    "all_median",
+    "recent5_median",
+    "weighted_recent5",
+    "recent_regime",
+    "same_hour_median",
+    "tod_recent_blend",
+)
+
+
+def _direct_horizon_rows(cycles, anchor_i, depth, anchor_ts):
+    """Leak-free prior samples of depletion->Nth-future-restock duration."""
+    rows = []
+    for source_i in range(anchor_i):
+        target_i = source_i + depth
+        if target_i >= len(cycles) or target_i > anchor_i:
+            break
+        source = cycles[source_i]
+        target = cycles[target_i]
+        if source.get("_excluded_regime") or target.get("_excluded_regime"):
+            continue
+        source_dep = int(source["depletion_time"])
+        target_restock = int(target["restock_time"])
+        target_dep = int(target["depletion_time"])
+        if target_restock >= anchor_ts:
+            continue
+        if _interval_crosses_travel_day(source_dep, target_dep):
+            continue
+        seconds = target_restock - source_dep
+        if seconds <= 0:
+            continue
+        rows.append({
+            "from_depletion": source_dep,
+            "to_restock": target_restock,
+            "seconds": float(seconds),
+        })
+    return rows
+
+
 @dataclass
 class ItemContext:
     country: str
@@ -131,7 +170,27 @@ def point_forecast_pair(ctx, lifetime_method, wait_method):
             if target_i >= len(cycles):
                 break
 
-            if depth == 1:
+            direct_method = (
+                wait_method.split(":", 1)[1]
+                if wait_method.startswith("direct:")
+                else None
+            )
+            if direct_method:
+                horizon_rows = _direct_horizon_rows(
+                    cycles, anchor_i, depth, anchor_ts
+                )
+                if len(horizon_rows) < ctx.min_history:
+                    continue
+                horizon_est = _estimate_wait(
+                    direct_method, horizon_rows, anchor_ts
+                )
+                if not horizon_est or horizon_est <= 0:
+                    continue
+                projected_restock = float(anchor_ts) + float(horizon_est)
+                wait_est = float(horizon_est)
+                predicted_wait_total = float(horizon_est)
+                predicted_bridge_lifetime_total = 0.0
+            elif depth == 1:
                 wait_est = _estimate_wait(
                     wait_method, known_waits, anchor_ts
                 )
@@ -188,13 +247,26 @@ def point_forecast_pair(ctx, lifetime_method, wait_method):
                 "actual_lifetime_seconds": actual_depletion - actual_restock,
                 "lifetime_estimate_seconds": float(target_lifetime),
                 "wait_estimate_seconds": float(wait_est),
-                "predicted_wait_total_seconds": predicted_wait_total,
-                "predicted_bridge_lifetime_total_seconds": predicted_bridge_lifetime_total,
+                "forecast_mode": "direct_horizon" if direct_method else "recursive",
+                "predicted_wait_total_seconds": (
+                    None if direct_method else predicted_wait_total
+                ),
+                "predicted_bridge_lifetime_total_seconds": (
+                    None if direct_method else predicted_bridge_lifetime_total
+                ),
                 "actual_wait_total_seconds": actual_wait_total,
                 "actual_bridge_lifetime_total_seconds": actual_bridge_lifetime_total,
-                "wait_component_error_seconds": actual_wait_total - predicted_wait_total,
+                "wait_component_error_seconds": (
+                    None if direct_method
+                    else actual_wait_total - predicted_wait_total
+                ),
                 "lifetime_component_error_seconds": (
-                    actual_bridge_lifetime_total - predicted_bridge_lifetime_total
+                    None if direct_method
+                    else actual_bridge_lifetime_total - predicted_bridge_lifetime_total
+                ),
+                "direct_horizon_error_seconds": (
+                    (actual_restock - float(anchor_ts)) - float(wait_est)
+                    if direct_method else None
                 ),
             })
 
@@ -459,11 +531,29 @@ def _summary(rows):
         "signed_bias_seconds": statistics.median(
             r["signed_error_seconds"] for r in population
         ),
-        "median_wait_component_error_seconds": statistics.median(
-            r.get("wait_component_error_seconds", 0.0) for r in population
+        "median_wait_component_error_seconds": (
+            statistics.median([
+                r["wait_component_error_seconds"] for r in population
+                if r.get("wait_component_error_seconds") is not None
+            ])
+            if any(r.get("wait_component_error_seconds") is not None for r in population)
+            else None
         ),
-        "median_lifetime_component_error_seconds": statistics.median(
-            r.get("lifetime_component_error_seconds", 0.0) for r in population
+        "median_lifetime_component_error_seconds": (
+            statistics.median([
+                r["lifetime_component_error_seconds"] for r in population
+                if r.get("lifetime_component_error_seconds") is not None
+            ])
+            if any(r.get("lifetime_component_error_seconds") is not None for r in population)
+            else None
+        ),
+        "median_direct_horizon_error_seconds": (
+            statistics.median([
+                r["direct_horizon_error_seconds"] for r in population
+                if r.get("direct_horizon_error_seconds") is not None
+            ])
+            if any(r.get("direct_horizon_error_seconds") is not None for r in population)
+            else None
         ),
     }
 
@@ -601,3 +691,11 @@ def all_point_pairs(ctx):
     for life in lifetimes:
         for wait in waits:
             yield life, wait, point_forecast_pair(ctx, life, wait)
+
+    # Direct-horizon models predict depletion->P2/P3/P4/P5 elapsed time
+    # directly instead of recursively summing unobserved lifetimes and waits.
+    # This is specifically intended to reduce compounded deeper-horizon error.
+    for life in lifetimes:
+        for method in DIRECT_HORIZON_METHODS:
+            wait_label = f"direct:{method}"
+            yield life, wait_label, point_forecast_pair(ctx, life, wait_label)
