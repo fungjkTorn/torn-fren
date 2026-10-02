@@ -800,6 +800,10 @@ def _fmt_rate(rate):
     return "—" if rate is None else f"{rate * 100:.1f}%"
 
 
+def _fmt_fraction(value):
+    return "—" if value is None else f"{float(value) * 100:.0f}%"
+
+
 def _line(strategy, s):
     return (
         f"  {strategy.name:<62} "
@@ -812,8 +816,8 @@ def _line(strategy, s):
         f"P90={_fmt_minutes(s['p90_absolute_error_seconds']):>7} "
         f"P95={_fmt_minutes(s['p95_absolute_error_seconds']):>7} "
         f"bias={_fmt_minutes(s['signed_bias_seconds']):>7} "
-        f"landPred={('—' if s['median_predicted_landing_fraction'] is None else f\"{s['median_predicted_landing_fraction']*100:.0f}%\"):>4} "
-        f"landActual={('—' if s['median_actual_landing_fraction_on_hits'] is None else f\"{s['median_actual_landing_fraction_on_hits']*100:.0f}%\"):>4} "
+        f"landPred={_fmt_fraction(s['median_predicted_landing_fraction']):>4} "
+        f"landActual={_fmt_fraction(s['median_actual_landing_fraction_on_hits']):>4} "
         f"margin={_fmt_minutes(s['median_arrival_margin_seconds']):>6}"
     )
 
