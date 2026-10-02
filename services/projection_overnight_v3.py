@@ -80,17 +80,46 @@ def _entry_brief(entry, max_depth):
             str(d): _serialize_summary(entry["holdout_by_depth"].get(d))
             for d in range(1, max_depth + 1)
         },
+        "rolling_folds_by_depth": {
+            str(d): [
+                _serialize_summary(s)
+                for s in (entry.get("rolling_folds_by_depth", {}).get(d) or [])
+            ]
+            for d in range(1, max_depth + 1)
+        },
     }
 
 
-def _rank_train(entries, selector):
+
+def _fold_floor(entry, depth):
+    folds = (entry.get("rolling_folds_by_depth") or {}).get(depth) or []
+    rates = [
+        f.get("wilson_lower_95")
+        for f in folds
+        if f and f.get("wilson_lower_95") is not None
+    ]
+    return min(rates) if rates else None
+
+
+def _rank_train(entries, selector, depth=None):
     usable = []
     for entry in entries:
         summary = selector(entry)
         if summary:
-            usable.append((entry, summary))
-    usable.sort(key=lambda x: conservative_key(x[1]), reverse=True)
-    return usable
+            fold_floor = _fold_floor(entry, depth) if depth is not None else None
+            usable.append((entry, summary, fold_floor))
+
+    def key(item):
+        entry, summary, fold_floor = item
+        base = conservative_key(summary)
+        # A model must be good across multiple chronological training folds, not
+        # merely on the aggregate. Missing fold evidence is neutral for sparse
+        # items; otherwise the worst fold is a strong tie-breaker.
+        stability = fold_floor if fold_floor is not None else -1.0
+        return (base[0], stability, base[1], base[2], base[3])
+
+    usable.sort(key=key, reverse=True)
+    return [(entry, summary) for entry, summary, _ in usable]
 
 
 def _strategy_from_name_components(life, wait, arrival, bias):
@@ -124,7 +153,7 @@ def stage1_pairs(country, item_name, max_depth, min_history, shortlist):
         finalists.add((e["strategy"].lifetime, e["strategy"].wait))
 
     for depth in range(1, max_depth + 1):
-        ranked = _rank_train(entries, lambda e, d=depth: e["train_by_depth"].get(d))
+        ranked = _rank_train(entries, lambda e, d=depth: e["train_by_depth"].get(d), depth=depth)
         for e, _ in ranked[:shortlist]:
             finalists.add((e["strategy"].lifetime, e["strategy"].wait))
 
@@ -159,7 +188,7 @@ def _ensemble_summary(entries, depth=None, active=False, top_n=3):
     if active:
         ranked = _rank_train(entries, lambda e: e["train_active"])
     else:
-        ranked = _rank_train(entries, lambda e: e["train_by_depth"].get(depth))
+        ranked = _rank_train(entries, lambda e: e["train_by_depth"].get(depth), depth=depth)
     members = [e for e, _ in ranked[:top_n]]
     if len(members) < 2:
         return None
@@ -245,7 +274,7 @@ def summarize_item(country, item_name, stage1, finalists, stage2, max_depth):
     )
 
     for depth in range(1, max_depth + 1):
-        ranked = _rank_train(stage2, lambda e, d=depth: e["train_by_depth"].get(d))
+        ranked = _rank_train(stage2, lambda e, d=depth: e["train_by_depth"].get(d), depth=depth)
         top = [e for e, _ in ranked[:5]]
         result["depths"][str(depth)] = {
             "top5_selected_on_train": [_entry_brief(e, max_depth) for e in top],
