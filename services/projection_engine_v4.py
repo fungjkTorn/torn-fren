@@ -52,7 +52,12 @@ def _direct_horizon_rows(cycles, anchor_i, depth, anchor_ts):
             break
         source = cycles[source_i]
         target = cycles[target_i]
-        if source.get("_excluded_regime") or target.get("_excluded_regime"):
+        chain = cycles[source_i : target_i + 1]
+        if any(
+            c.get("_excluded_regime")
+            or not c.get("_valid_for_training", True)
+            for c in chain
+        ):
             continue
         source_dep = int(source["depletion_time"])
         target_restock = int(target["restock_time"])
@@ -90,6 +95,7 @@ def _holdout_split_from_cycles(cycles, holdout_fraction=0.25, min_holdout=20):
         for c in cycles
         if c.get("depletion_time") is not None
         and not c.get("_excluded_regime")
+        and c.get("_valid_for_training", True)
     )
     if len(anchors) < min_holdout + 20:
         return None
@@ -143,13 +149,17 @@ def point_forecast_pair(ctx, lifetime_method, wait_method):
     waits = ctx.wait_rows
 
     for anchor_i, anchor in enumerate(cycles):
-        if anchor.get("_excluded_regime"):
+        if (
+            anchor.get("_excluded_regime")
+            or not anchor.get("_valid_for_training", True)
+        ):
             continue
         anchor_ts = int(anchor["depletion_time"])
 
         known_cycles = [
             c for c in cycles[: anchor_i + 1]
             if not c.get("_excluded_regime")
+            and c.get("_valid_for_training", True)
         ]
         # wait_rows are chronological; avoid rebuilding from SQLite and only
         # select information genuinely available before this anchor.
@@ -226,8 +236,14 @@ def point_forecast_pair(ctx, lifetime_method, wait_method):
             target = cycles[target_i]
             actual_restock = float(target["restock_time"])
             actual_depletion = float(target["depletion_time"])
-            if target.get("_excluded_regime") or _interval_crosses_travel_day(
-                anchor_ts, actual_depletion
+            chain_cycles = cycles[anchor_i : target_i + 1]
+            if (
+                any(
+                    c.get("_excluded_regime")
+                    or not c.get("_valid_for_training", True)
+                    for c in chain_cycles
+                )
+                or _interval_crosses_travel_day(anchor_ts, actual_depletion)
             ):
                 break
 
