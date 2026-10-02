@@ -570,12 +570,27 @@ def _simulate_strategy(
             # cycle between the anchor and target has clean ground truth. Do
             # not silently stitch across an invalid collector boundary.
             chain_cycles = cycles[anchor_i : target_i + 1]
+            chain_has_valid_bridges = True
+            for bridge_i in range(anchor_i, target_i):
+                source = cycles[bridge_i]
+                destination = cycles[bridge_i + 1]
+                source_dep = int(source["depletion_time"])
+                wait_seconds = waits_by_depletion.get(source_dep)
+                if wait_seconds is None:
+                    chain_has_valid_bridges = False
+                    break
+                expected_restock = source_dep + float(wait_seconds)
+                if abs(expected_restock - float(destination["restock_time"])) > 1.0:
+                    chain_has_valid_bridges = False
+                    break
+
             if (
                 any(
                     c.get("_excluded_regime")
                     or not c.get("_valid_for_training", True)
                     for c in chain_cycles
                 )
+                or not chain_has_valid_bridges
                 or _interval_crosses_travel_day(anchor_ts, actual_depletion)
             ):
                 break
