@@ -23,10 +23,14 @@ class Strategy:
     lifetime: str
     wait: str
     arrival_policy: str
+    window_policy: str = "none"
 
     @property
     def name(self):
-        return f"{self.lifetime} + {self.wait} + {self.arrival_policy}"
+        return (
+            f"{self.lifetime} + {self.wait} + {self.arrival_policy} "
+            f"+ window:{self.window_policy}"
+        )
 
 
 BASE_METHODS = (
@@ -47,6 +51,11 @@ BASE_METHODS = (
 )
 
 ARRIVAL_POLICIES = (
+    "restock0",
+    "plus1m",
+    "plus2m",
+    "plus3m",
+    "plus5m",
     "early35",
     "midpoint",
     "late65",
@@ -58,6 +67,12 @@ ARRIVAL_POLICIES = (
     "adaptive_all",
     "adaptive20",
     "adaptive10",
+)
+
+WINDOW_POLICIES = (
+    "none",
+    "midpoint_floor",
+    "end_floor",
 )
 
 
@@ -375,6 +390,16 @@ def _adaptive_landing_fraction(prior_rows, recent_limit=None):
 
 
 def _arrival_offset(policy, life_est, prior_depth_rows):
+    fixed_seconds = {
+        "restock0": 0.0,
+        "plus1m": 60.0,
+        "plus2m": 120.0,
+        "plus3m": 180.0,
+        "plus5m": 300.0,
+    }
+    if policy in fixed_seconds:
+        return fixed_seconds[policy]
+
     fixed_fractions = {
         "early35": 0.35,
         "midpoint": 0.50,
@@ -523,16 +548,27 @@ def _simulate_strategy(
                 max_width=life_est,
             )
 
-            # Mirror the website's conservative policy: never intentionally land
-            # before the late side of the calibrated restock window.
             calibrated_arrival = projected_restock + offset
             if window:
                 window_start = projected_restock + window[0]
                 window_end = projected_restock + window[1]
+                window_midpoint = (window_start + window_end) / 2.0
+            else:
+                window_start = window_end = window_midpoint = None
+
+            # The current website effectively uses end_floor. The tournament
+            # now treats that as only one candidate instead of assuming later
+            # is always safer.
+            if strategy.window_policy == "none" or not window:
+                recommended_arrival = calibrated_arrival
+            elif strategy.window_policy == "midpoint_floor":
+                recommended_arrival = max(calibrated_arrival, window_midpoint)
+            elif strategy.window_policy == "end_floor":
                 recommended_arrival = max(calibrated_arrival, window_end)
             else:
-                window_start = window_end = None
-                recommended_arrival = calibrated_arrival
+                raise ValueError(
+                    f"Unknown window policy: {strategy.window_policy}"
+                )
 
             recommended_departure = (
                 recommended_arrival - travel_seconds
@@ -675,6 +711,7 @@ def tournament(
     min_history=8,
     exclude_travel_day=True,
     arrival_policies=ARRIVAL_POLICIES,
+    window_policies=WINDOW_POLICIES,
 ):
     cycles, waits = _qualified_series(
         country,
@@ -684,12 +721,18 @@ def tournament(
     travel_seconds = TRAVEL_SECONDS.get(country.lower())
 
     results = []
-    for life_method, wait_method, arrival_policy in product(
+    for life_method, wait_method, arrival_policy, window_policy in product(
         BASE_METHODS,
         BASE_METHODS,
         arrival_policies,
+        window_policies,
     ):
-        strategy = Strategy(life_method, wait_method, arrival_policy)
+        strategy = Strategy(
+            life_method,
+            wait_method,
+            arrival_policy,
+            window_policy,
+        )
         rows = _simulate_strategy(
             cycles,
             waits,
@@ -856,7 +899,18 @@ def main():
     )
     args = parser.parse_args()
 
-    policies = ("adaptive_fraction20", "adaptive20", "midpoint", "late65", "late75") if args.fast else ARRIVAL_POLICIES
+    policies = (
+        "restock0",
+        "plus1m",
+        "plus2m",
+        "plus3m",
+        "plus5m",
+        "adaptive_fraction20",
+        "adaptive20",
+        "midpoint",
+        "late65",
+        "late75",
+    ) if args.fast else ARRIVAL_POLICIES
     result = tournament(
         args.country,
         args.item_name,
@@ -864,6 +918,7 @@ def main():
         min_history=max(3, args.min_history),
         exclude_travel_day=not args.include_travel_day,
         arrival_policies=policies,
+        window_policies=WINDOW_POLICIES,
     )
     print_report(
         result,
