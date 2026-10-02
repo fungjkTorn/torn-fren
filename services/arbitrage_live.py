@@ -1325,6 +1325,8 @@ def build_arbitrage_report(
     min_profit_per_item: int = 20_000,
     min_roi: float = 0.0,
     min_quantity: int = 1,
+    min_total_profit: int = 0,
+    max_capital: Optional[int] = None,
     force: bool = False,
     background: bool = False,
     buy_source: str = "all",
@@ -1365,6 +1367,8 @@ def build_arbitrage_report(
         min_profit_per_item=min_profit_per_item,
         min_roi=min_roi,
         min_quantity=min_quantity,
+        min_total_profit=min_total_profit,
+        max_capital=max_capital,
         excluded_buyers=excluded_set,
         max_opportunities_per_buyer=max_opportunities_per_trader,
         diversified=diversified,
@@ -1376,6 +1380,8 @@ def build_arbitrage_report(
         min_profit_per_item=min_profit_per_item,
         min_roi=min_roi,
         min_quantity=min_quantity,
+        min_total_profit=min_total_profit,
+        max_capital=max_capital,
         excluded_buyers=excluded_set,
     )
 
@@ -1426,6 +1432,78 @@ def build_arbitrage_report(
             opportunity.total_profit - second.total_profit
             if second else None
         )
+
+        item_candidates = candidates_by_item.get(item_key, [])
+        row["qualifying_buyer_count"] = len(item_candidates)
+        row["fallback_buyer_count"] = max(0, len(item_candidates) - 1)
+        row["fallback_profit_retention"] = (
+            min(1.0, second.total_profit / opportunity.total_profit)
+            if second and opportunity.total_profit > 0 else 0.0
+        )
+
+        selected_offer = next(
+            (
+                offer for offer in offers_by_item.get(str(opportunity.item_id or ""), [])
+                if offer.buyer_name == opportunity.buyer_name
+                and offer.source == opportunity.buyer_source
+                and offer.unit_price == opportunity.buyer_price
+            ),
+            None,
+        )
+        buyer_age_seconds = (
+            max(0.0, time.time() - float(selected_offer.observed_at))
+            if selected_offer and selected_offer.observed_at else None
+        )
+        row["buyer_age_seconds"] = buyer_age_seconds
+
+        fallback_score = min(1.0, row["fallback_buyer_count"] / 2.0)
+        retention_score = row["fallback_profit_retention"]
+        quantity_score = min(1.0, opportunity.quantity / 500.0)
+        if buyer_age_seconds is None:
+            freshness_score = 0.5
+        elif buyer_age_seconds <= 900:
+            freshness_score = 1.0
+        elif buyer_age_seconds <= 3600:
+            freshness_score = 0.75
+        elif buyer_age_seconds <= 10800:
+            freshness_score = 0.5
+        else:
+            freshness_score = 0.25
+        row["execution_score"] = round(
+            100.0 * (
+                0.35 * fallback_score
+                + 0.30 * retention_score
+                + 0.20 * quantity_score
+                + 0.15 * freshness_score
+            ),
+            1,
+        )
+        if row["fallback_buyer_count"] >= 2 and row["fallback_profit_retention"] >= 0.8:
+            row["exit_confidence"] = "high"
+        elif row["fallback_buyer_count"] >= 1 and row["fallback_profit_retention"] >= 0.6:
+            row["exit_confidence"] = "medium"
+        else:
+            row["exit_confidence"] = "low"
+
+        market_rows = sorted(
+            [
+                listing for listing in listings
+                if listing.source == "torn_item_market"
+                and str(listing.item_id or "") == str(opportunity.item_id or "")
+            ],
+            key=lambda listing: listing.unit_price,
+        )
+        market_ref = market_rows[0] if market_rows else None
+        row["market_reference_price"] = market_ref.unit_price if market_ref else None
+        row["market_reference_quantity"] = market_ref.quantity if market_ref else None
+        row["market_reference_profit_per_item"] = (
+            market_ref.unit_price - opportunity.average_buy_price
+            if market_ref else None
+        )
+        row["market_reference_roi"] = (
+            (market_ref.unit_price - opportunity.average_buy_price) / opportunity.average_buy_price
+            if market_ref and opportunity.average_buy_price > 0 else None
+        )
         output.append(row)
 
     selected_profit = sum(int(row.get("total_profit") or 0) for row in output)
@@ -1453,6 +1531,8 @@ def build_arbitrage_report(
         "min_profit_per_item": min_profit_per_item,
         "min_roi": min_roi,
         "min_quantity": min_quantity,
+        "min_total_profit": min_total_profit,
+        "max_capital": max_capital,
         "buy_source_filter": buy_source,
         "buyer_source_filter": buyer_source,
         "country_filter": country or None,
