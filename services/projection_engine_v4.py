@@ -237,12 +237,28 @@ def point_forecast_pair(ctx, lifetime_method, wait_method):
             actual_restock = float(target["restock_time"])
             actual_depletion = float(target["depletion_time"])
             chain_cycles = cycles[anchor_i : target_i + 1]
+            valid_bridge_map = {
+                int(r["from_depletion"]): int(r["to_restock"])
+                for r in waits
+                if r.get("from_depletion") is not None
+                and r.get("to_restock") is not None
+            }
+            chain_has_valid_bridges = True
+            for bridge_i in range(anchor_i, target_i):
+                source_dep = int(cycles[bridge_i]["depletion_time"])
+                expected_target = valid_bridge_map.get(source_dep)
+                actual_target = int(cycles[bridge_i + 1]["restock_time"])
+                if expected_target is None or expected_target != actual_target:
+                    chain_has_valid_bridges = False
+                    break
+
             if (
                 any(
                     c.get("_excluded_regime")
                     or not c.get("_valid_for_training", True)
                     for c in chain_cycles
                 )
+                or not chain_has_valid_bridges
                 or _interval_crosses_travel_day(anchor_ts, actual_depletion)
             ):
                 break
