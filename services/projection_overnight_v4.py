@@ -5,6 +5,9 @@ import os
 import sqlite3
 import statistics
 import time
+import threading
+import queue
+from multiprocessing import Manager
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 
@@ -44,6 +47,86 @@ FLOWER_NAMES = {
 XANAX_COUNTRIES = ("can", "uni", "jap")
 CHECKPOINT = Path("data/projection_overnight_v4_checkpoint.json")
 REPORT = Path("data/projection_overnight_v4_report.json")
+
+HEARTBEAT_SECONDS = 60
+
+
+def _emit_progress(progress_queue, **payload):
+    if progress_queue is None:
+        return
+    try:
+        payload.setdefault("timestamp", time.time())
+        payload.setdefault("pid", os.getpid())
+        progress_queue.put(payload)
+    except Exception:
+        # Progress reporting must never break a long research run.
+        pass
+
+
+def _progress_printer(progress_queue, total_pending, stop_event):
+    states = {}
+    completed = 0
+    last_heartbeat = 0.0
+
+    while not stop_event.is_set() or states:
+        try:
+            event = progress_queue.get(timeout=1.0)
+        except queue.Empty:
+            event = None
+        except Exception:
+            event = None
+
+        now = time.time()
+        if event:
+            kind = event.get("kind")
+            key = event.get("key")
+            if kind == "start":
+                states[key] = event
+                print(
+                    f"[worker pid={event.get('pid')}] START "
+                    f"{event['country'].upper()} / {event['item_name']}",
+                    flush=True,
+                )
+            elif kind == "progress":
+                previous = states.get(key, {})
+                states[key] = {**previous, **event}
+                elapsed = now - float(states[key].get("started_at", now))
+                pct = event.get("percent")
+                pct_text = f" {pct:5.1f}%" if pct is not None else ""
+                detail = event.get("detail") or ""
+                print(
+                    f"[worker pid={event.get('pid')}] "
+                    f"{event['country'].upper()} / {event['item_name']} "
+                    f"— {event.get('stage','working')}{pct_text} "
+                    f"— {elapsed/60:.1f}m"
+                    + (f" — {detail}" if detail else ""),
+                    flush=True,
+                )
+            elif kind == "done":
+                states.pop(key, None)
+                completed += 1
+
+        if now - last_heartbeat >= HEARTBEAT_SECONDS:
+            last_heartbeat = now
+            active = []
+            for state in states.values():
+                elapsed = now - float(state.get("started_at", now))
+                active.append(
+                    (
+                        elapsed,
+                        f"{state.get('country','').upper()} / "
+                        f"{state.get('item_name','')} "
+                        f"[{state.get('stage','working')}, {elapsed/60:.1f}m]"
+                    )
+                )
+            active.sort(reverse=True)
+            active_text = "; ".join(text for _elapsed, text in active[:8])
+            print(
+                f"[heartbeat] completed={completed}/{total_pending} "
+                f"active={len(states)}"
+                + (f" | {active_text}" if active_text else ""),
+                flush=True,
+            )
 
 
 def discover_items(countries=None):
@@ -228,36 +311,93 @@ def _select_finalist_pairs(stage1, shortlist, max_depth):
     return sorted(chosen)
 
 
-def run_item(country, item_name, max_depth=4, min_history=8, shortlist=10):
+def run_item(
+    country,
+    item_name,
+    max_depth=4,
+    min_history=8,
+    shortlist=10,
+    progress_queue=None,
+):
     started = time.time()
+    progress_key = f"{country.lower()}::{item_name.lower()}"
+    _emit_progress(
+        progress_queue,
+        kind="start",
+        key=progress_key,
+        country=country,
+        item_name=item_name,
+        started_at=started,
+        stage="build-history",
+    )
     ctx = build_item_context(
         country, item_name, max_depth=max_depth, min_history=min_history
     )
+    _emit_progress(
+        progress_queue,
+        kind="progress",
+        key=progress_key,
+        country=country,
+        item_name=item_name,
+        started_at=started,
+        stage="history-ready",
+        detail=f"{len(ctx.cycles)} valid cycles",
+    )
 
     if ctx.split_timestamp is None:
-        return {
+        result = {
             "country": country,
             "item_name": item_name,
             "status": "insufficient_holdout_history",
             "valid_cycles": len(ctx.cycles),
             "runtime_seconds": round(time.time() - started, 3),
         }
+        _emit_progress(
+            progress_queue,
+            kind="done",
+            key=progress_key,
+            country=country,
+            item_name=item_name,
+            started_at=started,
+            stage="done",
+        )
+        return result
 
     # Stage 1: each lifetime/wait point chain is built ONCE.
     point_cache = {}
     stage1 = []
-    for life, wait, point_rows in all_point_pairs(ctx):
+    stage1_total = (
+        len(tuple(BASE_METHODS) + tuple(EXTRA_LIFETIME_METHODS))
+        * len(tuple(BASE_METHODS) + tuple(EXTRA_WAIT_METHODS))
+    )
+    stage1_step = max(1, stage1_total // 10)
+    for stage1_index, (life, wait, point_rows) in enumerate(all_point_pairs(ctx), 1):
         point_cache[(life, wait)] = point_rows
         stage1.append(
             evaluate_from_point_rows(
                 ctx, point_rows, life, wait, "midpoint", "none"
             )
         )
+        if stage1_index == 1 or stage1_index % stage1_step == 0 or stage1_index == stage1_total:
+            _emit_progress(
+                progress_queue,
+                kind="progress",
+                key=progress_key,
+                country=country,
+                item_name=item_name,
+                started_at=started,
+                stage="stage1-point-models",
+                percent=100.0 * stage1_index / stage1_total,
+                detail=f"{stage1_index}/{stage1_total} point pairs",
+            )
 
     finalists = _select_finalist_pairs(stage1, shortlist, max_depth)
 
     # Stage 2: reuse each finalist point chain for all 24 policy combinations.
     stage2 = []
+    stage2_total = len(finalists) * len(ARRIVAL_POLICIES) * len(BIAS_POLICIES)
+    stage2_index = 0
+    stage2_step = max(1, stage2_total // 10)
     for life, wait in finalists:
         point_rows = point_cache[(life, wait)]
         for arrival in ARRIVAL_POLICIES:
@@ -267,6 +407,23 @@ def run_item(country, item_name, max_depth=4, min_history=8, shortlist=10):
                         ctx, point_rows, life, wait, arrival, bias
                     )
                 )
+                stage2_index += 1
+                if (
+                    stage2_index == 1
+                    or stage2_index % stage2_step == 0
+                    or stage2_index == stage2_total
+                ):
+                    _emit_progress(
+                        progress_queue,
+                        kind="progress",
+                        key=progress_key,
+                        country=country,
+                        item_name=item_name,
+                        started_at=started,
+                        stage="stage2-arrival-bias",
+                        percent=100.0 * stage2_index / stage2_total,
+                        detail=f"{stage2_index}/{stage2_total} policy models",
+                    )
 
     result = {
         "country": country,
@@ -308,6 +465,15 @@ def run_item(country, item_name, max_depth=4, min_history=8, shortlist=10):
         }
 
     result["runtime_seconds"] = round(time.time() - started, 3)
+    _emit_progress(
+        progress_queue,
+        kind="done",
+        key=progress_key,
+        country=country,
+        item_name=item_name,
+        started_at=started,
+        stage="done",
+    )
     return result
 
 
@@ -418,35 +584,60 @@ def run_suite(
     else:
         # Item-level parallelism is deliberate: each process gets independent
         # read-only analysis state and avoids shared mutable model caches.
-        with ProcessPoolExecutor(max_workers=workers) as pool:
-            futures = {
-                pool.submit(
-                    run_item,
-                    country,
-                    item_name,
-                    max_depth,
-                    min_history,
-                    shortlist,
-                ): (country, item_name)
-                for country, item_name in pending
-            }
+        #
+        # A Manager queue carries low-frequency stage/progress events back to
+        # the parent so long items never look frozen.
+        with Manager() as manager:
+            progress_queue = manager.Queue()
+            stop_event = threading.Event()
+            printer = threading.Thread(
+                target=_progress_printer,
+                args=(progress_queue, len(pending), stop_event),
+                daemon=True,
+            )
+            printer.start()
 
-            for future in as_completed(futures):
-                country, item_name = futures[future]
-                key = f"{country.lower()}::{item_name.lower()}"
-                try:
-                    result = future.result()
-                except Exception as exc:
-                    result = {
-                        "country": country,
-                        "item_name": item_name,
-                        "status": "error",
-                        "error": repr(exc),
-                    }
+            with ProcessPoolExecutor(max_workers=workers) as pool:
+                futures = {
+                    pool.submit(
+                        run_item,
+                        country,
+                        item_name,
+                        max_depth,
+                        min_history,
+                        shortlist,
+                        progress_queue,
+                    ): (country, item_name)
+                    for country, item_name in pending
+                }
 
-                checkpoint["completed"][key] = result
-                _save_json_atomic(CHECKPOINT, checkpoint)
-                _print_result(result, max_depth)
+                for future in as_completed(futures):
+                    country, item_name = futures[future]
+                    key = f"{country.lower()}::{item_name.lower()}"
+                    try:
+                        result = future.result()
+                    except Exception as exc:
+                        result = {
+                            "country": country,
+                            "item_name": item_name,
+                            "status": "error",
+                            "error": repr(exc),
+                        }
+                        _emit_progress(
+                            progress_queue,
+                            kind="done",
+                            key=key,
+                            country=country,
+                            item_name=item_name,
+                            stage="error",
+                        )
+
+                    checkpoint["completed"][key] = result
+                    _save_json_atomic(CHECKPOINT, checkpoint)
+                    _print_result(result, max_depth)
+
+            stop_event.set()
+            printer.join(timeout=3.0)
 
     checkpoint["finished_at"] = int(time.time())
     _save_json_atomic(CHECKPOINT, checkpoint)
