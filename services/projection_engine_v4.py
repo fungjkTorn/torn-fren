@@ -3,6 +3,7 @@ import statistics
 from dataclasses import dataclass
 
 from services.arrival_success_lab import TRAVEL_SECONDS
+from services.projection_chain_lab_v2 import _interval_crosses_travel_day
 from services.projection_chain_lab_v3 import (
     ARRIVAL_POLICIES,
     BASE_METHODS,
@@ -17,7 +18,6 @@ from services.projection_chain_lab_v3 import (
     _estimate_wait,
     _qualified_series,
     _wilson_lower,
-    _interval_crosses_travel_day,
 )
 
 # Optimized offline research engine.
