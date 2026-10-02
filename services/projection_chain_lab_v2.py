@@ -18,6 +18,27 @@ TRAVEL_DAY_START_TS = 1790308800
 TRAVEL_DAY_END_TS = 1790568000
 
 
+def _in_travel_day(ts):
+    return TRAVEL_DAY_START_TS <= int(ts) < TRAVEL_DAY_END_TS
+
+
+def _interval_crosses_travel_day(start_ts, end_ts):
+    """True when a historical forecast/transition touches the excluded regime."""
+    start_ts = int(start_ts)
+    end_ts = int(end_ts)
+    if end_ts < start_ts:
+        start_ts, end_ts = end_ts, start_ts
+    return start_ts < TRAVEL_DAY_END_TS and end_ts >= TRAVEL_DAY_START_TS
+
+
+def _cycle_excluded(cycle):
+    restock = cycle.get("restock_time")
+    depletion = cycle.get("depletion_time")
+    if restock is None or depletion is None:
+        return False
+    return _interval_crosses_travel_day(restock, depletion)
+
+
 @dataclass(frozen=True)
 class Strategy:
     lifetime: str
@@ -245,11 +266,11 @@ def _qualified_series(country, item_name, exclude_travel_day=True):
             and c.get("lifetime_seconds") is not None
         ):
             continue
-        if (
-            exclude_travel_day
-            and TRAVEL_DAY_START_TS <= int(c["restock_time"]) < TRAVEL_DAY_END_TS
-        ):
-            continue
+        # Keep the cycle in chronological position so forecast-depth indexing
+        # cannot stitch the pre-event history directly to the post-event history.
+        # The simulator excludes these rows from training/scoring instead.
+        c = dict(c)
+        c["_excluded_regime"] = bool(exclude_travel_day and _cycle_excluded(c))
         valid_cycles.append(c)
 
     wait_by_from_depletion = {}
@@ -263,9 +284,8 @@ def _qualified_series(country, item_name, exclude_travel_day=True):
             continue
         if (
             exclude_travel_day
-            and (
-                TRAVEL_DAY_START_TS <= int(s["from_depletion"]) < TRAVEL_DAY_END_TS
-                or TRAVEL_DAY_START_TS <= int(s["to_restock"]) < TRAVEL_DAY_END_TS
+            and _interval_crosses_travel_day(
+                int(s["from_depletion"]), int(s["to_restock"])
             )
         ):
             continue
@@ -480,11 +500,14 @@ def _simulate_strategy(
     prior_by_depth = {depth: [] for depth in range(1, max_depth + 1)}
 
     for anchor_i, anchor_cycle in enumerate(cycles):
+        if anchor_cycle.get("_excluded_regime"):
+            continue
         anchor_ts = int(anchor_cycle["depletion_time"])
 
         known_cycle_rows = [
             c for c in cycles[: anchor_i + 1]
             if int(c["depletion_time"]) <= anchor_ts
+            and not c.get("_excluded_regime")
         ]
         known_lifetimes = [float(c["lifetime_seconds"]) for c in known_cycle_rows]
         known_wait_pairs = [
@@ -537,6 +560,14 @@ def _simulate_strategy(
             target_cycle = cycles[target_i]
             actual_restock = float(target_cycle["restock_time"])
             actual_depletion = float(target_cycle["depletion_time"])
+
+            # Never score a frozen chain across Travel Day. Removing event
+            # cycles and joining the surrounding normal cycles created fake
+            # multi-day P2/P3/P4 errors in the earlier tournament.
+            if target_cycle.get("_excluded_regime") or _interval_crosses_travel_day(
+                anchor_ts, actual_depletion
+            ):
+                break
             actual_lifetime = actual_depletion - actual_restock
             error = actual_restock - projected_restock
 
