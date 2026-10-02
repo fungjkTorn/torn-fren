@@ -41,6 +41,9 @@ BASE_METHODS = (
     "trimmed10_mean",
     "blend_recent5_all",
     "trend5_clipped",
+    "hour3_median",
+    "hour6_median",
+    "hour3_recent20",
 )
 
 ARRIVAL_POLICIES = (
@@ -170,6 +173,44 @@ def _estimate(values, method):
         return _trend5(values)
 
     raise ValueError(f"Unknown estimator: {method}")
+
+
+def _hour_distance_seconds(a, b):
+    """Circular time-of-day distance, ignoring calendar date."""
+    day = 24 * 60 * 60
+    x = abs((float(a) % day) - (float(b) % day))
+    return min(x, day - x)
+
+
+def _contextual_estimate(pairs, target_timestamp, method, fallback_values):
+    """
+    Time-of-day matched estimator. Pairs are (event_timestamp, value) and are
+    already restricted to information available before the historical issuance.
+    """
+    if not method.startswith("hour"):
+        return _estimate(fallback_values, method)
+
+    if method == "hour3_median":
+        hours, recent_limit = 3, None
+    elif method == "hour6_median":
+        hours, recent_limit = 6, None
+    elif method == "hour3_recent20":
+        hours, recent_limit = 3, 20
+    else:
+        raise ValueError(f"Unknown contextual estimator: {method}")
+
+    matched = [
+        float(value)
+        for ts, value in pairs
+        if value is not None
+        and _hour_distance_seconds(ts, target_timestamp) <= hours * 3600
+    ]
+    if recent_limit:
+        matched = matched[-recent_limit:]
+
+    if len(matched) >= 5:
+        return statistics.median(matched)
+    return _median(fallback_values)
 
 
 def _qualified_series(country, item_name, exclude_travel_day=True):
@@ -416,27 +457,48 @@ def _simulate_strategy(
     for anchor_i, anchor_cycle in enumerate(cycles):
         anchor_ts = int(anchor_cycle["depletion_time"])
 
-        known_lifetimes = [
-            float(c["lifetime_seconds"])
-            for c in cycles[: anchor_i + 1]
+        known_cycle_rows = [
+            c for c in cycles[: anchor_i + 1]
             if int(c["depletion_time"]) <= anchor_ts
         ]
-        known_waits = [
-            float(waits_by_depletion[int(c["depletion_time"])])
+        known_lifetimes = [float(c["lifetime_seconds"]) for c in known_cycle_rows]
+        known_wait_pairs = [
+            (
+                int(c["depletion_time"]),
+                float(waits_by_depletion[int(c["depletion_time"])]),
+            )
             for c in cycles[:anchor_i]
             if int(c["depletion_time"]) in waits_by_depletion
             and int(c["depletion_time"]) < anchor_ts
         ]
+        known_waits = [value for _ts, value in known_wait_pairs]
 
         if len(known_lifetimes) < min_history or len(known_waits) < min_history:
             continue
 
-        life_est = _estimate(known_lifetimes, strategy.lifetime)
-        wait_est = _estimate(known_waits, strategy.wait)
-        if not life_est or not wait_est or life_est <= 0 or wait_est <= 0:
+        wait_est = _contextual_estimate(
+            known_wait_pairs,
+            anchor_ts,
+            strategy.wait,
+            known_waits,
+        )
+        if not wait_est or wait_est <= 0:
             continue
 
         projected_restock = float(anchor_ts) + float(wait_est)
+
+        lifetime_pairs = [
+            (int(c["restock_time"]), float(c["lifetime_seconds"]))
+            for c in known_cycle_rows
+        ]
+        life_est = _contextual_estimate(
+            lifetime_pairs,
+            projected_restock,
+            strategy.lifetime,
+            known_lifetimes,
+        )
+        if not life_est or life_est <= 0:
+            continue
         anchor_rows = []
 
         for depth in range(1, max_depth + 1):
