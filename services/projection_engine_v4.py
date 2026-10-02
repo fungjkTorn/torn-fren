@@ -201,18 +201,25 @@ def _median_error(prior_rows, policy):
 
 
 def _adaptive_arrival_offset(prior_rows, policy, life_est):
-    if policy == "midpoint":
-        return life_est * 0.50
-    if policy == "late65":
-        return life_est * 0.65
-    if policy == "late75":
-        return life_est * 0.75
+    fixed_seconds = {
+        "restock0": 0.0,
+        "plus1m": 60.0,
+        "plus2m": 120.0,
+        "plus3m": 180.0,
+        "plus5m": 300.0,
+    }
+    if policy in fixed_seconds:
+        return fixed_seconds[policy]
 
-    recent_limit = (
-        None if policy == "adaptive_all"
-        else 20 if policy == "adaptive20"
-        else 10
-    )
+    fixed_fractions = {
+        "early35": 0.35,
+        "midpoint": 0.50,
+        "late65": 0.65,
+        "late75": 0.75,
+        "late85": 0.85,
+    }
+    if policy in fixed_fractions:
+        return life_est * fixed_fractions[policy]
 
     usable = [
         r for r in prior_rows
@@ -220,6 +227,52 @@ def _adaptive_arrival_offset(prior_rows, policy, life_est):
         and r.get("actual_lifetime_seconds") is not None
         and r["actual_lifetime_seconds"] > 0
     ]
+
+    if policy.startswith("adaptive_fraction"):
+        recent_limit = (
+            None if policy == "adaptive_fraction_all"
+            else 20 if policy == "adaptive_fraction20"
+            else 10 if policy == "adaptive_fraction10"
+            else None
+        )
+        if policy not in {
+            "adaptive_fraction_all", "adaptive_fraction20", "adaptive_fraction10"
+        }:
+            raise ValueError(policy)
+        if recent_limit:
+            usable = usable[-recent_limit:]
+        if len(usable) < 5:
+            return life_est * 0.50
+
+        best = None
+        for fraction in [x / 20.0 for x in range(2, 20)]:
+            hits = 0
+            margins = []
+            for r in usable:
+                historical_life = float(
+                    r.get("lifetime_estimate_seconds") or life_est
+                )
+                offset = historical_life * fraction
+                lo = float(r["signed_error_seconds"])
+                hi = lo + float(r["actual_lifetime_seconds"])
+                if lo <= offset < hi:
+                    hits += 1
+                    margins.append(min(offset - lo, hi - offset))
+            rate = hits / len(usable)
+            margin = statistics.median(margins) if margins else -1.0
+            score = (rate, margin, -abs(fraction - 0.5), fraction)
+            if best is None or score > best:
+                best = score
+        return life_est * (best[-1] if best else 0.50)
+
+    if policy not in {"adaptive_all", "adaptive20", "adaptive10"}:
+        raise ValueError(policy)
+
+    recent_limit = (
+        None if policy == "adaptive_all"
+        else 20 if policy == "adaptive20"
+        else 10
+    )
     if recent_limit:
         usable = usable[-recent_limit:]
     if len(usable) < 5:
@@ -265,7 +318,7 @@ def _adaptive_arrival_offset(prior_rows, policy, life_est):
     return best[-1] if best else life_est * 0.50
 
 
-def apply_policy(ctx, point_rows, arrival_policy, bias_policy):
+def apply_policy(ctx, point_rows, arrival_policy, bias_policy, window_policy="end_floor"):
     """
     Apply one arrival/bias policy to a precomputed point chain.
 
@@ -297,10 +350,17 @@ def apply_policy(ctx, point_rows, arrival_policy, bias_policy):
 
         recommended_arrival = corrected + offset
         if window is not None:
-            recommended_arrival = max(
-                recommended_arrival,
-                corrected + float(window["hi"]),
-            )
+            window_lo = corrected + float(window["lo"])
+            window_hi = corrected + float(window["hi"])
+            window_mid = (window_lo + window_hi) / 2.0
+            if window_policy == "none":
+                pass
+            elif window_policy == "midpoint_floor":
+                recommended_arrival = max(recommended_arrival, window_mid)
+            elif window_policy == "end_floor":
+                recommended_arrival = max(recommended_arrival, window_hi)
+            else:
+                raise ValueError(window_policy)
 
         departure = (
             recommended_arrival - ctx.travel_seconds
@@ -475,12 +535,16 @@ def evaluate_from_point_rows(
     wait_method,
     arrival_policy,
     bias_policy,
+    window_policy="end_floor",
 ):
-    rows = apply_policy(ctx, point_rows, arrival_policy, bias_policy)
+    rows = apply_policy(
+        ctx, point_rows, arrival_policy, bias_policy, window_policy
+    )
 
     return {
         "strategy": V3Strategy(
-            lifetime_method, wait_method, arrival_policy, bias_policy
+            lifetime_method, wait_method, arrival_policy, bias_policy,
+            window_policy
         ),
         "rows": rows,
         "split_timestamp": ctx.split_timestamp,
