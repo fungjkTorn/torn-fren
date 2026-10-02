@@ -2,6 +2,7 @@ import unittest
 
 from services.projection_chain_lab_v2 import (
     Strategy,
+    _adaptive_landing_fraction,
     _simulate_strategy,
 )
 
@@ -67,6 +68,25 @@ class ProjectionChainLabV2Tests(unittest.TestCase):
 
         self.assertEqual(p1["actionable_from_anchor"], 0)
         self.assertEqual(p2["actionable_from_anchor"], 1)
+
+
+
+    def test_adaptive_fraction_learns_later_landing_when_forecast_is_early(self):
+        prior = []
+        for i in range(12):
+            predicted = 10000 + i * 1000
+            actual = predicted + 240
+            prior.append({
+                "predicted_restock_timestamp": predicted,
+                "actual_restock_timestamp": actual,
+                "actual_depletion_timestamp": actual + 600,
+                "lifetime_estimate_seconds": 600,
+                "window_end_timestamp": None,
+            })
+
+        fraction = _adaptive_landing_fraction(prior)
+        self.assertIsNotNone(fraction)
+        self.assertGreaterEqual(fraction, 0.70)
 
 
 if __name__ == "__main__":
