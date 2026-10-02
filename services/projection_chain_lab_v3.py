@@ -335,6 +335,33 @@ def _arrival_offset(policy, life_est, prior_rows):
     return best[-1] if best else life_est * 0.50
 
 
+
+def _calibrated_error_window(prior_rows, coverage=0.90, recent_limit=40):
+    usable = [
+        float(r["signed_error_seconds"])
+        for r in prior_rows
+        if r.get("signed_error_seconds") is not None
+    ]
+    if recent_limit:
+        usable = usable[-recent_limit:]
+    if len(usable) < 8:
+        return None
+
+    ordered = sorted(usable)
+    need = max(2, int(math.ceil(len(ordered) * coverage)))
+    best = None
+    for i in range(0, len(ordered) - need + 1):
+        lo = ordered[i]
+        hi = ordered[i + need - 1]
+        width = hi - lo
+        candidate = (width, abs((lo + hi) / 2.0), lo, hi)
+        if best is None or candidate < best:
+            best = candidate
+    if best is None:
+        return None
+    return {"lo": best[2], "hi": best[3], "width": best[0], "n": len(ordered)}
+
+
 def _simulate_v3(cycles, wait_map, strategy, travel_seconds, max_depth=4, min_history=8):
     rows = []
     prior_by_depth = {d: [] for d in range(1, max_depth + 1)}
@@ -404,7 +431,16 @@ def _simulate_v3(cycles, wait_map, strategy, travel_seconds, max_depth=4, min_hi
             error = actual_restock - corrected_restock
 
             arrival_offset = _arrival_offset(strategy.arrival_policy, life_est, prior)
+            calibrated_window = _calibrated_error_window(prior, coverage=0.90, recent_limit=40)
             recommended_arrival = corrected_restock + arrival_offset
+            # Conservative travel policy: once enough frozen residual history
+            # exists at this depth, do not intentionally arrive before the late
+            # edge of the empirically calibrated restock-error interval.
+            if calibrated_window is not None:
+                recommended_arrival = max(
+                    recommended_arrival,
+                    corrected_restock + calibrated_window["hi"],
+                )
             recommended_departure = (
                 recommended_arrival - travel_seconds if travel_seconds is not None else None
             )
@@ -432,6 +468,15 @@ def _simulate_v3(cycles, wait_map, strategy, travel_seconds, max_depth=4, min_hi
                 "wait_estimate_seconds": wait_est,
                 "recommended_arrival_timestamp": recommended_arrival,
                 "recommended_departure_timestamp": recommended_departure,
+                "calibrated_window_lo_seconds": (
+                    calibrated_window["lo"] if calibrated_window is not None else None
+                ),
+                "calibrated_window_hi_seconds": (
+                    calibrated_window["hi"] if calibrated_window is not None else None
+                ),
+                "calibrated_window_width_seconds": (
+                    calibrated_window["width"] if calibrated_window is not None else None
+                ),
                 "actionable_from_anchor": int(actionable),
                 "arrival_hit": hit,
                 "early_arrival": early,
@@ -542,6 +587,7 @@ def evaluate_strategy(country, item_name, strategy, max_depth=4, min_history=8):
     split_ts = _split_timestamp(rows)
     if split_ts is None:
         return None
+    train_rows_only = [r for r in rows if int(r["anchor_timestamp"]) < split_ts]
     return {
         "strategy": strategy,
         "rows": rows,
@@ -554,6 +600,10 @@ def evaluate_strategy(country, item_name, strategy, max_depth=4, min_history=8):
         },
         "holdout_by_depth": {
             d: _evaluate_rows(rows, split_ts, depth=d)
+            for d in range(1, max_depth + 1)
+        },
+        "rolling_folds_by_depth": {
+            d: rolling_fold_score(train_rows_only, d, folds=4)
             for d in range(1, max_depth + 1)
         },
     }
