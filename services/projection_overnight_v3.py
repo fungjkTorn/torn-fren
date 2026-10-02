@@ -7,6 +7,7 @@ import time
 from pathlib import Path
 
 from services.history_service import DB_PATH
+from services.country_regime_lab import analyze_country_regime
 from services.projection_chain_lab_v3 import (
     ARRIVAL_POLICIES,
     BIAS_POLICIES,
@@ -257,6 +258,7 @@ def summarize_item(country, item_name, stage1, finalists, stage2, max_depth):
     result = {
         "country": country,
         "item_name": item_name,
+        "country_regime_diagnostic": analyze_country_regime(country, item_name),
         "stage1_models": len(stage1),
         "finalist_pairs": len(finalists),
         "stage2_models": len(stage2),
@@ -362,6 +364,15 @@ def run(countries, max_depth=4, min_history=8, shortlist=10, resume=True):
         summary["runtime_seconds"] = round(time.time() - started, 2)
         checkpoint["completed"][key] = summary
         _save_checkpoint(checkpoint)
+
+        regime = summary.get("country_regime_diagnostic") or {}
+        corr = regime.get("pearson_country_to_next_lifetime")
+        if corr is not None:
+            print(
+                f"  country-regime diagnostic: n={regime.get('n')} "
+                f"peers={regime.get('peer_items')} corr={corr:.3f} "
+                "(experimental; not used for selection)"
+            )
 
         _print_winner("ACTIVE", summary["active"])
         for d in range(1, max_depth + 1):
