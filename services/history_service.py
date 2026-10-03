@@ -1575,12 +1575,27 @@ def _build_validated_cycles(rows, country: str = None, item_name: str = None):
         )
         cycle["max_collection_gap_seconds"] = coverage["max_gap_seconds"]
         cycle["coverage_method"] = coverage["method"]
+        cycle["coverage_valid"] = bool(coverage.get("valid"))
         cycle["restock_boundary_clean"] = _event_boundary_is_clean(cycle["restock_time"])
         cycle["depletion_boundary_clean"] = _event_boundary_is_clean(cycle["depletion_time"])
 
-        # Missing samples in the MIDDLE of an otherwise fully observed cycle do
-        # not change its exact restock/depletion timestamps.  Only an uncertain
-        # boundary invalidates lifetime ground truth.
+        # Lifetime ground truth requires continuity across the WHOLE observed
+        # restock -> depletion interval. A clean-looking recovery snapshot does
+        # not prove the item stayed in stock during a long collector outage:
+        # one or more depletion/restock cycles may have happened unseen.
+        if not coverage.get("valid"):
+            detail = coverage.get("reason")
+            if detail:
+                cycle["exclusion_reasons"].append(
+                    f"insufficient collector coverage during lifetime: {detail}"
+                )
+            else:
+                cycle["exclusion_reasons"].append(
+                    "insufficient collector coverage during lifetime: "
+                    f"max observation gap {coverage.get('max_gap_seconds')}s "
+                    f"exceeded allowance {coverage.get('allowed_gap_seconds')}s"
+                )
+
         if not cycle["restock_boundary_clean"]:
             cycle["exclusion_reasons"].append("restock boundary first observed during collector recovery")
         if not cycle["depletion_boundary_clean"]:
