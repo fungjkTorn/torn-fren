@@ -1144,7 +1144,60 @@
       };
     }
 
+    function rollPredictionTargetClientSide() {
+      const analysis = currentAnalysis;
+      const v2 = analysis?.prediction_v2;
+      const predictions = v2?.predictions || [];
+      const flightMinutes = PI_PILOT_FLIGHT_MINUTES[country];
+      if (!analysis || !predictions.length || !flightMinutes) return false;
+
+      const nowSeconds = Date.now() / 1000;
+      const flightSeconds = flightMinutes * 60;
+      let next = null;
+
+      for (const candidate of predictions) {
+        const window = departureWindowForPrediction(candidate, flightSeconds);
+        if (!window) continue;
+        candidate.usable_for_departure = nowSeconds <= window.latestLeave;
+        if (!next && candidate.usable_for_departure) next = candidate;
+      }
+
+      const current = analysis.prediction;
+      const changed = Boolean(
+        next?.estimate_timestamp &&
+        (
+          !current?.estimate_timestamp ||
+          next.prediction_number !== current.prediction_number ||
+          next.estimate_timestamp !== current.estimate_timestamp
+        )
+      );
+
+      if (!changed) return false;
+
+      previousActivePrediction = current ? { ...current } : null;
+      analysis.prediction_v2.display_prediction = next;
+      analysis.prediction_v2.active_prediction_number = next.prediction_number;
+      analysis.prediction_v2.cycles_before_active_target =
+        Math.max(0, (next.prediction_number || 1) - 1);
+      analysis.prediction = {
+        ...next,
+        confidence: next.travel_reliability,
+        sample_count: v2.model_evidence_tier,
+        excluded_sample_count: null,
+        note: v2.note,
+      };
+
+      // Redraw all target-dependent UI immediately; no model rebuild/network
+      // request is needed just because the clock crossed a departure deadline.
+      updateInsights(analysis);
+      if (chart) updateExistingChart(buildStockPoints(cachedRows), analysis, currentMinutes);
+      return true;
+    }
+
+
     function updateFlightTicker() {
+      if (rollPredictionTargetClientSide()) return;
+
       const flightMinutes = PI_PILOT_FLIGHT_MINUTES[country];
       const prediction = currentAnalysis?.prediction;
 
