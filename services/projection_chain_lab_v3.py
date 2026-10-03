@@ -9,6 +9,7 @@ from services.projection_chain_lab_v2 import (
     BASE_METHODS,
     Strategy,
     _active_target_rows,
+    _contextual_estimate,
     _fmt_minutes,
     _fmt_rate,
     _qualified_series,
@@ -234,7 +235,13 @@ def _estimate_lifetime(method, known_cycles, target_ts):
     values = [c.get("lifetime_seconds") for c in known_cycles]
     timestamps = [c.get("restock_time") for c in known_cycles]
     if method in BASE_METHODS:
-        return _base_estimate(values, method)
+        pairs = [
+            (c.get("restock_time"), c.get("lifetime_seconds"))
+            for c in known_cycles
+            if c.get("restock_time") is not None
+            and c.get("lifetime_seconds") is not None
+        ]
+        return _contextual_estimate(pairs, target_ts, method, values)
     if method == "recent_regime":
         return _recent_regime(values)
     if method == "same_hour_median":
@@ -250,7 +257,13 @@ def _estimate_wait(method, known_wait_rows, target_ts):
     values = [r["seconds"] for r in known_wait_rows]
     timestamps = [r["to_restock"] for r in known_wait_rows]
     if method in BASE_METHODS:
-        return _base_estimate(values, method)
+        pairs = [
+            (r.get("to_restock"), r.get("seconds"))
+            for r in known_wait_rows
+            if r.get("to_restock") is not None
+            and r.get("seconds") is not None
+        ]
+        return _contextual_estimate(pairs, target_ts, method, values)
     if method == "recent_regime":
         return _recent_regime(values)
     if method == "same_hour_median":
