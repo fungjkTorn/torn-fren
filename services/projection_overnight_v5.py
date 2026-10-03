@@ -19,12 +19,12 @@ from services.projection_chain_lab_v3 import (
 )
 from services.projection_engine_v4 import (
     DIRECT_HORIZON_METHODS,
-    WINDOW_POLICIES,
     active_target_rows,
     build_item_context,
     evaluate_from_point_rows,
     point_forecast_pair as v4_point_forecast_pair,
 )
+from services.projection_overnight_v4 import WINDOW_POLICIES
 from services.projection_engine_v5 import (
     BridgeConfig,
     SPACING_METHODS,
