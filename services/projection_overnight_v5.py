@@ -5,6 +5,7 @@ import os
 import sqlite3
 import statistics
 import time
+import traceback
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 
@@ -359,6 +360,10 @@ def _print_item(result):
     )
     if result.get("status") != "complete":
         print("  " + result.get("status","error"), flush=True)
+        if result.get("error"):
+            print("  " + result["error"], flush=True)
+        if result.get("traceback"):
+            print(result["traceback"], flush=True)
         return
 
     for d, block in result["depths"].items():
@@ -411,8 +416,11 @@ def run_suite(max_depth=5, min_history=8, shortlist=8, workers=4, resume=True):
                 result = future.result()
             except Exception as exc:
                 result = {
-                    "country": c, "item_name": i,
-                    "status": "error", "error": repr(exc)
+                    "country": c,
+                    "item_name": i,
+                    "status": "error",
+                    "error": repr(exc),
+                    "traceback": traceback.format_exc(),
                 }
             checkpoint["completed"][key] = result
             _save(CHECKPOINT, checkpoint)
@@ -433,7 +441,23 @@ def main():
     p.add_argument("--shortlist", type=int, default=8)
     p.add_argument("--workers", type=int, default=4)
     p.add_argument("--no-resume", action="store_true")
+    p.add_argument("--item-country", default=None)
+    p.add_argument("--item-name", default=None)
     args = p.parse_args()
+
+    if args.item_country or args.item_name:
+        if not (args.item_country and args.item_name):
+            p.error("--item-country and --item-name must be supplied together")
+        result = run_item(
+            args.item_country.lower(),
+            args.item_name,
+            max_depth=max(2, args.depth),
+            min_history=max(3, args.min_history),
+            shortlist=max(3, args.shortlist),
+        )
+        _print_item(result)
+        return
+
     run_suite(
         max_depth=max(2,args.depth),
         min_history=max(3,args.min_history),
