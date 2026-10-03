@@ -1,4 +1,5 @@
 from pathlib import Path
+import copy
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
@@ -71,7 +72,7 @@ def _get_analysis_nonblocking(country, item):
     key, future = _ensure_analysis_future(country, item)
     try:
         value = future.result(timeout=0.35)
-        return value, False
+        return _roll_prediction_to_now(value, now), False
     except FutureTimeoutError:
         return None, True
 
@@ -90,6 +91,101 @@ def _analysis_for_window(base_analysis, minutes):
 
 def _prediction_key(country, item):
     return (country.lower().strip(), item.lower().strip())
+
+
+def _latest_safe_leave_timestamp(prediction):
+    """
+    Reproduce the browser's modeled departure window without rebuilding the
+    forecast. Reachability is clock-dependent; point estimates are not.
+    """
+    if not prediction:
+        return None
+
+    estimate = prediction.get("estimate_timestamp")
+    calibrated_arrival = prediction.get("recommended_arrival_timestamp")
+    late_restock_bound = prediction.get("window_end_timestamp")
+    depletion = prediction.get("target_depletion_timestamp")
+    lifetime = prediction.get("expected_stock_lifetime_seconds")
+    travel = prediction.get("travel_seconds")
+
+    if not travel:
+        return None
+
+    earliest_arrival = max(
+        calibrated_arrival or estimate or 0,
+        late_restock_bound or estimate or 0,
+    )
+    if not earliest_arrival:
+        return None
+
+    depletion_buffer = (
+        max(60, min(300, round(float(lifetime) * 0.10)))
+        if lifetime else 60
+    )
+    latest_arrival = (
+        float(depletion) - depletion_buffer
+        if depletion is not None else None
+    )
+    if latest_arrival is None or latest_arrival <= earliest_arrival:
+        latest_arrival = (
+            late_restock_bound or calibrated_arrival or estimate
+        )
+    if latest_arrival is None:
+        return None
+    latest_arrival = max(float(latest_arrival), float(earliest_arrival))
+    return latest_arrival - float(travel)
+
+
+def _roll_prediction_to_now(prediction_v2, now=None):
+    """
+    Cheap time-only refresh for a cached Prediction V2 result.
+
+    Forecast estimates stay frozen. Only per-cycle reachability and the active
+    display target are advanced as departure windows expire.
+    """
+    if not prediction_v2:
+        return prediction_v2
+
+    now = time.time() if now is None else float(now)
+    result = copy.deepcopy(prediction_v2)
+    chain = result.get("predictions") or []
+
+    active = None
+    for prediction in chain:
+        latest_leave = _latest_safe_leave_timestamp(prediction)
+        usable = bool(latest_leave is not None and latest_leave >= now)
+        prediction["usable_for_departure"] = usable
+        prediction["latest_safe_leave_timestamp"] = (
+            int(round(latest_leave)) if latest_leave is not None else None
+        )
+        if active is None and usable:
+            active = prediction
+
+    result["display_prediction"] = active
+    result["active_prediction_number"] = (
+        active.get("prediction_number") if active else None
+    )
+    result["cycles_before_active_target"] = (
+        max(0, int(active.get("prediction_number", 1)) - 1)
+        if active else None
+    )
+    result["forecast_cycle_count"] = len(chain)
+
+    if active:
+        number = int(active.get("prediction_number") or 1)
+        if number > 1:
+            result["note"] = (
+                f"Prediction #{number} is the earliest cycle still reachable "
+                f"from the current time. {number - 1} earlier cycle(s) are no "
+                "longer usable for departure."
+            )
+    elif chain:
+        result["note"] = (
+            "All currently cached forecast departure windows have passed. "
+            "Waiting for the next model refresh to extend the chain."
+        )
+
+    return result
 
 
 def _store_prediction_result(key, future):
@@ -124,7 +220,7 @@ def _get_prediction_nonblocking(country, item):
         cached = _PREDICTION_CACHE.get(key)
 
     if cached and now - cached["cached_at"] <= _PREDICTION_CACHE_TTL_SECONDS:
-        return cached["value"], False
+        return _roll_prediction_to_now(cached["value"], now), False
 
     key, future = _ensure_prediction_future(country, item)
 
@@ -132,7 +228,7 @@ def _get_prediction_nonblocking(country, item):
         # Serve the last known prediction immediately while a fresh one is
         # calculated in the background. The graph auto-refresh will pick up
         # the refreshed result without blocking stock history rendering.
-        return cached["value"], True
+        return _roll_prediction_to_now(cached["value"], now), True
 
     # Warm-profile predictions normally finish quickly. Give them a tiny chance
     # to complete so users still get prediction + graph in one response. Cold
