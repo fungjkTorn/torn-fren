@@ -392,10 +392,12 @@ def run_suite(max_depth=5, min_history=8, shortlist=8, workers=4, resume=True):
         checkpoint = {"completed": {}, "started_at": int(time.time())}
 
     items = discover_items()
-    pending = [
-        x for x in items
-        if f"{x[0]}::{x[1].lower()}" not in checkpoint["completed"]
-    ]
+    pending = []
+    for x in items:
+        key = f"{x[0]}::{x[1].lower()}"
+        existing = checkpoint["completed"].get(key)
+        if existing is None or existing.get("status") != "complete":
+            pending.append(x)
     print(
         f"V5 bridge-family tournament: {len(items)} total, "
         f"{len(pending)} pending, workers={workers}",
