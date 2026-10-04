@@ -1,4 +1,6 @@
+import threading
 import time
+
 from services.stock_provider import get_travel_export
 from services.history_service import (
     get_collector_recovery_status,
@@ -15,16 +17,93 @@ from services.forecast_auditor import (
     resolve_forecast_audits,
 )
 from services.prediction_v2_live import build_live_prediction_v2
+from services.shadow_model_auditor import update_shadow_models
 
 POLL_INTERVAL_SECONDS = 30
 
+# Audit/model work can be much slower than collection. Keep it off the polling
+# path and coalesce repeated changes for the same item while the worker is busy.
+_AUDIT_PENDING = set()
+_AUDIT_LOCK = threading.Lock()
+_AUDIT_EVENT = threading.Event()
+_AUDIT_STOP = threading.Event()
 
-def run():
-    print(f"Starting poller — one export call every {POLL_INTERVAL_SECONDS}s. Press Ctrl+C to stop.")
 
-    # Never freeze fresh prediction/audit records from stale pre-outage state.
-    # If the machine/server was asleep or offline, the first successful poll
-    # will establish a recovery collection gap before prediction work resumes.
+def _schedule_item_audits(changed_by_country):
+    if not isinstance(changed_by_country, dict):
+        return
+    with _AUDIT_LOCK:
+        for country, item_names in changed_by_country.items():
+            for item_name in item_names:
+                _AUDIT_PENDING.add((country, item_name))
+    _AUDIT_EVENT.set()
+
+
+def _run_item_audits(country, item_name):
+    try:
+        result = update_prediction_audits_for_item(country, item_name)
+        if result["resolved"] or result["recorded"]:
+            print(
+                f"prediction audit {country}/{item_name}: "
+                f"resolved={result['resolved']}, recorded={result['recorded']}"
+            )
+    except Exception as exc:
+        print(f"Prediction audit error for {country}/{item_name}: {exc}")
+
+    try:
+        resolved_forecasts = resolve_forecast_audits(country, item_name)
+        if is_tracked_item(country, item_name):
+            refreshed = build_live_prediction_v2(
+                country,
+                item_name,
+                audit_source="poller",
+                record_audit=True,
+            )
+            active_num = (refreshed.get("display_prediction") or {}).get(
+                "prediction_number"
+            )
+            if resolved_forecasts or active_num:
+                print(
+                    f"forecast audit {country}/{item_name}: "
+                    f"resolved={resolved_forecasts}, active=P{active_num or '-'}"
+                )
+    except Exception as exc:
+        print(f"Forecast audit error for {country}/{item_name}: {exc}")
+
+    # Experimental travel-goal challengers run only in shadow mode. They never
+    # drive live guidance; they simply accumulate forward-test evidence.
+    if country.lower() == "jap" and item_name.lower() == "xanax":
+        try:
+            shadow = update_shadow_models(country, item_name)
+            if shadow.get("resolved") or shadow.get("recorded"):
+                print(
+                    f"shadow audit {country}/{item_name}: "
+                    f"resolved={shadow['resolved']}, recorded={shadow['recorded']}"
+                )
+        except Exception as exc:
+            print(f"Shadow model audit error for {country}/{item_name}: {exc}")
+
+
+def _audit_worker():
+    while not _AUDIT_STOP.is_set():
+        _AUDIT_EVENT.wait(timeout=1.0)
+        if _AUDIT_STOP.is_set():
+            return
+
+        while True:
+            with _AUDIT_LOCK:
+                if not _AUDIT_PENDING:
+                    _AUDIT_EVENT.clear()
+                    break
+                pending = sorted(_AUDIT_PENDING)
+                _AUDIT_PENDING.clear()
+
+            for country, item_name in pending:
+                _run_item_audits(country, item_name)
+
+
+def _seed_audits_async():
+    """Seed audit state without delaying the first production poll."""
     try:
         recovery_status = get_collector_recovery_status()
     except Exception as exc:
@@ -39,41 +118,53 @@ def run():
             f"({age_text} since last verified poll). "
             "Skipping startup prediction/audit seeding until recovery is recorded."
         )
-    else:
-        try:
-            seeded = seed_prediction_audits()
-            if seeded:
-                print(f"Seeded {seeded} current prediction audit records.")
-        except Exception as exc:
-            print(f"Prediction audit seed error: {exc}")
+        return
 
-        # Start multi-cycle forecast auditing immediately for items that already
-        # have a Prediction v2 profile from prior graph/Discord use.
-        try:
-            profiled = get_profiled_items()
-            tracked = set((c.lower(), i.lower()) for c, i in get_tracked_items())
-            seeded_forecasts = 0
+    try:
+        seeded = seed_prediction_audits()
+        if seeded:
+            print(f"Seeded {seeded} current prediction audit records.")
+    except Exception as exc:
+        print(f"Prediction audit seed error: {exc}")
 
-            for country, item_name in profiled:
-                if (country.lower(), item_name.lower()) in tracked:
-                    continue
-                try:
-                    build_live_prediction_v2(
-                        country,
-                        item_name,
-                        audit_source="poller-startup",
-                        record_audit=True,
-                    )
-                    seeded_forecasts += 1
-                except Exception as exc:
-                    print(f"Forecast audit seed error for {country}/{item_name}: {exc}")
+    try:
+        profiled = get_profiled_items()
+        tracked = set((c.lower(), i.lower()) for c, i in get_tracked_items())
+        seeded_forecasts = 0
 
-            if seeded_forecasts:
-                print(f"Seeded {seeded_forecasts} Prediction v2 forecast audit item(s).")
-        except Exception as exc:
-            print(f"Forecast audit startup error: {exc}")
+        for country, item_name in profiled:
+            if (country.lower(), item_name.lower()) in tracked:
+                continue
+            try:
+                build_live_prediction_v2(
+                    country,
+                    item_name,
+                    audit_source="poller-startup",
+                    record_audit=True,
+                )
+                seeded_forecasts += 1
+            except Exception as exc:
+                print(f"Forecast audit seed error for {country}/{item_name}: {exc}")
+
+        if seeded_forecasts:
+            print(f"Seeded {seeded_forecasts} Prediction v2 forecast audit item(s).")
+    except Exception as exc:
+        print(f"Forecast audit startup error: {exc}")
+
+
+def run():
+    print(f"Starting poller — one export call every {POLL_INTERVAL_SECONDS}s. Press Ctrl+C to stop.")
+
+    worker = threading.Thread(target=_audit_worker, name="torn-fren-audit-worker", daemon=True)
+    worker.start()
+    threading.Thread(
+        target=_seed_audits_async,
+        name="torn-fren-audit-seed",
+        daemon=True,
+    ).start()
 
     while True:
+        cycle_started = time.monotonic()
         export = None
 
         try:
@@ -93,9 +184,7 @@ def run():
                 print(f"Saving all country snapshots from {source}...")
                 changed_by_country = save_all_snapshots(export)
 
-                # IMPORTANT: success is recorded only after every DB save has
-                # completed.  The previous version recorded success before the
-                # save, which hid the changed_items outage from continuity checks.
+                # Success means provider fetch AND every DB save completed.
                 heartbeat = record_poll_heartbeat(True, source=source)
 
             except Exception as exc:
@@ -106,9 +195,6 @@ def run():
                 print(f"Poll cycle save error: {exc}")
                 changed_by_country = {}
 
-            # A recovery snapshot tells us current quantities but not WHEN
-            # anything changed while collection was offline.  Quarantine this
-            # entire change burst from both audit systems.
             recovered_from_gap = bool(
                 isinstance(heartbeat, dict)
                 and heartbeat.get("recovered_from_gap")
@@ -121,8 +207,8 @@ def run():
                 print(
                     "COLLECTION RECOVERY: "
                     f"{elapsed}s without verified polling. "
-                    "Current stock was saved, but recovery transitions are "
-                    "quarantined from model/audit ground truth."
+                    "Recovery transitions are treated as uncertain event boundaries; "
+                    "same-state item gaps may be bridged."
                 )
 
                 try:
@@ -133,56 +219,16 @@ def run():
                     )
                     if invalidated:
                         print(
-                            f"Invalidated {invalidated} pending multi-cycle "
-                            "forecast point(s) that crossed the outage."
+                            f"Invalidated {invalidated} pending forecast point(s) "
+                            "whose item cycle became ambiguous during the gap."
                         )
                 except Exception as exc:
                     print(f"Forecast gap invalidation error: {exc}")
 
-                # Do not run per-item prediction work on the recovery burst.
-                changed_by_country = {}
-
-            # Prediction auditing is downstream of collection. Audit failures
-            # must never turn a successful stock collection into a failed poll.
-            if isinstance(changed_by_country, dict):
-                for country, item_names in changed_by_country.items():
-                    for item_name in item_names:
-                        try:
-                            result = update_prediction_audits_for_item(country, item_name)
-                            if result["resolved"] or result["recorded"]:
-                                print(
-                                    f"prediction audit {country}/{item_name}: "
-                                    f"resolved={result['resolved']}, recorded={result['recorded']}"
-                                )
-                        except Exception as exc:
-                            print(f"Prediction audit error for {country}/{item_name}: {exc}")
-
-                        # Multi-cycle P1/P2/P3/... auditor.
-                        # Only tracked/profiled items get forecast refreshes, so
-                        # the poller does not run expensive Prediction v2 models
-                        # for every foreign item on every 30-second cycle.
-                        try:
-                            resolved_forecasts = resolve_forecast_audits(country, item_name)
-
-                            if is_tracked_item(country, item_name):
-                                refreshed = build_live_prediction_v2(
-                                    country,
-                                    item_name,
-                                    audit_source="poller",
-                                    record_audit=True,
-                                )
-                                active_num = (
-                                    (refreshed.get("display_prediction") or {})
-                                    .get("prediction_number")
-                                )
-                                if resolved_forecasts or active_num:
-                                    print(
-                                        f"forecast audit {country}/{item_name}: "
-                                        f"resolved={resolved_forecasts}, "
-                                        f"active=P{active_num or '-'}"
-                                    )
-                        except Exception as exc:
-                            print(f"Forecast audit error for {country}/{item_name}: {exc}")
+            # Never block collection on prediction/model work. Even a recovery
+            # burst is useful to the async worker; event-aware validation decides
+            # which item transitions are exact vs uncertain.
+            _schedule_item_audits(changed_by_country)
 
         elif export is None:
             try:
@@ -195,8 +241,13 @@ def run():
                 pass
             print("No travel export available this cycle.")
 
-        print(f"Sleeping {POLL_INTERVAL_SECONDS} seconds...\n")
-        time.sleep(POLL_INTERVAL_SECONDS)
+        elapsed = time.monotonic() - cycle_started
+        sleep_seconds = max(0.0, POLL_INTERVAL_SECONDS - elapsed)
+        print(
+            f"Poll cycle completed in {elapsed:.1f}s; "
+            f"sleeping {sleep_seconds:.1f}s...\n"
+        )
+        time.sleep(sleep_seconds)
 
 
 if __name__ == "__main__":

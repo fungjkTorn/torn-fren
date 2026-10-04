@@ -3,6 +3,7 @@ import time
 import discord
 
 from services.prediction_v2_live import build_live_prediction_v2
+from services.history_service import get_latest_item_snapshot
 
 
 COUNTRY_NAMES = {
@@ -38,6 +39,15 @@ def _pct(value):
     if value is None:
         return "—"
     return f"{value * 100:.1f}%"
+
+
+def _money(value):
+    if value is None:
+        return "—"
+    try:
+        return f"${int(value):,}"
+    except (TypeError, ValueError):
+        return "—"
 
 
 def _duration(seconds):
@@ -124,6 +134,10 @@ def build_prediction_v2_embed(country_code: str, item_name: str) -> discord.Embe
     flag, country_name = COUNTRY_NAMES.get(
         country_code, ("🌍", country_code.upper())
     )
+    item_state = get_latest_item_snapshot(country_code, item_name) or {}
+    foreign_cost = item_state.get("cost")
+    price_source = (item_state.get("source") or "stored").upper()
+    price_timestamp = item_state.get("timestamp")
 
     active = result.get("display_prediction")
     reliability = (
@@ -149,6 +163,8 @@ def build_prediction_v2_embed(country_code: str, item_name: str) -> discord.Embe
         embed.description = (
             f"{_target_line(active)}\n"
             f"📦 Current stock: **{stock_text}**\n"
+            f"💵 Foreign buy price: **{_money(foreign_cost)}**"
+            f" ({price_source}{' · last changed ' + _discord_time(price_timestamp, 'R') if price_timestamp else ''})\n"
             f"{reliability_emoji} Travel reliability: **{reliability.upper()}**"
         )
 
@@ -181,23 +197,11 @@ def build_prediction_v2_embed(country_code: str, item_name: str) -> discord.Embe
             inline=False,
         )
 
-        target_depletion = active.get("target_depletion_timestamp")
-        arrival_cushion = active.get("expected_arrival_cushion_seconds")
-        depletion_line = (
-            f"\n📉 Expected depletion: {_discord_time(target_depletion, 't')}"
-            if target_depletion else ""
-        )
-        cushion_line = (
-            f" · arrival cushion **{_duration(arrival_cushion)}**"
-            if arrival_cushion is not None and arrival_cushion >= 0 else ""
-        )
-
         embed.add_field(
             name="🎯 Estimated restock",
             value=(
                 f"**{_discord_time(active.get('estimate_timestamp'), 'F')}**\n"
                 f"Window: {window_text}"
-                f"{depletion_line}{cushion_line}"
             ),
             inline=False,
         )
@@ -244,6 +248,8 @@ def build_prediction_v2_embed(country_code: str, item_name: str) -> discord.Embe
         embed.description = (
             f"⚫ **No reachable active travel target**\n"
             f"📦 Current stock: **{stock_text}**\n"
+            f"💵 Foreign buy price: **{_money(foreign_cost)}**"
+            f" ({price_source}{' · last changed ' + _discord_time(price_timestamp, 'R') if price_timestamp else ''})\n"
             f"{reliability_emoji} Travel reliability: **{reliability.upper()}**"
         )
         chain_lines = _prediction_chain_lines(result)
