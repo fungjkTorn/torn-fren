@@ -283,54 +283,106 @@ def build_points(timeline, dep_times, cycle_feats, step_seconds):
     return out
 
 
-def estimate_delay(q, history_points, history_times, timeline, cfg, delay, travel, grace):
-    cutoff = float(q.t) - float(delay) - float(travel) - float(grace)
+def _score_delay_from_ranked(ranked_all, history_times, timeline, cfg, delay, travel, grace, qtime):
+    """
+    Score one candidate leave delay using a neighbor ranking that was computed
+    once for this query time.
+
+    V18 originally recomputed + resorted the same state distances for every
+    candidate departure.  The distance between query state and a historical
+    state does not depend on departure delay, so that was pure duplicate work.
+    Eligibility still remains delay-specific and past-only.
+    """
+    cutoff = float(qtime) - float(delay) - float(travel) - float(grace)
     hi = bisect.bisect_right(history_times, cutoff)
     if hi <= 0:
         return None
     lo = 0 if cfg.lookback_points is None else max(0, hi - cfg.lookback_points)
-    ranked = []
-    for p in history_points[lo:hi]:
-        d = distance(q, p, cfg)
-        if d is None:
+
+    chosen = []
+    for d, idx, p in ranked_all:
+        if idx < lo or idx >= hi:
             continue
-        ranked.append((d, p))
-    if len(ranked) < 8:
+        chosen.append((d, p))
+        if len(chosen) >= cfg.k:
+            break
+
+    if len(chosen) < 8:
         return None
-    ranked.sort(key=lambda x: x[0])
-    chosen = ranked[:cfg.k]
+
     weights = [math.exp(-min(20.0, d)) for d, _ in chosen]
     sw = sum(weights)
     if sw <= 0:
         return None
-    raw = sum(w * int(timeline.success(p.t + delay + travel, grace)) for w, (_d, p) in zip(weights, chosen)) / sw
+    raw = sum(
+        w * int(timeline.success(p.t + delay + travel, grace))
+        for w, (_d, p) in zip(weights, chosen)
+    ) / sw
     ne = (sw * sw) / max(1e-9, sum(w * w for w in weights))
     prob = (raw * ne + cfg.prior_strength * 0.5) / (ne + cfg.prior_strength)
     utility = prob - cfg.delay_penalty_per_hour * (delay / 3600.0)
-    return {"delay": float(delay), "prob": float(prob), "raw": float(raw), "support": float(ne), "utility": float(utility)}
+    return {
+        "delay": float(delay),
+        "prob": float(prob),
+        "raw": float(raw),
+        "support": float(ne),
+        "utility": float(utility),
+    }
 
 
 def plan(qtime, history_points, history_times, timeline, dep_times, cycle_feats, cfg, delays, travel, grace):
     q = context_at(qtime, timeline, dep_times, cycle_feats)
     if q is None:
         return None
+
+    # Compute query-to-history state distances ONCE.  For each future departure
+    # delay we then apply the correct past-only cutoff/lookback to this ranking.
+    # This preserves the original V18 scoring semantics while removing the
+    # dominant repeated O(delays * history * log(history)) work.
+    max_hi = bisect.bisect_right(
+        history_times,
+        float(q.t) - float(travel) - float(grace),
+    )
+    if max_hi <= 0:
+        return None
+
+    ranked_all = []
+    for idx in range(max_hi):
+        p = history_points[idx]
+        d = distance(q, p, cfg)
+        if d is None:
+            continue
+        ranked_all.append((d, idx, p))
+    if len(ranked_all) < 8:
+        return None
+    ranked_all.sort(key=lambda x: x[0])
+
     curve = []
     for delay in delays:
-        x = estimate_delay(q, history_points, history_times, timeline, cfg, delay, travel, grace)
+        x = _score_delay_from_ranked(
+            ranked_all, history_times, timeline, cfg,
+            delay, travel, grace, q.t,
+        )
         if x is not None:
             curve.append(x)
+
     if not curve:
         return None
+
     best = max(curve, key=lambda x: (x["utility"], x["prob"], -x["delay"]))
     floor = best["prob"] - cfg.earliest_margin
-    near = [x for x in curve if x["prob"] >= floor and x["utility"] >= best["utility"] - 0.03]
+    near = [
+        x for x in curve
+        if x["prob"] >= floor and x["utility"] >= best["utility"] - 0.03
+    ]
     chosen = min(near, key=lambda x: x["delay"]) if near else best
     return {
-        "query_time": float(qtime), "departure_time": float(qtime) + chosen["delay"],
+        "query_time": float(qtime),
+        "departure_time": float(qtime) + chosen["delay"],
         "arrival_time": float(qtime) + chosen["delay"] + travel,
-        "probability": chosen["prob"], "support": chosen["support"],
+        "probability": chosen["prob"],
+        "support": chosen["support"],
     }
-
 
 def simulate_session(start, planner, timeline, travel, grace, replan_step, max_wait):
     t = float(start)
