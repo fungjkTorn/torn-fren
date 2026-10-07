@@ -54,9 +54,11 @@ def build_samples(ws):
         if crosses_gap(anchor,target["end"]):
             continue
         recent=[x["width"] for x in ws[max(0,i-4):i+1]]
-        out.append({"anchor":anchor,"prev_width":ws[i]["width"],
+        out.append({"window_index":i,"anchor":anchor,"prev_width":ws[i]["width"],
           "prev2_width":ws[i-1]["width"] if i else None,
           "recent3":statistics.mean(recent[-3:]),"recent5":statistics.mean(recent),
+          "g1":ws[i+1]["start"]-ws[i]["end"],"l1":ws[i+1]["width"],
+          "g2":ws[i+2]["start"]-ws[i+1]["end"],
           "target_start":target["start"],"target_end":target["end"],
           "target_width":target["width"],"target_offset":target["start"]-anchor})
     return out
