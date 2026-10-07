@@ -3,7 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import time
-from concurrent.futures import ProcessPoolExecutor, as_completed
+from concurrent.futures import ProcessPoolExecutor, wait, FIRST_COMPLETED
 from pathlib import Path
 
 from services import history_service
@@ -133,11 +133,11 @@ def main():
     ap.add_argument("--grace-seconds", type=int, default=10)
     ap.add_argument("--holdout-fraction", type=float, default=.25)
     ap.add_argument("--history-step-seconds", type=int, default=600)
-    ap.add_argument("--replan-step-seconds", type=int, default=300)
+    ap.add_argument("--replan-step-seconds", type=int, default=900)
     ap.add_argument("--eval-step-seconds", type=int, default=1800)
-    ap.add_argument("--departure-grid-seconds", type=int, default=300)
+    ap.add_argument("--departure-grid-seconds", type=int, default=900)
     ap.add_argument("--max-wait-seconds", type=int, default=12 * 3600)
-    ap.add_argument("--topn", type=int, default=6)
+    ap.add_argument("--topn", type=int, default=4)
     args = ap.parse_args()
 
     db = Path(args.db).resolve()
@@ -228,14 +228,40 @@ def main():
         )
 
     started = time.time()
+    print(
+        f"TARGETS total={len(targets)} pending={len(pending)} "
+        f"workers={args.workers} grid={args.departure_grid_seconds}s "
+        f"replan={args.replan_step_seconds}s max_wait={args.max_wait_seconds/3600:.1f}h",
+        flush=True,
+    )
     if args.workers <= 1 or len(pending) <= 1:
-        for payload in pending:
+        for idx, payload in enumerate(pending, 1):
+            print(f"START {idx}/{len(pending)} {_key(payload['country'], payload['item'])}", flush=True)
             store(*_worker(payload))
     else:
         with ProcessPoolExecutor(max_workers=args.workers) as ex:
-            futures = [ex.submit(_worker, p) for p in pending]
-            for fut in as_completed(futures):
-                store(*fut.result())
+            future_map = {}
+            for idx, p in enumerate(pending, 1):
+                fut = ex.submit(_worker, p)
+                future_map[fut] = (idx, p)
+            unfinished = set(future_map)
+            last_heartbeat = time.time()
+            while unfinished:
+                done, unfinished = wait(unfinished, timeout=60, return_when=FIRST_COMPLETED)
+                for fut in done:
+                    store(*fut.result())
+                now = time.time()
+                if unfinished and (not done or now - last_heartbeat >= 60):
+                    names = [
+                        _key(future_map[f][1]["country"], future_map[f][1]["item"])
+                        for f in list(unfinished)[:min(8, len(unfinished))]
+                    ]
+                    print(
+                        f"HEARTBEAT completed={len(future_map)-len(unfinished)}/{len(future_map)} "
+                        f"still_running_or_queued={len(unfinished)} examples={names}",
+                        flush=True,
+                    )
+                    last_heartbeat = now
 
     report["runtime_seconds"] = round(time.time() - started, 3)
     report["summary"] = _summary(master, report["results"])
