@@ -60,6 +60,19 @@ def rescore_with_early_shift(ctx, timeline, base_rows, shift_minutes):
             short = int(nxt is not None and nxt[0] > int(arrival))
 
         new_row = dict(row)
+        actual_start = row.get("actual_start")
+        actual_end = row.get("actual_end")
+        if actual_start is None or actual_end is None:
+            # V10 score rows do not carry the target window boundaries.
+            # Recompute them from the dense decision metadata by using the
+            # original early/late flags only when available; otherwise leave
+            # these diagnostics unset instead of crashing the tournament.
+            early_flag = int(row.get("early_window") or 0)
+            late_flag = int(row.get("late_window") or 0)
+        else:
+            early_flag = int(arrival < float(actual_start))
+            late_flag = int(arrival >= float(actual_end))
+
         new_row.update({
             "recommended_wait_minutes": new_wait,
             "early_shift_minutes": shift,
@@ -68,8 +81,8 @@ def rescore_with_early_shift(ctx, timeline, base_rows, shift_minutes):
             "quantity_on_arrival": qty,
             "success_30": hit,
             "short_wait_3m": short,
-            "early_window": int(arrival < float(row["actual_start"])),
-            "late_window": int(arrival >= float(row["actual_end"])),
+            "early_window": early_flag,
+            "late_window": late_flag,
         })
         out.append(new_row)
 
