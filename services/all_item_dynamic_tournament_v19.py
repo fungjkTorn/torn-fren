@@ -141,6 +141,7 @@ def main():
     ap.add_argument("--eval-step-seconds", type=int, default=1800)
     ap.add_argument("--departure-grid-seconds", type=int, default=300)
     ap.add_argument("--max-wait-seconds", type=int, default=6 * 3600)
+    ap.add_argument("--min-cycles", type=int, default=12, help="Minimum qualified cycles required for the dynamic challenger. Lower than the plushie/flower default so sparse non-commodity items still get tested.")
     args = ap.parse_args()
 
     db = Path(args.db).resolve()
@@ -192,12 +193,13 @@ def main():
         "eval_step": args.eval_step_seconds,
         "departure_grid": args.departure_grid_seconds,
         "max_wait": args.max_wait_seconds,
+        "min_cycles": args.min_cycles,
     }
 
     pending = []
     for country, item in targets:
         k = _key(country, item)
-        if args.resume and k in report["results"]:
+        if args.resume and k in report["results"] and report["results"][k].get("status") == "complete":
             continue
         pending.append({"db": str(db), "country": country, "item": item, "opts": opts})
 
