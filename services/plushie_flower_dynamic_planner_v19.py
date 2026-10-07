@@ -100,9 +100,11 @@ class Timeline:
         start = self.first_ts
         peak = 0.0
         prev_active = None
+        previous_ts = None
         for i, (ts, qty) in enumerate(rows):
             active = qty >= self.min_qty
-            if i == 0 or active != prev_active:
+            crossed_gap = previous_ts is not None and overlaps_gap(self.gaps, previous_ts, ts)
+            if i == 0 or crossed_gap or active != prev_active:
                 start = float(ts)
                 peak = float(max(qty, 0)) if active else 0.0
             elif active:
@@ -262,7 +264,7 @@ def load_item(country, item_name, min_qty):
     return cleaned, normal, bounces, gaps
 
 
-def completed_cycle_features(cycles):
+def completed_cycle_features(cycles, gaps=None):
     dep_times = []
     feats = []
     lives, waits, rates, spans = [], [], [], []
@@ -271,6 +273,8 @@ def completed_cycle_features(cycles):
         peak = float(c.get("peak_quantity") or c.get("first_seen_quantity") or 0.0)
         rate = peak / max(life / 60.0, 1e-9)
         wait = None if i == 0 else float(c["restock_time"] - cycles[i - 1]["depletion_time"])
+        if i > 0 and overlaps_gap(gaps or [], cycles[i - 1]["depletion_time"], c["restock_time"]):
+            wait = None
         span = life + wait if wait is not None else None
         lives.append(life); waits.append(wait); rates.append(rate); spans.append(span)
         feats.append({
@@ -559,7 +563,7 @@ def run_item(country, item_name, min_qty, grace, holdout_fraction, topn, history
     if len(cycles) < 60:
         return country, item_name, {"status": "insufficient_cycles", "cycles": len(cycles)}
     timeline = Timeline(cleaned, cycles, min_qty, gaps=gaps)
-    dep_times, cycle_feats = completed_cycle_features(cycles)
+    dep_times, cycle_feats = completed_cycle_features(cycles, gaps=gaps)
     points = build_points(timeline, dep_times, cycle_feats, history_step)
     point_times = [p.t for p in points]
     if len(points) < 150:
