@@ -64,7 +64,11 @@ def main():
         for ok in gates:
             if ok: prefix+=1
             else: break
-        score=(prefix,r["wilson"].get(0,0),r["wilson"].get(60,0),floors[0],floors[60],r["coverage"],r["n"])
+        exact_floor = metric(r,0) > a.target_exact
+        # User objective: exact arrival is a hard floor, then optimize the grace targets.
+        # Wilson/fold terms break ties conservatively; they do not override the exact floor.
+        score=(int(exact_floor),prefix,metric(r,60),metric(r,15),metric(r,5),
+               r["wilson"].get(60,0),r["wilson"].get(15,0),r["coverage"],r["n"])
         scored.append((score,c,r,floors))
         if z%200==0: print(f"tested {z}/{len(cfgs)} eligible={len(scored)}",flush=True)
     scored.sort(key=lambda x:x[0],reverse=True)
@@ -76,10 +80,22 @@ def main():
         if eligible:
             best=max(eligible,key=lambda x:(x[2]["coverage"],x[2]["wilson"].get(60,0)))
             frontier.append({"exact_wilson_floor":floor,"config":best[1],"metrics":best[2],"fold_floors":best[3]})
+    # Non-dominated development frontier over exact/5s/15s/60s/coverage.
+    pareto=[]
+    for _,c,r,fl in scored:
+        vec=(metric(r,0),metric(r,5),metric(r,15),metric(r,60),r["coverage"])
+        dominated=False
+        for _,c2,r2,fl2 in scored:
+            vec2=(metric(r2,0),metric(r2,5),metric(r2,15),metric(r2,60),r2["coverage"])
+            if all(b>=a for a,b in zip(vec,vec2)) and any(b>a for a,b in zip(vec,vec2)):
+                dominated=True; break
+        if not dominated:
+            pareto.append({"config":c,"metrics":r,"fold_floors":fl})
+    pareto.sort(key=lambda x:(x["metrics"]["rates"].get(60,0),x["metrics"]["rates"].get(15,0),x["metrics"]["coverage"]),reverse=True)
     top=[{"config":c,"metrics":r,"fold_floors":fl} for _,c,r,fl in scored[:30]]
     out={"schema":"japan-xanax-regime-cv-v2","created_at":int(time.time()),"samples":len(rows),
       "development_only":True,"note":"Previously opened latest 25% is included as development; no final holdout claim.",
-      "top":top,"coverage_frontier":frontier}
+      "top":top,"coverage_frontier":frontier,"pareto_frontier":pareto[:100]}
     path=Path(a.output).with_suffix(".json"); path.parent.mkdir(parents=True,exist_ok=True); path.write_text(json.dumps(out,indent=2))
     print("\n=== ROBUST CV LEADER ==="); print(json.dumps(top[0],indent=2))
     print("\n=== COVERAGE FRONTIER ===")
