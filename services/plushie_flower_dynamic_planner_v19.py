@@ -565,16 +565,16 @@ def rank_key(summary, blocks):
     )
 
 
-def run_item(country, item_name, min_qty, grace, holdout_fraction, topn, history_step, replan_step, eval_step, departure_grid, max_wait):
+def run_item(country, item_name, min_qty, grace, holdout_fraction, topn, history_step, replan_step, eval_step, departure_grid, max_wait, min_cycles=60, min_points=150, min_starts=80):
     cleaned, cycles, bounces, gaps = load_item(country, item_name, min_qty)
-    if len(cycles) < 60:
-        return country, item_name, {"status": "insufficient_cycles", "cycles": len(cycles)}
+    if len(cycles) < int(min_cycles):
+        return country, item_name, {"status": "insufficient_cycles", "cycles": len(cycles), "min_cycles_required": int(min_cycles)}
     timeline = Timeline(cleaned, cycles, min_qty, gaps=gaps)
     dep_times, cycle_feats = completed_cycle_features(cycles, gaps=gaps)
     points = build_points(timeline, dep_times, cycle_feats, history_step)
     point_times = [p.t for p in points]
-    if len(points) < 150:
-        return country, item_name, {"status": "insufficient_points", "points": len(points)}
+    if len(points) < int(min_points):
+        return country, item_name, {"status": "insufficient_points", "points": len(points), "min_points_required": int(min_points)}
 
     travel = int(TRAVEL_SECONDS[country])
     delays = list(range(0, int(max_wait) + 1, int(departure_grid)))
@@ -589,8 +589,8 @@ def run_item(country, item_name, min_qty, grace, holdout_fraction, topn, history
         ):
             starts.append(float(t))
         t += eval_step
-    if len(starts) < 80:
-        return country, item_name, {"status": "insufficient_starts", "starts": len(starts)}
+    if len(starts) < int(min_starts):
+        return country, item_name, {"status": "insufficient_starts", "starts": len(starts), "min_starts_required": int(min_starts)}
 
     split = max(50, int(len(starts) * (1.0 - holdout_fraction)))
     split = min(split, len(starts) - 25)
@@ -663,6 +663,9 @@ def main():
     ap.add_argument("--eval-step-seconds", type=int, default=1800)
     ap.add_argument("--departure-grid-seconds", type=int, default=300)
     ap.add_argument("--max-wait-seconds", type=int, default=6*3600)
+    ap.add_argument("--min-cycles", type=int, default=60)
+    ap.add_argument("--min-points", type=int, default=150)
+    ap.add_argument("--min-starts", type=int, default=80)
     a = ap.parse_args()
 
     db = Path(a.db).resolve()
@@ -677,6 +680,7 @@ def main():
         "min_qty": a.min_qty, "grace": a.grace_seconds, "holdout_fraction": a.holdout_fraction,
         "topn": a.topn, "history_step": a.history_step_seconds, "replan_step": a.replan_step_seconds,
         "eval_step": a.eval_step_seconds, "departure_grid": a.departure_grid_seconds, "max_wait": a.max_wait_seconds,
+        "min_cycles": a.min_cycles, "min_points": a.min_points, "min_starts": a.min_starts,
     }
     report = {
         "schema": "plushie-flower-dynamic-planner-v19-master-v1", "created_at": int(time.time()),
