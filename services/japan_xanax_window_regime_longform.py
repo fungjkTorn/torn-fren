@@ -11,13 +11,29 @@ def wilson(k,n,z=1.96):
 def build_windows(country,item,minq):
     raw=hs._get_all_item_rows_with_source(country,item)
     clean,_=hs._suppress_provider_bounces(raw)
-    out=[]; start=None; peak=0
+    # A transition observed after a collector outage is not trustworthy ground
+    # truth: we know the recovered state, but not when the transition happened.
+    gaps=hs.get_collection_gaps()
+    def crosses_gap(a,b):
+        for g in gaps:
+            gs=g.get("start_timestamp"); ge=g.get("end_timestamp")
+            if gs is None: continue
+            ge=int(ge) if ge is not None else 2**63-1
+            if int(gs)<=int(b) and ge>=int(a): return True
+        return False
+    out=[]; start=None; peak=0; previous_ts=None
     for ts,q,_source in clean:
+        if previous_ts is not None and crosses_gap(previous_ts,ts):
+            # Break state across unknown collection coverage. Never infer a
+            # restock/depletion time from the recovery observation.
+            start=None; peak=0
         if q>=minq and start is None: start=ts; peak=q
         elif q>=minq: peak=max(peak,q)
         elif start is not None:
-            if ts>start: out.append({"start":start,"end":ts,"width":ts-start,"peak":peak})
+            if ts>start and not crosses_gap(start,ts):
+                out.append({"start":start,"end":ts,"width":ts-start,"peak":peak})
             start=None; peak=0
+        previous_ts=ts
     return out
 
 def build_samples(ws):
