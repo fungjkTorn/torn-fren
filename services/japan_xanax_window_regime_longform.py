@@ -38,8 +38,21 @@ def build_windows(country,item,minq):
 
 def build_samples(ws):
     out=[]
+    gaps=hs.get_collection_gaps()
+    def crosses_gap(a,b):
+        for g in gaps:
+            gs=g.get("start_timestamp"); ge=g.get("end_timestamp")
+            if gs is None: continue
+            ge=int(ge) if ge is not None else 2**63-1
+            if int(gs)<=int(b) and ge>=int(a): return True
+        return False
     for i in range(len(ws)-2):
         anchor=ws[i]["end"]; target=ws[i+2]
+        # P2 training truth is usable only when the entire decision-to-target
+        # path was continuously observed. Otherwise window i+1/i+2 may not
+        # actually be consecutive cycles.
+        if crosses_gap(anchor,target["end"]):
+            continue
         recent=[x["width"] for x in ws[max(0,i-4):i+1]]
         out.append({"anchor":anchor,"prev_width":ws[i]["width"],
           "prev2_width":ws[i-1]["width"] if i else None,
