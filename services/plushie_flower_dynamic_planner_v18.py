@@ -457,10 +457,10 @@ def rank_key(summary, blocks):
     )
 
 
-def run_item(country, item_name, min_qty, grace, holdout_fraction, topn, history_step, replan_step, eval_step, departure_grid, max_wait):
+def run_item(country, item_name, min_qty, grace, holdout_fraction, topn, history_step, replan_step, eval_step, departure_grid, max_wait, min_cycles=80):
     cleaned, cycles, bounces = load_item(country, item_name, min_qty)
-    if len(cycles) < 80:
-        return country, item_name, {"status": "insufficient_cycles", "cycles": len(cycles)}
+    if len(cycles) < int(min_cycles):
+        return country, item_name, {"status": "insufficient_cycles", "cycles": len(cycles), "min_cycles_required": int(min_cycles)}
     timeline = Timeline(cleaned, cycles, min_qty)
     dep_times, cycle_feats = completed_cycle_features(cycles)
     points = build_points(timeline, dep_times, cycle_feats, history_step)
