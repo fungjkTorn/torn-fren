@@ -99,3 +99,15 @@ The probabilities should vary by cycle instead of pretending every cycle is equa
 - continue searching for a true pre-departure G2 proxy rather than generic regression;
 - calibrate the full-coverage probability surface and leave-window output;
 - freeze the strongest candidate and validate on genuinely new future cycles.
+
+
+## Observation-lag breakthrough checkpoint
+The old benchmark treated first observed positive foreign stock as true restock start. That is likely wrong for crowd-sourced stock. Across 225 clean Japan Xanax windows, median first observed quantity is ~1992, mean ~1873, only 7 windows are first seen at 2500, and the hard observed maximum is exactly 2500.
+
+Two independent reconstructions were tested assuming a full Xanax restock of 2500: endpoint extrapolation and OLS quantity-vs-time extrapolation. Both expand the estimated >=30 stock window by reconstructing stock that likely existed before the first crowd observation. Observed median window is ~11.53m; endpoint reconstructs ~15.47m and OLS ~15.75m. Observed window width correlates ~0.54 with first observed quantity; after correction that falls to ~0.10 endpoint / ~0.14 OLS, supporting measurement-delay correction.
+
+Keeping the exact same 154 strict clean samples and 94 evaluation opportunities, with 100% valid coverage, an OLS-adjusted causal candidate selected on the first 47 produced 55.3% exact / 61.7% +3m there and 53.2% exact / 63.8% +3m on the later 47 pseudo-holdout. Combined: 54.3% exact, 54.3% +10s, 56.4% +1m, 62.8% +3m, 63.8% +5m, 71.3% +10m.
+
+A separate endpoint reconstruction candidate scored 55.3% exact on both first and later 47 blocks, providing an independent-method check.
+
+Important caveat: this improvement depends on the 2500 full-restock mechanic being correct. The data maximum of exactly 2500 supports it, but it must be verified/frozen before production claims. This is the first credible development result above the 50% exact-arrival floor at 100% valid coverage.
