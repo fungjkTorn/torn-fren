@@ -36,7 +36,11 @@ def predict(train,cur,a,cfg):
 def evaluate(rows,lo,hi,a,cfg):
     rec=[]
     for i in range(lo,hi):
-        p=predict(rows[:i],rows[i],a,cfg)
+        cur=rows[i]
+        # Do not let the immediately preceding overlapping P2 sample leak a
+        # future target into this decision. Only resolved labels are training.
+        train=[x for x in rows[:i] if x["target_end"] <= cur["anchor"]]
+        p=predict(train,cur,a,cfg)
         if not p:continue
         arr=rows[i]["anchor"]+a.travel+p["wait"]
         rec.append({"i":i,"wait":p["wait"],"pred":p["probs"],
