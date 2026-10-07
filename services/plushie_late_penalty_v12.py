@@ -39,7 +39,17 @@ def wilson_lower(hits, n, z=1.959963984540054):
     return (center - margin) / den
 
 
-def rescore_with_early_shift(ctx, timeline, base_rows, shift_minutes):
+def _decision_key(row):
+    return (
+        int(row["decision_timestamp"]),
+        int(row["anchor_timestamp"]),
+        int(row["age_seconds"]),
+    )
+
+
+def rescore_with_early_shift(
+    ctx, timeline, base_rows, shift_minutes, decision_lookup
+):
     out = []
     shift = float(shift_minutes)
     travel = float(ctx.travel_seconds)
@@ -60,18 +70,19 @@ def rescore_with_early_shift(ctx, timeline, base_rows, shift_minutes):
             short = int(nxt is not None and nxt[0] > int(arrival))
 
         new_row = dict(row)
-        actual_start = row.get("actual_start")
-        actual_end = row.get("actual_end")
-        if actual_start is None or actual_end is None:
-            # V10 score rows do not carry the target window boundaries.
-            # Recompute them from the dense decision metadata by using the
-            # original early/late flags only when available; otherwise leave
-            # these diagnostics unset instead of crashing the tournament.
-            early_flag = int(row.get("early_window") or 0)
-            late_flag = int(row.get("late_window") or 0)
-        else:
-            early_flag = int(arrival < float(actual_start))
-            late_flag = int(arrival >= float(actual_end))
+        decision = decision_lookup.get(_decision_key(row))
+        actual_start = (
+            decision.get("actual_start") if decision is not None else None
+        )
+        actual_end = (
+            decision.get("actual_end") if decision is not None else None
+        )
+        early_flag = int(
+            actual_start is not None and arrival < float(actual_start)
+        )
+        late_flag = int(
+            actual_end is not None and arrival >= float(actual_end)
+        )
 
         new_row.update({
             "recommended_wait_minutes": new_wait,
@@ -120,6 +131,7 @@ def run_item(country, item_name):
     if ctx.split_timestamp is None:
         raise RuntimeError("No outer split available")
 
+    decision_lookup = {_decision_key(d): d for d in decisions}
     configs = list(config_grid())
     candidates = []
 
@@ -147,7 +159,7 @@ def run_item(country, item_name):
 
         for shift in EARLY_SHIFTS_MINUTES:
             shifted_train = rescore_with_early_shift(
-                ctx, timeline, train_rows, shift
+                ctx, timeline, train_rows, shift, decision_lookup
             )
             inner_train = [
                 r for r in shifted_train
@@ -188,6 +200,7 @@ def run_item(country, item_name):
         timeline,
         selected.pop("_hold_base_rows"),
         selected["early_shift_minutes"],
+        decision_lookup,
     )
     holdout = summarize(selected_hold)
 
