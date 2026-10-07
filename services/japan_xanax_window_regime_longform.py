@@ -91,7 +91,11 @@ def predict(train,cur,cfg,args):
 def evaluate(rows,start,end,cfg,args):
     rec=[]
     for i in range(start,end):
-        pr=predict(rows[:i],rows[i],cfg,args)
+        cur=rows[i]
+        # Causal training only: an earlier P2 label is usable only after its
+        # target window has fully resolved by the current decision anchor.
+        train=[x for x in rows[:i] if x["target_end"] <= cur["anchor"]]
+        pr=predict(train,cur,cfg,args)
         if not pr: continue
         if cfg["conf"] is not None and pr["rates"].get(60,0)<cfg["conf"]: continue
         arrival=rows[i]["anchor"]+args.travel+pr["wait"]
