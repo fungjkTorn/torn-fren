@@ -147,7 +147,7 @@ def _worker(payload):
         if payload["max_starts"]==1:
             starts=[starts[len(starts)//2]]
         else:
-            starts=[starts[round(i*(len(starts)-1)/(payload["max_starts"]-1))]
+            starts=[starts[round(i*(len(starts)-1)/(payload["max_starts"]-1))] for i in range(payload["max_starts"])]
     if not starts:
         return key,{"status":"no_clean_new_sessions","new_end_timestamp":int(timeline.last_ts)}
 
