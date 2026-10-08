@@ -59,6 +59,20 @@ class ReleaseGateTests(unittest.TestCase):
         self.assertTrue(assess(x, "experimental_private_shadow")["ready"])
         self.assertFalse(assess(x, "public_live_guidance")["ready"])
 
+    def test_item_specific_missing_script_blocks_private_shadow(self):
+        x = evidence()
+        x["uses_item_specific_specialist"] = True
+        x["specialist_source_present_and_importable"] = False
+        x["item_specific_departure_adapter_tested"] = True
+        self.assertFalse(assess(x, "experimental_private_shadow")["ready"])
+
+    def test_item_specific_missing_adapter_blocks_public(self):
+        x = evidence()
+        x["uses_item_specific_specialist"] = True
+        x["specialist_source_present_and_importable"] = True
+        x["item_specific_departure_adapter_tested"] = False
+        self.assertFalse(assess(x, "public_live_guidance")["ready"])
+
     def test_unknown_release_target_rejected(self):
         with self.assertRaises(ValueError):
             assess({}, "merge_immediately")
