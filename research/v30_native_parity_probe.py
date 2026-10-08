@@ -123,7 +123,21 @@ def _native_candidate(db,version,item,master,selected,max_rows):
         dep_times,features=planner.completed_cycle_features(cycles)
     else:
         cleaned,cycles,bounces,_=planner.load_item(name,product,30)
-        timeline=planner.Timeline(cleaned,cycles,30,gaps=gaps)
+        if version=="v21":
+            # Original V21 _corrected_worker intentionally replaced the native
+            # cycle-window scorer with observed >=30 stock-at-arrival truth.
+            # This override affects analog *planning* and cannot be applied
+            # merely as a posthoc re-score of saved departures.
+            class QuantityTruthTimeline(planner.Timeline):
+                def success(self, arrival, grace_seconds):
+                    label=observed_arrival_success(
+                        self.ts,self.qty,self.gaps,arrival,
+                        self.min_qty,grace_seconds
+                    )
+                    return bool(label) if label is not None else False
+            timeline=QuantityTruthTimeline(cleaned,cycles,30,gaps=gaps)
+        else:
+            timeline=planner.Timeline(cleaned,cycles,30,gaps=gaps)
         dep_times,features=planner.completed_cycle_features(cycles,gaps=gaps)
     points=planner.build_points(timeline,dep_times,features,600)
     point_times=[p.t for p in points]
@@ -131,8 +145,8 @@ def _native_candidate(db,version,item,master,selected,max_rows):
     travel=int(v19.TRAVEL_SECONDS[name])
     delays=list(range(0,policy["max_wait"]+1,policy["departure_grid"]))
     rows=sample_rows(selected.get("holdout_rows") or [],max_rows)
-    # Use exact historical native scorer semantics, NOT V24's corrected
-    # arrival scorer; this is a provenance-aware parity test of *decisions*.
+    # Replay each version's original planning scorer; V21 intentionally uses
+    # corrected observed-quantity labels, unlike V19/V20 cycle windows.
     plans={}
     def p(t):
         k=int(t)
@@ -156,6 +170,8 @@ def _native_candidate(db,version,item,master,selected,max_rows):
         "version":version,
         "model_config":cfg.name,
         "engine_family":ENGINE_NAMES[version],
+        "truth_scorer":("observed_quantity_at_arrival" if version=="v21"
+                         else "qualified_cycle_windows"),
         "selected_original_schema":selected.get("schema"),
         "points_rebuilt":len(points),
         "points_recorded":selected.get("historical_points"),
