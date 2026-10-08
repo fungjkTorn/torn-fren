@@ -76,3 +76,33 @@ python -m unittest discover -s tests -p "test_dual_layer_prediction_*.py" -v
 ```
 
 No production `prediction_v2_live`, API route, Discord command, or dashboard has been changed.
+
+
+## Essential correction: do NOT penalize natural restock waiting
+The user clarified that long waits are often correct because a country/item may take hours to restock. A generic short wait-cap or penalty proportional to absolute hours would bias model selection against slow and rare items. **Historical arrival success is scored the same whether the legitimate target occurs in 5 minutes or 8 hours.**
+
+Separate:
+1. **Actual on-arrival availability** for desired quantity and +10s/+1m/etc (primary measure).
+2. **Natural/unavoidable opportunity wait**: in a hindsight benchmark, departure delay from session start until the earliest quantity-qualified, flight-reachable stock window. This duration incurs **no predictor penalty**, and no prediction should be judged a failure just because the next real restock is beyond an arbitrary global cap.
+3. **Avoidable delay/opportunity regret**: when a successful recommended departure occurs *after* an earlier actual feasible departure, optionally measure this as excess wait in seconds. Report skipped earlier opportunities, and separate early misses. Use future realized stock only for retrospective evaluation, never as a live feature.
+4. **User patience/travel constraint**: configurable as UI preference, not universal scoring constant; if no viable chance exists within that constraint, display the next expected stock window and clearly label the guidance as outside the user budget. Stock forecast must still be shown.
+5. **Forced wait cap**: track diagnostic status, but do not equate a 12-hour cap with bad accuracy unless earlier feasible opportunities were actually missed.
+
+On the original V21 10-item corrected holdouts, I rechecked historical first feasible opportunities (quantity >=30, 10s grace, airstrip flight and collector gaps), using the original frozen stock DB. Note first feasible time is hindsight/oracle, not known by the model at prediction time:
+
+| Item | V21 median wait | Hindsight earliest feasible median | Median hindsight excess wait (successful sessions only) |
+|---|---:|---:|---:|
+| arg:Meteorite Fragment | 292.5m | 153.1m | 40.7m |
+| haw:Large Suitcase | 195m | 150.9m | 101.7m |
+| can:Vicodin | 720m | 0m | 720m |
+| swi:Ketamine | 720m | 0m | 720m |
+| chi:Ecstasy | 720m | 0m | 720m |
+
+- 17 Meteorite sessions hit the 12h cap; among those, 12 had a hindsight earliest feasible departure >=9 hours after the session started. Much of this long wait is genuinely due to stock timing, not an inefficiency.
+- Conversely, all three capped high-stock drug models had a median earliest feasible departure of **immediately**. For those, waiting 12 hours really is avoidable under this quantity target.
+- Historical earliest viable departure can be earlier than the model could reliably infer; measure regret separately rather than using oracle hindsight to contaminate causal predictions.
+- Future stock windows crossing collector gaps/uncertain observations must be excluded as before.
+
+Implemented reusable pure offline scorer: `services/next_opportunity_evaluation.py`, with tests `tests/test_next_opportunity_evaluation.py`. The six local unit tests passed covering natural long waits, unnecessary 12h waits, multiple opportunities, out-of-budget windows, missed arrivals, invalid inputs. No production integration.
+
+**Next matched champion tournament should optimize arrival success FIRST. Report natural wait separately, and compare avoidable opportunity delay only after matching accuracy; never subtract arbitrary hours of necessary restock waiting from accuracy.**
