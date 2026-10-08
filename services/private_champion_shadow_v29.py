@@ -11,6 +11,7 @@ from __future__ import annotations
 import hmac
 import json
 import os
+import time
 from pathlib import Path
 from typing import Any, Callable
 
@@ -132,6 +133,7 @@ def make_shadow_snapshot(
 
     return {
         "schema": "torn-fren-private-research-shadow-v29",
+        "generated_at": int(time.time()),
         "key": key,
         "mode": "READ_ONLY_DIAGNOSTIC",
         "default_live_routing": "UNCHANGED",
