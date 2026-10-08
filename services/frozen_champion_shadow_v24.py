@@ -30,11 +30,11 @@ from pathlib import Path
 
 from services.remaining_item_v21 import observed_arrival_success
 
-SCHEMA="frozen-champion-v24-new-data-shadow-v1"
+SCHEMA="frozen-champion-v24-new-data-shadow-v2"
 DEFAULT_OUTPUT="data/frozen_champion_v24/new_vm_master.json"
 OLD_NATIVE={
     "v19": {"max_wait":21600,"departure_grid":300,"replan_step":300},
-    "v20": {"max_wait":43200,"departure_grid":300,"replan_step":300},
+    "v20": {"max_wait":43200,"departure_grid":300,"replan_step":900},
     "v21": {"max_wait":43200,"departure_grid":900,"replan_step":900},
 }
 
@@ -174,6 +174,7 @@ def _worker(payload):
         "status":"complete",
         "snapshot_cutoff":payload["cutoff"],
         "shared_starts":len(starts),
+        "eligible_start_times":[int(t) for t in starts],
         "travel_seconds":travel,
         "provider_bounces_suppressed":len(bounces),
         "known_collection_gaps":len(gaps),
@@ -183,20 +184,66 @@ def _worker(payload):
 
 
 def _match(item):
-    versions=item.get("versions") or {}
-    sets={ver:{row["start"]:row for row in v["rows"]} for ver,v in versions.items()}
-    common=set.intersection(*(set(rows) for rows in sets.values())) if sets else set()
-    counts={ver:{"hits":sum(int(sets[ver][t]["success"]) for t in common),
-                 "paired_n":len(common)}
-            for ver in sets}
-    return {"versions":counts,"common_starts":len(common),
-            "warning":"Same new sessions, but historical version-specific wait policies may differ."}
+    """Score every eligible shared start; missing recommendations count in coverage.
 
+    A conditional-only intersection of recommendation rows inflates performance
+    when a challenger silently abstains on difficult starting sessions.
+    """
+    from itertools import combinations
+    eligible = [int(t) for t in item.get("eligible_start_times", [])]
+    if not eligible or len(set(eligible)) != len(eligible):
+        raise ValueError("missing or duplicate eligible_start_times")
+    if len(eligible) != item.get("shared_starts"):
+        raise ValueError("eligible_start_times disagree with shared_starts")
+    sessions = set(eligible)
+    versions = item.get("versions") or {}
+    mapped = {}
+    counts = {}
+    for version, data in versions.items():
+        rows = data.get("rows") or []
+        by = {int(row["start"]): row for row in rows}
+        if len(by) != len(rows):
+            raise ValueError(f"{version}: duplicate recommendation starts")
+        if not set(by).issubset(sessions):
+            raise ValueError(f"{version}: recommendation outside eligible starts")
+        mapped[version] = by
+        hits = sum(bool(r["success"]) for r in by.values())
+        n_recommended = len(by)
+        counts[version] = {
+            "hits": hits,
+            "paired_n": len(eligible),
+            "all_start_success_rate": hits / len(eligible),
+            "recommendations": n_recommended,
+            "coverage": n_recommended / len(eligible),
+            "conditional_success_rate": hits / n_recommended if n_recommended else None,
+            "no_recommendation_starts": len(eligible) - n_recommended,
+            "session_caps": sum(bool(r.get("session_cap")) for r in by.values()),
+        }
+    head_to_head = {}
+    for left, right in combinations(sorted(mapped), 2):
+        a, b = mapped[left], mapped[right]
+        a_only = sum(bool(a.get(t, {}).get("success")) and
+                     not bool(b.get(t, {}).get("success")) for t in eligible)
+        b_only = sum(bool(b.get(t, {}).get("success")) and
+                     not bool(a.get(t, {}).get("success")) for t in eligible)
+        head_to_head[f"{left}_vs_{right}"] = {
+            "shared_eligible_starts": len(eligible),
+            f"{left}_only_successes": a_only,
+            f"{right}_only_successes": b_only,
+            "ties": len(eligible) - a_only - b_only,
+        }
+    return {
+        "versions": counts, "common_starts": len(eligible),
+        "head_to_head": head_to_head,
+        "warning": ("Intention-to-treat on shared eligible starts; no-recommendation "
+                    "counts as no successful trip. Native wait horizons differ by generation. "
+                    "Not a calibrated next-restock forecast."),
+    }
 
 def main():
     ap=argparse.ArgumentParser()
     ap.add_argument("--db",required=True)
-    ap.add_argument("--registry",required=True)
+    ap.add_argument("--registry",help="Optional 236-entry selection registry; without it replay all master catalog keys")
     for v in ("v19","v20","v21"):
         ap.add_argument("--"+v,required=True)
     ap.add_argument("--cutoff",type=int,required=True)
@@ -209,9 +256,11 @@ def main():
     ap.add_argument("--step",type=int,default=1800)
     ap.add_argument("--min-qty",type=int,default=30)
     ap.add_argument("--grace-seconds",type=int,default=10)
+    ap.add_argument("--v20-replan-seconds",type=int,default=900,
+                    help="Historical V20 replan cadence was not stored in its master; CLI default was 900s")
     ap.add_argument("--resume",action="store_true")
     args=ap.parse_args()
-    if args.workers<1 or args.max_starts<1 or args.step<60 or args.cutoff<=0:
+    if args.workers<1 or args.max_starts<1 or args.step<60 or args.cutoff<=0 or args.v20_replan_seconds<1:
         ap.error("invalid worker, sampling or cutoff settings")
     db=Path(args.db).resolve()
     if not db.is_file():
@@ -219,12 +268,32 @@ def main():
     db_sha=_digest_file(db)
     if args.expected_db_sha256 and db_sha.lower()!=args.expected_db_sha256.lower():
         raise SystemExit(f"STOP: frozen snapshot checksum mismatch {db_sha}; make a stable archived copy first")
-    registry=_champion_entries(_json(args.registry))
     masters={v:_json(getattr(args,v)) for v in OLD_NATIVE}
+    if args.registry:
+        registry=_champion_entries(_json(args.registry))
+    else:
+        registry={
+            key: {"key": key} for master in masters.values()
+            for key in (master.get("results") or {}) if key != "jap:Xanax"
+        }
+    native_policies={v:dict(policy) for v,policy in OLD_NATIVE.items()}
+    native_policies["v20"]["replan_step"]=args.v20_replan_seconds
+    v20_recorded=(masters["v20"].get("settings") or {}).get("departure_grid_seconds")
+    if v20_recorded is not None and int(v20_recorded)!=native_policies["v20"]["departure_grid"]:
+        raise SystemExit("STOP: V20 departure grid differs from recorded master settings")
+    v21_recorded=(masters["v21"].get("settings") or {}).get("options") or {}
+    for opt in ("max_wait","departure_grid","replan_step"):
+        if opt in v21_recorded and int(v21_recorded[opt])!=native_policies["v21"][opt]:
+            raise SystemExit(f"STOP: V21 {opt} differs from recorded master settings")
     keys=args.only or [
-        k for k,r in registry.items() if _resolve_config(r,masters)
+        k for k in sorted(registry) if any(
+            ((m.get("results") or {}).get(k) or {}).get("status")=="complete"
+            for m in masters.values()
+        )
     ]
-    settings={"cutoff":args.cutoff,"db_path":str(db),"db_sha256":db_sha,\n              "registry_sha256":_digest_file(args.registry),"db_size":db.stat().st_size,
+    settings={"cutoff":args.cutoff,"db_path":str(db),"db_sha256":db_sha,\n              "registry_sha256":_digest_file(args.registry) if args.registry else None,
+              "native_policies":native_policies,
+              "v20_replan_provenance":"CLI default 900s unless explicitly overridden; V20 master does not record replan cadence","db_size":db.stat().st_size,
               "db_mtime_ns":db.stat().st_mtime_ns,"max_starts":args.max_starts,
               "step":args.step,"min_qty":args.min_qty,"grace":args.grace_seconds,
               "master_shas":{v:hashlib.sha256(Path(getattr(args,v)).read_bytes()).hexdigest()
@@ -249,7 +318,7 @@ def main():
             result=(masters[v].get("results") or {}).get(key) or {}
             cfg=(result.get("selected_on_training") or {}).get("config")
             if result.get("status")=="complete" and cfg:
-                candidates[v]={"config":cfg,**OLD_NATIVE[v]}
+                candidates[v]={"config":cfg,**native_policies[v]}
         if not candidates:
             report["results"][key]={"status":"no_frozen_model"}
             continue
