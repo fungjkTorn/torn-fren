@@ -32,7 +32,7 @@ NATIVE={"uni:Heather":"dyn3","can:Wolverine Plushie":"dyn8"}
 TRAVEL={"uni":6360,"can":1620,"jap":8940}
 PILOT="pilot-museum-japan-v36"
 NATIVE_TIMEOUT=38
-WEB_TIMEOUT=3
+WEB_TIMEOUT=10
 MAX_RESPONSE_BYTES=1024*1024
 
 
@@ -62,15 +62,18 @@ def _v2_from_public_history(country,item,*,connection_factory=http.client.HTTPCo
             return {"status":"V2_UNAVAILABLE"}
         display=p.get("display_prediction") or {}
         if display and type(display.get("recommended_leave_by_timestamp")) in (int,float):
-            return {"status":"available",
+            return {"status":("available_stale" if analysis.get("prediction_v2_stale") is True
+                                 else "available"),
                 "recommended_leave_by_timestamp":int(display["recommended_leave_by_timestamp"]),
                 "recommended_arrival_timestamp":(
                    int(display["recommended_arrival_timestamp"])
                    if type(display.get("recommended_arrival_timestamp")) in (int,float)
                    else None)}
         return {"status":str(p.get("status") or "V2_WARMING_OR_UNAVAILABLE")[:75]}
-    except (OSError,TimeoutError,ValueError,json.JSONDecodeError):
-        return {"status":"PUBLIC_HISTORY_TIMEOUT_OR_ERROR"}
+    except TimeoutError:
+        return {"status":"PUBLIC_HISTORY_TIMEOUT"}
+    except (OSError,ValueError,json.JSONDecodeError):
+        return {"status":"PUBLIC_HISTORY_CONNECTION_OR_FORMAT_ERROR"}
     finally:
         conn.close()
 

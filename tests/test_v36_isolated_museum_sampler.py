@@ -144,9 +144,49 @@ class V36IsolatedCaptureTests(unittest.TestCase):
             return o
         obj=_v2_from_public_history("jap","Xanax",connection_factory=factory)
         self.assertEqual(obj["status"],"available")
-        self.assertEqual(arr[0].assertion,("127.0.0.1",8000,3))
+        self.assertEqual(arr[0].assertion,("127.0.0.1",8000,10))
         self.assertEqual(arr[0].method,"GET")
         self.assertNotIn("token",arr[0].path.lower())
+
+    def test_stale_v2_baseline_is_labeled_but_timestamps_preserved(self):
+        class Response:
+            status=200
+            def read(self,size):
+                return json.dumps({
+                    "country":"uni","item":"Heather",
+                    "analysis":{
+                       "prediction_v2_stale":True,
+                       "prediction_v2":{"status":"using_future_reachable_cycle",
+                           "display_prediction":{
+                              "recommended_leave_by_timestamp":T+4000,
+                              "recommended_arrival_timestamp":T+10360}}}
+                }).encode()
+        class C:
+            def __init__(self,host,port,timeout):
+                self.assertion=(host,port,timeout)
+            def request(self,*args):pass
+            def getresponse(self):return Response()
+            def close(self):pass
+        data=_v2_from_public_history("uni","Heather",connection_factory=C)
+        self.assertEqual(data["status"],"available_stale")
+        self.assertEqual(data["recommended_arrival_timestamp"]-
+                         data["recommended_leave_by_timestamp"],6360)
+
+    def test_distinguish_timeout_and_network_unavailability(self):
+        class TimeoutConnection:
+            def __init__(self,*args,**kwargs):pass
+            def request(self,*args):raise TimeoutError("no response")
+            def close(self):pass
+        class FailedConnection:
+            def __init__(self,*args,**kwargs):pass
+            def request(self,*args):raise ConnectionRefusedError("refused")
+            def close(self):pass
+        timeout=_v2_from_public_history("uni","Heather",
+                    connection_factory=TimeoutConnection)
+        refused=_v2_from_public_history("uni","Heather",
+                    connection_factory=FailedConnection)
+        self.assertEqual(timeout["status"],"PUBLIC_HISTORY_TIMEOUT")
+        self.assertEqual(refused["status"],"PUBLIC_HISTORY_CONNECTION_OR_FORMAT_ERROR")
 
     def test_live_capture_never_marks_unapproved_item(self):
         with self.assertRaises(ValueError):
