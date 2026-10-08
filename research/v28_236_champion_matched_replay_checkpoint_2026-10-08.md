@@ -16,10 +16,10 @@
 |---|---:|---:|---:|---:|---:|---:|
 | Camel Plushie (UAE) | **8/8** | 3/8 | 4/8 | 4/8 | 3/8 | 8/8 |
 | Chamois Plushie (Switzerland) | 4/5 | 3/5 | 4/5 | 4/5 | 1/5 | 5/5 |
-| Lion Plushie (South Africa) | **11/12** | 10/12 | 11/12 | 11/12 | 5/12 | 12/12 |
+| Lion Plushie (South Africa) | **9/12** | 10/12 | 11/12 | 11/12 | 5/12 | 12/12 |
 | Monkey Plushie (Argentina) | 3/5 | 4/5 | 4/5 | 4/5 | 5/5 | 5/5 |
 | Nessie Plushie (UK) | 9/12 | 10/12 | **11/12** | 7/12 | 6/12 | 12/12 |
-| Panda Plushie (China) | 8/12 | 8/12 | **9/12** | 6/12 | 6/12 | 12/12 |
+| Panda Plushie (China) | 6/12 | 8/12 | **9/12** | 6/12 | 6/12 | 12/12 |
 | Red Fox Plushie (UK) | 7/12 | 9/12 | 9/12 | 9/12 | 8/12 | 12/12 |
 
 **These are compatibility-port research results, not native-certified predictions or statistically independent trip samples.** Overlapping session starts represent correlated stock cycles.
@@ -28,7 +28,7 @@
 - Diagnostic on five older-model item keys: exact departure reproduction **33/42** (V19 10/15; V20 8/12; V21 15/15). This is not sufficient parity to authorize a winner switch.
 - The strongest emerging specialist is Camel, but 8/8 has a wide confidence interval and is insufficient proof of a >90% long-run success rate.
 - On the newer cohort Nessie, Red Fox and Panda specialists underperformed a generic comparator, despite historical >90% development figures; investigate regime drift and code parity before replacing handoff incumbents.
-- The locally evaluated Lion/Panda ML selectors were refitted on a causally mature **140-start** sample for runtime; `research/plushie_champions/locked_replay.py` in this branch caps at 320. This is an intentional research-port divergence and blocks native equivalence claims.
+- Lion/Panda selectors were rerun using the GitHub locked runner’s causally mature **320-start** pre-cutoff cap. Smaller 140-start refits initially scored Lion 11/12 and Panda 8/12; after correcting the cap those scores fell to 9/12 and 6/12. This training sensitivity reinforces the no-promotion decision.
 - Historical success metrics were used extensively for model development; Oct 5–8 postcutoff snapshot is now also studied. A truly untouched future lockbox requires data collected later.
 
 ## Code status and release blockers
