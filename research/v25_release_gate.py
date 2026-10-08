@@ -24,6 +24,12 @@ def assess(evidence: dict, target: str = "public_live_guidance") -> dict:
     require(bool(evidence.get("baseline_fallback_tested")), "V2 fallback not tested")
     require(bool(evidence.get("freshness_and_gap_checks_tested")), "collector freshness/gaps not tested")
 
+    if evidence.get("uses_item_specific_specialist"):
+        require(bool(evidence.get("specialist_source_present_and_importable")),
+                "item-specific specialist source missing or not importable")
+        require(bool(evidence.get("item_specific_departure_adapter_tested")),
+                "item-specific specialist needs a tested live departure adapter")
+
     if evidence.get("uses_japan_xanax_specialist"):
         require(bool(evidence.get("specialist_live_departure_adapter_tested")),
                 "Japan specialist does not yet have a validated real-time departure adapter")
