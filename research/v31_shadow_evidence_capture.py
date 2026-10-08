@@ -26,6 +26,7 @@ CREATE TABLE IF NOT EXISTS shadow_decisions (
     item_key TEXT NOT NULL,
     tick_epoch INTEGER NOT NULL,
     recorded_at INTEGER NOT NULL,
+    source_generated_at INTEGER NOT NULL,
     source_schema TEXT NOT NULL,
     candidate_model_family TEXT,
     candidate_config TEXT,
@@ -79,6 +80,9 @@ def record_private_decision(
     ts=int(time.time()) if now is None else int(now)
     if ts<=0:
         raise ValueError("invalid capture time")
+    generated=_timestamp(snapshot.get("generated_at"))
+    if generated is None or generated>ts or ts-generated>180:
+        raise ValueError("private snapshot is stale or lacks a trustworthy capture time")
     baseline=snapshot["baseline"]
     challenger=snapshot["challenger"]
     executed=(challenger.get("status")=="RESEARCH_PROPOSAL_ONLY" and
@@ -86,7 +90,8 @@ def record_private_decision(
               snapshot.get("champion_executed") is True)
     if snapshot.get("champion_executed") is True and not executed:
         raise ValueError("inconsistent challenger outcome")
-    row=(experiment_id,key,(ts//300)*300,ts,SOURCE_SCHEMA,
+    tick=(generated//300)*300
+    row=(experiment_id,key,tick,ts,generated,SOURCE_SCHEMA,
          str(snapshot.get("candidate_model_family") or ""),
          str(snapshot.get("candidate_config") or ""),
          str(challenger.get("status") or "UNKNOWN"),
@@ -113,17 +118,17 @@ def record_private_decision(
         cur=con.execute("""
         INSERT OR IGNORE INTO shadow_decisions
         (experiment_id,item_key,tick_epoch,recorded_at,source_schema,
-         candidate_model_family,candidate_config,challenger_status,
+         source_generated_at,candidate_model_family,candidate_config,challenger_status,
          challenger_executed,challenger_departure,challenger_arrival,
          v2_status,v2_departure,v2_arrival,source_is_private,
-         live_routing_unchanged) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+         live_routing_unchanged) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         """,row)
         inserted=cur.rowcount==1
         old=con.execute("""SELECT id,recorded_at FROM shadow_decisions
                            WHERE experiment_id=? AND item_key=? AND tick_epoch=?""",
-                        (experiment_id,key,(ts//300)*300)).fetchone()
+                        (experiment_id,key,tick)).fetchone()
     return {"status":"RECORDED" if inserted else "DUPLICATE_TICK_IGNORED",
-            "id":old[0],"tick_epoch":(ts//300)*300,
+            "id":old[0],"tick_epoch":tick,
             "source":SOURCE_SCHEMA,"challenger_executed":executed}
 
 
