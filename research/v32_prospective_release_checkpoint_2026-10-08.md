@@ -7,7 +7,7 @@
 - Verified source-aligned research reproducibility, previously 132/132 saved departures across four disputed items. This was **compatibility-port exact-decision parity**, not full original native execution and NOT 132 stock successes.
 - V31 read-only private single-tick generic inference, check-summed frozen masters, heartbeat/gap/future-data protection, 35s child timeout, V2 fallback/rollback flags; research-only, never public guidance.
 - V32 discovered and **fixed a real INSERT positional bug** in V31 evidence capture: `source_schema` and `source_generated_at` values were swapped. V32 regression test reads those two SQLite columns, verifying proper order. No production evidence capture had been deployed; previous synthetic data should be discarded.
-- V32 `research/v32_score_shadow.py` opens the collector and V31 evidence SQLite **read-only**. It only scores a private proposal after a complete maturity horizon, checking near-arrival pre/post stock observation freshness, successful poll heartbeats, absence of known collection gaps and transition ambiguity. Missed proposals remain failures for coverage, not excluded successes.
+- V32 `research/v32_score_shadow.py` opens the collector and V31 evidence SQLite **read-only**. It only scores a private proposal after a complete maturity horizon, checking near-arrival pre/post stock observation freshness, successful poll heartbeats, absence of known collection gaps and transition ambiguity. Missed proposals remain failures for coverage, not excluded successes. A proposal with departure already passed at evidence capture is also an explicit MISS, not a dropped denominator. V2 is scored on the same matured sessions and under the same conservative stock-bracketing rule.
 - Travel times corrected to original `services.arrival_success_lab.TRAVEL_SECONDS` values (PI and airstrip).
 - V32 `research/v32_capture_pilot.py` is an explicitly opt-in, local loopback-only **one-pass** HTTP reader, max four research items/invocation, with private token in request headers and only whitelisted safe columns persisted to separate SQLite. No scheduler, no gameplay, no player API.
 - `research/v32_catalog_release_report.py` creates a row for all 236 provisional item candidates; missing genuinely prospective observations remain **NULL/not measured**, not fabricated 0%; every model stays blocked pending native parity, independent resolved stock windows, forward success, tested rollback.
@@ -52,3 +52,11 @@ python -m research.v32_capture_pilot \
 ```
 
 Do not invent a live validation rate now: no private postfreeze capture exists in the original user-provided archive. No VM credentials are connected in this chat. No direct future-data feed is available in the tools. Production release is still blocked; a new independently collected snapshot, exact native runner and a controlled authenticated VM stage are mandatory.
+
+## Final V32 addendum
+
+- V32 PR #8 remains draft, targeting the V31 research branch, not main.
+- Strict evidence maturity, late/invalid departure failures, and matched V2-versus-challenger denominators are CI-tested.
+- V31 parent branch was also patched with the timestamp-vs-schema column-order fix and a regression test; V32 contains the same correction.
+- The user-visible 236-item research scoreboard is provided as XLSX, CSV, and a self-contained searchable HTML table. **All 236 statuses are NOT CERTIFIED**. Historical rates exist for 152 items, others are unmeasured or have incomplete evidence; the research tables should never be marketed as measured production win rates.
+- Workflow passing does not establish field performance: no on-VM capture, no new postfreeze outcomes, no independent complete event certification, and the specialist adapters are incomplete. Staged research only.
