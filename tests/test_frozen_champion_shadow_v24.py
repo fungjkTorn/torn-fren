@@ -60,9 +60,9 @@ class FrozenReplayTests(unittest.TestCase):
         self.assertEqual(EXPECTED_RESULT_SCHEMAS["v19"], "plushie-flower-dynamic-planner-v18.1-item-v1")
         self.assertEqual(EXPECTED_RESULT_SCHEMAS["v20"], "plushie-flower-dynamic-planner-v19-item-v1")
 
-    def test_v20_default_replan_is_900_not_300(self):
+    def test_v20_default_replan_is_300_original_cli_and_saved_plans(self):
         self.assertEqual(OLD_NATIVE["v19"]["replan_step"],300)
-        self.assertEqual(OLD_NATIVE["v20"]["replan_step"],900)
+        self.assertEqual(OLD_NATIVE["v20"]["replan_step"],300)
         self.assertEqual(OLD_NATIVE["v20"]["departure_grid"],300)
         self.assertEqual(OLD_NATIVE["v21"]["replan_step"],900)
 
