@@ -7,6 +7,7 @@ from fastapi.responses import FileResponse
 from services.history_service import get_item_history_since, get_stock_catalog, get_stock_graph_analysis
 from services.prediction_v2_live import build_live_prediction_v2
 from services.admin_health import build_admin_health
+from services.arbitrage_live import build_arbitrage_report, build_arbitrage_item_diagnostic, build_trader_finder
 
 app = FastAPI(title="Torn Fren Stock Graph")
 
@@ -67,6 +68,70 @@ def api_catalog():
 @app.get("/api/admin/health")
 def api_admin_health():
     return build_admin_health()
+
+
+@app.get("/api/arbitrage")
+def api_arbitrage(
+    min_profit: int = Query(20_000, ge=0, le=1_000_000_000),
+    min_roi: float = Query(0.0, ge=0.0, le=100.0),
+    min_quantity: int = Query(1, ge=1, le=1_000_000),
+    min_total_profit: int = Query(0, ge=0, le=100_000_000_000),
+    max_capital: int | None = Query(None, ge=1, le=10_000_000_000_000),
+    force: bool = Query(False),
+    item: str | None = Query(None),
+    buy_source: str = Query("all"),
+    buyer_source: str = Query("all"),
+    country: str | None = Query(None),
+    mode: str = Query("arbitrage"),
+    exclude_traders: str | None = Query(None),
+    max_per_trader: int | None = Query(None, ge=1, le=1000),
+    diversified: bool = Query(False),
+):
+    if item and mode == "traders":
+        result = build_trader_finder(
+            item,
+            force=force,
+            background=True,
+            buyer_source=buyer_source,
+        )
+        if not result.get("found"):
+            raise HTTPException(status_code=404, detail=f"Unknown foreign item: {item}")
+        return result
+
+    if item:
+        result = build_arbitrage_item_diagnostic(
+            item,
+            force=force,
+            background=True,
+        )
+        if not result.get("found"):
+            raise HTTPException(status_code=404, detail=f"Unknown foreign item: {item}")
+        return result
+
+    return build_arbitrage_report(
+        min_profit_per_item=min_profit,
+        min_roi=min_roi,
+        min_quantity=min_quantity,
+        min_total_profit=min_total_profit,
+        max_capital=max_capital,
+        force=force,
+        background=True,
+        buy_source=buy_source,
+        buyer_source=buyer_source,
+        country=country,
+        excluded_traders=[
+            name.strip()
+            for name in (exclude_traders or "").split(",")
+            if name.strip()
+        ],
+        max_opportunities_per_trader=max_per_trader,
+        diversified=diversified,
+    )
+
+
+@app.get("/arbitrage")
+def arbitrage_page():
+    return FileResponse(STATIC_DIR / "arbitrage.html")
 
 
 @app.get("/admin")

@@ -21,3 +21,6 @@ __pycache__/
 *.pyc
 .venv/
 venv/
+# Arbitrage runtime snapshot
+data/arbitrage_snapshot.json
+data/arbitrage_snapshot.json.tmp

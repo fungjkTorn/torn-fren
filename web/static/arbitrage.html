@@ -1,0 +1,347 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Torn Fren · Arbitrage Scanner</title>
+  <style>
+    :root{color-scheme:dark;--bg:#0b0f14;--panel:#121821;--panel2:#161f2a;--text:#e7edf5;--muted:#8fa1b5;--line:#263241;--accent:#6ea8fe;--good:#48d597;--bad:#ff7070;--warn:#f0bf5a}
+    *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,sans-serif}
+    .wrap{max-width:1500px;margin:0 auto;padding:28px} h1{margin:0 0 6px;font-size:30px}.sub{color:var(--muted);margin-bottom:20px}
+    .toolbar,.stats{display:flex;gap:12px;flex-wrap:wrap;align-items:end}.toolbar{background:var(--panel);border:1px solid var(--line);padding:14px;border-radius:14px}
+    label{display:flex;flex-direction:column;gap:6px;color:var(--muted);font-size:12px}input,select,button{background:#0d131b;color:var(--text);border:1px solid var(--line);border-radius:9px;padding:9px 10px}
+    #itemSearch{min-width:220px}button{cursor:pointer;font-weight:700}button.primary{background:var(--accent);color:#07111d;border-color:transparent}.stats{margin:14px 0}
+    .stat{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:11px 14px;min-width:140px}.stat b{display:block;font-size:18px}.stat span{color:var(--muted);font-size:12px}
+    .notice{margin:10px 0;color:var(--muted)}.error{color:var(--bad)}.table-shell{overflow-x:hidden;border:1px solid var(--line);border-radius:14px;background:var(--panel)}
+    table{width:100%;border-collapse:collapse;table-layout:fixed}th,td{padding:10px 8px;border-bottom:1px solid var(--line);text-align:right;overflow-wrap:anywhere}
+    th:first-child,td:first-child,th:nth-child(2),td:nth-child(2),th:nth-child(10),td:nth-child(10),th:nth-child(11),td:nth-child(11){text-align:left}
+    th:nth-child(1){width:12%}th:nth-child(2){width:9%}th:nth-child(3){width:8%}th:nth-child(4){width:8%}th:nth-child(5){width:9%}th:nth-child(6){width:5%}th:nth-child(7){width:5%}th:nth-child(8){width:9%}th:nth-child(9){width:10%}th:nth-child(10){width:9%}th:nth-child(11){width:8%}th:nth-child(12){width:8%}
+    td:nth-child(3),td:nth-child(4),td:nth-child(5),td:nth-child(6),td:nth-child(7),td:nth-child(8),td:nth-child(9){white-space:nowrap}
+    th{position:sticky;top:0;background:var(--panel2);color:#b9c8d8;font-size:12px;cursor:pointer;user-select:none}tr:hover td{background:#141c26}
+    .good{color:var(--good);font-weight:700}.muted{color:var(--muted)}.tiny{font-size:11px}.pill{display:inline-block;padding:3px 7px;border-radius:999px;background:#1b2633;color:#bcd0e5;font-size:11px;margin:2px 3px 2px 0}
+    .warnpill{background:#332815;color:#ffd98a}.badpill{background:#3a1e22;color:#ff9a9a}.row-link{color:inherit;font-weight:700;text-decoration:none}.row-link:hover{color:#8ab6ff;text-decoration:underline}
+    .sortmark{color:var(--accent);margin-left:4px}.inspect{font-size:11px;color:#8ab6ff;cursor:pointer;margin-top:3px}.inspect:hover{text-decoration:underline}
+    dialog{width:min(900px,92vw);max-height:85vh;background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:14px;padding:0}
+    dialog::backdrop{background:rgba(0,0,0,.65)}.modal-head{display:flex;justify-content:space-between;align-items:center;padding:16px 18px;border-bottom:1px solid var(--line)}.modal-body{padding:16px 18px;overflow:auto;max-height:72vh}
+    .diag-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}.diag-card{border:1px solid var(--line);border-radius:10px;padding:12px}.diag-row{display:flex;justify-content:space-between;gap:12px;padding:5px 0;border-bottom:1px solid #1d2733}.diag-row:last-child{border-bottom:0}.close{background:transparent}
+    @media(max-width:1100px){.table-shell{overflow-x:auto}table{min-width:1100px;table-layout:auto}th,td{white-space:nowrap}}
+    @media(max-width:700px){.wrap{padding:14px}h1{font-size:24px}.diag-grid{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Arbitrage Scanner</h1>
+  <div class="sub">Foreign-purchasable items only · Weav3r.dev/TornW3B bazaars + official Torn Item Market API → best Weav3r.dev/TornW3B or Torn Exchange trader bid</div>
+
+  <div class="toolbar">
+    <label>Minimum profit / item<input id="minProfit" type="number" value="20000" min="0" step="1000"></label>
+    <label>Minimum ROI %<input id="minRoi" type="number" value="0" min="0" step="0.5"></label>
+    <label>Minimum quantity<input id="minQty" type="number" value="1" min="1" step="1"></label>
+    <label>Minimum total profit<input id="minTotalProfit" type="number" value="0" min="0" step="100000" placeholder="No minimum"></label>
+    <label>Capital budget<input id="maxCapital" type="number" min="1" step="1000000" placeholder="Unlimited"></label>
+    <label>Item
+      <select id="itemSearch">
+        <option value="">Choose an item…</option>
+      </select>
+    </label>
+    <label>Country
+      <select id="countryFilter">
+        <option value="">All countries</option><option>Argentina</option><option>Canada</option><option>Cayman Islands</option>
+        <option>China</option><option>Hawaii</option><option>Japan</option><option>Mexico</option><option>South Africa</option>
+        <option>Switzerland</option><option>United Arab Emirates</option><option>United Kingdom</option>
+      </select>
+    </label>
+    <label>Buy from
+      <select id="buySource"><option value="all">All buy sources</option><option value="tornw3b">Weav3r.dev / TornW3B bazaars</option><option value="item_market">Official Torn Item Market API</option></select>
+    </label>
+    <label>Sell to
+      <select id="buyerSource"><option value="all">All trader sources</option><option value="tornw3b">Weav3r.dev / TornW3B traders</option><option value="torn_exchange">Torn Exchange traders</option></select>
+    </label>
+    <label>Sort by
+      <select id="sortBy">
+        <option value="total_profit">Total profit</option>
+        <option value="execution_score">Execution score</option>
+        <option value="average_profit_per_item">Profit / item</option>
+        <option value="roi">ROI</option>
+        <option value="quantity">Quantity</option>
+        <option value="average_buy_price">Average buy price</option>
+        <option value="item_name">Item name</option>
+      </select>
+    </label>
+    <button id="scan" class="primary">Scan</button>
+    <button id="inspectBtn">Item Details</button>
+    <button id="traderBtn">Trader Finder</button>
+    <button id="force">Force refresh sources</button>
+
+    <label>Exclude trader
+      <div style="display:flex;gap:6px">
+        <select id="excludeTraderPicker"><option value="">Choose trader…</option></select>
+        <button type="button" id="addExclusion">Add</button>
+      </div>
+      <div id="excludedTraderChips" class="tiny"></div>
+    </label>
+    <label>Max rows / trader
+      <input id="maxPerTrader" type="number" min="1" step="1" placeholder="Unlimited">
+    </label>
+    <label style="flex-direction:row;align-items:center;gap:8px;padding-bottom:8px">
+      <input id="diversified" type="checkbox">
+      Diversified mode
+    </label>
+  </div>
+
+  <div class="stats">
+    <div class="stat"><b id="opportunityCount">—</b><span>opportunities</span></div>
+    <div class="stat"><b id="listingCount">—</b><span>buy listings</span></div>
+    <div class="stat"><b id="offerCount">—</b><span>trader bids</span></div>
+    <div class="stat"><b id="catalogCount">—</b><span>foreign items in scope</span></div>
+    <div class="stat"><b id="topBuyerConcentration">—</b><span>top buyer concentration</span></div>
+  </div>
+
+  <div id="status" class="notice">Ready.</div>
+  <div class="table-shell">
+    <table>
+      <thead><tr>
+        <th data-key="item_name">Item</th><th data-key="countries">Foreign source</th><th data-key="average_buy_price">Avg buy</th>
+        <th data-key="buyer_price">Trader buy</th><th data-key="average_profit_per_item">Profit / item</th><th data-key="roi">ROI</th>
+        <th data-key="quantity">Qty</th><th data-key="total_cost">Capital</th><th data-key="total_profit">Total profit</th>
+        <th data-key="execution_score" title="Heuristic based on fallback buyers, fallback profit retention, executable quantity, and bid freshness. Not a response/reliability guarantee.">Execution</th>
+        <th data-key="market_reference_price" title="Lowest current Official Torn Item Market ask. This is a resale reference, not a guaranteed buyer.">Market ref</th>
+        <th data-key="buyer_name">Trader</th><th>Buy source</th><th>Anomaly</th>
+      </tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+  </div>
+</div>
+
+<dialog id="diagDialog">
+  <div class="modal-head"><div><b id="diagTitle">Item details</b><div class="tiny muted" id="diagMeta"></div></div><button class="close" onclick="document.getElementById('diagDialog').close()">Close</button></div>
+  <div class="modal-body" id="diagBody">Loading…</div>
+</dialog>
+
+<dialog id="traderDialog">
+  <div class="modal-head"><div><b id="traderTitle">Trader Finder</b><div class="tiny muted" id="traderMeta"></div></div><button class="close" onclick="document.getElementById('traderDialog').close()">Close</button></div>
+  <div class="modal-body" id="traderBody">Choose an item to rank trader bids.</div>
+</dialog>
+
+<script>
+let currentRows=[], catalogItems=[], catalogOptions=[], traderOptions=[], excludedTraderNames=new Set(), activeSort="total_profit", descending=true;
+
+const money=v=>"$"+Math.round(Number(v||0)).toLocaleString();
+const pct=v=>(Number(v||0)*100).toFixed(1)+"%";
+const safe=v=>String(v??"").replace(/[&<>"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;"}[ch]));
+const sourceLabel=s=>({"tornw3b_bazaar":"Weav3r.dev / TornW3B","torn_item_market":"Official Torn Item Market","tornw3b_trader":"Weav3r.dev / TornW3B trader","torn_exchange":"Torn Exchange"}[s]||s);
+const ageText=ts=>{if(!ts)return "age ?";const s=Math.max(0,Date.now()/1000-Number(ts));if(s<60)return Math.round(s)+"s old";if(s<3600)return Math.round(s/60)+"m old";return (s/3600).toFixed(1)+"h old";};
+
+function refreshItemOptions(){
+  const country=document.getElementById("countryFilter").value;
+  const select=document.getElementById("itemSearch");
+  const current=select.value;
+  const options=(catalogOptions||[])
+    .filter(row=>!country || (row.countries||[]).includes(country))
+    .sort((a,b)=>a.item_name.localeCompare(b.item_name));
+
+  select.innerHTML='<option value="">Choose an item…</option>'+
+    options.map(x=>'<option value="'+safe(x.item_name)+'">'+safe(x.item_name)+'</option>').join("");
+
+  if(current && options.some(x=>x.item_name===current)) select.value=current;
+  else select.value="";
+
+  updateItemActionState();
+}
+
+function updateItemActionState(){
+  const hasItem=Boolean(document.getElementById("itemSearch").value);
+  document.getElementById("inspectBtn").disabled=!hasItem;
+  document.getElementById("traderBtn").disabled=!hasItem;
+}
+
+function refreshTraderOptions(selectedNames=[]){
+  excludedTraderNames=new Set(selectedNames||[]);
+  const picker=document.getElementById("excludeTraderPicker");
+  const current=picker.value;
+  const available=(traderOptions||[]).filter(name=>!excludedTraderNames.has(name));
+  picker.innerHTML='<option value="">Choose trader…</option>'+available.map(name=>'<option value="'+safe(name)+'">'+safe(name)+'</option>').join("");
+  if(current && available.includes(current)) picker.value=current;
+  renderExcludedTraderChips();
+}
+
+function renderExcludedTraderChips(){
+  const wrap=document.getElementById("excludedTraderChips");
+  wrap.innerHTML=[...excludedTraderNames].sort((a,b)=>a.localeCompare(b)).map(name=>
+    '<span class="pill badpill">'+safe(name)+' <button type="button" class="remove-exclusion" data-name="'+safe(name)+'" style="padding:0 4px;border:0;background:transparent;color:inherit">×</button></span>'
+  ).join("") || '<span class="muted">None excluded</span>';
+}
+
+function updateSortIndicators(){
+  document.querySelectorAll("th[data-key]").forEach(th=>{
+    const old=th.querySelector(".sortmark"); if(old) old.remove();
+    if(th.dataset.key===activeSort){
+      const s=document.createElement("span"); s.className="sortmark"; s.textContent=descending?"▼":"▲"; th.appendChild(s);
+    }
+  });
+}
+
+function render(){
+  const q=document.getElementById("itemSearch").value.trim().toLowerCase();
+  const rows=[...currentRows].filter(r=>!q || String(r.item_name||"").toLowerCase()===q);
+  rows.sort((a,b)=>{
+    let av=a[activeSort],bv=b[activeSort];
+    if(activeSort==="countries"){av=(av||[]).join(",");bv=(bv||[]).join(",");}
+    if(typeof av==="string") return descending?bv.localeCompare(av):av.localeCompare(bv);
+    return descending?Number(bv||0)-Number(av||0):Number(av||0)-Number(bv||0);
+  });
+  updateSortIndicators();
+
+  document.getElementById("rows").innerHTML=rows.map(row=>{
+    const countries=(row.countries||[]).map(x=>'<span class="pill">'+safe(x)+'</span>').join("");
+    const itemHtml=row.buy_url?'<a class="row-link" href="'+safe(row.buy_url)+'" target="_blank" rel="noreferrer">'+safe(row.item_name)+'</a>':'<b>'+safe(row.item_name)+'</b>';
+    const traderHtml=row.buyer_url?'<a class="row-link" href="'+safe(row.buyer_url)+'" target="_blank" rel="noreferrer">'+safe(row.buyer_name)+'</a>':'<b>'+safe(row.buyer_name)+'</b>';
+    const sq=row.buy_source_quantities||{};
+    const sources=(row.buy_sources||[]).map(x=>'<span class="pill">'+safe(sourceLabel(x))+(sq[x]!=null?' · '+Number(sq[x]).toLocaleString():'')+'</span>').join("")||"—";
+    const anomalies=(row.anomaly_labels||[]).map((x,i)=>'<span class="pill '+(i===0&&row.roi>=1?'badpill':'warnpill')+'">'+safe(x)+'</span>').join("")||'<span class="muted tiny">Normal</span>';
+    return '<tr>'+
+      '<td>'+itemHtml+'<div class="inspect row-item-details" data-item="'+safe(row.item_name)+'">Item details</div></td>'+
+      '<td>'+countries+'</td><td>'+money(row.average_buy_price)+'</td><td>'+money(row.buyer_price)+'</td>'+
+      '<td class="good">'+money(row.average_profit_per_item)+'</td><td class="good">'+pct(row.roi)+'</td>'+
+      '<td>'+Number(row.quantity||0).toLocaleString()+'</td><td>'+money(row.total_cost)+'</td><td class="good">'+money(row.total_profit)+'</td>'+
+      '<td><b>'+Number(row.execution_score||0).toFixed(0)+'/100</b><div class="tiny muted">'+safe(row.exit_confidence||"low")+' exit · '+Number(row.fallback_buyer_count||0)+' fallback'+(Number(row.fallback_buyer_count||0)===1?'':'s')+
+      (row.fallback_buyer_count? ' · '+(Number(row.fallback_profit_retention||0)*100).toFixed(0)+'% retained':'')+'</div></td>'+
+      '<td>'+(row.market_reference_price!=null?money(row.market_reference_price):'—')+
+      (row.market_reference_profit_per_item!=null?'<div class="tiny '+(Number(row.market_reference_profit_per_item)>=0?'good':'muted')+'">gross ref '+money(row.market_reference_profit_per_item)+'/item</div>':'')+
+      '</td>'+
+      '<td>'+traderHtml+'<div class="tiny muted">'+safe(sourceLabel(row.buyer_source))+'</div>'+
+      (row.second_best_buyer_name?'<div class="tiny muted">#2 '+safe(row.second_best_buyer_name)+' · '+money(row.second_best_buyer_price)+' · gap '+money(row.buyer_price_gap)+'</div>':'')+
+      '</td><td>'+sources+'</td><td>'+anomalies+'</td></tr>';
+  }).join("");
+
+  if(!rows.length) document.getElementById("rows").innerHTML='<tr><td colspan="14" class="muted" style="text-align:center;padding:30px">No qualifying opportunities match these filters/search.</td></tr>';
+}
+
+async function inspectItem(name){
+  name=(name||document.getElementById("itemSearch").value||"").trim();
+  if(!name) return;
+  const dlg=document.getElementById("diagDialog"); dlg.showModal();
+  document.getElementById("diagTitle").textContent=name;
+  document.getElementById("diagMeta").textContent="Loading item diagnostics…";
+  document.getElementById("diagBody").innerHTML="Loading…";
+  try{
+    const r=await fetch("/api/arbitrage?item="+encodeURIComponent(name));
+    if(!r.ok) throw new Error("HTTP "+r.status);
+    const d=await r.json();
+    document.getElementById("diagTitle").textContent=d.item_name;
+    document.getElementById("diagMeta").textContent=(d.countries||[]).join(", ")+" · "+d.listing_count+" buy listings · "+d.offer_count+" trader bids"+(d.refreshing?" · refresh running":"");
+    const buys=(d.listings||[]).slice(0,15).map(x=>'<div class="diag-row"><span>'+safe(sourceLabel(x.source))+' · '+safe(x.seller_name||"seller")+'<div class="tiny muted">'+safe(ageText(x.observed_at))+'</div></span><span><b>'+money(x.price)+'</b> × '+Number(x.quantity||0).toLocaleString()+'</span></div>').join("")||'<div class="muted">No buy listings in snapshot.</div>';
+    const offers=(d.offers||[]).slice(0,15).map(x=>'<div class="diag-row"><span>'+(x.url?'<a href="'+safe(x.url)+'" target="_blank">'+safe(x.buyer_name)+'</a>':safe(x.buyer_name))+' · '+safe(sourceLabel(x.source))+'<div class="tiny muted">'+safe(ageText(x.observed_at))+'</div></span><span><b>'+money(x.price)+'</b></span></div>').join("")||'<div class="muted">No trader bids in snapshot.</div>';
+    document.getElementById("diagBody").innerHTML='<div class="diag-grid"><div class="diag-card"><b>Cheapest buy listings</b>'+buys+'</div><div class="diag-card"><b>Highest trader bids</b>'+offers+'</div></div>';
+  }catch(e){
+    document.getElementById("diagMeta").textContent="";
+    document.getElementById("diagBody").innerHTML='<div class="error">Could not load diagnostics: '+safe(e.message)+'</div>';
+  }
+}
+
+
+async function findTraders(name){
+  name=(name||document.getElementById("itemSearch").value||"").trim();
+  if(!name) return;
+  const dlg=document.getElementById("traderDialog"); dlg.showModal();
+  document.getElementById("traderTitle").textContent="Trader Finder · "+name;
+  document.getElementById("traderMeta").textContent="Loading ranked trader bids…";
+  document.getElementById("traderBody").innerHTML="Loading…";
+  try{
+    const params=new URLSearchParams({
+      item:name,
+      mode:"traders",
+      buyer_source:document.getElementById("buyerSource").value
+    });
+    const r=await fetch("/api/arbitrage?"+params.toString());
+    if(!r.ok) throw new Error("HTTP "+r.status);
+    const d=await r.json();
+    document.getElementById("traderTitle").textContent="Trader Finder · "+d.item_name;
+    document.getElementById("traderMeta").textContent=(d.countries||[]).join(", ")+" · "+d.buyer_count+" trader"+(d.buyer_count===1?"":"s")+" · highest price first";
+    const buyers=(d.buyers||[]).map(x=>'<div class="diag-row"><span><b>#'+x.rank+'</b> · '+(x.url?'<a href="'+safe(x.url)+'" target="_blank">'+safe(x.buyer_name)+'</a>':safe(x.buyer_name))+'<div class="tiny muted">'+safe(sourceLabel(x.source))+' · '+safe(ageText(x.observed_at))+'</div></span><span><b>'+money(x.price)+'</b></span></div>').join("")||'<div class="muted">No trader bids in the current snapshot.</div>';
+    document.getElementById("traderBody").innerHTML='<div class="diag-card"><b>Best buyers</b>'+buyers+'</div>';
+  }catch(e){
+    document.getElementById("traderMeta").textContent="";
+    document.getElementById("traderBody").innerHTML='<div class="error">Could not load trader finder: '+safe(e.message)+'</div>';
+  }
+}
+
+async function load(force=false){
+  const params=new URLSearchParams({
+    min_profit:Number(document.getElementById("minProfit").value||0),
+    min_roi:Number(document.getElementById("minRoi").value||0)/100,
+    min_quantity:Number(document.getElementById("minQty").value||1),
+    min_total_profit:Number(document.getElementById("minTotalProfit").value||0),
+    force:String(force),
+    buy_source:document.getElementById("buySource").value,
+    buyer_source:document.getElementById("buyerSource").value,
+    diversified:String(document.getElementById("diversified").checked)
+  });
+  const capital=Number(document.getElementById("maxCapital").value||0);
+  if(capital>0) params.set("max_capital",String(capital));
+  const excluded=[...excludedTraderNames];
+  if(excluded.length)params.set("exclude_traders",excluded.join(","));
+  const maxPer=Number(document.getElementById("maxPerTrader").value||0);
+  if(maxPer>0)params.set("max_per_trader",String(maxPer));
+  const country=document.getElementById("countryFilter").value;if(country)params.set("country",country);
+  const status=document.getElementById("status"); status.className="notice"; status.textContent=force?"Refreshing live sources…":"Loading scanner…";
+  document.getElementById("scan").disabled=true; document.getElementById("force").disabled=true;
+  try{
+    const response=await fetch("/api/arbitrage?"+params); if(!response.ok) throw new Error("HTTP "+response.status);
+    const data=await response.json(); currentRows=data.opportunities||[]; catalogItems=data.catalog_items||[]; catalogOptions=data.catalog_options||catalogItems.map(x=>({item_name:x,countries:[]}));
+    traderOptions=data.trader_options||[];
+    refreshItemOptions();
+    refreshTraderOptions(data.excluded_traders||[]);
+    opportunityCount.textContent=Number(data.opportunity_count||0).toLocaleString(); listingCount.textContent=Number(data.listing_count||0).toLocaleString();
+    offerCount.textContent=Number(data.offer_count||0).toLocaleString(); catalogCount.textContent=Number(data.catalog_count||0).toLocaleString();
+    const concentration=(data.buyer_concentration||[])[0];
+    topBuyerConcentration.textContent=concentration?(concentration.buyer_name+" · "+(Number(concentration.opportunity_share||0)*100).toFixed(0)+"%"):"—";
+    const when=data.generated_at?new Date(data.generated_at*1000).toLocaleTimeString():"not ready yet", errs=(data.errors||[]).length;
+    const age=data.source_age_seconds==null?"":" · age "+Math.round(data.source_age_seconds/60)+"m", refreshing=data.refreshing?" · refresh running in background":"";
+    status.textContent="Source snapshot: "+when+age+refreshing+" · "+errs+" source error"+(errs===1?"":"s")+". Results are opportunities, not guaranteed inventory.";
+    if(errs) status.classList.add("error");
+    activeSort=document.getElementById("sortBy").value; descending=true; render();
+    if(data.refreshing){clearTimeout(window._arbPollTimer);window._arbPollTimer=setTimeout(()=>load(false),15000);}
+  }catch(e){status.className="notice error";status.textContent="Scanner failed: "+e.message;}
+  finally{document.getElementById("scan").disabled=false;document.getElementById("force").disabled=false;}
+}
+
+document.getElementById("scan").onclick=()=>load(false);
+document.getElementById("force").onclick=()=>load(true);
+document.getElementById("inspectBtn").onclick=()=>inspectItem();
+document.getElementById("traderBtn").onclick=()=>findTraders();
+document.getElementById("rows").addEventListener("click",e=>{
+  const target=e.target.closest(".row-item-details");
+  if(!target) return;
+  inspectItem(target.dataset.item);
+});
+document.getElementById("itemSearch").addEventListener("change",()=>{updateItemActionState();render();});
+document.getElementById("sortBy").onchange=e=>{activeSort=e.target.value;descending=true;render();};
+document.getElementById("countryFilter").onchange=()=>{refreshItemOptions();load(false);};
+document.getElementById("buySource").onchange=()=>load(false);
+document.getElementById("buyerSource").onchange=()=>load(false);
+document.getElementById("addExclusion").onclick=()=>{
+  const picker=document.getElementById("excludeTraderPicker");
+  const name=picker.value;
+  if(!name) return;
+  excludedTraderNames.add(name);
+  renderExcludedTraderChips();
+  load(false);
+};
+document.getElementById("excludedTraderChips").addEventListener("click",e=>{
+  const btn=e.target.closest(".remove-exclusion");
+  if(!btn) return;
+  excludedTraderNames.delete(btn.dataset.name);
+  renderExcludedTraderChips();
+  load(false);
+});
+document.getElementById("maxPerTrader").addEventListener("change",()=>load(false));
+document.getElementById("diversified").onchange=()=>load(false);
+document.querySelectorAll("th[data-key]").forEach(th=>th.onclick=()=>{
+  const key=th.dataset.key;if(activeSort===key)descending=!descending;else{activeSort=key;descending=true;}
+  const opt=[...document.getElementById("sortBy").options].find(o=>o.value===key);if(opt)document.getElementById("sortBy").value=key;render();
+});
+updateItemActionState();
+load(false);
+</script>
+</body></html>
