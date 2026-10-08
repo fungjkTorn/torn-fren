@@ -10,15 +10,53 @@ from services.frozen_champion_shadow_v24 import (
 )
 
 class FrozenReplayTests(unittest.TestCase):
-    def test_same_start_pairing(self):
-        x={"versions":{
-            "v19":{"rows":[{"start":10,"success":True},{"start":20,"success":False}]},
-            "v21":{"rows":[{"start":10,"success":False},{"start":20,"success":True},{"start":30,"success":True}]}
-        }}
+    def test_all_start_denominator_and_pairwise_outcomes(self):
+        x={"shared_starts":3,"eligible_start_times":[10,20,30],
+           "versions":{
+              "v19":{"rows":[{"start":10,"success":True},{"start":20,"success":False}]},
+              "v21":{"rows":[{"start":10,"success":False},
+                               {"start":20,"success":True},{"start":30,"success":True}]}
+           }}
         r=_match(x)
-        self.assertEqual(r["common_starts"],2)
-        self.assertEqual(r["versions"]["v19"],{"hits":1,"paired_n":2})
-        self.assertEqual(r["versions"]["v21"],{"hits":1,"paired_n":2})
+        self.assertEqual(r["common_starts"],3)
+        self.assertEqual(r["versions"]["v19"]["hits"],1)
+        self.assertEqual(r["versions"]["v19"]["paired_n"],3)
+        self.assertAlmostEqual(r["versions"]["v19"]["coverage"],2/3)
+        self.assertAlmostEqual(r["versions"]["v19"]["all_start_success_rate"],1/3)
+        self.assertEqual(r["versions"]["v19"]["no_recommendation_starts"],1)
+        self.assertEqual(r["versions"]["v21"]["hits"],2)
+        self.assertEqual(r["head_to_head"]["v19_vs_v21"]["v19_only_successes"],1)
+        self.assertEqual(r["head_to_head"]["v19_vs_v21"]["v21_only_successes"],2)
+
+    def test_both_missing_recommendation_not_silently_removed(self):
+        data={"shared_starts":4,"eligible_start_times":[10,20,30,40],
+              "versions":{"v19":{"rows":[{"start":10,"success":True}]},
+                          "v20":{"rows":[]}}}
+        result=_match(data)
+        self.assertEqual(result["common_starts"],4)
+        self.assertEqual(result["versions"]["v19"]["paired_n"],4)
+        self.assertEqual(result["versions"]["v20"]["recommendations"],0)
+        self.assertEqual(result["versions"]["v20"]["coverage"],0.0)
+        self.assertIsNone(result["versions"]["v20"]["conditional_success_rate"])
+
+    def test_reject_malformed_start_sets(self):
+        for bad in (
+            {"shared_starts":2,"eligible_start_times":[10,10],"versions":{}},
+            {"shared_starts":2,"eligible_start_times":[10],"versions":{}},
+            {"shared_starts":1,"eligible_start_times":[10],
+             "versions":{"v19":{"rows":[{"start":20,"success":True}]}}},
+            {"shared_starts":1,"eligible_start_times":[10],
+             "versions":{"v19":{"rows":[{"start":10,"success":True},
+                                      {"start":10,"success":False}]}}},
+        ):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                _match(bad)
+
+    def test_v20_default_replan_is_900_not_300(self):
+        self.assertEqual(OLD_NATIVE["v19"]["replan_step"],300)
+        self.assertEqual(OLD_NATIVE["v20"]["replan_step"],900)
+        self.assertEqual(OLD_NATIVE["v20"]["departure_grid"],300)
+        self.assertEqual(OLD_NATIVE["v21"]["replan_step"],900)
 
     def test_frozen_config_not_selected_afresh(self):
         entry={"key":"arg:Tear Gas","provisional_model":"v19"}
