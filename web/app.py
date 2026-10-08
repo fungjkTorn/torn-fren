@@ -13,6 +13,7 @@ from services.prediction_v2_live import build_live_prediction_v2
 from services.admin_health import build_admin_health
 from services.forecast_auditor import get_recent_active_forecasts
 from services.profitability import enrich_items_with_profitability, profitability_for_item
+from web.private_shadow_v29 import champion_shadow
 
 app = FastAPI(title="Torn Fren Stock Graph")
 
@@ -356,5 +357,10 @@ def api_admin_health():
 def admin_page():
     return FileResponse(STATIC_DIR / "admin.html")
 
+
+# Private, OFF-by-default research canary: standalone route before catch-all static mount.
+# This does not replace /api/history V2 or alter profitability graph routes.
+app.add_api_route("/api/research/champion-shadow", champion_shadow,
+                  methods=["GET"], include_in_schema=False)
 
 app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="static")
