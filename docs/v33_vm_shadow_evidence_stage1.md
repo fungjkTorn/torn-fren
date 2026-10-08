@@ -53,8 +53,13 @@ if path.is_file():
         print("Attempts:",c.execute("SELECT COUNT(*) FROM shadow_capture_attempts").fetchone()[0])
         print("Status counts:",c.execute(
           "SELECT status,COUNT(*) FROM shadow_capture_attempts GROUP BY status").fetchall())
-        print("Valid prediction rows:",c.execute(
-          "SELECT COUNT(*) FROM shadow_decisions").fetchone()[0])
+        tables={row[0] for row in c.execute(
+          "SELECT name FROM sqlite_master WHERE type='table'")}
+        if "shadow_decisions" in tables:
+            print("Valid prediction rows:",c.execute(
+              "SELECT COUNT(*) FROM shadow_decisions").fetchone()[0])
+        else:
+            print("Valid prediction rows: 0 (no accepted responses yet)")
 PY
 ```
 
