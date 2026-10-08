@@ -91,6 +91,17 @@ class ContractTests(unittest.TestCase):
                                 "recommended_arrival_timestamp": 11001}
             )
 
+    def test_partial_stock_and_infeasible_requested_quantity(self):
+        x = build_dual_layer_prediction(
+            **{**BASE, "observed_quantity": 15},
+            data_quality={"historical_max_quantity": 20},
+        )
+        self.assertEqual(x["current"]["state"], "below_requested_quantity")
+        self.assertTrue(any(
+            "exceeds historically observed maximum" in w
+            for w in x["data_quality"]["warnings"]
+        ))
+
     def test_stale_and_wait_cap_warning(self):
         x = build_dual_layer_prediction(
             **{**BASE, "last_observed_timestamp": 9000},
