@@ -72,7 +72,7 @@ def build_dual_layer_prediction(
         raise ValueError("observed_quantity cannot be negative")
     if seen is not None and now is not None and seen > now:
         raise ValueError("last observation cannot be in the future")
-    state = "unknown" if qty is None else "active" if qty >= requested_quantity else "sold_out"
+    state = ("unknown" if qty is None else "sold_out" if qty == 0\n             else "active" if qty >= requested_quantity else "below_requested_quantity")
 
     quality = deepcopy(data_quality or {})
     warnings = list(quality.get("warnings") or [])
@@ -100,9 +100,9 @@ def build_dual_layer_prediction(
             "projected": bool(raw.get("projected", False)),
         })
 
-    tr = travel or {}
+    historical_max = quality.get("historical_max_quantity")\n    if historical_max is not None and historical_max < requested_quantity:\n        warnings.append("requested quantity exceeds historically observed maximum")\n\n    tr = travel or {}
     seconds = _number(tr.get("travel_seconds"), "travel_seconds")
-    leave = _number(tr.get("recommended_leave_timestamp"), "leave")
+    if seconds is not None and seconds < 0:\n        raise ValueError("travel_seconds cannot be negative")\n    leave = _number(tr.get("recommended_leave_timestamp"), "leave")
     arrival = _number(tr.get("recommended_arrival_timestamp"), "arrival")
     leave_window = _window(
         leave, tr.get("leave_window_start_timestamp"),
