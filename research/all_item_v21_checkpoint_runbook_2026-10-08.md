@@ -20,7 +20,7 @@ cd C:\Users\fungb\Desktop\torn-fren
 .\venv\Scripts\Activate.ps1
 git pull --ff-only
 python -m py_compile services\all_item_v21_checkpoint.py
-python -m unittest tests.test_all_item_v21_checkpoint -v
+python -m unittest discover -s tests -p "test_all_item_v21_checkpoint.py" -v
 ```
 
 **Short smoke test** (a completely separate new checkpoint file; does not touch previous V21):
