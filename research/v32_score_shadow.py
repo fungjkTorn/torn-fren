@@ -19,8 +19,8 @@ from pathlib import Path
 QUANTITY=30
 GRACE=10
 MAX_OBSERVATION_GAP=180
-TRAVEL={"mex":1620,"cay":2100,"can":2460,"haw":3960,"uni":5580,
-        "arg":6660,"swi":6660,"jap":8940,"chi":9840,"uae":10020,"sou":10320}
+TRAVEL={"mex":1020,"cay":1380,"can":1620,"haw":5340,"uni":6360,
+        "arg":6660,"swi":6960,"jap":8940,"chi":9600,"uae":10800,"sou":11820}
 # Known original model travel values should be audited against the
 # source planner before being used for any live decision.
 ALL_TABLES=("stock_history","poll_heartbeats","collection_gaps")
