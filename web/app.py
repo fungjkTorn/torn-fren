@@ -7,7 +7,7 @@ from fastapi.responses import FileResponse
 from services.history_service import get_item_history_since, get_stock_catalog, get_stock_graph_analysis
 from services.prediction_v2_live import build_live_prediction_v2
 from services.admin_health import build_admin_health
-from web.private_shadow_v29 import router as research_shadow_router
+from web.private_shadow_v29 import champion_shadow
 
 app = FastAPI(title="Torn Fren Stock Graph")
 
@@ -77,6 +77,6 @@ def admin_page():
 
 # Register the private route after normal API routes but before the root static mount.
 # Neither its registration nor a request to it modifies public V2 forecast routing.
-app.include_router(research_shadow_router)
+app.add_api_route('/api/research/champion-shadow', champion_shadow, methods=['GET'], include_in_schema=False)
 
 app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="static")
