@@ -49,6 +49,8 @@ class EvidenceCaptureTests(unittest.TestCase):
                 self.assertEqual(con.execute("select sum(challenger_executed) from shadow_decisions").fetchone()[0],2)
                 row=con.execute("select resolution_status,v2_departure,challenger_departure from shadow_decisions limit 1").fetchone()
                 self.assertEqual(row,("PENDING",1792000900,1792000300))
+                metadata=con.execute("SELECT source_schema,source_generated_at FROM shadow_decisions ORDER BY id LIMIT 1").fetchone()
+                self.assertEqual(metadata,("torn-fren-v31-shadow-evidence-capture-v1",1792000100))
             text=db.read_bytes().decode("latin1")
             for forbidden in ("TOP_SECRET_SHOULD_NEVER_BE_STORED","DO_NOT_STORE_API_KEY","/private/collector/source.json"):
                 self.assertNotIn(forbidden,text)
