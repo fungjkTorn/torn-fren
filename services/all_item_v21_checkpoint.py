@@ -270,13 +270,17 @@ def _options(args):
     }
 
 
-def _report(state, prior, conn, gaps, args):
-    cache = {}
-    decisions = {}
-    for key, entry in state["catalog"].items():
-        decisions[key] = _item_decision(key, prior, state["results"], entry,
-                                       conn, gaps, cache, args)
-    state["winners"] = decisions
+def _report(state, prior, conn, gaps, args, cache, changed_key=None):
+    decisions = state.setdefault("winners", {})
+    if changed_key is not None and len(decisions) == len(state["catalog"]):
+        decisions[changed_key] = _item_decision(
+            changed_key, prior, state["results"], state["catalog"][changed_key],
+            conn, gaps, cache, args,
+        )
+    else:
+        for key, entry in state["catalog"].items():
+            decisions[key] = _item_decision(key, prior, state["results"], entry,
+                                           conn, gaps, cache, args)
     phase_counts = {}
     winner_counts = {}
     for k, e in state["catalog"].items():
@@ -348,9 +352,10 @@ def main():
 
     conn = sqlite3.connect(f"file:{db.as_posix()}?mode=ro", uri=True)
     gaps = load_gaps(conn)
+    truth_cache = {}
 
-    def checkpoint():
-        _report(state, prior, conn, gaps, a)
+    def checkpoint(changed_key=None):
+        _report(state, prior, conn, gaps, a, truth_cache, changed_key)
         state["updated_at"] = int(time.time())
         _atomic(out, state)
         print("CHECKPOINT items_attempted={}/{} completed={} candidates={} saved={}".format(
@@ -397,7 +402,7 @@ def main():
                 hold.get("arrival_success_rate"), result.get("cycles"),
             ), flush=True)
             # Durable crash-safe checkpoint after EVERY item.
-            checkpoint()
+            checkpoint(key)
 
         if a.workers == 1:
             for inp in inputs:
