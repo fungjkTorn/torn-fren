@@ -34,7 +34,7 @@ SCHEMA="frozen-champion-v24-new-data-shadow-v2"
 DEFAULT_OUTPUT="data/frozen_champion_v24/new_vm_master.json"
 OLD_NATIVE={
     "v19": {"max_wait":21600,"departure_grid":300,"replan_step":300},
-    "v20": {"max_wait":43200,"departure_grid":300,"replan_step":900},
+    "v20": {"max_wait":43200,"departure_grid":300,"replan_step":300},
     "v21": {"max_wait":43200,"departure_grid":900,"replan_step":900},
 }
 
@@ -296,8 +296,8 @@ def main():
     ap.add_argument("--step",type=int,default=1800)
     ap.add_argument("--min-qty",type=int,default=30)
     ap.add_argument("--grace-seconds",type=int,default=10)
-    ap.add_argument("--v20-replan-seconds",type=int,default=900,
-                    help="Historical V20 replan cadence was not stored in its master; CLI default was 900s")
+    ap.add_argument("--v20-replan-seconds",type=int,default=300,
+                    help="V20 original engine defaults to 300s; saved capped sessions show 145 checks over 12h")
     ap.add_argument("--resume",action="store_true")
     args=ap.parse_args()
     if args.workers<1 or args.max_starts<1 or args.step<60 or args.cutoff<=0 or args.v20_replan_seconds<1:
@@ -334,7 +334,7 @@ def main():
     settings={"cutoff":args.cutoff,"db_path":str(db),"db_sha256":db_sha,
               "registry_sha256":_digest_file(args.registry) if args.registry else None,
               "native_policies":native_policies,
-              "v20_replan_provenance":"CLI default 900s unless explicitly overridden; V20 master does not record replan cadence","db_size":db.stat().st_size,
+              "v20_replan_provenance":"V20 original engine CLI default 300s; 145 saved max-wait planning checks confirm 5m cadence","db_size":db.stat().st_size,
               "db_mtime_ns":db.stat().st_mtime_ns,"max_starts":args.max_starts,
               "step":args.step,"min_qty":args.min_qty,"grace":args.grace_seconds,
               "master_shas":{v:hashlib.sha256(Path(getattr(args,v)).read_bytes()).hexdigest()
