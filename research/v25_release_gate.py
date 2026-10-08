@@ -40,6 +40,8 @@ def assess(evidence: dict, target: str = "public_live_guidance") -> dict:
 
     if target == "public_live_guidance":
         require(bool(evidence.get("native_replay_parity_passed")), "no native replay parity")
+        require(bool(evidence.get("causal_prefix_invariance_passed")),
+                "replay may use future data to qualify predecision history")
         require(bool(evidence.get("prospective_after_model_freeze")), "no untouched forward validation")
         require(int(evidence.get("independent_starts") or 0) >= 30,
                 "fewer than 30 prospective eligible starts")
