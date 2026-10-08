@@ -61,3 +61,18 @@ This module **does not connect to the live application**. It provides the shared
 - Do not claim 100% availability prediction if forced 12h waits.
 - Do not infer a restock-window forecast from an arrival-only model.
 - Do not deploy automatically.
+
+
+## First offline implementation checkpoint
+New files on main (offline research/adapter only, not imported by production routes):
+- `services/dual_layer_prediction_contract.py`: pure shared result schema for current stock, multi-cycle restock/depletion windows, evidence/confidence, leave time/window/leave-by, flight time, arrival, optional calibrated odds, quality warnings and historical accuracy.
+- `services/dual_layer_prediction_legacy_adapter.py`: transforms existing V2 forecast objects into that schema **without** misrepresenting V2's `recommended_leave_by_timestamp` as an optimized leave time. Both first and second projected cycle fields are preserved.
+- `tests/test_dual_layer_prediction_contract.py`: planned unit checks for stock state, active vs below requested, window order, flight-time consistency, probability-calibration guardrails, staleness and wait budget.
+- `tests/test_dual_layer_prediction_legacy_adapter.py`: planned V2 compatibility checks.
+
+Code authored and committed, but Python tests have **not yet been run in the repo runtime**. From local venv after `git pull` when convenient, run:
+```powershell
+python -m unittest discover -s tests -p "test_dual_layer_prediction_*.py" -v
+```
+
+No production `prediction_v2_live`, API route, Discord command, or dashboard has been changed.
