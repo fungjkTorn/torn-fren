@@ -109,6 +109,7 @@ def build_dual_layer_prediction(
     seconds = _number(tr.get("travel_seconds"), "travel_seconds")
     if seconds is not None and seconds < 0:
         raise ValueError("travel_seconds cannot be negative")
+    leave_by = _number(tr.get("leave_by_timestamp"), "leave_by")
     leave = _number(tr.get("recommended_leave_timestamp"), "leave")
     arrival = _number(tr.get("recommended_arrival_timestamp"), "arrival")
     leave_window = _window(
@@ -168,6 +169,7 @@ def build_dual_layer_prediction(
             "model_name": tr.get("model_name"),
             "travel_seconds": seconds,
             "recommended_leave_timestamp": leave,
+            "leave_by_timestamp": leave_by,
             "recommended_arrival_timestamp": arrival,
             "leave_window": leave_window,
             "wait_seconds": wait,
