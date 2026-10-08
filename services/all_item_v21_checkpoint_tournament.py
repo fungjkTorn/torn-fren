@@ -17,6 +17,7 @@ import os
 import sqlite3
 import time
 from collections import Counter
+from dataclasses import replace
 from concurrent.futures import FIRST_COMPLETED, ProcessPoolExecutor, wait
 from pathlib import Path
 
@@ -42,8 +43,7 @@ def _v19_rates(audit):
     reports = audit.get("masters") or []
     if not reports:
         raise ValueError("V19 truth audit has no masters")
-    v19 = next((r for r in reports if
-                any("v19" in str(r.get("master", "")).lower() for _ in [None])), reports[0])
+    v19 = next((r for r in reports if "v19" in str(r.get("master", "")).lower()), reports[0])
     return {x["key"]: x for x in v19.get("items", [])}
 
 
@@ -144,6 +144,26 @@ def build_leaderboard(report):
     }
 
 
+def _unpenalized_worker(payload):
+    """Keep the V19/V20 model code untouched, but eliminate generic hours cost.
+
+    Actual arrival success is still the main scoring objective. Restock length
+    is natural; a long wait is not automatically a poor recommendation.
+    """
+    from services import plushie_flower_dynamic_planner_v19 as planner
+    original_configs = planner.configs
+    def configs_without_absolute_wait_penalty():
+        return [
+            replace(c, delay_penalty_per_hour=0.0)
+            for c in original_configs()
+        ]
+    planner.configs = configs_without_absolute_wait_penalty
+    try:
+        return _corrected_worker(payload)
+    finally:
+        planner.configs = original_configs
+
+
 def main():
     ap = argparse.ArgumentParser(description="All-item V21 resumable corrected-truth checkpoint run")
     ap.add_argument("--db", required=True)
@@ -197,7 +217,7 @@ def main():
         "sha256": sha, "threshold": args.threshold,
         "min_qty": args.min_qty, "grace_seconds": args.grace_seconds,
         "min_cycles": args.min_cycles,
-        "include_strong": args.include_strong, "options": opts,
+        "include_strong": args.include_strong, "options": opts,\n        "absolute_wait_penalty_disabled": True,
     }
     plan_rows = plan(source, audit, seed, _max_qty(db),
                      args.threshold, args.min_cycles, args.min_qty,
@@ -267,7 +287,7 @@ def main():
                 payload = next(cursor)
             except StopIteration:
                 return False
-            inflight[pool.submit(_corrected_worker, payload)] = payload["key"]
+            inflight[pool.submit(_unpenalized_worker, payload)] = payload["key"]
             return True
         for _ in range(args.workers):
             if not submit():
