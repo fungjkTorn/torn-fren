@@ -28,5 +28,6 @@ jobs:
       - name: Compile gate
         run: python -m py_compile research/v25_release_gate.py research/v26_merge_champion_registry.py
       - name: Test release gate
-        run: python -m unittest discover -s tests -p 'test_v25_release_gate.py' -v
+        run: |
+          python -m unittest discover -s tests -p 'test_v25_release_gate.py' -v
           python -m unittest discover -s tests -p 'test_v26_champion_manifest.py' -v
