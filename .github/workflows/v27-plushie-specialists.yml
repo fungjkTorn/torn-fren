@@ -10,6 +10,8 @@ on:
       - 'tests/test_v27_plushie_imports.py'
       - 'tests/test_v28_locked_replay.py'
       - 'tests/test_v29_private_shadow.py'
+      - 'tests/test_v29_prefix_lookahead_audit.py'
+      - 'research/v29_prefix_lookahead_audit.py'
       - 'services/private_champion_shadow_v29.py'
       - 'web/private_shadow_v29.py'
       - 'web/app.py'
@@ -31,5 +33,6 @@ jobs:
       - run: python -m unittest discover -s tests -p 'test_v27_plushie_imports.py' -v
       - run: python -m unittest discover -s tests -p 'test_v28_locked_replay.py' -v
       - run: python -m unittest discover -s tests -p 'test_v29_private_shadow.py' -v
+      - run: python -m unittest discover -s tests -p 'test_v29_prefix_lookahead_audit.py' -v
       - run: python -m unittest discover -s tests -p 'test_v26_champion_manifest.py' -v
       - run: python -m unittest discover -s tests -p 'test_v25_release_gate.py' -v
