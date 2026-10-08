@@ -1,0 +1,28 @@
+name: V27 plushie specialist reproducibility smoke
+
+on:
+  push:
+    branches:
+      - research/v27-plushie-native-finalization
+  pull_request:
+    paths:
+      - 'research/plushie_champions/**'
+      - 'tests/test_v27_plushie_imports.py'
+      - '.github/workflows/v27-plushie-specialists.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  specialist-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python -m pip install -r research/plushie_champions/requirements-research.txt
+      - run: python -m unittest discover -s tests -p 'test_v27_plushie_imports.py' -v
+      - run: python -m unittest discover -s tests -p 'test_v26_champion_manifest.py' -v
+      - run: python -m unittest discover -s tests -p 'test_v25_release_gate.py' -v
