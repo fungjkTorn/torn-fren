@@ -291,7 +291,8 @@ def main():
             for m in masters.values()
         )
     ]
-    settings={"cutoff":args.cutoff,"db_path":str(db),"db_sha256":db_sha,\n              "registry_sha256":_digest_file(args.registry) if args.registry else None,
+    settings={"cutoff":args.cutoff,"db_path":str(db),"db_sha256":db_sha,
+              "registry_sha256":_digest_file(args.registry) if args.registry else None,
               "native_policies":native_policies,
               "v20_replan_provenance":"CLI default 900s unless explicitly overridden; V20 master does not record replan cadence","db_size":db.stat().st_size,
               "db_mtime_ns":db.stat().st_mtime_ns,"max_starts":args.max_starts,
