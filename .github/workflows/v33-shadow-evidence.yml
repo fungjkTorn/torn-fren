@@ -1,0 +1,29 @@
+name: V33 private shadow evidence sampler
+
+on:
+  push:
+    branches:
+      - release/vm-shadow-evidence-v33-20261008
+  pull_request:
+    paths:
+      - 'research/v31_shadow_evidence_capture.py'
+      - 'research/v33_private_shadow_sampler.py'
+      - 'tests/test_v31_shadow_evidence_capture.py'
+      - 'tests/test_v33_private_shadow_sampler.py'
+      - '.github/workflows/v33-shadow-evidence.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  canary-collection:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: python -m unittest discover -s tests -p 'test_v31_shadow_evidence_capture.py' -v
+      - run: python -m unittest discover -s tests -p 'test_v33_private_shadow_sampler.py' -v
+      - run: python -m py_compile research/v31_shadow_evidence_capture.py research/v33_private_shadow_sampler.py
