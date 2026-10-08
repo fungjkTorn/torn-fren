@@ -20,21 +20,21 @@ def history_for_peaks(peaks):
 class PrefixSensitivityTests(unittest.TestCase):
     def test_future_outlier_changes_historical_tiny_flag(self):
         rows=history_for_peaks([2,10,10,1000])
-        s=compare_one(rows,450)
+        s=compare_one(rows,510)
         self.assertEqual(s["precutoff_raw_cycles"],3)
         self.assertEqual(s["future_peaks_change_tiny_flag_count"],1)
 
     def test_truncating_at_cutoff_has_no_lookahead(self):
         rows=history_for_peaks([2,10,10,1000])
-        earlier=[r for r in rows if r[0]<=450]
-        self.assertEqual(compare_one(earlier,450)["future_peaks_change_tiny_flag_count"],0)
+        earlier=[r for r in rows if r[0]<=510]
+        self.assertEqual(compare_one(earlier,510)["future_peaks_change_tiny_flag_count"],0)
         self.assertEqual(len(completed_peaks(earlier)),3)
 
     def test_missing_database_never_gets_created(self):
         with tempfile.TemporaryDirectory() as td:
             path=Path(td)/"missing.db"
             with self.assertRaises(FileNotFoundError):
-                audit(path,450)
+                audit(path,510)
             self.assertFalse(path.exists())
 
     def test_sqlite_audit_is_read_only(self):
@@ -45,7 +45,7 @@ class PrefixSensitivityTests(unittest.TestCase):
                     (timestamp INTEGER,country TEXT,item_name TEXT,quantity INTEGER);""")
                 con.executemany("INSERT INTO stock_history VALUES (?,?,?,?)",
                     [(ts,"arg","Testing Stock",q) for ts,q in history_for_peaks([2,10,10,1000])])
-            data=audit(p,450)
+            data=audit(p,510)
             self.assertEqual(data["affected_keys"],["arg:Testing Stock"])
             self.assertTrue(p.exists())
 
