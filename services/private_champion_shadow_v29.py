@@ -86,8 +86,11 @@ def make_shadow_snapshot(
     model_family = selected.get("model_family")
     if not model_family:
         raise ShadowUnavailable("item has no research candidate")
-    from services.prediction_v2_live import build_live_prediction_v2
-    reference_fn = v2_fn or build_live_prediction_v2
+    if v2_fn is None:
+        from services.prediction_v2_live import build_live_prediction_v2
+        reference_fn = build_live_prediction_v2
+    else:
+        reference_fn = v2_fn
     baseline = {"status": "unavailable", "reason": "V2 baseline failed"}
     try:
         # Avoid duplicated forecast audit records from diagnostics.
