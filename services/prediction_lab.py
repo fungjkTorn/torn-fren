@@ -139,7 +139,7 @@ def extract_prediction_samples(country: str, item_name: str):
             "valid_cycles": 0,
         }
 
-    cycles, _active, wait_samples = _build_validated_cycles(rows)
+    cycles, _active, wait_samples = _build_validated_cycles(rows, country, item_name)
     completed = [cycle for cycle in cycles if cycle.get("complete")]
     valid_cycles = [cycle for cycle in completed if cycle.get("valid_lifetime")]
     valid_waits = [sample for sample in wait_samples if sample.get("valid")]

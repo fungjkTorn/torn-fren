@@ -92,7 +92,7 @@ def build_cycle_feature_rows(country: str, item_name: str):
     if not rows:
         return [], bounces
 
-    cycles, _active, wait_samples = _build_validated_cycles(rows)
+    cycles, _active, wait_samples = _build_validated_cycles(rows, country, item_name)
     completed = [c for c in cycles if c.get("complete")]
     normal = [c for c in completed if not c.get("tiny_restock")]
 

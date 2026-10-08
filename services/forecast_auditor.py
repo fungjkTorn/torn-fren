@@ -6,6 +6,7 @@ from pathlib import Path
 from services.history_service import (
     _build_validated_cycles,
     _collection_coverage,
+    _interval_gaps_preserve_item_cycle,
     _connect,
     _get_all_item_rows_with_source,
     _suppress_provider_bounces,
@@ -199,7 +200,7 @@ def record_forecast_snapshot(country, item_name, result, source="live"):
         if cursor.rowcount == 0:
             row = conn.execute(
                 """
-                SELECT id FROM forecast_audit_runs
+                SELECT id, created_at FROM forecast_audit_runs
                 WHERE country = ? AND item_name = ? AND signature = ?
                 """,
                 (country.lower(), item_name, signature),
@@ -207,6 +208,7 @@ def record_forecast_snapshot(country, item_name, result, source="live"):
             return {
                 "recorded": False,
                 "run_id": int(row[0]) if row else None,
+                "created_at": int(row[1]) if row else None,
                 "points": 0,
             }
 
@@ -244,7 +246,61 @@ def record_forecast_snapshot(country, item_name, result, source="live"):
             )
             point_count += 1
 
-    return {"recorded": True, "run_id": run_id, "points": point_count}
+    return {"recorded": True, "run_id": run_id, "created_at": now, "points": point_count}
+
+
+def get_recent_active_forecasts(country, item_name, since_timestamp=None, limit=16):
+    """Return persisted active-target forecasts for graph history overlays."""
+    ensure_forecast_audit_schema()
+    params = [country.lower(), item_name]
+    since_clause = ""
+    if since_timestamp is not None:
+        since_clause = " AND r.created_at >= ?"
+        params.append(int(since_timestamp))
+    params.append(max(1, min(int(limit), 50)))
+
+    with _connect() as conn:
+        rows = conn.execute(
+            f"""
+            SELECT
+                r.id, r.created_at, r.status, r.active_prediction_number,
+                p.prediction_number, p.estimate_timestamp,
+                p.window_start_timestamp, p.window_end_timestamp,
+                p.recommended_arrival_timestamp, p.recommended_leave_by_timestamp,
+                p.projected, p.usable_for_departure, p.travel_reliability,
+                p.model_name, p.status
+            FROM forecast_audit_runs r
+            JOIN forecast_audit_points p
+              ON p.run_id = r.id
+             AND p.prediction_number = r.active_prediction_number
+            WHERE r.country = ? AND LOWER(r.item_name) = LOWER(?)
+              {since_clause}
+            ORDER BY r.created_at DESC
+            LIMIT ?
+            """,
+            params,
+        ).fetchall()
+
+    return [
+        {
+            "run_id": int(row[0]),
+            "issued_at_timestamp": int(row[1]),
+            "run_status": row[2],
+            "active_prediction_number": row[3],
+            "prediction_number": int(row[4]) if row[4] is not None else None,
+            "estimate_timestamp": int(row[5]) if row[5] is not None else None,
+            "window_start_timestamp": int(row[6]) if row[6] is not None else None,
+            "window_end_timestamp": int(row[7]) if row[7] is not None else None,
+            "recommended_arrival_timestamp": int(row[8]) if row[8] is not None else None,
+            "recommended_leave_by_timestamp": int(row[9]) if row[9] is not None else None,
+            "projected": bool(row[10]),
+            "usable_for_departure": bool(row[11]),
+            "travel_reliability": row[12],
+            "model_name": row[13],
+            "point_status": row[14],
+        }
+        for row in rows
+    ]
 
 
 def is_tracked_item(country, item_name):
@@ -315,7 +371,7 @@ def _normal_completed_cycles(country, item_name):
     if not rows:
         return []
 
-    cycles, _active, _waits = _build_validated_cycles(rows)
+    cycles, _active, _waits = _build_validated_cycles(rows, country, item_name)
     return [
         cycle
         for cycle in cycles
@@ -333,12 +389,13 @@ def invalidate_pending_forecasts_crossing_gap(
     reason="collector recovery gap",
 ):
     """
-    Retire every still-pending multi-cycle forecast that existed before a
-    collection outage and therefore cannot be mapped safely to P1/P2/P3/etc.
+    Invalidate only pending forecast runs whose ITEM-SPECIFIC cycle identity
+    became ambiguous during a collection gap.
 
-    Without this, a pre-gap P4 could accidentally be matched to the fourth
-    *observed* cycle after recovery even though unknown cycles occurred during
-    the outage.
+    Short same-state gaps are bridged.  This prevents normal audit/model work
+    delays from destroying otherwise valid P1/P2/P3 ground truth while still
+    retiring runs when a restock/depletion boundary may genuinely have been
+    missed.
     """
     ensure_forecast_audit_schema()
     now = int(time.time())
@@ -346,27 +403,47 @@ def invalidate_pending_forecasts_crossing_gap(
     gap_end = int(gap_end_timestamp)
 
     with _connect() as conn:
-        cursor = conn.execute(
+        runs = conn.execute(
             """
-            UPDATE forecast_audit_points
-            SET status = 'invalidated',
-                ground_truth_valid = 0,
-                validation_reason = ?,
-                resolved_at = ?
-            WHERE status = 'pending'
-              AND run_id IN (
-                  SELECT id
-                  FROM forecast_audit_runs
-                  WHERE created_at <= ?
-              )
+            SELECT DISTINCT r.id, r.country, r.item_name
+            FROM forecast_audit_runs r
+            JOIN forecast_audit_points p ON p.run_id = r.id
+            WHERE p.status = 'pending'
+              AND r.created_at <= ?
             """,
-            (
-                f"invalidated: {reason} ({gap_start} -> {gap_end})",
-                now,
-                gap_start,
-            ),
+            (gap_start,),
+        ).fetchall()
+
+    invalidated = 0
+    preserved = 0
+    for run_id, country, item_name in runs:
+        continuity = _interval_gaps_preserve_item_cycle(
+            country, item_name, gap_start, gap_end
         )
-        return int(cursor.rowcount or 0)
+        if continuity["valid"]:
+            preserved += 1
+            continue
+
+        with _connect() as conn:
+            cursor = conn.execute(
+                """
+                UPDATE forecast_audit_points
+                SET status = 'invalidated',
+                    ground_truth_valid = 0,
+                    validation_reason = ?,
+                    resolved_at = ?
+                WHERE status = 'pending' AND run_id = ?
+                """,
+                (
+                    f"invalidated: {reason} ({gap_start} -> {gap_end}); "
+                    f"{continuity['reason']}",
+                    now,
+                    int(run_id),
+                ),
+            )
+            invalidated += int(cursor.rowcount or 0)
+
+    return invalidated
 
 def resolve_forecast_audits(country, item_name):
     """
@@ -453,20 +530,27 @@ def resolve_forecast_audits(country, item_name):
                     < actual_depletion
                 )
 
-            # To score arrival success, collection must have remained trustworthy
-            # from forecast creation through the target cycle's depletion.
-            coverage = _collection_coverage(
-                int(run_created_at),
-                actual_depletion,
+            # Score against event-aware continuity. Missing middle polls are OK
+            # when they cannot have changed this item's cycle identity and the
+            # actual target cycle boundaries were cleanly observed.
+            continuity = _interval_gaps_preserve_item_cycle(
+                country, item_name, int(run_created_at), actual_depletion
             )
-            valid = int(bool(coverage["valid"]))
-            reason = (
-                f"coverage valid via {coverage['method']} "
-                f"(max gap {coverage['max_gap_seconds']}s)"
-                if valid
-                else f"coverage invalid via {coverage['method']} "
-                f"(max gap {coverage['max_gap_seconds']}s)"
+            boundary_valid = bool(
+                actual_cycle.get("restock_boundary_clean", actual_cycle.get("valid_lifetime"))
+                and actual_cycle.get("depletion_boundary_clean", actual_cycle.get("valid_lifetime"))
             )
+            valid = int(bool(continuity["valid"] and boundary_valid))
+            if valid:
+                reason = (
+                    f"event-aware coverage valid; {continuity['reason']} "
+                    f"(max gap {continuity['max_gap_seconds']}s)"
+                )
+            else:
+                reason = (
+                    f"event-aware coverage invalid; {continuity['reason']} "
+                    f"(boundaries_clean={boundary_valid}, max gap {continuity['max_gap_seconds']}s)"
+                )
 
             conn.execute(
                 """
