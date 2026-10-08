@@ -1,0 +1,28 @@
+name: V37 isolated V2 reference timeout and freshness
+
+on:
+  push:
+    branches: [release/v37-v2-baseline-timeout-20261008]
+  pull_request:
+    paths:
+      - 'research/v36_isolated_museum_sampler.py'
+      - 'tests/test_v36_isolated_museum_sampler.py'
+      - '.github/workflows/v37-v2-baseline.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  baseline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: python -m unittest discover -s tests -p 'test_v36_isolated_museum_sampler.py' -v
+      - run: python -m unittest discover -s tests -p 'test_v35_museum_japan_private_pilot.py' -v
+      - run: python -m unittest discover -s tests -p 'test_v34_prospective_ops_audit.py' -v
+      - run: python -m unittest discover -s tests -p 'test_v33_systemd_units.py' -v
+      - run: python -m py_compile research/v36_isolated_museum_sampler.py
