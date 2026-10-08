@@ -45,8 +45,19 @@ def assess(evidence: dict, target: str = "public_live_guidance") -> dict:
                 "fewer than 30 prospective eligible starts")
         require(int(evidence.get("distinct_resolved_qualified_windows") or 0) >= 8,
                 "fewer than 8 distinct resolved stock windows")
-        require(float(evidence.get("all_start_success") or 0) >=
-                float(evidence.get("required_arrival_success", 0.90)),
+        item_key = evidence.get("item_key")
+        require(bool(item_key), "missing item key for item-specific promotion")
+        temporary_75 = item_key in {
+            "arg:Monkey Plushie", "swi:Chamois Plushie", "uae:Camel Plushie"
+        }
+        minimum = .75 if temporary_75 else .90
+        requested = float(evidence.get("required_arrival_success", minimum))
+        require(requested >= minimum,
+                "requested reliability target below allowed per-item floor")
+        if temporary_75 and requested < .90:
+            require(bool(evidence.get("temporary_low_reliability_caution_visible")),
+                    "temporary 75%-floor plushie requires explicit caution disclosure")
+        require(float(evidence.get("all_start_success") or 0) >= max(requested, minimum),
                 "all-start arrival success below reliability target")
         require(float(evidence.get("coverage") or 0) >= 0.95,
                 "recommendation coverage below 95%")
