@@ -88,3 +88,19 @@ python -u -m services.remaining_item_v21 tournament `
 ```
 
 The separate V21 files do not alter the live website, Discord bot, original V19/V20 tournament or any production registry.
+
+
+## Sparse-item baseline on original frozen DB
+A further independent 30+-quantity *depart-now* baseline was calculated for V19 sparse/insufficient items on the last chronological quarter of the frozen DB. Decisions were made every 4 hours, scored only when departure-to-arrival coverage was gap-free, using the item/country's normal PI airstrip flight time and +10s grace. This is a diagnostic baseline, not a model-selected production result.
+
+- 40 sparse/high-availability items had >=10 evaluable decisions: median depart-now success 98.5%; 36/40 achieved >=80%; 32/40 achieved >=90% (typically about 32–33 test decisions per item).
+- 37 sparse/mixed-availability items: median depart-now success 43.8%; only 1 reached >=90%.
+- 4 sparse/low-availability items: median depart-now success ~3.2%; none reached >=80%.
+
+High-availability examples: Argentina Flamethrower/Shrooms/Speed, Canada PCP, Cayman Bearer Bond/Harpoon/Tavor TAR-21 and China Qsz-92 all scored 100% depart-now in their sampled holdout decisions. The high-availability subset is *not* inherently an impossible sparse-data ML problem: many can be served well by verified-stock + direct-arrival availability logic.
+
+Mixed availability examples: Argentina Macana 78.8% depart-now; Canada Ice Pick 6.5%; Hawaii Small Suitcase 0%; Canada Safety Boots 12.1%. These need better timing, observed scarcity assessment and/or different quantity objectives.
+
+These figures come from a distinct 4-hour holdout-decision cohort, not V19's 30-minute simulated-session cohort; avoid naïve direct percentage comparisons.
+
+**Revised priority:** (1) repair scoring truth and rerun champion selection; (2) simple verified-availability fallback for 40+ persistent high-stock sparse items; (3) focus expensive model searches on scarce/mixed remaining cases; (4) item-specific quantity requirement for low-quantity items.
