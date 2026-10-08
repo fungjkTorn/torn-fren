@@ -67,6 +67,7 @@ def make_shadow_snapshot(
     v2_fn: Callable | None = None,
     environ: dict[str, str] | None = None,
     registry_path: str | Path | None = None,
+    challenger_fn: Callable | None = None,
 ) -> dict:
     env = os.environ if environ is None else environ
     if env.get(ENABLED_ENV, "").strip().lower() not in ("1", "true", "yes"):
@@ -113,17 +114,37 @@ def make_shadow_snapshot(
         # Do not echo stack traces, keys, environment or internal paths to API clients.
         pass
 
+    challenger={"status":"DISABLED","champion_executed":False}
+    try:
+        if challenger_fn is None:
+            from services.private_challenger_adapter_v31 import research_candidate
+            candidate_fn=research_candidate
+        else:
+            candidate_fn=challenger_fn
+        challenger=candidate_fn(code,name,selected,candidate.get("category","other"),
+                                environ=env)
+        if not isinstance(challenger,dict):
+            challenger={"status":"INVALID_RESEARCH_WORKER_RESULT","champion_executed":False}
+    except Exception:
+        challenger={"status":"RESEARCH_WORKER_FAILED","champion_executed":False}
+    actually_executed=(challenger.get("status")=="RESEARCH_PROPOSAL_ONLY" and
+                       challenger.get("champion_executed") is True)
+
     return {
         "schema": "torn-fren-private-research-shadow-v29",
         "key": key,
         "mode": "READ_ONLY_DIAGNOSTIC",
         "default_live_routing": "UNCHANGED",
-        "champion_executed": False,
-        "champion_status": "FROZEN_CANDIDATE_NOT_INTEGRATED",
+        "champion_executed": actually_executed,
+        "champion_status": ("FROZEN_RESEARCH_SINGLE_TICK_ONLY" if actually_executed
+                            else "FROZEN_CANDIDATE_NOT_INTEGRATED"),
         "candidate_model_family": model_family,
         "candidate_config": selected.get("config_name"),
         "candidate_promoted": False,
         "chance_calibrated": False,
         "baseline": baseline,
-        "note": "All suggested departure times in baseline are from V2, not the challenger.",
+        "challenger": challenger,
+        "note": ("Baseline timestamps come only from V2. Any challenger timestamps "
+                 "are private research single-tick proposals, not live guidance or "
+                 "calibrated chances; production V2 routing is unchanged."),
     }
