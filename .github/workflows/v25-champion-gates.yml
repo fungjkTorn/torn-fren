@@ -1,0 +1,28 @@
+name: V25 champion safety gates
+
+on:
+  pull_request:
+    paths:
+      - 'research/v25_release_gate.py'
+      - 'tests/test_v25_release_gate.py'
+      - '.github/workflows/v25-champion-gates.yml'
+  push:
+    branches:
+      - research/v25-champion-selection-gates
+
+permissions:
+  contents: read
+
+jobs:
+  champion-gates:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Compile gate
+        run: python -m py_compile research/v25_release_gate.py
+      - name: Test release gate
+        run: python -m unittest discover -s tests -p 'test_v25_release_gate.py' -v
