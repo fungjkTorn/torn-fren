@@ -57,7 +57,7 @@ class ShadowSamplerTests(unittest.TestCase):
     def test_both_allowed_items_same_tick_and_no_recommendation_is_recorded(self):
         with tempfile.TemporaryDirectory() as td:
             ledger=Path(td)/"evidence.db"
-            for key in sorted(ALLOWED):
+            for key in ("can:Bear Gall","can:Fire Hydrant"):
                 c,i=key.split(":",1)
                 x=capture_one(key,ledger=ledger,experiment="pilot-v33",
                        token=TEST_TOKEN,clock=lambda:T,
@@ -99,7 +99,7 @@ class ShadowSamplerTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             ledger=Path(td)/"ledger.db"
             with self.assertRaises(ValueError):
-                capture_one("jap:Xanax",ledger=ledger,experiment="pilot-v33",
+                capture_one("mex:Unsupported",ledger=ledger,experiment="pilot-v33",
                             token=TEST_TOKEN,clock=lambda:T,
                             fetcher=lambda c,i,t:fake_snapshot(c,i))
             result=capture_one("can:Bear Gall",ledger=ledger,experiment="pilot-v33",
