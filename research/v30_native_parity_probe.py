@@ -107,7 +107,7 @@ def _native_candidate(db,version,item,master,selected,max_rows):
     planner=v18 if version=="v19" else v19
     policy=OLD_NATIVE[version].copy()
     if version=="v20":
-        policy["replan_step"]=int((master.get("settings") or {}).get("replan_seconds",900))
+        policy["replan_step"]=int((master.get("settings") or {}).get("replan_seconds",300))
     if version=="v21":
         options=(master.get("settings") or {}).get("options") or {}
         for field in ("max_wait","departure_grid","replan_step"):
