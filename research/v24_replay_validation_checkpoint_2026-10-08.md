@@ -63,3 +63,16 @@ Optional: `--registry data\torn_fren_matched_provisional_registry.json` preserve
 After smoke, use a **new output path** for 24+ starts / broader coverage. Report all-start success with honest denominators. Do not conflate arrival success with next-restock time error, calibration, or production readiness.
 
 **Validation status:** Source edits and regression cases committed. Native project unit tests and the newer-data replay have not yet been executed in this environment because the frozen VM SQLite snapshot is absent. No revised V24 champions or improved success percentages are claimed.
+
+## Scoreboard export after a successful replay
+
+A new read-only reporter exports *all* attempted items and version-specific success under the shared-start denominator. It records a descriptive leader but **never promotes it**:
+
+```powershell
+python -m unittest discover -s tests -p "test_v24_shadow_scoreboard.py" -v
+python -m research.v24_shadow_scoreboard `
+  --master "data\frozen_champion_v24\new_vm_master_v2_smoke.json" `
+  --csv "data\frozen_champion_v24\v24_smoke_scoreboard.csv"
+```
+
+For the broader replay, replace the master path and write a **new CSV filename**. A model hitting 90% success on only recommended sessions but covering half of starts is not scored at 90% all-start success. The `item_leader` is descriptive, with explicit `too_few_independent_starts` or `descriptive_only_no_promotion` evidence labels. These session-level counts are not independent stock cycles and must not be mistaken for strong statistical confidence.
