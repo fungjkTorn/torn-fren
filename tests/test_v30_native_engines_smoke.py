@@ -71,6 +71,11 @@ class NativeSourceSmokeTests(unittest.TestCase):
                          "services.plushie_flower_dynamic_planner_v18"
                          if version=="v19" else
                          "services.plushie_flower_dynamic_planner_v19")
+                    self.assertEqual(
+                        out["truth_scorer"],
+                        "observed_quantity_at_arrival" if version=="v21"
+                        else "qualified_cycle_windows",
+                    )
                     self.assertIsNotNone(out["rows"][0]["replayed_departure"])
                     self.assertTrue(db.exists())
                     # Native replay could not write to the frozen source.
