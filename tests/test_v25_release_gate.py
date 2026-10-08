@@ -5,6 +5,7 @@ from research.v25_release_gate import assess
 def evidence():
     return dict(
         frozen_model_id="jap:Xanax-v8-research",
+        item_key="jap:Xanax",
         raw_config_sha256="frozen-full-config-sha256",
         read_only_shadow=True,
         baseline_fallback_tested=True,
@@ -72,6 +73,24 @@ class ReleaseGateTests(unittest.TestCase):
         x["specialist_source_present_and_importable"] = True
         x["item_specific_departure_adapter_tested"] = False
         self.assertFalse(assess(x, "public_live_guidance")["ready"])
+
+    def test_unlisted_item_cannot_lower_below_ninety(self):
+        x = evidence()
+        x["item_key"] = "can:Fire Hydrant"
+        x["required_arrival_success"] = .75
+        x["all_start_success"] = .8
+        self.assertFalse(assess(x)["ready"])
+
+    def test_three_far_plushies_can_use_temporary_floor_with_caution(self):
+        for key in ("arg:Monkey Plushie", "swi:Chamois Plushie", "uae:Camel Plushie"):
+            x = evidence()
+            x["item_key"] = key
+            x["required_arrival_success"] = .75
+            x["all_start_success"] = .77
+            x["temporary_low_reliability_caution_visible"] = True
+            self.assertTrue(assess(x)["ready"])
+            x["temporary_low_reliability_caution_visible"] = False
+            self.assertFalse(assess(x)["ready"])
 
     def test_unknown_release_target_rejected(self):
         with self.assertRaises(ValueError):
