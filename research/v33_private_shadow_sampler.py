@@ -27,7 +27,15 @@ PORT=8000
 TOKEN_ENV="TORN_FREN_CHAMPION_SHADOW_TOKEN"
 FLAG_ENV="TORN_FREN_CHAMPION_SHADOW_ENABLED"
 NATIVE_ENV="TORN_FREN_CHAMPION_SHADOW_NATIVE_ENABLED"
-ALLOWED={"can:Bear Gall","can:Fire Hydrant"}
+ALLOWED={
+    # Historical two-item smoke tests are still allowed for reproducing old
+    # evidence, but no longer scheduled by the V35 service unit.
+    "can:Bear Gall","can:Fire Hydrant",
+    # Frozen V18 champion native shadow.
+    "uni:Heather","can:Wolverine Plushie",
+    # Specialist registry pending exact live inference: baseline-only capture.
+    "uni:Nessie Plushie","jap:Xanax",
+}
 EXPERIMENT="canary-v33-20261008"
 
 ATTEMPT_SCHEMA="""
@@ -156,8 +164,8 @@ def main():
     p.add_argument("--experiment",default=EXPERIMENT)
     p.add_argument("--item",action="append",required=True,choices=sorted(ALLOWED))
     args=p.parse_args()
-    if len(args.item)!=len(set(args.item)) or len(args.item)>2:
-        p.error("at most two unique approved items per sampling run")
+    if len(args.item)!=len(set(args.item)) or len(args.item)>4:
+        p.error("at most four unique approved items per sampling run")
     if not args.experiment or len(args.experiment)>64 or not all(
         c.isalnum() or c in "-_." for c in args.experiment
     ):
