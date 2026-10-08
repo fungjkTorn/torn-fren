@@ -26,7 +26,8 @@ PLUSHIES = [
 ]
 
 def connect(db: str | Path) -> sqlite3.Connection:
-    return sqlite3.connect(str(Path(db)))
+    path = Path(db).resolve(strict=True)
+    return sqlite3.connect(path.as_uri() + "?mode=ro", uri=True)
 
 def load_gaps(con):
     rows=con.execute("select start_timestamp, coalesce(end_timestamp,9999999999) from collection_gaps order by start_timestamp").fetchall()
