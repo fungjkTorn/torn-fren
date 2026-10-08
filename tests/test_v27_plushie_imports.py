@@ -16,7 +16,7 @@ SPECIALISTS = ROOT / "research" / "plushie_champions"
 sys.path.insert(0, str(SPECIALISTS))
 from common import (ResearchContext, AnalogPlanner, TemplatePlanner,
                     TRAVEL_SECONDS, STEP, MAX_WAIT, MIN_QTY, GRACE,
-                    PLUSHIES, valid_starts)
+                    PLUSHIES, valid_starts, connect)
 
 FILES = {
     "nessie": "recent_phase_select",
@@ -47,6 +47,17 @@ class ImportedChampionSmoke(unittest.TestCase):
             self.assertTrue(conf)
         self.assertEqual(importlib.import_module("checkpoint4_online_selector").WINNING_WINDOWS,
                          {"Monkey Plushie":2,"Chamois Plushie":3})
+
+    def test_replay_opens_database_strictly_read_only(self):
+        with tempfile.TemporaryDirectory() as td:
+            db=Path(td)/"db.db"
+            self.assertRaises(FileNotFoundError, connect, str(db))
+            self.assertFalse(db.exists())
+            with sqlite3.connect(db) as con:
+                con.execute("create table x(i integer)")
+            with connect(str(db)) as con:
+                with self.assertRaises(sqlite3.OperationalError):
+                    con.execute("insert into x values(1)")
 
     def test_synthetic_history_planning_without_external_keys(self):
         with tempfile.TemporaryDirectory() as td:
