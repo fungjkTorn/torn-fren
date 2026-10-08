@@ -98,6 +98,15 @@ def record_private_decision(
          _timestamp(baseline.get("recommended_arrival_timestamp")),
          1,1)
     target=Path(db_path)
+    if target.is_file():
+        # Never append evidence tables to the actual stock collector database,
+        # even if an operator supplies a differently named archive filename.
+        with sqlite3.connect(target.resolve().as_uri()+"?mode=ro",uri=True) as probe:
+            old=probe.execute("""SELECT name FROM sqlite_master WHERE type='table'
+                                 AND name IN ('stock_history','collection_gaps')
+                                 LIMIT 1""").fetchone()
+        if old is not None:
+            raise ValueError("refusing to alter a stock collector database")
     target.parent.mkdir(parents=True,exist_ok=True)
     with sqlite3.connect(target,timeout=15) as con:
         con.execute(CREATE_TABLE)
