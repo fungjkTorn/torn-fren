@@ -11,6 +11,7 @@ def private_snapshot():
     return {
       "schema":"torn-fren-private-research-shadow-v29",
       "mode":"READ_ONLY_DIAGNOSTIC",
+      "generated_at":1792000100,
       "default_live_routing":"UNCHANGED",
       "key":"can:Fire Hydrant",
       "candidate_promoted":False,
@@ -38,6 +39,7 @@ class EvidenceCaptureTests(unittest.TestCase):
             snap=private_snapshot()
             x=record_private_decision(db,snap,"pilot-V31",now=1792000100)
             y=record_private_decision(db,snap,"pilot-V31",now=1792000170)
+            snap["generated_at"]=1792000400
             z=record_private_decision(db,snap,"pilot-V31",now=1792000400)
             self.assertEqual(x["status"],"RECORDED")
             self.assertEqual(y["status"],"DUPLICATE_TICK_IGNORED")
@@ -62,6 +64,16 @@ class EvidenceCaptureTests(unittest.TestCase):
             with sqlite3.connect(p) as con:
                 row=con.execute("select challenger_executed,challenger_departure,resolution_status from shadow_decisions").fetchone()
                 self.assertEqual(row,(0,None,"PENDING"))
+
+    def test_reject_stale_backdated_or_future_snapshot(self):
+        with tempfile.TemporaryDirectory() as td:
+            file=Path(td)/"private.db"
+            snap=private_snapshot()
+            with self.assertRaises(ValueError):
+                record_private_decision(file,snap,"pilot-V31",now=1792000400)
+            snap["generated_at"]=1792000200
+            with self.assertRaises(ValueError):
+                record_private_decision(file,snap,"pilot-V31",now=1792000100)
 
     def test_refuse_actual_stock_db_even_when_filename_is_misleading(self):
         with tempfile.TemporaryDirectory() as td:
