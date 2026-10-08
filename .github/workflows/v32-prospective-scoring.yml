@@ -1,0 +1,33 @@
+name: V32 prospective evidence scoring gate
+
+on:
+  push:
+    branches: [research/v32-prospective-outcome-gates]
+  pull_request:
+    paths:
+      - 'research/v32_score_shadow.py'
+      - 'tests/test_v32_shadow_score.py'
+      - 'tests/test_v32_catalog_release.py'
+      - 'research/v32_catalog_release_report.py'
+      - 'research/v32_capture_pilot.py'
+      - 'tests/test_v32_capture_pilot.py'
+      - '.github/workflows/v32-prospective-scoring.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  prospective-scoring:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python -m unittest discover -s tests -p 'test_v32_shadow_score.py' -v
+      - run: python -m unittest discover -s tests -p 'test_v32_capture_pilot.py' -v
+      - run: python -m unittest discover -s tests -p 'test_v32_catalog_release.py' -v
+      - run: python -m unittest discover -s tests -p 'test_v31_shadow_evidence_capture.py' -v
+      - run: python -m unittest discover -s tests -p 'test_v25_release_gate.py' -v
+      - run: python -m py_compile research/v32_score_shadow.py
