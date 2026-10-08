@@ -83,7 +83,7 @@ def _truth_map(audit):
 
 
 def _catalog(db, prior, truth, seeds, args):
-    conn = sqlite3.connect(f"file:{db.as_posix()}?mode=ro", uri=True)
+    conn = sqlite3.connect(db.as_uri() + "?mode=ro", uri=True)
     try:
         catalog = {}
         corrected = _truth_map(truth)
@@ -239,8 +239,10 @@ def _item_decision(key, prior, results, entry, conn, gaps, cache, args):
         winner, reason = "v19_corrected", "No sufficient paired evidence to replace established incumbent"
     elif new_rate is not None:
         winner, reason = "v21_corrected", "No V19 evaluated model; V21 is provisional"
+    elif immediate["sessions"] >= 30 and immediate["rate"] is not None and immediate["rate"] >= .70:
+        winner, reason = "depart_now_baseline", "Promising observed availability; no qualified cycle model"
     elif immediate["sessions"] >= 30:
-        winner, reason = "depart_now_baseline", "Only simple tested availability baseline; no qualified cycle model"
+        winner, reason = "best_effort_sparse", "Low-scoring immediate fallback, NOT a validated champion"
     else:
         winner, reason = "unresolved_sparse", "No well-evaluated model; retain live V2 forecast fallback"
 
@@ -314,7 +316,6 @@ def main():
     ap.add_argument("--retry-failures", action="store_true")
     ap.add_argument("--retest-strong", action="store_true")
     ap.add_argument("--max-new", type=int, default=0, help="0=all; positive=limit new item attempts this run")
-    ap.add_argument("--checkpoint-every", type=int, default=10)
     ap.add_argument("--min-qty", type=int, default=30)
     ap.add_argument("--grace-seconds", type=int, default=10)
     ap.add_argument("--max-wait-hours", type=int, default=12)
@@ -323,12 +324,14 @@ def main():
     ap.add_argument("--min-cycles", type=int, default=6)
     ap.add_argument("--topn", type=int, default=3)
     a = ap.parse_args()
-    if a.workers < 1 or a.checkpoint_every < 1 or a.max_new < 0:
-        raise SystemExit("workers, checkpoint-every >=1; max-new >=0")
+    if a.workers < 1 or a.max_new < 0:
+        raise SystemExit("workers >=1 and max-new >=0 required")
     db, prior, truth, seeds, db_sha = _sources(a)
     out = Path(a.output)
     settings = {
         "db_sha256": db_sha, "v19_sha256": _digest(a.v19),
+        "audit_sha256": _digest(a.audit),
+        "seed_v21_sha256": _digest(a.seed_v21) if a.seed_v21 and Path(a.seed_v21).exists() else None,
         "min_qty": a.min_qty, "grace_seconds": a.grace_seconds,
         "options": _options(a),
     }
@@ -350,7 +353,7 @@ def main():
         if key in state["catalog"] and key not in state["results"]:
             state["results"][key] = r
 
-    conn = sqlite3.connect(f"file:{db.as_posix()}?mode=ro", uri=True)
+    conn = sqlite3.connect(db.as_uri() + "?mode=ro", uri=True)
     gaps = load_gaps(conn)
     truth_cache = {}
 
