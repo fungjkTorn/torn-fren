@@ -1,0 +1,4514 @@
+{
+  "schema": "torn-fren-all-236-provisional-champions-v26",
+  "date": "2026-10-08",
+  "benchmarks": {
+    "quantity": 30,
+    "arrival_grace_seconds": 10,
+    "specialist_wait_seconds": 28800,
+    "specialist_replan_seconds": 300
+  },
+  "source_notice": "Existing all-item registry + new 21-item handoff, previously consulted development data. Not an independently validated per-trip confidence claim.",
+  "all_live_promotions_prohibited": true,
+  "items": {
+    "arg:Cannabis": {
+      "item_key": "arg:Cannabis",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v19",
+        "config_name": "dyn4",
+        "development_arrival_success_rate": 0.9615384615384616,
+        "development_hits": 200,
+        "development_starts": 208
+      },
+      "current_provisional_candidate": {
+        "model_family": "v19",
+        "config_name": "dyn4",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "arg:Ceibo Flower": {
+      "item_key": "arg:Ceibo Flower",
+      "category": "flower",
+      "original_all_item_selection": {
+        "model_family": "v19",
+        "config_name": "dyn3",
+        "development_arrival_success_rate": 0.953781512605042,
+        "development_hits": 227,
+        "development_starts": 238
+      },
+      "current_provisional_candidate": {
+        "item_key": "arg:Ceibo Flower",
+        "item": "Ceibo Flower",
+        "country": "arg",
+        "model_family": "V18",
+        "config_name": "dyn3",
+        "full_model_description": "V18 `dyn3`",
+        "source_path": "services/plushie_flower_dynamic_planner_v18.py",
+        "source_verified": true,
+        "development_success_rate": 0.9538,
+        "development_hits": null,
+        "development_starts": null,
+        "development_coverage": 1,
+        "original_handoff_status": "LOCK candidate",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED",
+        "max_wait_seconds": 28800,
+        "replan_seconds": 300
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "arg:Chalcedony Point": {
+      "item_key": "arg:Chalcedony Point",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v21",
+        "config_name": "dyn1",
+        "development_arrival_success_rate": 0.4523809523809524,
+        "development_hits": 38,
+        "development_starts": 84
+      },
+      "current_provisional_candidate": {
+        "model_family": "v21",
+        "config_name": "dyn1",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "arg:Compass": {
+      "item_key": "arg:Compass",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v19",
+        "config_name": "dyn2",
+        "development_arrival_success_rate": 0.4935064935064935,
+        "development_hits": 76,
+        "development_starts": 154
+      },
+      "current_provisional_candidate": {
+        "model_family": "v19",
+        "config_name": "dyn2",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "arg:Flamethrower": {
+      "item_key": "arg:Flamethrower",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "depart_now_baseline",
+        "config_name": null,
+        "development_arrival_success_rate": null,
+        "development_hits": null,
+        "development_starts": 0
+      },
+      "current_provisional_candidate": {
+        "model_family": "depart_now_baseline",
+        "config_name": null,
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "arg:Ketamine": {
+      "item_key": "arg:Ketamine",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v21",
+        "config_name": "dyn7",
+        "development_arrival_success_rate": 1,
+        "development_hits": 84,
+        "development_starts": 84
+      },
+      "current_provisional_candidate": {
+        "model_family": "v21",
+        "config_name": "dyn7",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "arg:LSD": {
+      "item_key": "arg:LSD",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v21",
+        "config_name": "dyn7",
+        "development_arrival_success_rate": 1,
+        "development_hits": 75,
+        "development_starts": 75
+      },
+      "current_provisional_candidate": {
+        "model_family": "v21",
+        "config_name": "dyn7",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "arg:Lighter": {
+      "item_key": "arg:Lighter",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v19",
+        "config_name": "dyn4",
+        "development_arrival_success_rate": 0.9471153846153846,
+        "development_hits": 197,
+        "development_starts": 208
+      },
+      "current_provisional_candidate": {
+        "model_family": "v19",
+        "config_name": "dyn4",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "arg:Liquid Body Armor": {
+      "item_key": "arg:Liquid Body Armor",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "quantity_below_30",
+        "config_name": null,
+        "development_arrival_success_rate": null,
+        "development_hits": null,
+        "development_starts": 0
+      },
+      "current_provisional_candidate": {
+        "model_family": "quantity_requalified_needs_new_tournament",
+        "newer_vm_observed_max": 100,
+        "promotion_status": "RESEARCH_ONLY_BLOCKED",
+        "note": "Old quantity_below_30 classification stale on newer snapshot."
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "arg:Macana": {
+      "item_key": "arg:Macana",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v20",
+        "config_name": "dyn7",
+        "development_arrival_success_rate": 0.7926829268292683,
+        "development_hits": 65,
+        "development_starts": 82
+      },
+      "current_provisional_candidate": {
+        "model_family": "v20",
+        "config_name": "dyn7",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "arg:Meteorite Fragment": {
+      "item_key": "arg:Meteorite Fragment",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v21",
+        "config_name": "dyn1",
+        "development_arrival_success_rate": 0.9590163934426228,
+        "development_hits": 117,
+        "development_starts": 122
+      },
+      "current_provisional_candidate": {
+        "model_family": "v21",
+        "config_name": "dyn1",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "arg:Monkey Plushie": {
+      "item_key": "arg:Monkey Plushie",
+      "category": "plushie",
+      "original_all_item_selection": {
+        "model_family": "v21",
+        "config_name": "dyn5",
+        "development_arrival_success_rate": 0.8466257668711656,
+        "development_hits": 138,
+        "development_starts": 163
+      },
+      "current_provisional_candidate": {
+        "item_key": "arg:Monkey Plushie",
+        "item": "Monkey Plushie",
+        "country": "arg",
+        "model_family": "online_template_expert",
+        "config_name": null,
+        "full_model_description": "online template-expert selector, 2-day resolved-performance window",
+        "source_path": "checkpoint4_online_selector.py",
+        "source_verified": false,
+        "development_success_rate": 0.7615000000000001,
+        "development_hits": 83,
+        "development_starts": 109,
+        "development_coverage": 1,
+        "original_handoff_status": "BASE champion; stretch >90 unresolved",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED",
+        "max_wait_seconds": 28800,
+        "replan_seconds": 300
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "arg:Patagonian Fossil": {
+      "item_key": "arg:Patagonian Fossil",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v19",
+        "config_name": "dyn3",
+        "development_arrival_success_rate": 0.8607594936708861,
+        "development_hits": 68,
+        "development_starts": 79
+      },
+      "current_provisional_candidate": {
+        "model_family": "v19",
+        "config_name": "dyn3",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "arg:Shrooms": {
+      "item_key": "arg:Shrooms",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v21",
+        "config_name": "dyn7",
+        "development_arrival_success_rate": 1,
+        "development_hits": 84,
+        "development_starts": 84
+      },
+      "current_provisional_candidate": {
+        "model_family": "v21",
+        "config_name": "dyn7",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "arg:Soccer Ball": {
+      "item_key": "arg:Soccer Ball",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v20",
+        "config_name": "dyn1",
+        "development_arrival_success_rate": 0.8225806451612904,
+        "development_hits": 102,
+        "development_starts": 124
+      },
+      "current_provisional_candidate": {
+        "model_family": "v20",
+        "config_name": "dyn1",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "arg:Speed": {
+      "item_key": "arg:Speed",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "depart_now_baseline",
+        "config_name": null,
+        "development_arrival_success_rate": null,
+        "development_hits": null,
+        "development_starts": 0
+      },
+      "current_provisional_candidate": {
+        "model_family": "depart_now_baseline",
+        "config_name": null,
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "arg:Tear Gas": {
+      "item_key": "arg:Tear Gas",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v19",
+        "config_name": "dyn7",
+        "development_arrival_success_rate": 0.3128834355828221,
+        "development_hits": 51,
+        "development_starts": 163
+      },
+      "current_provisional_candidate": {
+        "model_family": "v19",
+        "config_name": "dyn7",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "arg:Throwing Knife": {
+      "item_key": "arg:Throwing Knife",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "best_effort_sparse",
+        "config_name": null,
+        "development_arrival_success_rate": null,
+        "development_hits": null,
+        "development_starts": 0
+      },
+      "current_provisional_candidate": {
+        "model_family": "best_effort_sparse",
+        "config_name": null,
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "can:Aluminum Plate": {
+      "item_key": "can:Aluminum Plate",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v19",
+        "config_name": "dyn4",
+        "development_arrival_success_rate": 0.9701492537313432,
+        "development_hits": 130,
+        "development_starts": 134
+      },
+      "current_provisional_candidate": {
+        "model_family": "v19",
+        "config_name": "dyn4",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "can:Bear Gall": {
+      "item_key": "can:Bear Gall",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v21",
+        "config_name": "dyn12",
+        "development_arrival_success_rate": 0.9864864864864864,
+        "development_hits": 146,
+        "development_starts": 148
+      },
+      "current_provisional_candidate": {
+        "model_family": "v21",
+        "config_name": "dyn12",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "can:Cannabis": {
+      "item_key": "can:Cannabis",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v21",
+        "config_name": "dyn10",
+        "development_arrival_success_rate": 0.9754601226993864,
+        "development_hits": 159,
+        "development_starts": 163
+      },
+      "current_provisional_candidate": {
+        "model_family": "v21",
+        "config_name": "dyn10",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "can:Crocus": {
+      "item_key": "can:Crocus",
+      "category": "flower",
+      "original_all_item_selection": {
+        "model_family": "v19",
+        "config_name": "dyn5",
+        "development_arrival_success_rate": 0.9567099567099568,
+        "development_hits": 221,
+        "development_starts": 231
+      },
+      "current_provisional_candidate": {
+        "item_key": "can:Crocus",
+        "item": "Crocus",
+        "country": "can",
+        "model_family": "V18",
+        "config_name": "dyn5",
+        "full_model_description": "V18 `dyn5`",
+        "source_path": "services/plushie_flower_dynamic_planner_v18.py",
+        "source_verified": true,
+        "development_success_rate": 0.9567,
+        "development_hits": null,
+        "development_starts": null,
+        "development_coverage": 1,
+        "original_handoff_status": "LOCK candidate",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED",
+        "max_wait_seconds": 28800,
+        "replan_seconds": 300
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "can:Dog Treats": {
+      "item_key": "can:Dog Treats",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v21",
+        "config_name": "dyn10",
+        "development_arrival_success_rate": 0.9703703703703704,
+        "development_hits": 131,
+        "development_starts": 135
+      },
+      "current_provisional_candidate": {
+        "model_family": "v21",
+        "config_name": "dyn10",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "can:Ecstasy": {
+      "item_key": "can:Ecstasy",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v19",
+        "config_name": "dyn7",
+        "development_arrival_success_rate": 0.9678899082568808,
+        "development_hits": 211,
+        "development_starts": 218
+      },
+      "current_provisional_candidate": {
+        "model_family": "v19",
+        "config_name": "dyn7",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "can:Fire Hydrant": {
+      "item_key": "can:Fire Hydrant",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v21",
+        "config_name": "dyn13",
+        "development_arrival_success_rate": 0.4358974358974359,
+        "development_hits": 51,
+        "development_starts": 117
+      },
+      "current_provisional_candidate": {
+        "model_family": "v21",
+        "config_name": "dyn13",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "can:Hockey Stick": {
+      "item_key": "can:Hockey Stick",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v21",
+        "config_name": "dyn13",
+        "development_arrival_success_rate": 0.9814814814814816,
+        "development_hits": 159,
+        "development_starts": 162
+      },
+      "current_provisional_candidate": {
+        "model_family": "v21",
+        "config_name": "dyn13",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "can:Ice Pick": {
+      "item_key": "can:Ice Pick",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v21",
+        "config_name": "dyn5",
+        "development_arrival_success_rate": 0.2018348623853211,
+        "development_hits": 22,
+        "development_starts": 109
+      },
+      "current_provisional_candidate": {
+        "model_family": "v21",
+        "config_name": "dyn5",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "can:Insulin": {
+      "item_key": "can:Insulin",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v19",
+        "config_name": "dyn7",
+        "development_arrival_success_rate": 0.9838709677419356,
+        "development_hits": 244,
+        "development_starts": 248
+      },
+      "current_provisional_candidate": {
+        "model_family": "v19",
+        "config_name": "dyn7",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "can:Ithaca 37": {
+      "item_key": "can:Ithaca 37",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v21",
+        "config_name": "dyn1",
+        "development_arrival_success_rate": 0.6311475409836066,
+        "development_hits": 77,
+        "development_starts": 122
+      },
+      "current_provisional_candidate": {
+        "model_family": "v21",
+        "config_name": "dyn1",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "can:Lorcin 380": {
+      "item_key": "can:Lorcin 380",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v21",
+        "config_name": "dyn12",
+        "development_arrival_success_rate": 0.9534883720930232,
+        "development_hits": 82,
+        "development_starts": 86
+      },
+      "current_provisional_candidate": {
+        "model_family": "v21",
+        "config_name": "dyn12",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "can:Mountie Hat": {
+      "item_key": "can:Mountie Hat",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v21",
+        "config_name": "dyn4",
+        "development_arrival_success_rate": 0.2549019607843137,
+        "development_hits": 13,
+        "development_starts": 51
+      },
+      "current_provisional_candidate": {
+        "model_family": "v21",
+        "config_name": "dyn4",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "can:PCP": {
+      "item_key": "can:PCP",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v21",
+        "config_name": "dyn5",
+        "development_arrival_success_rate": 1,
+        "development_hits": 83,
+        "development_starts": 83
+      },
+      "current_provisional_candidate": {
+        "model_family": "v21",
+        "config_name": "dyn5",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "can:PVC Cards": {
+      "item_key": "can:PVC Cards",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v19",
+        "config_name": "dyn8",
+        "development_arrival_success_rate": 0.97196261682243,
+        "development_hits": 208,
+        "development_starts": 214
+      },
+      "current_provisional_candidate": {
+        "model_family": "v19",
+        "config_name": "dyn8",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "can:Quartz Point": {
+      "item_key": "can:Quartz Point",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v20",
+        "config_name": "dyn9",
+        "development_arrival_success_rate": 0.5517241379310345,
+        "development_hits": 32,
+        "development_starts": 58
+      },
+      "current_provisional_candidate": {
+        "model_family": "v20",
+        "config_name": "dyn9",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "can:Safety Boots": {
+      "item_key": "can:Safety Boots",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "best_effort_sparse",
+        "config_name": null,
+        "development_arrival_success_rate": null,
+        "development_hits": null,
+        "development_starts": 0
+      },
+      "current_provisional_candidate": {
+        "model_family": "best_effort_sparse",
+        "config_name": null,
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "can:Vicodin": {
+      "item_key": "can:Vicodin",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v19",
+        "config_name": "dyn3",
+        "development_arrival_success_rate": 1,
+        "development_hits": 80,
+        "development_starts": 80
+      },
+      "current_provisional_candidate": {
+        "model_family": "v19",
+        "config_name": "dyn3",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "can:Wolverine Plushie": {
+      "item_key": "can:Wolverine Plushie",
+      "category": "plushie",
+      "original_all_item_selection": {
+        "model_family": "v19",
+        "config_name": "dyn8",
+        "development_arrival_success_rate": 0.9758064516129032,
+        "development_hits": 242,
+        "development_starts": 248
+      },
+      "current_provisional_candidate": {
+        "item_key": "can:Wolverine Plushie",
+        "item": "Wolverine Plushie",
+        "country": "can",
+        "model_family": "V18",
+        "config_name": "dyn8",
+        "full_model_description": "V18 `dyn8`",
+        "source_path": "services/plushie_flower_dynamic_planner_v18.py",
+        "source_verified": true,
+        "development_success_rate": 0.9758,
+        "development_hits": null,
+        "development_starts": null,
+        "development_coverage": 1,
+        "original_handoff_status": "LOCK candidate",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED",
+        "max_wait_seconds": 28800,
+        "replan_seconds": 300
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "can:Xanax": {
+      "item_key": "can:Xanax",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v19",
+        "config_name": "dyn8",
+        "development_arrival_success_rate": 0.9074074074074074,
+        "development_hits": 147,
+        "development_starts": 162
+      },
+      "current_provisional_candidate": {
+        "model_family": "v19",
+        "config_name": "dyn8",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "cay:Banana Orchid": {
+      "item_key": "cay:Banana Orchid",
+      "category": "flower",
+      "original_all_item_selection": {
+        "model_family": "v19",
+        "config_name": "dyn7",
+        "development_arrival_success_rate": 0.9411764705882352,
+        "development_hits": 224,
+        "development_starts": 238
+      },
+      "current_provisional_candidate": {
+        "item_key": "cay:Banana Orchid",
+        "item": "Banana Orchid",
+        "country": "cay",
+        "model_family": "V18",
+        "config_name": "dyn7",
+        "full_model_description": "V18 `dyn7`",
+        "source_path": "services/plushie_flower_dynamic_planner_v18.py",
+        "source_verified": true,
+        "development_success_rate": 0.9412,
+        "development_hits": null,
+        "development_starts": null,
+        "development_coverage": 1,
+        "original_handoff_status": "LOCK candidate",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED",
+        "max_wait_seconds": 28800,
+        "replan_seconds": 300
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "cay:Bearer Bond": {
+      "item_key": "cay:Bearer Bond",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "depart_now_baseline",
+        "config_name": null,
+        "development_arrival_success_rate": null,
+        "development_hits": null,
+        "development_starts": 0
+      },
+      "current_provisional_candidate": {
+        "model_family": "depart_now_baseline",
+        "config_name": null,
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "cay:Bikini": {
+      "item_key": "cay:Bikini",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v21",
+        "config_name": "dyn10",
+        "development_arrival_success_rate": 0.7950819672131147,
+        "development_hits": 97,
+        "development_starts": 122
+      },
+      "current_provisional_candidate": {
+        "model_family": "v21",
+        "config_name": "dyn10",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "cay:Diamond Bladed Knife": {
+      "item_key": "cay:Diamond Bladed Knife",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v21",
+        "config_name": "dyn3",
+        "development_arrival_success_rate": 0.9135802469135802,
+        "development_hits": 74,
+        "development_starts": 81
+      },
+      "current_provisional_candidate": {
+        "model_family": "v21",
+        "config_name": "dyn3",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "cay:Diving Gloves": {
+      "item_key": "cay:Diving Gloves",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v21",
+        "config_name": "dyn8",
+        "development_arrival_success_rate": 0.984126984126984,
+        "development_hits": 124,
+        "development_starts": 126
+      },
+      "current_provisional_candidate": {
+        "model_family": "v21",
+        "config_name": "dyn8",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "cay:Flippers": {
+      "item_key": "cay:Flippers",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v21",
+        "config_name": "dyn4",
+        "development_arrival_success_rate": 0.9759036144578314,
+        "development_hits": 81,
+        "development_starts": 83
+      },
+      "current_provisional_candidate": {
+        "model_family": "v21",
+        "config_name": "dyn4",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "cay:Harpoon": {
+      "item_key": "cay:Harpoon",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "depart_now_baseline",
+        "config_name": null,
+        "development_arrival_success_rate": null,
+        "development_hits": null,
+        "development_starts": 0
+      },
+      "current_provisional_candidate": {
+        "model_family": "depart_now_baseline",
+        "config_name": null,
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "cay:Naval Cutlass": {
+      "item_key": "cay:Naval Cutlass",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "quantity_below_30",
+        "config_name": null,
+        "development_arrival_success_rate": null,
+        "development_hits": null,
+        "development_starts": 0
+      },
+      "current_provisional_candidate": {
+        "model_family": "quantity_below_30",
+        "config_name": null,
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "cay:Nodding Turtle": {
+      "item_key": "cay:Nodding Turtle",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v19",
+        "config_name": "dyn3",
+        "development_arrival_success_rate": 0.7409638554216867,
+        "development_hits": 123,
+        "development_starts": 166
+      },
+      "current_provisional_candidate": {
+        "model_family": "v19",
+        "config_name": "dyn3",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "cay:Snorkel": {
+      "item_key": "cay:Snorkel",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v21",
+        "config_name": "dyn11",
+        "development_arrival_success_rate": 0.3066666666666666,
+        "development_hits": 23,
+        "development_starts": 75
+      },
+      "current_provisional_candidate": {
+        "model_family": "v21",
+        "config_name": "dyn11",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "cay:Speedo": {
+      "item_key": "cay:Speedo",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v21",
+        "config_name": "dyn4",
+        "development_arrival_success_rate": 0.983739837398374,
+        "development_hits": 121,
+        "development_starts": 123
+      },
+      "current_provisional_candidate": {
+        "model_family": "v21",
+        "config_name": "dyn4",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "cay:Steel Drum": {
+      "item_key": "cay:Steel Drum",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v19",
+        "config_name": "dyn1",
+        "development_arrival_success_rate": 0,
+        "development_hits": 0,
+        "development_starts": 161
+      },
+      "current_provisional_candidate": {
+        "model_family": "v19",
+        "config_name": "dyn1",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "cay:Stingray Plushie": {
+      "item_key": "cay:Stingray Plushie",
+      "category": "plushie",
+      "original_all_item_selection": {
+        "model_family": "v19",
+        "config_name": "dyn7",
+        "development_arrival_success_rate": 0.9799196787148594,
+        "development_hits": 244,
+        "development_starts": 249
+      },
+      "current_provisional_candidate": {
+        "item_key": "cay:Stingray Plushie",
+        "item": "Stingray Plushie",
+        "country": "cay",
+        "model_family": "V18",
+        "config_name": "dyn7",
+        "full_model_description": "V18 `dyn7`",
+        "source_path": "services/plushie_flower_dynamic_planner_v18.py",
+        "source_verified": true,
+        "development_success_rate": 0.9799,
+        "development_hits": null,
+        "development_starts": null,
+        "development_coverage": 1,
+        "original_handoff_status": "LOCK candidate",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED",
+        "max_wait_seconds": 28800,
+        "replan_seconds": 300
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "cay:Tavor TAR-21": {
+      "item_key": "cay:Tavor TAR-21",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "depart_now_baseline",
+        "config_name": null,
+        "development_arrival_success_rate": null,
+        "development_hits": null,
+        "development_starts": 0
+      },
+      "current_provisional_candidate": {
+        "model_family": "depart_now_baseline",
+        "config_name": null,
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "cay:Trout": {
+      "item_key": "cay:Trout",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v19",
+        "config_name": "dyn3",
+        "development_arrival_success_rate": 0.7349397590361446,
+        "development_hits": 122,
+        "development_starts": 166
+      },
+      "current_provisional_candidate": {
+        "model_family": "v19",
+        "config_name": "dyn3",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "cay:Wetsuit": {
+      "item_key": "cay:Wetsuit",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "best_effort_sparse",
+        "config_name": null,
+        "development_arrival_success_rate": null,
+        "development_hits": null,
+        "development_starts": 0
+      },
+      "current_provisional_candidate": {
+        "model_family": "best_effort_sparse",
+        "config_name": null,
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "chi:Blowgun": {
+      "item_key": "chi:Blowgun",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v21",
+        "config_name": "dyn4",
+        "development_arrival_success_rate": 0.6410256410256411,
+        "development_hits": 50,
+        "development_starts": 78
+      },
+      "current_provisional_candidate": {
+        "model_family": "v21",
+        "config_name": "dyn4",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "chi:Bo Staff": {
+      "item_key": "chi:Bo Staff",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v19",
+        "config_name": "dyn1",
+        "development_arrival_success_rate": 0,
+        "development_hits": 0,
+        "development_starts": 116
+      },
+      "current_provisional_candidate": {
+        "model_family": "v19",
+        "config_name": "dyn1",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "chi:Ecstasy": {
+      "item_key": "chi:Ecstasy",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v19",
+        "config_name": "dyn5",
+        "development_arrival_success_rate": 1,
+        "development_hits": 77,
+        "development_starts": 77
+      },
+      "current_provisional_candidate": {
+        "model_family": "v19",
+        "config_name": "dyn5",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "chi:Fireworks": {
+      "item_key": "chi:Fireworks",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v19",
+        "config_name": "dyn6",
+        "development_arrival_success_rate": 0.38,
+        "development_hits": 57,
+        "development_starts": 150
+      },
+      "current_provisional_candidate": {
+        "model_family": "v19",
+        "config_name": "dyn6",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "chi:Guandao": {
+      "item_key": "chi:Guandao",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "quantity_below_30",
+        "config_name": null,
+        "development_arrival_success_rate": null,
+        "development_hits": null,
+        "development_starts": 120
+      },
+      "current_provisional_candidate": {
+        "model_family": "quantity_below_30",
+        "config_name": null,
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "chi:Jade Buddha": {
+      "item_key": "chi:Jade Buddha",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v19",
+        "config_name": "dyn8",
+        "development_arrival_success_rate": 0.9205607476635514,
+        "development_hits": 197,
+        "development_starts": 214
+      },
+      "current_provisional_candidate": {
+        "model_family": "v19",
+        "config_name": "dyn8",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "chi:Katana": {
+      "item_key": "chi:Katana",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v19",
+        "config_name": "dyn3",
+        "development_arrival_success_rate": 0.490566037735849,
+        "development_hits": 78,
+        "development_starts": 159
+      },
+      "current_provisional_candidate": {
+        "model_family": "v19",
+        "config_name": "dyn3",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "chi:LSD": {
+      "item_key": "chi:LSD",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "depart_now_baseline",
+        "config_name": null,
+        "development_arrival_success_rate": null,
+        "development_hits": null,
+        "development_starts": 0
+      },
+      "current_provisional_candidate": {
+        "model_family": "depart_now_baseline",
+        "config_name": null,
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "chi:Magnesium Shavings": {
+      "item_key": "chi:Magnesium Shavings",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v19",
+        "config_name": "dyn7",
+        "development_arrival_success_rate": 0.9418604651162792,
+        "development_hits": 81,
+        "development_starts": 86
+      },
+      "current_provisional_candidate": {
+        "model_family": "v19",
+        "config_name": "dyn7",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "chi:Opium": {
+      "item_key": "chi:Opium",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v21",
+        "config_name": "dyn2",
+        "development_arrival_success_rate": 1,
+        "development_hits": 83,
+        "development_starts": 83
+      },
+      "current_provisional_candidate": {
+        "model_family": "v21",
+        "config_name": "dyn2",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "chi:PCP": {
+      "item_key": "chi:PCP",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "depart_now_baseline",
+        "config_name": null,
+        "development_arrival_success_rate": null,
+        "development_hits": null,
+        "development_starts": 0
+      },
+      "current_provisional_candidate": {
+        "model_family": "depart_now_baseline",
+        "config_name": null,
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "chi:Panda Plushie": {
+      "item_key": "chi:Panda Plushie",
+      "category": "plushie",
+      "original_all_item_selection": {
+        "model_family": "v20",
+        "config_name": "dyn6",
+        "development_arrival_success_rate": 0.8148148148148148,
+        "development_hits": 132,
+        "development_starts": 162
+      },
+      "current_provisional_candidate": {
+        "item_key": "chi:Panda Plushie",
+        "item": "Panda Plushie",
+        "country": "chi",
+        "model_family": "two_expert_extra_trees",
+        "config_name": null,
+        "full_model_description": "two-expert global-regime analog bank: A `(k16, gw=.15)`, B `(k18, gw=.75)` + ExtraTrees selector `depth=3, leaf=3`",
+        "source_path": "panda_pair_selector_ml.py",
+        "source_verified": false,
+        "development_success_rate": 0.9167000000000001,
+        "development_hits": 99,
+        "development_starts": 108,
+        "development_coverage": 1,
+        "original_handoff_status": "PROVISIONAL: weak selector validation, retest early",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED",
+        "max_wait_seconds": 28800,
+        "replan_seconds": 300
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "chi:Pangolin Scales": {
+      "item_key": "chi:Pangolin Scales",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v20",
+        "config_name": "dyn13",
+        "development_arrival_success_rate": 0.8198757763975155,
+        "development_hits": 132,
+        "development_starts": 161
+      },
+      "current_provisional_candidate": {
+        "model_family": "v20",
+        "config_name": "dyn13",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "chi:Peony": {
+      "item_key": "chi:Peony",
+      "category": "flower",
+      "original_all_item_selection": {
+        "model_family": "v21",
+        "config_name": "dyn10",
+        "development_arrival_success_rate": 1,
+        "development_hits": 143,
+        "development_starts": 143
+      },
+      "current_provisional_candidate": {
+        "item_key": "chi:Peony",
+        "item": "Peony",
+        "country": "chi",
+        "model_family": "V20",
+        "config_name": "traj12",
+        "full_model_description": "V20 `traj12`",
+        "source_path": "services/plushie_flower_dynamic_planner_v20.py",
+        "source_verified": true,
+        "development_success_rate": 1,
+        "development_hits": null,
+        "development_starts": null,
+        "development_coverage": 1,
+        "original_handoff_status": "LOCK candidate",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED",
+        "max_wait_seconds": 28800,
+        "replan_seconds": 300
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "chi:Printing Paper": {
+      "item_key": "chi:Printing Paper",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v19",
+        "config_name": "dyn1",
+        "development_arrival_success_rate": 0.9605263157894736,
+        "development_hits": 73,
+        "development_starts": 76
+      },
+      "current_provisional_candidate": {
+        "model_family": "v19",
+        "config_name": "dyn1",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "chi:Qsz-92": {
+      "item_key": "chi:Qsz-92",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "depart_now_baseline",
+        "config_name": null,
+        "development_arrival_success_rate": null,
+        "development_hits": null,
+        "development_starts": 0
+      },
+      "current_provisional_candidate": {
+        "model_family": "depart_now_baseline",
+        "config_name": null,
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "chi:SKS Carbine": {
+      "item_key": "chi:SKS Carbine",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v21",
+        "config_name": "dyn1",
+        "development_arrival_success_rate": 0.1666666666666666,
+        "development_hits": 13,
+        "development_starts": 78
+      },
+      "current_provisional_candidate": {
+        "model_family": "v21",
+        "config_name": "dyn1",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "chi:Speed": {
+      "item_key": "chi:Speed",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "depart_now_baseline",
+        "config_name": null,
+        "development_arrival_success_rate": null,
+        "development_hits": null,
+        "development_starts": 0
+      },
+      "current_provisional_candidate": {
+        "model_family": "depart_now_baseline",
+        "config_name": null,
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "chi:Stick of Dynamite": {
+      "item_key": "chi:Stick of Dynamite",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v21",
+        "config_name": "dyn11",
+        "development_arrival_success_rate": 0.6486486486486487,
+        "development_hits": 48,
+        "development_starts": 74
+      },
+      "current_provisional_candidate": {
+        "model_family": "v21",
+        "config_name": "dyn11",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "chi:Tiger Bone Powder": {
+      "item_key": "chi:Tiger Bone Powder",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v19",
+        "config_name": "dyn5",
+        "development_arrival_success_rate": 0.984924623115578,
+        "development_hits": 196,
+        "development_starts": 199
+      },
+      "current_provisional_candidate": {
+        "model_family": "v19",
+        "config_name": "dyn5",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "chi:Twin Tiger Hooks": {
+      "item_key": "chi:Twin Tiger Hooks",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v19",
+        "config_name": "dyn1",
+        "development_arrival_success_rate": 0,
+        "development_hits": 0,
+        "development_starts": 152
+      },
+      "current_provisional_candidate": {
+        "model_family": "v19",
+        "config_name": "dyn1",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "chi:Wushu Double Axes": {
+      "item_key": "chi:Wushu Double Axes",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "quantity_below_30",
+        "config_name": null,
+        "development_arrival_success_rate": null,
+        "development_hits": null,
+        "development_starts": 143
+      },
+      "current_provisional_candidate": {
+        "model_family": "quantity_below_30",
+        "config_name": null,
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "haw:Basalt Point": {
+      "item_key": "haw:Basalt Point",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v21",
+        "config_name": "dyn12",
+        "development_arrival_success_rate": 0.4126984126984127,
+        "development_hits": 26,
+        "development_starts": 63
+      },
+      "current_provisional_candidate": {
+        "model_family": "v21",
+        "config_name": "dyn12",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "haw:Bushmaster Carbon 15": {
+      "item_key": "haw:Bushmaster Carbon 15",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v20",
+        "config_name": "dyn7",
+        "development_arrival_success_rate": 0.7653061224489796,
+        "development_hits": 75,
+        "development_starts": 98
+      },
+      "current_provisional_candidate": {
+        "model_family": "v20",
+        "config_name": "dyn7",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "haw:Coconut Bra": {
+      "item_key": "haw:Coconut Bra",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "quantity_below_30",
+        "config_name": null,
+        "development_arrival_success_rate": null,
+        "development_hits": null,
+        "development_starts": 0
+      },
+      "current_provisional_candidate": {
+        "model_family": "quantity_below_30",
+        "config_name": null,
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "haw:HEG": {
+      "item_key": "haw:HEG",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v21",
+        "config_name": "dyn5",
+        "development_arrival_success_rate": 0.9256198347107438,
+        "development_hits": 112,
+        "development_starts": 121
+      },
+      "current_provisional_candidate": {
+        "model_family": "v21",
+        "config_name": "dyn5",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "haw:Large Suitcase": {
+      "item_key": "haw:Large Suitcase",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v21",
+        "config_name": "dyn3",
+        "development_arrival_success_rate": 0.6911764705882353,
+        "development_hits": 94,
+        "development_starts": 136
+      },
+      "current_provisional_candidate": {
+        "model_family": "v21",
+        "config_name": "dyn3",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "haw:Medium Suitcase": {
+      "item_key": "haw:Medium Suitcase",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "best_effort_sparse",
+        "config_name": null,
+        "development_arrival_success_rate": null,
+        "development_hits": null,
+        "development_starts": 0
+      },
+      "current_provisional_candidate": {
+        "model_family": "best_effort_sparse",
+        "config_name": null,
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "haw:Orchid": {
+      "item_key": "haw:Orchid",
+      "category": "flower",
+      "original_all_item_selection": {
+        "model_family": "v19",
+        "config_name": "dyn3",
+        "development_arrival_success_rate": 1,
+        "development_hits": 240,
+        "development_starts": 240
+      },
+      "current_provisional_candidate": {
+        "item_key": "haw:Orchid",
+        "item": "Orchid",
+        "country": "haw",
+        "model_family": "V18",
+        "config_name": "dyn3",
+        "full_model_description": "V18 `dyn3`",
+        "source_path": "services/plushie_flower_dynamic_planner_v18.py",
+        "source_verified": true,
+        "development_success_rate": 1,
+        "development_hits": null,
+        "development_starts": null,
+        "development_coverage": 1,
+        "original_handoff_status": "LOCK candidate",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED",
+        "max_wait_seconds": 28800,
+        "replan_seconds": 300
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "haw:Pele Charm": {
+      "item_key": "haw:Pele Charm",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v19",
+        "config_name": "dyn2",
+        "development_arrival_success_rate": 0.9375,
+        "development_hits": 225,
+        "development_starts": 240
+      },
+      "current_provisional_candidate": {
+        "model_family": "v19",
+        "config_name": "dyn2",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "haw:Shark Fin": {
+      "item_key": "haw:Shark Fin",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v21",
+        "config_name": "dyn10",
+        "development_arrival_success_rate": 0.6012269938650306,
+        "development_hits": 98,
+        "development_starts": 163
+      },
+      "current_provisional_candidate": {
+        "model_family": "v21",
+        "config_name": "dyn10",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "haw:Small Suitcase": {
+      "item_key": "haw:Small Suitcase",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "best_effort_sparse",
+        "config_name": null,
+        "development_arrival_success_rate": null,
+        "development_hits": null,
+        "development_starts": 0
+      },
+      "current_provisional_candidate": {
+        "model_family": "best_effort_sparse",
+        "config_name": null,
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "haw:Taurus": {
+      "item_key": "haw:Taurus",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "best_effort_sparse",
+        "config_name": null,
+        "development_arrival_success_rate": null,
+        "development_hits": null,
+        "development_starts": 0
+      },
+      "current_provisional_candidate": {
+        "model_family": "best_effort_sparse",
+        "config_name": null,
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "haw:Taurus PT92": {
+      "item_key": "haw:Taurus PT92",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v20",
+        "config_name": "dyn12",
+        "development_arrival_success_rate": 0.8709677419354839,
+        "development_hits": 108,
+        "development_starts": 124
+      },
+      "current_provisional_candidate": {
+        "model_family": "v20",
+        "config_name": "dyn12",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "haw:Turtle Shell": {
+      "item_key": "haw:Turtle Shell",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v21",
+        "config_name": "dyn11",
+        "development_arrival_success_rate": 0.6341463414634146,
+        "development_hits": 104,
+        "development_starts": 164
+      },
+      "current_provisional_candidate": {
+        "model_family": "v21",
+        "config_name": "dyn11",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "haw:Type 98 Anti Tank": {
+      "item_key": "haw:Type 98 Anti Tank",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "quantity_below_30",
+        "config_name": null,
+        "development_arrival_success_rate": null,
+        "development_hits": null,
+        "development_starts": 0
+      },
+      "current_provisional_candidate": {
+        "model_family": "quantity_below_30",
+        "config_name": null,
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "jap:BT MP9": {
+      "item_key": "jap:BT MP9",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "depart_now_baseline",
+        "config_name": null,
+        "development_arrival_success_rate": null,
+        "development_hits": null,
+        "development_starts": 0
+      },
+      "current_provisional_candidate": {
+        "model_family": "depart_now_baseline",
+        "config_name": null,
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "jap:Bonded Latex": {
+      "item_key": "jap:Bonded Latex",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v19",
+        "config_name": "dyn3",
+        "development_arrival_success_rate": 0.99,
+        "development_hits": 99,
+        "development_starts": 100
+      },
+      "current_provisional_candidate": {
+        "model_family": "v19",
+        "config_name": "dyn3",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "jap:Bottle of Sake": {
+      "item_key": "jap:Bottle of Sake",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v21",
+        "config_name": "dyn6",
+        "development_arrival_success_rate": 0.8037974683544303,
+        "development_hits": 127,
+        "development_starts": 158
+      },
+      "current_provisional_candidate": {
+        "model_family": "v21",
+        "config_name": "dyn6",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "jap:Chain Whip": {
+      "item_key": "jap:Chain Whip",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "quantity_below_30",
+        "config_name": null,
+        "development_arrival_success_rate": null,
+        "development_hits": null,
+        "development_starts": 130
+      },
+      "current_provisional_candidate": {
+        "model_family": "quantity_below_30",
+        "config_name": null,
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "jap:Cherry Blossom": {
+      "item_key": "jap:Cherry Blossom",
+      "category": "flower",
+      "original_all_item_selection": {
+        "model_family": "v21",
+        "config_name": "dyn9",
+        "development_arrival_success_rate": 0.9171974522292994,
+        "development_hits": 144,
+        "development_starts": 157
+      },
+      "current_provisional_candidate": {
+        "item_key": "jap:Cherry Blossom",
+        "item": "Cherry Blossom",
+        "country": "jap",
+        "model_family": "V19",
+        "config_name": "dyn2",
+        "full_model_description": "V19 `dyn2`",
+        "source_path": "services/plushie_flower_dynamic_planner_v19.py",
+        "source_verified": true,
+        "development_success_rate": 1,
+        "development_hits": null,
+        "development_starts": null,
+        "development_coverage": 1,
+        "original_handoff_status": "LOCK candidate",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED",
+        "max_wait_seconds": 28800,
+        "replan_seconds": 300
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "jap:Chopsticks": {
+      "item_key": "jap:Chopsticks",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v19",
+        "config_name": "dyn2",
+        "development_arrival_success_rate": 0.6193548387096774,
+        "development_hits": 96,
+        "development_starts": 155
+      },
+      "current_provisional_candidate": {
+        "model_family": "v19",
+        "config_name": "dyn2",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "jap:Counterfeit Manga": {
+      "item_key": "jap:Counterfeit Manga",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v21",
+        "config_name": "dyn13",
+        "development_arrival_success_rate": 0.925,
+        "development_hits": 148,
+        "development_starts": 160
+      },
+      "current_provisional_candidate": {
+        "model_family": "v21",
+        "config_name": "dyn13",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "jap:Ecstasy": {
+      "item_key": "jap:Ecstasy",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v19",
+        "config_name": "dyn1",
+        "development_arrival_success_rate": 0.9302325581395348,
+        "development_hits": 80,
+        "development_starts": 86
+      },
+      "current_provisional_candidate": {
+        "model_family": "v19",
+        "config_name": "dyn1",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "jap:Flexible Body Armor": {
+      "item_key": "jap:Flexible Body Armor",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "depart_now_baseline",
+        "config_name": null,
+        "development_arrival_success_rate": null,
+        "development_hits": null,
+        "development_starts": 0
+      },
+      "current_provisional_candidate": {
+        "model_family": "depart_now_baseline",
+        "config_name": null,
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "jap:Glow Stick": {
+      "item_key": "jap:Glow Stick",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v21",
+        "config_name": "dyn7",
+        "development_arrival_success_rate": 0.8104575163398693,
+        "development_hits": 124,
+        "development_starts": 153
+      },
+      "current_provisional_candidate": {
+        "model_family": "v21",
+        "config_name": "dyn7",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "jap:Hydrochloric Acid": {
+      "item_key": "jap:Hydrochloric Acid",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "best_effort_sparse",
+        "config_name": null,
+        "development_arrival_success_rate": null,
+        "development_hits": null,
+        "development_starts": 0
+      },
+      "current_provisional_candidate": {
+        "model_family": "best_effort_sparse",
+        "config_name": null,
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "jap:Kabuki Mask": {
+      "item_key": "jap:Kabuki Mask",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v20",
+        "config_name": "dyn5",
+        "development_arrival_success_rate": 0.4213836477987421,
+        "development_hits": 67,
+        "development_starts": 159
+      },
+      "current_provisional_candidate": {
+        "model_family": "v20",
+        "config_name": "dyn5",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "jap:Kama": {
+      "item_key": "jap:Kama",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "quantity_below_30",
+        "config_name": null,
+        "development_arrival_success_rate": null,
+        "development_hits": null,
+        "development_starts": 140
+      },
+      "current_provisional_candidate": {
+        "model_family": "quantity_below_30",
+        "config_name": null,
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "jap:Ketamine": {
+      "item_key": "jap:Ketamine",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "depart_now_baseline",
+        "config_name": null,
+        "development_arrival_success_rate": null,
+        "development_hits": null,
+        "development_starts": 0
+      },
+      "current_provisional_candidate": {
+        "model_family": "depart_now_baseline",
+        "config_name": null,
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "jap:Kodachi": {
+      "item_key": "jap:Kodachi",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "depart_now_baseline",
+        "config_name": null,
+        "development_arrival_success_rate": null,
+        "development_hits": null,
+        "development_starts": 0
+      },
+      "current_provisional_candidate": {
+        "model_family": "depart_now_baseline",
+        "config_name": null,
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "jap:Maneki Neko": {
+      "item_key": "jap:Maneki Neko",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v21",
+        "config_name": "dyn11",
+        "development_arrival_success_rate": 0.775,
+        "development_hits": 62,
+        "development_starts": 80
+      },
+      "current_provisional_candidate": {
+        "model_family": "v21",
+        "config_name": "dyn11",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "jap:Metal Nunchaku": {
+      "item_key": "jap:Metal Nunchaku",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v21",
+        "config_name": "dyn6",
+        "development_arrival_success_rate": 0.8391608391608392,
+        "development_hits": 120,
+        "development_starts": 143
+      },
+      "current_provisional_candidate": {
+        "model_family": "v21",
+        "config_name": "dyn6",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "jap:Metal Nunchakus": {
+      "item_key": "jap:Metal Nunchakus",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "best_effort_sparse",
+        "config_name": null,
+        "development_arrival_success_rate": null,
+        "development_hits": null,
+        "development_starts": 0
+      },
+      "current_provisional_candidate": {
+        "model_family": "best_effort_sparse",
+        "config_name": null,
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "jap:Ninja Star": {
+      "item_key": "jap:Ninja Star",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v19",
+        "config_name": "dyn7",
+        "development_arrival_success_rate": 0.7070707070707071,
+        "development_hits": 70,
+        "development_starts": 99
+      },
+      "current_provisional_candidate": {
+        "model_family": "v19",
+        "config_name": "dyn7",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "jap:Opium": {
+      "item_key": "jap:Opium",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v21",
+        "config_name": "dyn2",
+        "development_arrival_success_rate": 1,
+        "development_hits": 79,
+        "development_starts": 79
+      },
+      "current_provisional_candidate": {
+        "model_family": "v21",
+        "config_name": "dyn2",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "jap:Sai": {
+      "item_key": "jap:Sai",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "quantity_below_30",
+        "config_name": null,
+        "development_arrival_success_rate": null,
+        "development_hits": null,
+        "development_starts": 130
+      },
+      "current_provisional_candidate": {
+        "model_family": "quantity_below_30",
+        "config_name": null,
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "jap:Sensu": {
+      "item_key": "jap:Sensu",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v21",
+        "config_name": "dyn1",
+        "development_arrival_success_rate": 0.0283687943262411,
+        "development_hits": 4,
+        "development_starts": 141
+      },
+      "current_provisional_candidate": {
+        "model_family": "v21",
+        "config_name": "dyn1",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "jap:Shrooms": {
+      "item_key": "jap:Shrooms",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v21",
+        "config_name": "dyn1",
+        "development_arrival_success_rate": 1,
+        "development_hits": 77,
+        "development_starts": 77
+      },
+      "current_provisional_candidate": {
+        "model_family": "v21",
+        "config_name": "dyn1",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "jap:Speed": {
+      "item_key": "jap:Speed",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "depart_now_baseline",
+        "config_name": null,
+        "development_arrival_success_rate": null,
+        "development_hits": null,
+        "development_starts": 0
+      },
+      "current_provisional_candidate": {
+        "model_family": "depart_now_baseline",
+        "config_name": null,
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "jap:Sumo Doll": {
+      "item_key": "jap:Sumo Doll",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v19",
+        "config_name": "dyn7",
+        "development_arrival_success_rate": 0.422360248447205,
+        "development_hits": 68,
+        "development_starts": 161
+      },
+      "current_provisional_candidate": {
+        "model_family": "v19",
+        "config_name": "dyn7",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "jap:Vicodin": {
+      "item_key": "jap:Vicodin",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "depart_now_baseline",
+        "config_name": null,
+        "development_arrival_success_rate": null,
+        "development_hits": null,
+        "development_starts": 0
+      },
+      "current_provisional_candidate": {
+        "model_family": "depart_now_baseline",
+        "config_name": null,
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "jap:Whale Meat": {
+      "item_key": "jap:Whale Meat",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v21",
+        "config_name": "dyn10",
+        "development_arrival_success_rate": 0.9607843137254902,
+        "development_hits": 147,
+        "development_starts": 153
+      },
+      "current_provisional_candidate": {
+        "model_family": "v21",
+        "config_name": "dyn10",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "jap:Wooden Nunchaku": {
+      "item_key": "jap:Wooden Nunchaku",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "quantity_below_30",
+        "config_name": null,
+        "development_arrival_success_rate": null,
+        "development_hits": null,
+        "development_starts": 121
+      },
+      "current_provisional_candidate": {
+        "model_family": "quantity_below_30",
+        "config_name": null,
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "jap:Wooden Nunchakus": {
+      "item_key": "jap:Wooden Nunchakus",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "quantity_below_30",
+        "config_name": null,
+        "development_arrival_success_rate": null,
+        "development_hits": null,
+        "development_starts": 0
+      },
+      "current_provisional_candidate": {
+        "model_family": "quantity_below_30",
+        "config_name": null,
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "jap:Xanax": {
+      "item_key": "jap:Xanax",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "specialist_japan_xanax",
+        "config_name": null,
+        "development_arrival_success_rate": null,
+        "development_hits": null,
+        "development_starts": 246
+      },
+      "current_provisional_candidate": {
+        "model_family": "japan_xanax_specialist",
+        "model_name": "external specialist",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED",
+        "note": "Separate Japan Xanax model cannot be silently replaced with generic planner."
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "jap:Yakitori Lantern": {
+      "item_key": "jap:Yakitori Lantern",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v21",
+        "config_name": "dyn10",
+        "development_arrival_success_rate": 0.8857142857142857,
+        "development_hits": 93,
+        "development_starts": 105
+      },
+      "current_provisional_candidate": {
+        "model_family": "v21",
+        "config_name": "dyn10",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "mex:9mm Uzi": {
+      "item_key": "mex:9mm Uzi",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "depart_now_baseline",
+        "config_name": null,
+        "development_arrival_success_rate": null,
+        "development_hits": null,
+        "development_starts": 0
+      },
+      "current_provisional_candidate": {
+        "model_family": "depart_now_baseline",
+        "config_name": null,
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "mex:AK-47": {
+      "item_key": "mex:AK-47",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v21",
+        "config_name": "dyn4",
+        "development_arrival_success_rate": 0.8295454545454546,
+        "development_hits": 73,
+        "development_starts": 88
+      },
+      "current_provisional_candidate": {
+        "model_family": "v21",
+        "config_name": "dyn4",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "mex:ArmaLite M-15A4": {
+      "item_key": "mex:ArmaLite M-15A4",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "best_effort_sparse",
+        "config_name": null,
+        "development_arrival_success_rate": null,
+        "development_hits": null,
+        "development_starts": 0
+      },
+      "current_provisional_candidate": {
+        "model_family": "best_effort_sparse",
+        "config_name": null,
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "mex:Axe": {
+      "item_key": "mex:Axe",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v21",
+        "config_name": "dyn5",
+        "development_arrival_success_rate": 0.5882352941176471,
+        "development_hits": 50,
+        "development_starts": 85
+      },
+      "current_provisional_candidate": {
+        "model_family": "v21",
+        "config_name": "dyn5",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "mex:Blank Tokens": {
+      "item_key": "mex:Blank Tokens",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "quantity_below_30",
+        "config_name": null,
+        "development_arrival_success_rate": null,
+        "development_hits": null,
+        "development_starts": 0
+      },
+      "current_provisional_candidate": {
+        "model_family": "quantity_below_30",
+        "config_name": null,
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "mex:Bolt Cutters": {
+      "item_key": "mex:Bolt Cutters",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v19",
+        "config_name": "dyn7",
+        "development_arrival_success_rate": 1,
+        "development_hits": 122,
+        "development_starts": 122
+      },
+      "current_provisional_candidate": {
+        "model_family": "v19",
+        "config_name": "dyn7",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "mex:Bottle of Tequila": {
+      "item_key": "mex:Bottle of Tequila",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v19",
+        "config_name": "dyn5",
+        "development_arrival_success_rate": 0.973568281938326,
+        "development_hits": 221,
+        "development_starts": 227
+      },
+      "current_provisional_candidate": {
+        "model_family": "v19",
+        "config_name": "dyn5",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "mex:Card Skimmer": {
+      "item_key": "mex:Card Skimmer",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v19",
+        "config_name": "dyn3",
+        "development_arrival_success_rate": 0.979381443298969,
+        "development_hits": 190,
+        "development_starts": 194
+      },
+      "current_provisional_candidate": {
+        "model_family": "v19",
+        "config_name": "dyn3",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "mex:Claymore Mine": {
+      "item_key": "mex:Claymore Mine",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v19",
+        "config_name": "dyn3",
+        "development_arrival_success_rate": 0.7,
+        "development_hits": 84,
+        "development_starts": 120
+      },
+      "current_provisional_candidate": {
+        "model_family": "v19",
+        "config_name": "dyn3",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "mex:Cobra Derringer": {
+      "item_key": "mex:Cobra Derringer",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "best_effort_sparse",
+        "config_name": null,
+        "development_arrival_success_rate": null,
+        "development_hits": null,
+        "development_starts": 0
+      },
+      "current_provisional_candidate": {
+        "model_family": "best_effort_sparse",
+        "config_name": null,
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "mex:Crazy Straw": {
+      "item_key": "mex:Crazy Straw",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v19",
+        "config_name": "dyn3",
+        "development_arrival_success_rate": 0.9832402234636872,
+        "development_hits": 176,
+        "development_starts": 179
+      },
+      "current_provisional_candidate": {
+        "model_family": "v19",
+        "config_name": "dyn3",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "mex:Dahlia": {
+      "item_key": "mex:Dahlia",
+      "category": "flower",
+      "original_all_item_selection": {
+        "model_family": "v19",
+        "config_name": "dyn2",
+        "development_arrival_success_rate": 0.9748953974895398,
+        "development_hits": 233,
+        "development_starts": 239
+      },
+      "current_provisional_candidate": {
+        "item_key": "mex:Dahlia",
+        "item": "Dahlia",
+        "country": "mex",
+        "model_family": "V18",
+        "config_name": "dyn2",
+        "full_model_description": "V18 `dyn2`",
+        "source_path": "services/plushie_flower_dynamic_planner_v18.py",
+        "source_verified": true,
+        "development_success_rate": 0.9749,
+        "development_hits": null,
+        "development_starts": null,
+        "development_coverage": 1,
+        "original_handoff_status": "LOCK candidate",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED",
+        "max_wait_seconds": 28800,
+        "replan_seconds": 300
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "mex:Desert Eagle": {
+      "item_key": "mex:Desert Eagle",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "best_effort_sparse",
+        "config_name": null,
+        "development_arrival_success_rate": null,
+        "development_hits": null,
+        "development_starts": 0
+      },
+      "current_provisional_candidate": {
+        "model_family": "best_effort_sparse",
+        "config_name": null,
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "mex:Dual 92G Berettas": {
+      "item_key": "mex:Dual 92G Berettas",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "quantity_below_30",
+        "config_name": null,
+        "development_arrival_success_rate": null,
+        "development_hits": null,
+        "development_starts": 0
+      },
+      "current_provisional_candidate": {
+        "model_family": "quantity_below_30",
+        "config_name": null,
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "mex:Flak Jacket": {
+      "item_key": "mex:Flak Jacket",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v21",
+        "config_name": "dyn3",
+        "development_arrival_success_rate": 0.9291338582677166,
+        "development_hits": 118,
+        "development_starts": 127
+      },
+      "current_provisional_candidate": {
+        "model_family": "v21",
+        "config_name": "dyn3",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "mex:Flare Gun": {
+      "item_key": "mex:Flare Gun",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "best_effort_sparse",
+        "config_name": null,
+        "development_arrival_success_rate": null,
+        "development_hits": null,
+        "development_starts": 0
+      },
+      "current_provisional_candidate": {
+        "model_family": "best_effort_sparse",
+        "config_name": null,
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "mex:Heckler & Koch SL8": {
+      "item_key": "mex:Heckler & Koch SL8",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v19",
+        "config_name": "dyn3",
+        "development_arrival_success_rate": 0,
+        "development_hits": 0,
+        "development_starts": 89
+      },
+      "current_provisional_candidate": {
+        "model_family": "v19",
+        "config_name": "dyn3",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "mex:Jaguar Plushie": {
+      "item_key": "mex:Jaguar Plushie",
+      "category": "plushie",
+      "original_all_item_selection": {
+        "model_family": "v19",
+        "config_name": "dyn3",
+        "development_arrival_success_rate": 0.9839357429718876,
+        "development_hits": 245,
+        "development_starts": 249
+      },
+      "current_provisional_candidate": {
+        "item_key": "mex:Jaguar Plushie",
+        "item": "Jaguar Plushie",
+        "country": "mex",
+        "model_family": "V18",
+        "config_name": "dyn3",
+        "full_model_description": "V18 `dyn3`",
+        "source_path": "services/plushie_flower_dynamic_planner_v18.py",
+        "source_verified": true,
+        "development_success_rate": 0.9839,
+        "development_hits": null,
+        "development_starts": null,
+        "development_coverage": 1,
+        "original_handoff_status": "LOCK candidate",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED",
+        "max_wait_seconds": 28800,
+        "replan_seconds": 300
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "mex:Kevlar Gloves": {
+      "item_key": "mex:Kevlar Gloves",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "best_effort_sparse",
+        "config_name": null,
+        "development_arrival_success_rate": null,
+        "development_hits": null,
+        "development_starts": 0
+      },
+      "current_provisional_candidate": {
+        "model_family": "best_effort_sparse",
+        "config_name": null,
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "mex:Leather Bullwhip": {
+      "item_key": "mex:Leather Bullwhip",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "depart_now_baseline",
+        "config_name": null,
+        "development_arrival_success_rate": null,
+        "development_hits": null,
+        "development_starts": 0
+      },
+      "current_provisional_candidate": {
+        "model_family": "depart_now_baseline",
+        "config_name": null,
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "mex:M249 SAW": {
+      "item_key": "mex:M249 SAW",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "best_effort_sparse",
+        "config_name": null,
+        "development_arrival_success_rate": null,
+        "development_hits": null,
+        "development_starts": 0
+      },
+      "current_provisional_candidate": {
+        "model_family": "best_effort_sparse",
+        "config_name": null,
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "mex:Mayan Statue": {
+      "item_key": "mex:Mayan Statue",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v21",
+        "config_name": "dyn13",
+        "development_arrival_success_rate": 0.8132530120481928,
+        "development_hits": 135,
+        "development_starts": 166
+      },
+      "current_provisional_candidate": {
+        "model_family": "v21",
+        "config_name": "dyn13",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "mex:Minigun": {
+      "item_key": "mex:Minigun",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "best_effort_sparse",
+        "config_name": null,
+        "development_arrival_success_rate": null,
+        "development_hits": null,
+        "development_starts": 0
+      },
+      "current_provisional_candidate": {
+        "model_family": "best_effort_sparse",
+        "config_name": null,
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "mex:Ninja Claws": {
+      "item_key": "mex:Ninja Claws",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v21",
+        "config_name": "dyn5",
+        "development_arrival_success_rate": null,
+        "development_hits": null,
+        "development_starts": 0
+      },
+      "current_provisional_candidate": {
+        "model_family": "v21",
+        "config_name": "dyn5",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "mex:Obsidian Point": {
+      "item_key": "mex:Obsidian Point",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v21",
+        "config_name": "dyn4",
+        "development_arrival_success_rate": 1,
+        "development_hits": 41,
+        "development_starts": 41
+      },
+      "current_provisional_candidate": {
+        "model_family": "v21",
+        "config_name": "dyn4",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "mex:Outer Tactical Vest": {
+      "item_key": "mex:Outer Tactical Vest",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "best_effort_sparse",
+        "config_name": null,
+        "development_arrival_success_rate": null,
+        "development_hits": null,
+        "development_starts": 0
+      },
+      "current_provisional_candidate": {
+        "model_family": "best_effort_sparse",
+        "config_name": null,
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "mex:SIG 550": {
+      "item_key": "mex:SIG 550",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "quantity_below_30",
+        "config_name": null,
+        "development_arrival_success_rate": null,
+        "development_hits": null,
+        "development_starts": 0
+      },
+      "current_provisional_candidate": {
+        "model_family": "quantity_below_30",
+        "config_name": null,
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "mex:Samurai Sword": {
+      "item_key": "mex:Samurai Sword",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "depart_now_baseline",
+        "config_name": null,
+        "development_arrival_success_rate": null,
+        "development_hits": null,
+        "development_starts": 0
+      },
+      "current_provisional_candidate": {
+        "model_family": "depart_now_baseline",
+        "config_name": null,
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "mex:Springfield 1911": {
+      "item_key": "mex:Springfield 1911",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v20",
+        "config_name": "dyn5",
+        "development_arrival_success_rate": 0.3707865168539326,
+        "development_hits": 33,
+        "development_starts": 89
+      },
+      "current_provisional_candidate": {
+        "model_family": "v20",
+        "config_name": "dyn5",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "mex:Taser": {
+      "item_key": "mex:Taser",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "best_effort_sparse",
+        "config_name": null,
+        "development_arrival_success_rate": null,
+        "development_hits": null,
+        "development_starts": 0
+      },
+      "current_provisional_candidate": {
+        "model_family": "best_effort_sparse",
+        "config_name": null,
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "mex:Trench Coat": {
+      "item_key": "mex:Trench Coat",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "depart_now_baseline",
+        "config_name": null,
+        "development_arrival_success_rate": null,
+        "development_hits": null,
+        "development_starts": 0
+      },
+      "current_provisional_candidate": {
+        "model_family": "depart_now_baseline",
+        "config_name": null,
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "mex:Yucca Plant": {
+      "item_key": "mex:Yucca Plant",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v21",
+        "config_name": "dyn3",
+        "development_arrival_success_rate": 0.8952380952380953,
+        "development_hits": 94,
+        "development_starts": 105
+      },
+      "current_provisional_candidate": {
+        "model_family": "v21",
+        "config_name": "dyn3",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "mex:Zip Ties": {
+      "item_key": "mex:Zip Ties",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v21",
+        "config_name": "dyn13",
+        "development_arrival_success_rate": 0.967948717948718,
+        "development_hits": 151,
+        "development_starts": 156
+      },
+      "current_provisional_candidate": {
+        "model_family": "v21",
+        "config_name": "dyn13",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "sou:African Violet": {
+      "item_key": "sou:African Violet",
+      "category": "flower",
+      "original_all_item_selection": {
+        "model_family": "v19",
+        "config_name": "dyn7",
+        "development_arrival_success_rate": 0.9416666666666668,
+        "development_hits": 226,
+        "development_starts": 240
+      },
+      "current_provisional_candidate": {
+        "item_key": "sou:African Violet",
+        "item": "African Violet",
+        "country": "sou",
+        "model_family": "V19",
+        "config_name": "dyn7",
+        "full_model_description": "V19 `dyn7`",
+        "source_path": "services/plushie_flower_dynamic_planner_v19.py",
+        "source_verified": true,
+        "development_success_rate": 0.9281,
+        "development_hits": null,
+        "development_starts": null,
+        "development_coverage": 1,
+        "original_handoff_status": "LOCK candidate",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED",
+        "max_wait_seconds": 28800,
+        "replan_seconds": 300
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "sou:Afro Comb": {
+      "item_key": "sou:Afro Comb",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "depart_now_baseline",
+        "config_name": null,
+        "development_arrival_success_rate": null,
+        "development_hits": null,
+        "development_starts": 0
+      },
+      "current_provisional_candidate": {
+        "model_family": "depart_now_baseline",
+        "config_name": null,
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "sou:Combat Boots": {
+      "item_key": "sou:Combat Boots",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v20",
+        "config_name": "dyn3",
+        "development_arrival_success_rate": 0.5954198473282443,
+        "development_hits": 78,
+        "development_starts": 131
+      },
+      "current_provisional_candidate": {
+        "model_family": "v20",
+        "config_name": "dyn3",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "sou:Combat Gloves": {
+      "item_key": "sou:Combat Gloves",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v19",
+        "config_name": "dyn2",
+        "development_arrival_success_rate": 0.3513513513513513,
+        "development_hits": 26,
+        "development_starts": 74
+      },
+      "current_provisional_candidate": {
+        "model_family": "v19",
+        "config_name": "dyn2",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "sou:Combat Helmet": {
+      "item_key": "sou:Combat Helmet",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v21",
+        "config_name": "dyn8",
+        "development_arrival_success_rate": 0.8244274809160306,
+        "development_hits": 108,
+        "development_starts": 131
+      },
+      "current_provisional_candidate": {
+        "model_family": "v21",
+        "config_name": "dyn8",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "sou:Combat Pants": {
+      "item_key": "sou:Combat Pants",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v19",
+        "config_name": "dyn1",
+        "development_arrival_success_rate": 0.5808823529411765,
+        "development_hits": 79,
+        "development_starts": 136
+      },
+      "current_provisional_candidate": {
+        "model_family": "v19",
+        "config_name": "dyn1",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "sou:Combat Vest": {
+      "item_key": "sou:Combat Vest",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v21",
+        "config_name": "dyn2",
+        "development_arrival_success_rate": 0.2467532467532467,
+        "development_hits": 19,
+        "development_starts": 77
+      },
+      "current_provisional_candidate": {
+        "model_family": "v21",
+        "config_name": "dyn2",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "sou:Elephant Statue": {
+      "item_key": "sou:Elephant Statue",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v21",
+        "config_name": "dyn1",
+        "development_arrival_success_rate": 0.5822784810126582,
+        "development_hits": 92,
+        "development_starts": 158
+      },
+      "current_provisional_candidate": {
+        "model_family": "v21",
+        "config_name": "dyn1",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "sou:Knuckle Dusters": {
+      "item_key": "sou:Knuckle Dusters",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v21",
+        "config_name": "dyn2",
+        "development_arrival_success_rate": 0.7294117647058823,
+        "development_hits": 62,
+        "development_starts": 85
+      },
+      "current_provisional_candidate": {
+        "model_family": "v21",
+        "config_name": "dyn2",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "sou:LSD": {
+      "item_key": "sou:LSD",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "depart_now_baseline",
+        "config_name": null,
+        "development_arrival_success_rate": null,
+        "development_hits": null,
+        "development_starts": 0
+      },
+      "current_provisional_candidate": {
+        "model_family": "depart_now_baseline",
+        "config_name": null,
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "sou:Lion Plushie": {
+      "item_key": "sou:Lion Plushie",
+      "category": "plushie",
+      "original_all_item_selection": {
+        "model_family": "v21",
+        "config_name": "dyn12",
+        "development_arrival_success_rate": 0.90625,
+        "development_hits": 145,
+        "development_starts": 160
+      },
+      "current_provisional_candidate": {
+        "item_key": "sou:Lion Plushie",
+        "item": "Lion Plushie",
+        "country": "sou",
+        "model_family": "two_expert_logistic",
+        "config_name": null,
+        "full_model_description": "two-expert global-regime analog bank: A `(k14, gw=.35)`, B `(k18, gw=.5)` + logistic selector",
+        "source_path": "lion_pair_selector_ml.py",
+        "source_verified": false,
+        "development_success_rate": 0.9159,
+        "development_hits": 98,
+        "development_starts": 107,
+        "development_coverage": 1,
+        "original_handoff_status": "LOCK candidate / retest selector",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED",
+        "max_wait_seconds": 28800,
+        "replan_seconds": 300
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "sou:Mag 7": {
+      "item_key": "sou:Mag 7",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "best_effort_sparse",
+        "config_name": null,
+        "development_arrival_success_rate": null,
+        "development_hits": null,
+        "development_starts": 0
+      },
+      "current_provisional_candidate": {
+        "model_family": "best_effort_sparse",
+        "config_name": null,
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "sou:Opium": {
+      "item_key": "sou:Opium",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v21",
+        "config_name": "dyn2",
+        "development_arrival_success_rate": 1,
+        "development_hits": 77,
+        "development_starts": 77
+      },
+      "current_provisional_candidate": {
+        "model_family": "v21",
+        "config_name": "dyn2",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "sou:PCP": {
+      "item_key": "sou:PCP",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "depart_now_baseline",
+        "config_name": null,
+        "development_arrival_success_rate": null,
+        "development_hits": null,
+        "development_starts": 0
+      },
+      "current_provisional_candidate": {
+        "model_family": "depart_now_baseline",
+        "config_name": null,
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "sou:Quartzite Point": {
+      "item_key": "sou:Quartzite Point",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v21",
+        "config_name": "dyn2",
+        "development_arrival_success_rate": 0.875,
+        "development_hits": 35,
+        "development_starts": 40
+      },
+      "current_provisional_candidate": {
+        "model_family": "v21",
+        "config_name": "dyn2",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "sou:Raw Ivory": {
+      "item_key": "sou:Raw Ivory",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v19",
+        "config_name": "dyn2",
+        "development_arrival_success_rate": 0.9390243902439024,
+        "development_hits": 231,
+        "development_starts": 246
+      },
+      "current_provisional_candidate": {
+        "model_family": "v19",
+        "config_name": "dyn2",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "sou:Shrooms": {
+      "item_key": "sou:Shrooms",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v19",
+        "config_name": "dyn3",
+        "development_arrival_success_rate": 0.922077922077922,
+        "development_hits": 71,
+        "development_starts": 77
+      },
+      "current_provisional_candidate": {
+        "model_family": "v19",
+        "config_name": "dyn3",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "sou:Smoke Grenade": {
+      "item_key": "sou:Smoke Grenade",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v19",
+        "config_name": "dyn3",
+        "development_arrival_success_rate": 0.9300411522633744,
+        "development_hits": 226,
+        "development_starts": 243
+      },
+      "current_provisional_candidate": {
+        "model_family": "v19",
+        "config_name": "dyn3",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "sou:Spear": {
+      "item_key": "sou:Spear",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v21",
+        "config_name": "dyn3",
+        "development_arrival_success_rate": 0.6218487394957983,
+        "development_hits": 74,
+        "development_starts": 119
+      },
+      "current_provisional_candidate": {
+        "model_family": "v21",
+        "config_name": "dyn3",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "sou:Uncut Diamonds": {
+      "item_key": "sou:Uncut Diamonds",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v21",
+        "config_name": "dyn10",
+        "development_arrival_success_rate": 1,
+        "development_hits": 134,
+        "development_starts": 134
+      },
+      "current_provisional_candidate": {
+        "model_family": "v21",
+        "config_name": "dyn10",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "sou:Vektor CR-21": {
+      "item_key": "sou:Vektor CR-21",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v21",
+        "config_name": "dyn11",
+        "development_arrival_success_rate": 0.935897435897436,
+        "development_hits": 73,
+        "development_starts": 78
+      },
+      "current_provisional_candidate": {
+        "model_family": "v21",
+        "config_name": "dyn11",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "sou:Xanax": {
+      "item_key": "sou:Xanax",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v19",
+        "config_name": "dyn1",
+        "development_arrival_success_rate": 0.9407894736842104,
+        "development_hits": 143,
+        "development_starts": 152
+      },
+      "current_provisional_candidate": {
+        "model_family": "v19",
+        "config_name": "dyn1",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "swi:Cannabis": {
+      "item_key": "swi:Cannabis",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v21",
+        "config_name": "dyn2",
+        "development_arrival_success_rate": 0.8,
+        "development_hits": 108,
+        "development_starts": 135
+      },
+      "current_provisional_candidate": {
+        "model_family": "v21",
+        "config_name": "dyn2",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "swi:Chamois Plushie": {
+      "item_key": "swi:Chamois Plushie",
+      "category": "plushie",
+      "original_all_item_selection": {
+        "model_family": "v19",
+        "config_name": "dyn8",
+        "development_arrival_success_rate": 0.6993865030674846,
+        "development_hits": 114,
+        "development_starts": 163
+      },
+      "current_provisional_candidate": {
+        "item_key": "swi:Chamois Plushie",
+        "item": "Chamois Plushie",
+        "country": "swi",
+        "model_family": "online_template_expert",
+        "config_name": null,
+        "full_model_description": "online template-expert selector, 3-day resolved-performance window",
+        "source_path": "checkpoint4_online_selector.py",
+        "source_verified": false,
+        "development_success_rate": 0.7798,
+        "development_hits": 85,
+        "development_starts": 109,
+        "development_coverage": 1,
+        "original_handoff_status": "BASE champion; stretch >90 unresolved",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED",
+        "max_wait_seconds": 28800,
+        "replan_seconds": 300
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "swi:Dozen White Roses": {
+      "item_key": "swi:Dozen White Roses",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "quantity_below_30",
+        "config_name": null,
+        "development_arrival_success_rate": null,
+        "development_hits": null,
+        "development_starts": 0
+      },
+      "current_provisional_candidate": {
+        "model_family": "quantity_below_30",
+        "config_name": null,
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "swi:Edelweiss": {
+      "item_key": "swi:Edelweiss",
+      "category": "flower",
+      "original_all_item_selection": {
+        "model_family": "v19",
+        "config_name": "dyn6",
+        "development_arrival_success_rate": 0.9121338912133892,
+        "development_hits": 218,
+        "development_starts": 239
+      },
+      "current_provisional_candidate": {
+        "item_key": "swi:Edelweiss",
+        "item": "Edelweiss",
+        "country": "swi",
+        "model_family": "V19",
+        "config_name": "dyn9",
+        "full_model_description": "V19 `dyn9`",
+        "source_path": "services/plushie_flower_dynamic_planner_v19.py",
+        "source_verified": true,
+        "development_success_rate": 0.9176000000000001,
+        "development_hits": null,
+        "development_starts": null,
+        "development_coverage": 1,
+        "original_handoff_status": "LOCK candidate",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED",
+        "max_wait_seconds": 28800,
+        "replan_seconds": 300
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "swi:Ephedrine Powder": {
+      "item_key": "swi:Ephedrine Powder",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v21",
+        "config_name": "dyn2",
+        "development_arrival_success_rate": 0.8766233766233766,
+        "development_hits": 135,
+        "development_starts": 154
+      },
+      "current_provisional_candidate": {
+        "model_family": "v21",
+        "config_name": "dyn2",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "swi:Ergotamine Ampoule": {
+      "item_key": "swi:Ergotamine Ampoule",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v19",
+        "config_name": "dyn7",
+        "development_arrival_success_rate": 0.9916666666666668,
+        "development_hits": 238,
+        "development_starts": 240
+      },
+      "current_provisional_candidate": {
+        "model_family": "v19",
+        "config_name": "dyn7",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "swi:Flash Grenade": {
+      "item_key": "swi:Flash Grenade",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v21",
+        "config_name": "dyn2",
+        "development_arrival_success_rate": 0.8159509202453987,
+        "development_hits": 133,
+        "development_starts": 163
+      },
+      "current_provisional_candidate": {
+        "model_family": "v21",
+        "config_name": "dyn2",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "swi:Jackhammer": {
+      "item_key": "swi:Jackhammer",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "depart_now_baseline",
+        "config_name": null,
+        "development_arrival_success_rate": null,
+        "development_hits": null,
+        "development_starts": 0
+      },
+      "current_provisional_candidate": {
+        "model_family": "depart_now_baseline",
+        "config_name": null,
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "swi:Ketamine": {
+      "item_key": "swi:Ketamine",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v19",
+        "config_name": "dyn1",
+        "development_arrival_success_rate": 1,
+        "development_hits": 76,
+        "development_starts": 76
+      },
+      "current_provisional_candidate": {
+        "model_family": "v19",
+        "config_name": "dyn1",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "swi:LSD": {
+      "item_key": "swi:LSD",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "depart_now_baseline",
+        "config_name": null,
+        "development_arrival_success_rate": null,
+        "development_hits": null,
+        "development_starts": 0
+      },
+      "current_provisional_candidate": {
+        "model_family": "depart_now_baseline",
+        "config_name": null,
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "swi:Neumune Tablet": {
+      "item_key": "swi:Neumune Tablet",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "quantity_below_30",
+        "config_name": null,
+        "development_arrival_success_rate": null,
+        "development_hits": null,
+        "development_starts": 156
+      },
+      "current_provisional_candidate": {
+        "model_family": "quantity_below_30",
+        "config_name": null,
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "swi:PCP": {
+      "item_key": "swi:PCP",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "depart_now_baseline",
+        "config_name": null,
+        "development_arrival_success_rate": null,
+        "development_hits": null,
+        "development_starts": 0
+      },
+      "current_provisional_candidate": {
+        "model_family": "depart_now_baseline",
+        "config_name": null,
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "swi:SIG 552": {
+      "item_key": "swi:SIG 552",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "quantity_below_30",
+        "config_name": null,
+        "development_arrival_success_rate": null,
+        "development_hits": null,
+        "development_starts": 0
+      },
+      "current_provisional_candidate": {
+        "model_family": "quantity_below_30",
+        "config_name": null,
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "swi:Safrole Oil": {
+      "item_key": "swi:Safrole Oil",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v19",
+        "config_name": "dyn2",
+        "development_arrival_success_rate": 0.9452054794520548,
+        "development_hits": 207,
+        "development_starts": 219
+      },
+      "current_provisional_candidate": {
+        "model_family": "v19",
+        "config_name": "dyn2",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "swi:Shrooms": {
+      "item_key": "swi:Shrooms",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v21",
+        "config_name": "dyn2",
+        "development_arrival_success_rate": 1,
+        "development_hits": 84,
+        "development_starts": 84
+      },
+      "current_provisional_candidate": {
+        "model_family": "v21",
+        "config_name": "dyn2",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "swi:Snowboard": {
+      "item_key": "swi:Snowboard",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "depart_now_baseline",
+        "config_name": null,
+        "development_arrival_success_rate": null,
+        "development_hits": null,
+        "development_starts": 0
+      },
+      "current_provisional_candidate": {
+        "model_family": "depart_now_baseline",
+        "config_name": null,
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "swi:Speed": {
+      "item_key": "swi:Speed",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "depart_now_baseline",
+        "config_name": null,
+        "development_arrival_success_rate": null,
+        "development_hits": null,
+        "development_starts": 0
+      },
+      "current_provisional_candidate": {
+        "model_family": "depart_now_baseline",
+        "config_name": null,
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "swi:Swiss Army Knife": {
+      "item_key": "swi:Swiss Army Knife",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v19",
+        "config_name": "dyn3",
+        "development_arrival_success_rate": 0.9027777777777778,
+        "development_hits": 65,
+        "development_starts": 72
+      },
+      "current_provisional_candidate": {
+        "model_family": "v19",
+        "config_name": "dyn3",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "uae:Ambergris Lump": {
+      "item_key": "uae:Ambergris Lump",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v19",
+        "config_name": "dyn1",
+        "development_arrival_success_rate": 0.9264705882352942,
+        "development_hits": 126,
+        "development_starts": 136
+      },
+      "current_provisional_candidate": {
+        "model_family": "v19",
+        "config_name": "dyn1",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "uae:Camel Plushie": {
+      "item_key": "uae:Camel Plushie",
+      "category": "plushie",
+      "original_all_item_selection": {
+        "model_family": "v20",
+        "config_name": "dyn7",
+        "development_arrival_success_rate": 0.7267080745341615,
+        "development_hits": 117,
+        "development_starts": 161
+      },
+      "current_provisional_candidate": {
+        "item_key": "uae:Camel Plushie",
+        "item": "Camel Plushie",
+        "country": "uae",
+        "model_family": "template_probability_selector",
+        "config_name": null,
+        "full_model_description": "current-plan-probability selector across 24 template experts",
+        "source_path": "camel_fast_selector.py",
+        "source_verified": false,
+        "development_success_rate": 0.75,
+        "development_hits": 81,
+        "development_starts": 108,
+        "development_coverage": 1,
+        "original_handoff_status": "BASE champion; stretch >90 unresolved",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED",
+        "max_wait_seconds": 28800,
+        "replan_seconds": 300
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "uae:Gold Laptop": {
+      "item_key": "uae:Gold Laptop",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "quantity_below_30",
+        "config_name": null,
+        "development_arrival_success_rate": null,
+        "development_hits": null,
+        "development_starts": 0
+      },
+      "current_provisional_candidate": {
+        "model_family": "quantity_below_30",
+        "config_name": null,
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "uae:Gold Plated AK-47": {
+      "item_key": "uae:Gold Plated AK-47",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "quantity_below_30",
+        "config_name": null,
+        "development_arrival_success_rate": null,
+        "development_hits": null,
+        "development_starts": 0
+      },
+      "current_provisional_candidate": {
+        "model_family": "quantity_below_30",
+        "config_name": null,
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "uae:Handbag": {
+      "item_key": "uae:Handbag",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "quantity_below_30",
+        "config_name": null,
+        "development_arrival_success_rate": null,
+        "development_hits": null,
+        "development_starts": 0
+      },
+      "current_provisional_candidate": {
+        "model_family": "quantity_below_30",
+        "config_name": null,
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "uae:Natural Pearls": {
+      "item_key": "uae:Natural Pearls",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v21",
+        "config_name": "dyn3",
+        "development_arrival_success_rate": 1,
+        "development_hits": 152,
+        "development_starts": 152
+      },
+      "current_provisional_candidate": {
+        "model_family": "v21",
+        "config_name": "dyn3",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "uae:Pillow": {
+      "item_key": "uae:Pillow",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "quantity_below_30",
+        "config_name": null,
+        "development_arrival_success_rate": null,
+        "development_hits": null,
+        "development_starts": 0
+      },
+      "current_provisional_candidate": {
+        "model_family": "quantity_below_30",
+        "config_name": null,
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "uae:Pink Mac-10": {
+      "item_key": "uae:Pink Mac-10",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "quantity_below_30",
+        "config_name": null,
+        "development_arrival_success_rate": null,
+        "development_hits": null,
+        "development_starts": 0
+      },
+      "current_provisional_candidate": {
+        "model_family": "quantity_below_30",
+        "config_name": null,
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "uae:Platinum PDA": {
+      "item_key": "uae:Platinum PDA",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "quantity_below_30",
+        "config_name": null,
+        "development_arrival_success_rate": null,
+        "development_hits": null,
+        "development_starts": 0
+      },
+      "current_provisional_candidate": {
+        "model_family": "quantity_below_30",
+        "config_name": null,
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "uae:Potassium Nitrate": {
+      "item_key": "uae:Potassium Nitrate",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v21",
+        "config_name": "dyn12",
+        "development_arrival_success_rate": 0.9426229508196722,
+        "development_hits": 115,
+        "development_starts": 122
+      },
+      "current_provisional_candidate": {
+        "model_family": "v21",
+        "config_name": "dyn12",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "uae:Proda Sunglasses": {
+      "item_key": "uae:Proda Sunglasses",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v21",
+        "config_name": "dyn2",
+        "development_arrival_success_rate": 1,
+        "development_hits": 82,
+        "development_starts": 82
+      },
+      "current_provisional_candidate": {
+        "model_family": "v21",
+        "config_name": "dyn2",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "uae:Sports Shades": {
+      "item_key": "uae:Sports Shades",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v21",
+        "config_name": "dyn11",
+        "development_arrival_success_rate": 0.2151898734177215,
+        "development_hits": 17,
+        "development_starts": 79
+      },
+      "current_provisional_candidate": {
+        "model_family": "v21",
+        "config_name": "dyn11",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "uae:Sports Sneakers": {
+      "item_key": "uae:Sports Sneakers",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "quantity_below_30",
+        "config_name": null,
+        "development_arrival_success_rate": null,
+        "development_hits": null,
+        "development_starts": 0
+      },
+      "current_provisional_candidate": {
+        "model_family": "quantity_below_30",
+        "config_name": null,
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "uae:Tribulus Omanense": {
+      "item_key": "uae:Tribulus Omanense",
+      "category": "flower",
+      "original_all_item_selection": {
+        "model_family": "v19",
+        "config_name": "dyn3",
+        "development_arrival_success_rate": 0.9662447257383966,
+        "development_hits": 229,
+        "development_starts": 237
+      },
+      "current_provisional_candidate": {
+        "item_key": "uae:Tribulus Omanense",
+        "item": "Tribulus Omanense",
+        "country": "uae",
+        "model_family": "V18",
+        "config_name": "dyn3",
+        "full_model_description": "V18 `dyn3`",
+        "source_path": "services/plushie_flower_dynamic_planner_v18.py",
+        "source_verified": true,
+        "development_success_rate": 0.9662000000000001,
+        "development_hits": null,
+        "development_starts": null,
+        "development_coverage": 1,
+        "original_handoff_status": "LOCK candidate",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED",
+        "max_wait_seconds": 28800,
+        "replan_seconds": 300
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "uni:Cannabis": {
+      "item_key": "uni:Cannabis",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v19",
+        "config_name": "dyn7",
+        "development_arrival_success_rate": 0.9565217391304348,
+        "development_hits": 88,
+        "development_starts": 92
+      },
+      "current_provisional_candidate": {
+        "model_family": "v19",
+        "config_name": "dyn7",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "uni:Chert Point": {
+      "item_key": "uni:Chert Point",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "best_effort_sparse",
+        "config_name": null,
+        "development_arrival_success_rate": null,
+        "development_hits": null,
+        "development_starts": 0
+      },
+      "current_provisional_candidate": {
+        "model_family": "best_effort_sparse",
+        "config_name": null,
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "uni:Claymore Sword": {
+      "item_key": "uni:Claymore Sword",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "best_effort_sparse",
+        "config_name": null,
+        "development_arrival_success_rate": null,
+        "development_hits": null,
+        "development_starts": 0
+      },
+      "current_provisional_candidate": {
+        "model_family": "best_effort_sparse",
+        "config_name": null,
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "uni:Cricket Bat": {
+      "item_key": "uni:Cricket Bat",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "quantity_below_30",
+        "config_name": null,
+        "development_arrival_success_rate": null,
+        "development_hits": null,
+        "development_starts": 66
+      },
+      "current_provisional_candidate": {
+        "model_family": "quantity_below_30",
+        "config_name": null,
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "uni:Crossbow": {
+      "item_key": "uni:Crossbow",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "best_effort_sparse",
+        "config_name": null,
+        "development_arrival_success_rate": null,
+        "development_hits": null,
+        "development_starts": 0
+      },
+      "current_provisional_candidate": {
+        "model_family": "best_effort_sparse",
+        "config_name": null,
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "uni:Dart Board": {
+      "item_key": "uni:Dart Board",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v19",
+        "config_name": "dyn3",
+        "development_arrival_success_rate": 0.5221238938053098,
+        "development_hits": 59,
+        "development_starts": 113
+      },
+      "current_provisional_candidate": {
+        "model_family": "v19",
+        "config_name": "dyn3",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "uni:Ecstasy": {
+      "item_key": "uni:Ecstasy",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v19",
+        "config_name": "dyn2",
+        "development_arrival_success_rate": 1,
+        "development_hits": 79,
+        "development_starts": 79
+      },
+      "current_provisional_candidate": {
+        "model_family": "v19",
+        "config_name": "dyn2",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "uni:Enfield SA-80": {
+      "item_key": "uni:Enfield SA-80",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "best_effort_sparse",
+        "config_name": null,
+        "development_arrival_success_rate": null,
+        "development_hits": null,
+        "development_starts": 0
+      },
+      "current_provisional_candidate": {
+        "model_family": "best_effort_sparse",
+        "config_name": null,
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "uni:Flail": {
+      "item_key": "uni:Flail",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "quantity_below_30",
+        "config_name": null,
+        "development_arrival_success_rate": null,
+        "development_hits": null,
+        "development_starts": 0
+      },
+      "current_provisional_candidate": {
+        "model_family": "quantity_below_30",
+        "config_name": null,
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "uni:Frying Pan": {
+      "item_key": "uni:Frying Pan",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "best_effort_sparse",
+        "config_name": null,
+        "development_arrival_success_rate": null,
+        "development_hits": null,
+        "development_starts": 0
+      },
+      "current_provisional_candidate": {
+        "model_family": "best_effort_sparse",
+        "config_name": null,
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "uni:Grenade": {
+      "item_key": "uni:Grenade",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "depart_now_baseline",
+        "config_name": null,
+        "development_arrival_success_rate": null,
+        "development_hits": null,
+        "development_starts": 0
+      },
+      "current_provisional_candidate": {
+        "model_family": "depart_now_baseline",
+        "config_name": null,
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "uni:Heather": {
+      "item_key": "uni:Heather",
+      "category": "flower",
+      "original_all_item_selection": {
+        "model_family": "v19",
+        "config_name": "dyn3",
+        "development_arrival_success_rate": 0.9956521739130436,
+        "development_hits": 229,
+        "development_starts": 230
+      },
+      "current_provisional_candidate": {
+        "item_key": "uni:Heather",
+        "item": "Heather",
+        "country": "uni",
+        "model_family": "V18",
+        "config_name": "dyn3",
+        "full_model_description": "V18 `dyn3`",
+        "source_path": "services/plushie_flower_dynamic_planner_v18.py",
+        "source_verified": true,
+        "development_success_rate": 0.9913,
+        "development_hits": null,
+        "development_starts": null,
+        "development_coverage": 1,
+        "original_handoff_status": "LOCK candidate",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED",
+        "max_wait_seconds": 28800,
+        "replan_seconds": 300
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "uni:Inkwell": {
+      "item_key": "uni:Inkwell",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v21",
+        "config_name": "dyn10",
+        "development_arrival_success_rate": 0.9637681159420288,
+        "development_hits": 133,
+        "development_starts": 138
+      },
+      "current_provisional_candidate": {
+        "model_family": "v21",
+        "config_name": "dyn10",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "uni:Ketamine": {
+      "item_key": "uni:Ketamine",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v21",
+        "config_name": "dyn1",
+        "development_arrival_success_rate": 1,
+        "development_hits": 84,
+        "development_starts": 84
+      },
+      "current_provisional_candidate": {
+        "model_family": "v21",
+        "config_name": "dyn1",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "uni:Model Space Ship": {
+      "item_key": "uni:Model Space Ship",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v19",
+        "config_name": "dyn1",
+        "development_arrival_success_rate": 0.0666666666666666,
+        "development_hits": 9,
+        "development_starts": 135
+      },
+      "current_provisional_candidate": {
+        "model_family": "v19",
+        "config_name": "dyn1",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "uni:Nessie Plushie": {
+      "item_key": "uni:Nessie Plushie",
+      "category": "plushie",
+      "original_all_item_selection": {
+        "model_family": "v20",
+        "config_name": "dyn12",
+        "development_arrival_success_rate": 0.8963414634146342,
+        "development_hits": 147,
+        "development_starts": 164
+      },
+      "current_provisional_candidate": {
+        "item_key": "uni:Nessie Plushie",
+        "item": "Nessie Plushie",
+        "country": "uni",
+        "model_family": "recent_phase_template",
+        "config_name": null,
+        "full_model_description": "recent phase/template: `(2h lookback, lag 1d, +/-1h shift, minfit .5, recency_pow 1)`",
+        "source_path": "recent_phase_select.py",
+        "source_verified": false,
+        "development_success_rate": 0.9057999999999999,
+        "development_hits": 125,
+        "development_starts": 138,
+        "development_coverage": 1,
+        "original_handoff_status": "LOCK candidate, narrow margin",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED",
+        "max_wait_seconds": 28800,
+        "replan_seconds": 300
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "uni:PCP": {
+      "item_key": "uni:PCP",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "depart_now_baseline",
+        "config_name": null,
+        "development_arrival_success_rate": null,
+        "development_hits": null,
+        "development_starts": 0
+      },
+      "current_provisional_candidate": {
+        "model_family": "depart_now_baseline",
+        "config_name": null,
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "uni:Paper Weight": {
+      "item_key": "uni:Paper Weight",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v20",
+        "config_name": "dyn11",
+        "development_arrival_success_rate": 0.5254237288135594,
+        "development_hits": 62,
+        "development_starts": 118
+      },
+      "current_provisional_candidate": {
+        "model_family": "v20",
+        "config_name": "dyn11",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "uni:Red Fox Plushie": {
+      "item_key": "uni:Red Fox Plushie",
+      "category": "plushie",
+      "original_all_item_selection": {
+        "model_family": "v20",
+        "config_name": "dyn5",
+        "development_arrival_success_rate": 0.6951219512195121,
+        "development_hits": 114,
+        "development_starts": 164
+      },
+      "current_provisional_candidate": {
+        "item_key": "uni:Red Fox Plushie",
+        "item": "Red Fox Plushie",
+        "country": "uni",
+        "model_family": "global_regime_analog",
+        "config_name": null,
+        "full_model_description": "global-regime analog planner `k=18`, global weight `.5`",
+        "source_path": "rf_localgrid.py",
+        "source_verified": false,
+        "development_success_rate": 0.9181999999999999,
+        "development_hits": 101,
+        "development_starts": 110,
+        "development_coverage": 1,
+        "original_handoff_status": "LOCK candidate",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED",
+        "max_wait_seconds": 28800,
+        "replan_seconds": 300
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "uni:Sextant": {
+      "item_key": "uni:Sextant",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v19",
+        "config_name": "dyn1",
+        "development_arrival_success_rate": 0,
+        "development_hits": 0,
+        "development_starts": 116
+      },
+      "current_provisional_candidate": {
+        "model_family": "v19",
+        "config_name": "dyn1",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "uni:Ship in a Bottle": {
+      "item_key": "uni:Ship in a Bottle",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "quantity_below_30",
+        "config_name": null,
+        "development_arrival_success_rate": null,
+        "development_hits": null,
+        "development_starts": 123
+      },
+      "current_provisional_candidate": {
+        "model_family": "quantity_below_30",
+        "config_name": null,
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "uni:Shrooms": {
+      "item_key": "uni:Shrooms",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v21",
+        "config_name": "dyn1",
+        "development_arrival_success_rate": 1,
+        "development_hits": 78,
+        "development_starts": 78
+      },
+      "current_provisional_candidate": {
+        "model_family": "v21",
+        "config_name": "dyn1",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "uni:Stick Grenade": {
+      "item_key": "uni:Stick Grenade",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v21",
+        "config_name": "dyn12",
+        "development_arrival_success_rate": 0.6029411764705882,
+        "development_hits": 82,
+        "development_starts": 136
+      },
+      "current_provisional_candidate": {
+        "model_family": "v21",
+        "config_name": "dyn12",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "uni:Tailor's Dummy": {
+      "item_key": "uni:Tailor's Dummy",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v21",
+        "config_name": "dyn1",
+        "development_arrival_success_rate": 0.6964285714285714,
+        "development_hits": 39,
+        "development_starts": 56
+      },
+      "current_provisional_candidate": {
+        "model_family": "v21",
+        "config_name": "dyn1",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "uni:Tailors Dummy": {
+      "item_key": "uni:Tailors Dummy",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "quantity_below_30",
+        "config_name": null,
+        "development_arrival_success_rate": null,
+        "development_hits": null,
+        "development_starts": 0
+      },
+      "current_provisional_candidate": {
+        "model_family": "quantity_below_30",
+        "config_name": null,
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "uni:Vicodin": {
+      "item_key": "uni:Vicodin",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "depart_now_baseline",
+        "config_name": null,
+        "development_arrival_success_rate": null,
+        "development_hits": null,
+        "development_starts": 0
+      },
+      "current_provisional_candidate": {
+        "model_family": "depart_now_baseline",
+        "config_name": null,
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "uni:WWII Helmet": {
+      "item_key": "uni:WWII Helmet",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "best_effort_sparse",
+        "config_name": null,
+        "development_arrival_success_rate": null,
+        "development_hits": null,
+        "development_starts": 0
+      },
+      "current_provisional_candidate": {
+        "model_family": "best_effort_sparse",
+        "config_name": null,
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    },
+    "uni:Xanax": {
+      "item_key": "uni:Xanax",
+      "category": "other",
+      "original_all_item_selection": {
+        "model_family": "v19",
+        "config_name": "dyn3",
+        "development_arrival_success_rate": 0.9285714285714286,
+        "development_hits": 208,
+        "development_starts": 224
+      },
+      "current_provisional_candidate": {
+        "model_family": "v19",
+        "config_name": "dyn3",
+        "source": "all_item_matched_development_results",
+        "promotion_status": "RESEARCH_ONLY_BLOCKED"
+      },
+      "promotion_status": "RESEARCH_ONLY_BLOCKED"
+    }
+  }
+}
