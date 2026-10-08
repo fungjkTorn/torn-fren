@@ -13,7 +13,7 @@ from services.frozen_candidate_worker_v31 import (
     inspect_live_source, frozen_single_tick
 )
 from services.private_challenger_adapter_v31 import (
-    research_candidate, MASTER_ENV, DB_PATH_FLAG, NATIVE_FLAG
+    research_candidate, MASTER_ENV, MASTER_SHA_ENV, DB_PATH_FLAG, NATIVE_FLAG
 )
 from services.private_champion_shadow_v29 import (
     make_shadow_snapshot, ENABLED_ENV, TOKEN_ENV
@@ -88,7 +88,8 @@ class PrivateChallengerTests(unittest.TestCase):
     def test_adapter_rejects_mismatch_and_preserves_baseline(self):
         with tempfile.TemporaryDirectory() as folder:
             db,master,now=self.synthetic(folder)
-            env={NATIVE_FLAG:"1",DB_PATH_FLAG:str(db),MASTER_ENV["v21"]:str(master)}
+            env={NATIVE_FLAG:"1",DB_PATH_FLAG:str(db),MASTER_ENV["v21"]:str(master),
+                 MASTER_SHA_ENV["v21"]:hashlib.sha256(master.read_bytes()).hexdigest()}
             selected={"model_family":"v21","config_name":"dyn1"}
             def runner(args,**kwargs):
                 self.assertIn("--version",args)
@@ -100,6 +101,16 @@ class PrivateChallengerTests(unittest.TestCase):
                    "recommended_arrival_timestamp":now+900+1620,
                    "replan_step_seconds":900,"research_horizon_seconds":43200,
                    "probability_calibrated":False}),stderr="")
+            missing=dict(env)
+            del missing[MASTER_SHA_ENV["v21"]]
+            self.assertEqual(research_candidate("can","Fire Hydrant",selected,
+                 "other",missing,now,run_worker=runner)["status"],
+                 "MISSING_PINNED_MASTER_SHA")
+            tampered=dict(env)
+            tampered[MASTER_SHA_ENV["v21"]]="0"*64
+            self.assertEqual(research_candidate("can","Fire Hydrant",selected,
+                 "other",tampered,now,run_worker=runner)["status"],
+                 "FROZEN_MASTER_SHA_MISMATCH")
             valid=research_candidate("can","Fire Hydrant",selected,"other",
                                      env,now,run_worker=runner)
             self.assertTrue(valid["champion_executed"])
