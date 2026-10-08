@@ -94,6 +94,42 @@ class V35ResearchOnlyTests(unittest.TestCase):
                 self.assertFalse(x["champion_executed"])
                 self.assertEqual(x["status"],"SPECIALIST_OR_BASELINE_UNSUPPORTED")
 
+    def test_specialist_baseline_only_is_captureable_without_false_wins(self):
+        from unittest.mock import patch
+        from services.private_champion_shadow_v29 import (
+            make_shadow_snapshot,ENABLED_ENV,TOKEN_ENV,
+        )
+        from research.v31_shadow_evidence_capture import record_private_decision
+        token="pilot-test-only-0123456789abcdef0123456789"
+        when=1791499800
+        def v2(country,item,record_audit):
+            self.assertFalse(record_audit)
+            travel=8940 if country=="jap" else 6360
+            return {"display_prediction":{
+                "recommended_leave_by_timestamp":when+1000,
+                "recommended_arrival_timestamp":when+1000+travel}}
+        with tempfile.TemporaryDirectory() as directory:
+            ledger=Path(directory)/"evidence.db"
+            for country,item in [("uni","Nessie Plushie"),("jap","Xanax")]:
+                with patch("services.private_champion_shadow_v29.time.time",
+                           return_value=when):
+                    snapshot=make_shadow_snapshot(country,item,token,
+                        v2_fn=v2,
+                        environ={ENABLED_ENV:"1",TOKEN_ENV:token,
+                                 NATIVE_FLAG:"1"})
+                self.assertFalse(snapshot["champion_executed"])
+                self.assertEqual(snapshot["challenger"]["status"],
+                                 "SPECIALIST_OR_BASELINE_UNSUPPORTED")
+                self.assertEqual(snapshot["baseline"]["status"],"available")
+                result=record_private_decision(ledger,snapshot,
+                    "pilot-museum-japan-v35",now=when)
+                self.assertEqual(result["status"],"RECORDED")
+            with sqlite3.connect(ledger) as con:
+                self.assertEqual(con.execute(
+                    "SELECT COUNT(*) FROM shadow_decisions "
+                    "WHERE challenger_executed=0 AND v2_departure IS NOT NULL"
+                    ).fetchone()[0],2)
+
     def test_only_two_frozen_v18_configs_allowed(self):
         with tempfile.TemporaryDirectory() as directory:
             db,now=self.synthetic(directory,"uni:Heather")
