@@ -75,3 +75,53 @@ python -c "import json,collections; x=json.load(open(r'data\all_item_v21\full_ma
 - Durable research output: `data/all_item_v21/full_master.json`
 - Independent V19 truth audit: `data/remaining_item_v21/truth_audit.json`
 - Frozen DB checksum: `9f39d40e4f255d310ea0a4e20a68d179af2ec145f7b43a02faf10a03d1359761`.
+
+
+## Overnight eight-worker run (2026-10-08)
+
+Additional capacity confirmed: user's ongoing V20 has four workers; for the independent V21 sweep, set **eight** if CPU and memory headroom permit. Eight plus four is **12 competing processes**; reduce V21 to four/six by restarting with the same --resume if the PC begins paging or slowing substantially.
+
+V21 candidate scoring now sets the generic per-hour delay penalty to **zero** during the research run. This preserves natural waits for slow restocks; it does **not** change V19/V20 production behavior. It does not alter the 12-hour computational search horizon; forecast opportunities beyond it need their own out-of-horizon status and are not grounds for calling the item a poor predictor.
+
+Preflight on the user's exact frozen DB:
+- 236 total keys
+- 37 already strong corrected V19 incumbents (retain)
+- 10 completed seeded V21 runs (reuse)
+- 28 historically below requested 30 units (quantity-infeasible at this threshold)
+- 1 specialized Japan Xanax
+- 160 remaining attempts in the original broad runner: 112 have >=6 cycles and qualify for substantive V21 modeling, while the other 48 have <6 completed cycles and typically return insufficient quickly before sparse fallback.
+
+### Commands
+```powershell
+cd C:\Users\fungb\Desktop\torn-fren
+.\venv\Scripts\Activate.ps1
+git pull --ff-only
+python -m py_compile services\all_item_v21_checkpoint.py
+python -m unittest discover -s tests -p "test_all_item_v21_checkpoint.py" -v
+```
+
+One-time two-item smoke test on separate research files (safe to resume):
+```powershell
+python -u -m services.all_item_v21_checkpoint run `
+  --db "data\torn-fren-stock-history-fresh.db" `
+  --v19 "data\all_item_v19\master.json" `
+  --audit "data\remaining_item_v21\truth_audit.json" `
+  --seed-v21 "data\remaining_item_v21\corrected_master.json" `
+  --output "data\all_item_v21\full_master.json" `
+  --workers 2 --max-new 2 --resume
+```
+
+Then restart with eight workers:
+```powershell
+python -u -m services.all_item_v21_checkpoint run `
+  --db "data\torn-fren-stock-history-fresh.db" `
+  --v19 "data\all_item_v19\master.json" `
+  --audit "data\remaining_item_v21\truth_audit.json" `
+  --seed-v21 "data\remaining_item_v21\corrected_master.json" `
+  --output "data\all_item_v21\full_master.json" `
+  --workers 8 --resume
+```
+
+Important: Old 10-item V21 seed uses its original config penalties, so this tournament uses a distinct selection policy for *newly processed* items. Assess head-to-head on matched starts and retain previous champions as separate candidates.
+
+**No assistant-side continuous overnight process is running.** The assistant can inspect the frozen DB and do research preflight, but its four-core environment is not suitable for uninterrupted broad sweep compared with the user's PC.
