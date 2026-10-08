@@ -58,6 +58,39 @@ Total postcutoff completed windows = **1,772**. Example heavily observed items: 
 
 The chat artifact `V31_236_Independent_Stock_Window_Readiness.csv` contains the full 236-row audit; raw DB was not committed.
 
+
+## Append-only prospective evidence capture
+
+`research/v31_shadow_evidence_capture.py` now supports manual, separate-SQLite
+capture of the **private** API JSON. It is strictly OFF by default: there is no
+scheduler, public endpoint storage or live VM deployment. It captures only
+explicitly whitelisted model identities, V2 and challenger departure/arrival
+timestamps and missing recommendations. All raw API keys, token headers,
+master paths and freeform response metadata are excluded.
+
+Every snapshot must carry a **server-generated** `generated_at` timestamp.
+The recorder checks that this timestamp is no more than 180 seconds behind
+ingestion and never in the future. The unique index
+`(experiment_id,item_key,tick_epoch)` enforces at most one observation per item
+per five-minute decision tick, preventing retries from inflating the
+denominator. Missing challenger proposals are still recorded. Entries remain
+`resolution_status='PENDING'` pending an independent future truth-scoring
+pipeline; **none of these records is counted as a successful prediction yet**.
+
+Manual example after separately obtaining the private authenticated JSON:
+
+```bash
+python -m research.v31_shadow_evidence_capture \
+  --snapshot /secure/path/private-shadow-response.json \
+  --evidence-db data/research_shadow_decisions_v31.db \
+  --experiment-id V31-private-pilot
+```
+
+The CLI does not accept a historical capture-time override, and the recorder
+refuses to append its evidence table to a collector DB even if the collector
+file has been renamed. No database (large or small) and no secrets were
+committed to GitHub.
+
 ## Remaining release work
 
 - Execute original-module native same-source parity against the 126MB archived `fresh(4).db` on an environment with both the archived database and checked-out versioned Python services. The 132/132 source-aligned result in V30 was a compatibility port, not this native execution; CI native smoke uses synthetic SQLite.
