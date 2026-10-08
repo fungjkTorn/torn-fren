@@ -14,6 +14,7 @@ def evidence():
         specialist_live_departure_adapter_tested=True,
         publishes_probability=False,
         native_replay_parity_passed=True,
+        causal_prefix_invariance_passed=True,
         prospective_after_model_freeze=True,
         independent_starts=45,
         distinct_resolved_qualified_windows=10,
@@ -91,6 +92,12 @@ class ReleaseGateTests(unittest.TestCase):
             self.assertTrue(assess(x)["ready"])
             x["temporary_low_reliability_caution_visible"] = False
             self.assertFalse(assess(x)["ready"])
+
+    def test_lookahead_detection_blocks_promotion(self):
+        x = evidence()
+        x["causal_prefix_invariance_passed"] = False
+        self.assertFalse(assess(x)["ready"])
+        self.assertTrue(any("future data" in p for p in assess(x)["blockers"]))
 
     def test_unknown_release_target_rejected(self):
         with self.assertRaises(ValueError):
