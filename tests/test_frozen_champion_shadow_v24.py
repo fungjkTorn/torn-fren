@@ -52,6 +52,14 @@ class FrozenReplayTests(unittest.TestCase):
             with self.subTest(bad=bad), self.assertRaises(ValueError):
                 _match(bad)
 
+    def test_original_model_family_binding(self):
+        from services.frozen_champion_shadow_v24 import ENGINE_FAMILY, EXPECTED_RESULT_SCHEMAS
+        self.assertTrue(ENGINE_FAMILY["v19"].endswith("_v18"))
+        self.assertTrue(ENGINE_FAMILY["v20"].endswith("_v19"))
+        self.assertEqual(ENGINE_FAMILY["v20"], ENGINE_FAMILY["v21"])
+        self.assertEqual(EXPECTED_RESULT_SCHEMAS["v19"], "plushie-flower-dynamic-planner-v18.1-item-v1")
+        self.assertEqual(EXPECTED_RESULT_SCHEMAS["v20"], "plushie-flower-dynamic-planner-v19-item-v1")
+
     def test_v20_default_replan_is_900_not_300(self):
         self.assertEqual(OLD_NATIVE["v19"]["replan_step"],300)
         self.assertEqual(OLD_NATIVE["v20"]["replan_step"],900)
