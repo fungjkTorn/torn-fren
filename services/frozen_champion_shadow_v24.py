@@ -101,72 +101,113 @@ def _digest_file(path):
     return h.hexdigest()
 
 
+ENGINE_FAMILY = {
+    "v19": "services.plushie_flower_dynamic_planner_v18",
+    "v20": "services.plushie_flower_dynamic_planner_v19",
+    "v21": "services.plushie_flower_dynamic_planner_v19",
+}
+EXPECTED_RESULT_SCHEMAS = {
+    "v19": "plushie-flower-dynamic-planner-v18.1-item-v1",
+    "v20": "plushie-flower-dynamic-planner-v19-item-v1",
+    "v21": "plushie-flower-dynamic-planner-v19-item-v1",
+}
+
+
 def _worker(payload):
     from services import history_service
-    from services import plushie_flower_dynamic_planner_v19 as planner
+    from services import plushie_flower_dynamic_planner_v18 as planner18
+    from services import plushie_flower_dynamic_planner_v19 as planner19
 
     key=payload["key"]
     country,item_name=key.split(":",1)
     _install_frozen_readonly_history(history_service,payload["db"])
+    gaps=planner19.normalize_gaps(history_service.get_collection_gaps())
 
-    # Worker processes may handle several items; don't stack a new subclass
-    # of the previously monkey-patched Timeline on every iteration.
-    base_timeline=getattr(planner,"_frozen_v24_timeline_base",planner.Timeline)
-    planner._frozen_v24_timeline_base=base_timeline
-    class TruthTimeline(base_timeline):
-        def success(self,arrival,grace):
-            val=observed_arrival_success(
-                self.ts,self.qty,self.gaps,arrival,self.min_qty,grace
-            )
-            return bool(val) if val is not None else False
+    # V19's saved schema is v18.1; V20/V21 explicitly use the v19 planner.
+    # Reusing v19 for V19 changes feature distances (sequence terms) and would
+    # falsely label a new policy as the historical frozen V19 incumbent.
+    engines={"v19":planner18,"v20":planner19,"v21":planner19}
+    prepared={}
+    for version in payload["candidates"]:
+        planner=engines[version]
+        base_attr="_frozen_v24_timeline_base"
+        base=getattr(planner,base_attr,planner.Timeline)
+        setattr(planner,base_attr,base)
+        class TruthTimeline(base):
+            def success(self,arrival,grace):
+                val=observed_arrival_success(
+                    self.ts,self.qty,gaps,arrival,self.min_qty,grace
+                )
+                return bool(val) if val is not None else False
+        planner.Timeline=TruthTimeline
+        if version=="v19":
+            cleaned,cycles,bounces=planner.load_item(country,item_name,payload["min_qty"])
+            timeline=TruthTimeline(cleaned,cycles,payload["min_qty"])
+            dep_times,cycle_feats=planner.completed_cycle_features(cycles)
+        else:
+            if "v20" in prepared or "v21" in prepared:
+                donor=prepared.get("v20") or prepared.get("v21")
+                prepared[version]=dict(donor)
+                continue
+            cleaned,cycles,bounces,_=planner.load_item(country,item_name,payload["min_qty"])
+            timeline=TruthTimeline(cleaned,cycles,payload["min_qty"],gaps=gaps)
+            dep_times,cycle_feats=planner.completed_cycle_features(cycles,gaps=gaps)
+        points=planner.build_points(timeline,dep_times,cycle_feats,600)
+        prepared[version]={
+            "planner":planner,"timeline":timeline,
+            "dep_times":dep_times,"cycle_feats":cycle_feats,
+            "points":points,"point_times":[p.t for p in points],
+            "bounces":len(bounces),
+        }
 
-    planner.Timeline=TruthTimeline
-    cleaned,cycles,bounces,gaps=planner.load_item(country,item_name,payload["min_qty"])
-    if not cleaned:
-        return key,{"status":"no_history"}
-    timeline=TruthTimeline(cleaned,cycles,payload["min_qty"],gaps=gaps)
-    dep_times,cycle_feats=planner.completed_cycle_features(cycles,gaps=gaps)
-    points=planner.build_points(timeline,dep_times,cycle_feats,600)
-    if len(points)<60:
-        return key,{"status":"insufficient_points","points":len(points)}
+    if all(len(p["points"])<60 for p in prepared.values()):
+        return key,{"status":"insufficient_points","points_by_version":{
+            v:len(p["points"]) for v,p in prepared.items()}}
 
-    travel=int(planner.TRAVEL_SECONDS[country])
+    travel=int(planner19.TRAVEL_SECONDS[country])
     max_horizon=max(c["max_wait"] for c in payload["candidates"].values())
-    # All candidate models must have a full common 12h observed horizon.
+    # Use the shared v19-era timeline to set one cohort across all models.
+    reference=prepared.get("v20") or prepared.get("v21") or prepared["v19"]
+    timeline=reference["timeline"]
     first=((payload["cutoff"]+1799)//1800)*1800
     last=int(timeline.last_ts-max_horizon-travel-payload["grace"])
     starts=[]
     for t in range(first,last+1,payload["step"]):
-        if timeline.crosses_gap(t,t+max_horizon+travel+payload["grace"]):
+        if planner19.overlaps_gap(gaps,t,t+max_horizon+travel+payload["grace"]):
             continue
-        if planner.context_at(t,timeline,dep_times,cycle_feats) is None:
+        if reference["planner"].context_at(
+            t,timeline,reference["dep_times"],reference["cycle_feats"]
+        ) is None:
             continue
         starts.append(float(t))
     if payload["max_starts"] and len(starts)>payload["max_starts"]:
-        # Spread across the new period rather than favoring the first few.
         if payload["max_starts"]==1:
             starts=[starts[len(starts)//2]]
         else:
-            starts=[starts[round(i*(len(starts)-1)/(payload["max_starts"]-1))] for i in range(payload["max_starts"])]
+            starts=[starts[round(i*(len(starts)-1)/(payload["max_starts"]-1)]
+                    for i in range(payload["max_starts"])]
     if not starts:
         return key,{"status":"no_clean_new_sessions","new_end_timestamp":int(timeline.last_ts)}
 
     per={}
     for version,candidate in payload["candidates"].items():
+        p=prepared[version]
+        planner=p["planner"]
         cfg=planner.Config(**candidate["config"])
         durations=list(range(0,candidate["max_wait"]+1,candidate["departure_grid"]))
         rows,_,summary=planner.eval_config(
-            starts,cfg,points,[p.t for p in points],
-            timeline,dep_times,cycle_feats,durations,travel,payload["grace"],
+            starts,cfg,p["points"],p["point_times"],p["timeline"],
+            p["dep_times"],p["cycle_feats"],durations,travel,payload["grace"],
             candidate["replan_step"],candidate["max_wait"]
         )
         per[version]={
-            "model":cfg.name,"summary":summary,
+            "model":cfg.name,"engine_family":ENGINE_FAMILY[version],
+            "summary":summary,
             "rows":[{"start":int(r["start"]),"departure":int(r["departure"]),
                      "arrival":int(r["arrival"]),"success":bool(r["success"]),
                      "session_cap":bool(r.get("session_cap",False))}
                     for r in rows],
-            "original_candidate_settings": {
+            "original_candidate_settings":{
                 k:candidate[k] for k in ("max_wait","departure_grid","replan_step")
             },
         }
@@ -176,12 +217,11 @@ def _worker(payload):
         "shared_starts":len(starts),
         "eligible_start_times":[int(t) for t in starts],
         "travel_seconds":travel,
-        "provider_bounces_suppressed":len(bounces),
+        "provider_bounces_suppressed":reference["bounces"],
         "known_collection_gaps":len(gaps),
         "versions":per,
-        "warning":"Dynamic policy replay on new timestamps. Not an independent next-drop confidence calibration.",
+        "warning":"Dynamic policy replay on newer timestamps, not independent next-drop confidence calibration.",
     }
-
 
 def _match(item):
     """Score every eligible shared start; missing recommendations count in coverage.
@@ -319,6 +359,8 @@ def main():
             result=(masters[v].get("results") or {}).get(key) or {}
             cfg=(result.get("selected_on_training") or {}).get("config")
             if result.get("status")=="complete" and cfg:
+                if result.get("schema") != EXPECTED_RESULT_SCHEMAS[v]:
+                    raise SystemExit(f"STOP: {key} {v} model schema does not match native engine family")
                 candidates[v]={"config":cfg,**native_policies[v]}
         if not candidates:
             report["results"][key]={"status":"no_frozen_model"}
