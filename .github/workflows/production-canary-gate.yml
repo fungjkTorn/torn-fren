@@ -1,0 +1,35 @@
+name: Production-canary isolation gate
+
+on:
+  push:
+    branches: [release/private-shadow-canary-20261008]
+  pull_request:
+    paths:
+      - "web/app.py"
+      - "web/private_shadow_v29.py"
+      - "services/private_champion_shadow_v29.py"
+      - "services/private_challenger_adapter_v31.py"
+      - "services/frozen_candidate_worker_v31.py"
+      - "research/all_236_champions_v26.json"
+      - "tests/test_release_shadow_canary.py"
+      - "tests/test_v29_private_shadow.py"
+      - "tests/test_v31_private_challenger.py"
+      - ".github/workflows/production-canary-gate.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  canary-isolation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: python -m pip install fastapi httpx requests
+      - run: python -m unittest discover -s tests -p "test_release_shadow_canary.py" -v
+      - run: python -m unittest discover -s tests -p "test_v29_private_shadow.py" -v
+      - run: python -m unittest discover -s tests -p "test_v31_private_challenger.py" -v
+      - run: python -m py_compile web/app.py web/private_shadow_v29.py services/private_champion_shadow_v29.py services/private_challenger_adapter_v31.py services/frozen_candidate_worker_v31.py
