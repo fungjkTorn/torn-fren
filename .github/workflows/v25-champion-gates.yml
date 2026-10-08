@@ -7,6 +7,7 @@ on:
       - 'tests/test_v25_release_gate.py'
       - 'research/v26_merge_champion_registry.py'
       - 'research/plushie_flower_champions_v26.json'
+      - 'research/all_236_champions_v26.json'
       - 'tests/test_v26_champion_manifest.py'
       - '.github/workflows/v25-champion-gates.yml'
   push:
