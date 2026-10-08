@@ -5,6 +5,9 @@ on:
     paths:
       - 'research/v25_release_gate.py'
       - 'tests/test_v25_release_gate.py'
+      - 'research/v26_merge_champion_registry.py'
+      - 'research/plushie_flower_champions_v26.json'
+      - 'tests/test_v26_champion_manifest.py'
       - '.github/workflows/v25-champion-gates.yml'
   push:
     branches:
@@ -23,6 +26,7 @@ jobs:
         with:
           python-version: '3.11'
       - name: Compile gate
-        run: python -m py_compile research/v25_release_gate.py
+        run: python -m py_compile research/v25_release_gate.py research/v26_merge_champion_registry.py
       - name: Test release gate
         run: python -m unittest discover -s tests -p 'test_v25_release_gate.py' -v
+          python -m unittest discover -s tests -p 'test_v26_champion_manifest.py' -v
