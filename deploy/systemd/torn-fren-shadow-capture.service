@@ -16,6 +16,6 @@ NoNewPrivileges=yes
 PrivateTmp=yes
 ProtectSystem=strict
 ProtectHome=yes
-TimeoutStartSec=100
-# First pilot: a single frozen V21 Canadian item. No stock collector writes.
-ExecStart=/usr/bin/python3 -m research.v33_private_shadow_sampler --evidence-db /var/lib/torn-fren-shadow/capture.db --experiment pilot-beargall-v33 --item "can:Bear Gall"
+TimeoutStartSec=275
+# V35 pilot: exact V18 champion Heather/Wolverine plus baseline-only Nessie/Xanax.\n# Four sequential calls, bounded by 275s, never changing player-facing forecasts.
+ExecStart=/usr/bin/python3 -m research.v33_private_shadow_sampler --evidence-db /var/lib/torn-fren-shadow/capture.db --experiment pilot-museum-japan-v35 --item "uni:Heather" --item "can:Wolverine Plushie" --item "uni:Nessie Plushie" --item "jap:Xanax"
