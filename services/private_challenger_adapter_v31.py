@@ -37,6 +37,63 @@ def research_candidate(
     if env.get(NATIVE_FLAG,"").strip().lower() not in ("1","true","yes"):
         return {"status":"DISABLED","champion_executed":False}
     version=selected.get("model_family")
+    # V35 strictly whitelisted original V18 flower/plushie champions.
+    # Specialists (Nessie, Japan Xanax etc.) still record V2 only until
+    # their exact frozen adapters pass causal validation.
+    if version=="V18":
+        from services.private_v18_champion_worker_v35 import FROZEN_V18_PILOT
+        key=f"{country}:{item}"
+        config_name=selected.get("config_name")
+        if FROZEN_V18_PILOT.get(key)!=config_name:
+            return {"status":"SPECIALIST_OR_BASELINE_UNSUPPORTED",
+                    "champion_executed":False}
+        db=env.get(DB_PATH_FLAG,"")
+        if not db or not Path(db).is_file():
+            return {"status":"PRIVATE_SOURCES_UNAVAILABLE",
+                    "champion_executed":False}
+        timestamp=int(time.time()) if now is None else int(now)
+        args=[sys.executable,"-m","services.private_v18_champion_worker_v35",
+              "--db",db,"--country",country,"--item",item,
+              "--config",config_name,"--now",str(timestamp)]
+        try:
+            invoker=run_worker or subprocess.run
+            p=invoker(args,capture_output=True,text=True,timeout=35,check=False)
+            if p.returncode!=0 or len(p.stdout)>8192:
+                return {"status":"PRIVATE_WORKER_FAILED","champion_executed":False}
+            data=json.loads(p.stdout)
+            if not isinstance(data,dict):
+                raise ValueError("invalid child response")
+            if data.get("status")!="RESEARCH_PROPOSAL_ONLY":
+                return {"status":str(data.get("status") or "NO_RESULT"),
+                        "champion_executed":False}
+            departure=data.get("recommended_departure_timestamp")
+            arrival=data.get("recommended_arrival_timestamp")
+            if (data.get("key")!=key or
+                data.get("model_generation")!="V18" or
+                data.get("model_config")!=config_name or
+                data.get("probability_calibrated") is not False or
+                not isinstance(departure,int) or
+                not isinstance(arrival,int) or departure<timestamp or
+                arrival<=departure or departure-timestamp>28800 or
+                data.get("replan_step_seconds")!=300 or
+                data.get("research_horizon_seconds")!=28800):
+                return {"status":"FROZEN_CONFIG_IDENTITY_MISMATCH",
+                        "champion_executed":False}
+            return {
+                "status":"RESEARCH_PROPOSAL_ONLY",
+                "champion_executed":True,
+                "mode":"PRIVATE_DIAGNOSTIC_NOT_LIVE",
+                "model_generation":"V18",
+                "model_config":config_name,
+                "recommended_departure_timestamp":departure,
+                "recommended_arrival_timestamp":arrival,
+                "quantity_threshold":30,"grace_seconds":10,
+                "replanning_seconds":300,"horizon_seconds":28800,
+                "chance_calibrated":False,
+                "source":"FROZEN_V18_ORIGINAL_ENGINE_SINGLE_TICK",
+            }
+        except (OSError,ValueError,json.JSONDecodeError,subprocess.TimeoutExpired):
+            return {"status":"PRIVATE_WORKER_FAILED","champion_executed":False}
     if version not in MASTER_ENV:
         return {"status":"SPECIALIST_OR_BASELINE_UNSUPPORTED",
                 "champion_executed":False}
