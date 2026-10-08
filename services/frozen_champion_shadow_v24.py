@@ -30,11 +30,11 @@ from pathlib import Path
 
 from services.remaining_item_v21 import observed_arrival_success
 
-SCHEMA="frozen-champion-v24-new-data-shadow-v1"
+SCHEMA="frozen-champion-v24-new-data-shadow-v2"
 DEFAULT_OUTPUT="data/frozen_champion_v24/new_vm_master.json"
 OLD_NATIVE={
     "v19": {"max_wait":21600,"departure_grid":300,"replan_step":300},
-    "v20": {"max_wait":43200,"departure_grid":300,"replan_step":300},
+    "v20": {"max_wait":43200,"departure_grid":300,"replan_step":900},
     "v21": {"max_wait":43200,"departure_grid":900,"replan_step":900},
 }
 
@@ -101,72 +101,113 @@ def _digest_file(path):
     return h.hexdigest()
 
 
+ENGINE_FAMILY = {
+    "v19": "services.plushie_flower_dynamic_planner_v18",
+    "v20": "services.plushie_flower_dynamic_planner_v19",
+    "v21": "services.plushie_flower_dynamic_planner_v19",
+}
+EXPECTED_RESULT_SCHEMAS = {
+    "v19": "plushie-flower-dynamic-planner-v18.1-item-v1",
+    "v20": "plushie-flower-dynamic-planner-v19-item-v1",
+    "v21": "plushie-flower-dynamic-planner-v19-item-v1",
+}
+
+
 def _worker(payload):
     from services import history_service
-    from services import plushie_flower_dynamic_planner_v19 as planner
+    from services import plushie_flower_dynamic_planner_v18 as planner18
+    from services import plushie_flower_dynamic_planner_v19 as planner19
 
     key=payload["key"]
     country,item_name=key.split(":",1)
     _install_frozen_readonly_history(history_service,payload["db"])
+    gaps=planner19.normalize_gaps(history_service.get_collection_gaps())
 
-    # Worker processes may handle several items; don't stack a new subclass
-    # of the previously monkey-patched Timeline on every iteration.
-    base_timeline=getattr(planner,"_frozen_v24_timeline_base",planner.Timeline)
-    planner._frozen_v24_timeline_base=base_timeline
-    class TruthTimeline(base_timeline):
-        def success(self,arrival,grace):
-            val=observed_arrival_success(
-                self.ts,self.qty,self.gaps,arrival,self.min_qty,grace
-            )
-            return bool(val) if val is not None else False
+    # V19's saved schema is v18.1; V20/V21 explicitly use the v19 planner.
+    # Reusing v19 for V19 changes feature distances (sequence terms) and would
+    # falsely label a new policy as the historical frozen V19 incumbent.
+    engines={"v19":planner18,"v20":planner19,"v21":planner19}
+    prepared={}
+    for version in payload["candidates"]:
+        planner=engines[version]
+        base_attr="_frozen_v24_timeline_base"
+        base=getattr(planner,base_attr,planner.Timeline)
+        setattr(planner,base_attr,base)
+        class TruthTimeline(base):
+            def success(self,arrival,grace):
+                val=observed_arrival_success(
+                    self.ts,self.qty,gaps,arrival,self.min_qty,grace
+                )
+                return bool(val) if val is not None else False
+        planner.Timeline=TruthTimeline
+        if version=="v19":
+            cleaned,cycles,bounces=planner.load_item(country,item_name,payload["min_qty"])
+            timeline=TruthTimeline(cleaned,cycles,payload["min_qty"])
+            dep_times,cycle_feats=planner.completed_cycle_features(cycles)
+        else:
+            if "v20" in prepared or "v21" in prepared:
+                donor=prepared.get("v20") or prepared.get("v21")
+                prepared[version]=dict(donor)
+                continue
+            cleaned,cycles,bounces,_=planner.load_item(country,item_name,payload["min_qty"])
+            timeline=TruthTimeline(cleaned,cycles,payload["min_qty"],gaps=gaps)
+            dep_times,cycle_feats=planner.completed_cycle_features(cycles,gaps=gaps)
+        points=planner.build_points(timeline,dep_times,cycle_feats,600)
+        prepared[version]={
+            "planner":planner,"timeline":timeline,
+            "dep_times":dep_times,"cycle_feats":cycle_feats,
+            "points":points,"point_times":[p.t for p in points],
+            "bounces":len(bounces),
+        }
 
-    planner.Timeline=TruthTimeline
-    cleaned,cycles,bounces,gaps=planner.load_item(country,item_name,payload["min_qty"])
-    if not cleaned:
-        return key,{"status":"no_history"}
-    timeline=TruthTimeline(cleaned,cycles,payload["min_qty"],gaps=gaps)
-    dep_times,cycle_feats=planner.completed_cycle_features(cycles,gaps=gaps)
-    points=planner.build_points(timeline,dep_times,cycle_feats,600)
-    if len(points)<60:
-        return key,{"status":"insufficient_points","points":len(points)}
+    if all(len(p["points"])<60 for p in prepared.values()):
+        return key,{"status":"insufficient_points","points_by_version":{
+            v:len(p["points"]) for v,p in prepared.items()}}
 
-    travel=int(planner.TRAVEL_SECONDS[country])
+    travel=int(planner19.TRAVEL_SECONDS[country])
     max_horizon=max(c["max_wait"] for c in payload["candidates"].values())
-    # All candidate models must have a full common 12h observed horizon.
+    # Use the shared v19-era timeline to set one cohort across all models.
+    reference=prepared.get("v20") or prepared.get("v21") or prepared["v19"]
+    timeline=reference["timeline"]
     first=((payload["cutoff"]+1799)//1800)*1800
     last=int(timeline.last_ts-max_horizon-travel-payload["grace"])
     starts=[]
     for t in range(first,last+1,payload["step"]):
-        if timeline.crosses_gap(t,t+max_horizon+travel+payload["grace"]):
+        if planner19.overlaps_gap(gaps,t,t+max_horizon+travel+payload["grace"]):
             continue
-        if planner.context_at(t,timeline,dep_times,cycle_feats) is None:
+        if reference["planner"].context_at(
+            t,timeline,reference["dep_times"],reference["cycle_feats"]
+        ) is None:
             continue
         starts.append(float(t))
     if payload["max_starts"] and len(starts)>payload["max_starts"]:
-        # Spread across the new period rather than favoring the first few.
         if payload["max_starts"]==1:
             starts=[starts[len(starts)//2]]
         else:
             starts=[starts[round(i*(len(starts)-1)/(payload["max_starts"]-1))]
+                    for i in range(payload["max_starts"])]
     if not starts:
         return key,{"status":"no_clean_new_sessions","new_end_timestamp":int(timeline.last_ts)}
 
     per={}
     for version,candidate in payload["candidates"].items():
+        p=prepared[version]
+        planner=p["planner"]
         cfg=planner.Config(**candidate["config"])
         durations=list(range(0,candidate["max_wait"]+1,candidate["departure_grid"]))
         rows,_,summary=planner.eval_config(
-            starts,cfg,points,[p.t for p in points],
-            timeline,dep_times,cycle_feats,durations,travel,payload["grace"],
+            starts,cfg,p["points"],p["point_times"],p["timeline"],
+            p["dep_times"],p["cycle_feats"],durations,travel,payload["grace"],
             candidate["replan_step"],candidate["max_wait"]
         )
         per[version]={
-            "model":cfg.name,"summary":summary,
+            "model":cfg.name,"engine_family":ENGINE_FAMILY[version],
+            "summary":summary,
             "rows":[{"start":int(r["start"]),"departure":int(r["departure"]),
                      "arrival":int(r["arrival"]),"success":bool(r["success"]),
                      "session_cap":bool(r.get("session_cap",False))}
                     for r in rows],
-            "original_candidate_settings": {
+            "original_candidate_settings":{
                 k:candidate[k] for k in ("max_wait","departure_grid","replan_step")
             },
         }
@@ -174,29 +215,75 @@ def _worker(payload):
         "status":"complete",
         "snapshot_cutoff":payload["cutoff"],
         "shared_starts":len(starts),
+        "eligible_start_times":[int(t) for t in starts],
         "travel_seconds":travel,
-        "provider_bounces_suppressed":len(bounces),
+        "provider_bounces_suppressed":reference["bounces"],
         "known_collection_gaps":len(gaps),
         "versions":per,
-        "warning":"Dynamic policy replay on new timestamps. Not an independent next-drop confidence calibration.",
+        "warning":"Dynamic policy replay on newer timestamps, not independent next-drop confidence calibration.",
     }
 
-
 def _match(item):
-    versions=item.get("versions") or {}
-    sets={ver:{row["start"]:row for row in v["rows"]} for ver,v in versions.items()}
-    common=set.intersection(*(set(rows) for rows in sets.values())) if sets else set()
-    counts={ver:{"hits":sum(int(sets[ver][t]["success"]) for t in common),
-                 "paired_n":len(common)}
-            for ver in sets}
-    return {"versions":counts,"common_starts":len(common),
-            "warning":"Same new sessions, but historical version-specific wait policies may differ."}
+    """Score every eligible shared start; missing recommendations count in coverage.
 
+    A conditional-only intersection of recommendation rows inflates performance
+    when a challenger silently abstains on difficult starting sessions.
+    """
+    from itertools import combinations
+    eligible = [int(t) for t in item.get("eligible_start_times", [])]
+    if not eligible or len(set(eligible)) != len(eligible):
+        raise ValueError("missing or duplicate eligible_start_times")
+    if len(eligible) != item.get("shared_starts"):
+        raise ValueError("eligible_start_times disagree with shared_starts")
+    sessions = set(eligible)
+    versions = item.get("versions") or {}
+    mapped = {}
+    counts = {}
+    for version, data in versions.items():
+        rows = data.get("rows") or []
+        by = {int(row["start"]): row for row in rows}
+        if len(by) != len(rows):
+            raise ValueError(f"{version}: duplicate recommendation starts")
+        if not set(by).issubset(sessions):
+            raise ValueError(f"{version}: recommendation outside eligible starts")
+        mapped[version] = by
+        hits = sum(bool(r["success"]) for r in by.values())
+        n_recommended = len(by)
+        counts[version] = {
+            "hits": hits,
+            "paired_n": len(eligible),
+            "all_start_success_rate": hits / len(eligible),
+            "recommendations": n_recommended,
+            "coverage": n_recommended / len(eligible),
+            "conditional_success_rate": hits / n_recommended if n_recommended else None,
+            "no_recommendation_starts": len(eligible) - n_recommended,
+            "session_caps": sum(bool(r.get("session_cap")) for r in by.values()),
+        }
+    head_to_head = {}
+    for left, right in combinations(sorted(mapped), 2):
+        a, b = mapped[left], mapped[right]
+        a_only = sum(bool(a.get(t, {}).get("success")) and
+                     not bool(b.get(t, {}).get("success")) for t in eligible)
+        b_only = sum(bool(b.get(t, {}).get("success")) and
+                     not bool(a.get(t, {}).get("success")) for t in eligible)
+        head_to_head[f"{left}_vs_{right}"] = {
+            "shared_eligible_starts": len(eligible),
+            f"{left}_only_successes": a_only,
+            f"{right}_only_successes": b_only,
+            "ties": len(eligible) - a_only - b_only,
+        }
+    return {
+        "versions": counts, "common_starts": len(eligible),
+        "head_to_head": head_to_head,
+        "warning": ("Intention-to-treat on shared eligible starts; no-recommendation "
+                    "counts as no successful trip. Native wait horizons differ by generation. "
+                    "Not a calibrated next-restock forecast."),
+    }
 
 def main():
     ap=argparse.ArgumentParser()
     ap.add_argument("--db",required=True)
-    ap.add_argument("--registry",required=True)
+    ap.add_argument("--registry",help="Optional 236-entry selection registry; without it replay all master catalog keys")
     for v in ("v19","v20","v21"):
         ap.add_argument("--"+v,required=True)
     ap.add_argument("--cutoff",type=int,required=True)
@@ -209,9 +296,11 @@ def main():
     ap.add_argument("--step",type=int,default=1800)
     ap.add_argument("--min-qty",type=int,default=30)
     ap.add_argument("--grace-seconds",type=int,default=10)
+    ap.add_argument("--v20-replan-seconds",type=int,default=900,
+                    help="Historical V20 replan cadence was not stored in its master; CLI default was 900s")
     ap.add_argument("--resume",action="store_true")
     args=ap.parse_args()
-    if args.workers<1 or args.max_starts<1 or args.step<60 or args.cutoff<=0:
+    if args.workers<1 or args.max_starts<1 or args.step<60 or args.cutoff<=0 or args.v20_replan_seconds<1:
         ap.error("invalid worker, sampling or cutoff settings")
     db=Path(args.db).resolve()
     if not db.is_file():
@@ -219,12 +308,33 @@ def main():
     db_sha=_digest_file(db)
     if args.expected_db_sha256 and db_sha.lower()!=args.expected_db_sha256.lower():
         raise SystemExit(f"STOP: frozen snapshot checksum mismatch {db_sha}; make a stable archived copy first")
-    registry=_champion_entries(_json(args.registry))
     masters={v:_json(getattr(args,v)) for v in OLD_NATIVE}
+    if args.registry:
+        registry=_champion_entries(_json(args.registry))
+    else:
+        registry={
+            key: {"key": key} for master in masters.values()
+            for key in (master.get("results") or {}) if key != "jap:Xanax"
+        }
+    native_policies={v:dict(policy) for v,policy in OLD_NATIVE.items()}
+    native_policies["v20"]["replan_step"]=args.v20_replan_seconds
+    v20_recorded=(masters["v20"].get("settings") or {}).get("departure_grid_seconds")
+    if v20_recorded is not None and int(v20_recorded)!=native_policies["v20"]["departure_grid"]:
+        raise SystemExit("STOP: V20 departure grid differs from recorded master settings")
+    v21_recorded=(masters["v21"].get("settings") or {}).get("options") or {}
+    for opt in ("max_wait","departure_grid","replan_step"):
+        if opt in v21_recorded and int(v21_recorded[opt])!=native_policies["v21"][opt]:
+            raise SystemExit(f"STOP: V21 {opt} differs from recorded master settings")
     keys=args.only or [
-        k for k,r in registry.items() if _resolve_config(r,masters)
+        k for k in sorted(registry) if any(
+            ((m.get("results") or {}).get(k) or {}).get("status")=="complete"
+            for m in masters.values()
+        )
     ]
-    settings={"cutoff":args.cutoff,"db_path":str(db),"db_sha256":db_sha,\n              "registry_sha256":_digest_file(args.registry),"db_size":db.stat().st_size,
+    settings={"cutoff":args.cutoff,"db_path":str(db),"db_sha256":db_sha,
+              "registry_sha256":_digest_file(args.registry) if args.registry else None,
+              "native_policies":native_policies,
+              "v20_replan_provenance":"CLI default 900s unless explicitly overridden; V20 master does not record replan cadence","db_size":db.stat().st_size,
               "db_mtime_ns":db.stat().st_mtime_ns,"max_starts":args.max_starts,
               "step":args.step,"min_qty":args.min_qty,"grace":args.grace_seconds,
               "master_shas":{v:hashlib.sha256(Path(getattr(args,v)).read_bytes()).hexdigest()
@@ -249,7 +359,9 @@ def main():
             result=(masters[v].get("results") or {}).get(key) or {}
             cfg=(result.get("selected_on_training") or {}).get("config")
             if result.get("status")=="complete" and cfg:
-                candidates[v]={"config":cfg,**OLD_NATIVE[v]}
+                if result.get("schema") != EXPECTED_RESULT_SCHEMAS[v]:
+                    raise SystemExit(f"STOP: {key} {v} model schema does not match native engine family")
+                candidates[v]={"config":cfg,**native_policies[v]}
         if not candidates:
             report["results"][key]={"status":"no_frozen_model"}
             continue
