@@ -34,6 +34,20 @@ class V26RegistryTests(unittest.TestCase):
              "old_matched_hits": "", "old_matched_n": ""}
         ]
 
+    def test_checked_in_all_236_registry_is_consistent(self):
+        saved=json.loads((ROOT/"research"/"all_236_champions_v26.json").read_text())
+        items=saved["items"]
+        self.assertEqual(len(items),236)
+        for candidate in self.plushies["items"]:
+            key=candidate["item_key"]
+            self.assertEqual(items[key]["current_provisional_candidate"]["full_model_description"],
+                             candidate["full_model_description"])
+        self.assertEqual(items["jap:Xanax"]["current_provisional_candidate"]["model_family"],
+                         "japan_xanax_specialist")
+        self.assertEqual(items["arg:Liquid Body Armor"]["current_provisional_candidate"]["model_family"],
+                         "quantity_requalified_needs_new_tournament")
+        self.assertTrue(all(x["promotion_status"]=="RESEARCH_ONLY_BLOCKED" for x in items.values()))
+
     def test_handoff_has_21_with_18_development_over_90(self):
         data = self.plushies
         self.assertEqual(len(self.keys), 21)
