@@ -13,6 +13,7 @@ def evidence():
         uses_japan_xanax_specialist=True,
         specialist_live_departure_adapter_tested=True,
         publishes_probability=False,
+        same_source_db_verified=True,
         native_replay_parity_passed=True,
         causal_prefix_invariance_passed=True,
         prospective_after_model_freeze=True,
@@ -92,6 +93,12 @@ class ReleaseGateTests(unittest.TestCase):
             self.assertTrue(assess(x)["ready"])
             x["temporary_low_reliability_caution_visible"] = False
             self.assertFalse(assess(x)["ready"])
+
+    def test_cross_snapshot_parity_never_promotes(self):
+        x = evidence()
+        x["same_source_db_verified"] = False
+        self.assertFalse(assess(x)["ready"])
+        self.assertTrue(any("same source DB" in b for b in assess(x)["blockers"]))
 
     def test_lookahead_detection_blocks_promotion(self):
         x = evidence()

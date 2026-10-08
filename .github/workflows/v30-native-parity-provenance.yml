@@ -1,0 +1,32 @@
+name: V30 source-provenance parity safeguards
+
+on:
+  push:
+    branches:
+      - research/v30-native-parity-diagnostics
+  pull_request:
+    paths:
+      - research/v30_native_parity_probe.py
+      - research/v25_release_gate.py
+      - tests/test_v30_native_parity_probe.py
+      - tests/test_v30_native_engines_smoke.py
+      - tests/test_v25_release_gate.py
+      - .github/workflows/v30-native-parity-provenance.yml
+
+permissions:
+  contents: read
+
+jobs:
+  native-parity-provenance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python -m pip install requests
+      - run: python -m unittest discover -s tests -p 'test_v30_native_parity_probe.py' -v
+      - run: python -m unittest discover -s tests -p 'test_v30_native_engines_smoke.py' -v
+      - run: python -m unittest discover -s tests -p 'test_v25_release_gate.py' -v
+      - run: python -m py_compile research/v30_native_parity_probe.py

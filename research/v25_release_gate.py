@@ -39,6 +39,8 @@ def assess(evidence: dict, target: str = "public_live_guidance") -> dict:
                 "cannot publish uncalibrated trip-success percentages")
 
     if target == "public_live_guidance":
+        require(bool(evidence.get("same_source_db_verified")),
+                "native parity must compare the exact same source DB snapshot")
         require(bool(evidence.get("native_replay_parity_passed")), "no native replay parity")
         require(bool(evidence.get("causal_prefix_invariance_passed")),
                 "replay may use future data to qualify predecision history")
