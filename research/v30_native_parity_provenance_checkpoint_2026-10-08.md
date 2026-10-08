@@ -32,7 +32,7 @@ Original model snapshot counts also differ materially from the later DB. Example
 - New `research/v30_native_parity_probe.py` calls **original versioned planner code**, never the V28 research port. It validates original result schema, uses original V18.1/V19 engine family, original frozen config, original historical simulation rules, deterministic label-blind sample starts, complete denominator and strictly read-only SQLite.
 - Before execution, compare tested DB SHA to the original master `settings.db_sha256`. If missing or different, report `UNKNOWN_SOURCE_DB_HASH` / `CROSS_SNAPSHOT` and **refuse to claim parity**. `--force-cross-snapshot-diagnostic` allows only explicitly labeled non-certifying exploratory comparisons.
 - Enhanced `research/v25_release_gate.py` with required `same_source_db_verified` flag for public model activation, in addition to native parity and causal prefix-invariance.
-- GitHub Actions V30 source-provenance CI passed 9 provenance/test-contract tests + 14 release-gate tests. Separate V25 guard job passed 14 + 10 tests.
+- GitHub Actions V30 source-provenance CI passed 9 provenance/test-contract tests + 1 true native-engine synthetic SQLite integration test (V19, V20, V21 paths) + 14 release-gate tests. The native integration test executes original planner code and verifies the source SQLite digest stays unchanged; synthetic stock accuracy is not predictive validation. Separate V25 guard job passed 14 + 10 tests.
 
 ### To run genuine native parity when original frozen source DB is available
 
