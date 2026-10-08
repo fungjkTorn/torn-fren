@@ -91,7 +91,7 @@ def record_private_decision(
     if snapshot.get("champion_executed") is True and not executed:
         raise ValueError("inconsistent challenger outcome")
     tick=(generated//300)*300
-    row=(experiment_id,key,tick,ts,generated,SOURCE_SCHEMA,
+    row=(experiment_id,key,tick,ts,SOURCE_SCHEMA,generated,
          str(snapshot.get("candidate_model_family") or ""),
          str(snapshot.get("candidate_config") or ""),
          str(challenger.get("status") or "UNKNOWN"),
