@@ -112,6 +112,39 @@ class ShadowOutcomeTests(unittest.TestCase):
             self.assertEqual(report["items"]["can:Fire Hydrant"]["resolved_eligible_sessions"],0)
             self.assertEqual(report["items"]["can:Fire Hydrant"]["rows"][0]["status"],"PENDING_SESSION_HORIZON")
 
+    def test_already_departed_plan_is_counted_as_miss_not_excluded(self):
+        with tempfile.TemporaryDirectory() as td:
+            raw=Path(td)/"stock.db";collector(raw)
+            ledger=Path(td)/"evidence.db"
+            s=snapshot(BASE+100,BASE+100,BASE+1000)
+            # The suggestion was already in the past when the client logged it.
+            record_private_decision(ledger,s,"pilot",now=BASE+110)
+            r=score_capture(ledger,raw,experiment="pilot",freeze_epoch=BASE,
+                            asof_epoch=BASE+56000)
+            item=r["items"]["can:Fire Hydrant"]
+            self.assertEqual(item["resolved_eligible_sessions"],1)
+            self.assertEqual(item["successful_arrivals"],0)
+            self.assertEqual(item["all_start_success"],0.0)
+            self.assertEqual(item["rows"][0]["status"],"INVALID_OR_ALREADY_DEPARTED_RECOMMENDATION")
+
+    def test_v2_and_challenger_share_matured_denominator(self):
+        with tempfile.TemporaryDirectory() as td:
+            raw=Path(td)/"stock.db";collector(raw)
+            ledger=Path(td)/"evidence.db"
+            s=snapshot(BASE+100,BASE+120,BASE+1000)
+            s["baseline"]={
+                "status":"available",
+                "recommended_leave_by_timestamp":BASE+150,
+                "recommended_arrival_timestamp":BASE+1200}
+            record_private_decision(ledger,s,"pilot",now=BASE+101)
+            r=score_capture(ledger,raw,experiment="pilot",freeze_epoch=BASE,
+                            asof_epoch=BASE+56000)
+            item=r["items"]["can:Fire Hydrant"]
+            self.assertEqual(item["resolved_eligible_sessions"],1)
+            self.assertEqual(item["v2_scored_matched_sessions"],1)
+            self.assertEqual(item["v2_successes"],1)
+            self.assertEqual(item["v2_all_start_rate"],1.0)
+
 
 if __name__=="__main__":
     unittest.main()
