@@ -29,6 +29,14 @@ class CanaryIsolationTests(unittest.TestCase):
 
     def test_live_v2_route_is_still_registered(self):
         paths={r.path for r in app.routes if hasattr(r,"path")}
+        from web.private_shadow_v29 import router as private_router
+        self.assertIn("/api/research/champion-shadow",
+                     {r.path for r in private_router.routes
+                      if hasattr(r,"path")},
+                     "The module has not registered the private handler")
+        print("SHADOW DEBUG module routes:", [x.path for x in private_router.routes])
+        print("SHADOW DEBUG app route count:",len(app.routes))
+        print("SHADOW DEBUG app routes:", sorted(paths))
         for name in ("/api/history","/api/catalog","/api/admin/health",
                      "/api/research/champion-shadow"):
             self.assertIn(name,paths)
