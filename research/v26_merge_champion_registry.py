@@ -7,6 +7,7 @@ import argparse
 import csv
 import hashlib
 import json
+import sqlite3
 from pathlib import Path
 
 
@@ -81,12 +82,45 @@ def merge_registry(prior, plushie_manifest, masters):
     }
 
 
+def refresh_quantity_feasibility(merged, observed_max_by_item):
+    """Mark old below-30 classifications as needing a new model where newly possible."""
+    changed = []
+    for key, entry in merged["items"].items():
+        if entry.get("replaces_old_all_item_candidate_for_research"):
+            continue
+        if entry["historical_all_item_selection"]["family"] != "quantity_below_30":
+            continue
+        maximum = observed_max_by_item.get(key)
+        if maximum is not None and maximum >= 30:
+            entry["candidate"] = {
+                "model_family": "quantity_requalified_needs_new_tournament",
+                "observed_max_quantity": int(maximum),
+                "promotion_status": "RESEARCH_ONLY_BLOCKED",
+            }
+            entry["quantity_classification_changed"] = True
+            changed.append(key)
+    merged["quantity_classification_retested"] = sorted(changed)
+    return merged
+
+
+def read_observed_max_read_only(db):
+    path = Path(db).resolve()
+    if not path.is_file():
+        raise FileNotFoundError(path)
+    with sqlite3.connect(path.as_uri() + "?mode=ro", uri=True) as conn:
+        return {country + ":" + name: int(maximum)
+                for country, name, maximum in conn.execute(
+                    "SELECT country, item_name, MAX(quantity) FROM stock_history GROUP BY country, item_name"
+                )}
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--prior-csv", required=True)
     parser.add_argument("--plushies", default="research/plushie_flower_champions_v26.json")
     for family in SOURCE_KEYS:
         parser.add_argument("--" + family, required=True)
+    parser.add_argument("--db", help="Optional frozen SQLite history; opened in read-only mode")
     parser.add_argument("--output", required=True)
     args = parser.parse_args()
     prior = list(csv.DictReader(Path(args.prior_csv).open(encoding="utf-8-sig", newline="")))
@@ -96,6 +130,8 @@ def main():
         for family in SOURCE_KEYS
     }
     artifact = merge_registry(prior, plushies, masters)
+    if args.db:
+        artifact = refresh_quantity_feasibility(artifact, read_observed_max_read_only(args.db))
     output = Path(args.output)
     if output.exists():
         raise SystemExit("Refusing to overwrite existing frozen registry: " + str(output))
