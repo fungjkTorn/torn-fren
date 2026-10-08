@@ -120,6 +120,21 @@ class V34Tests(unittest.TestCase):
                                if t//300*300+43200+1620+10+180<=ASOF))
         self.assertLess(r["v21"]["conservative_success_lower_bound"],1)
 
+    def test_rotating_four_item_schedule_penalizes_only_its_20min_slots(self):
+        anchor=T+360   # expected :01/:06/... minute of first eligible 4-slot rotation
+        once=audit(self.ev,self.stock,experiment=EXP,
+             freeze_epoch=T,asof_epoch=ASOF,scheduled_from_epoch=anchor,
+             policy_max_wait=43200,items=[KEY],schedule_stride_seconds=1200)
+        every=audit(self.ev,self.stock,experiment=EXP,
+             freeze_epoch=T,asof_epoch=ASOF,scheduled_from_epoch=anchor,
+             policy_max_wait=43200,items=[KEY],schedule_stride_seconds=300)
+        self.assertEqual(once["schedule_stride_seconds"],1200)
+        a=once["items"][KEY]
+        b=every["items"][KEY]
+        self.assertGreater(b["missing_timer_ticks"],a["missing_timer_ticks"])
+        self.assertLess(a["matured_attempts_or_missing_ticks"],
+                        b["matured_attempts_or_missing_ticks"])
+
     def test_stock_gap_cannot_be_credited_as_success(self):
         with sqlite3.connect(self.stock) as c:
             c.execute("INSERT INTO collection_gaps VALUES (?,?)",(ARR-40,ARR+40))

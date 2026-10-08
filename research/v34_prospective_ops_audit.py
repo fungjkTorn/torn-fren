@@ -118,7 +118,8 @@ def _completed_windows(con,country,item,freeze,asof):
 
 
 def audit(evidence_db,stock_db,*,experiment,freeze_epoch,asof_epoch,
-          scheduled_from_epoch,policy_max_wait=43200,items=None):
+          scheduled_from_epoch,policy_max_wait=43200,items=None,
+          schedule_stride_seconds=300):
     if (not experiment or freeze_epoch<=0 or asof_epoch<freeze_epoch or
         policy_max_wait<300 or policy_max_wait>43200):
         raise ValueError("invalid temporal or experimental configuration")
@@ -126,6 +127,8 @@ def audit(evidence_db,stock_db,*,experiment,freeze_epoch,asof_epoch,
         scheduled_from_epoch<freeze_epoch or scheduled_from_epoch%300!=60
     ):
         raise ValueError("scheduled_from must represent an actual :01/:06/... minute")
+    if schedule_stride_seconds not in (300,1200):
+        raise ValueError("unsupported explicitly scheduled item stride")
     if Path(evidence_db).resolve()==Path(stock_db).resolve():
         raise ValueError("evidence and collector DB must be separate")
     output={"schema":"torn-fren-v34-strict-prospective-ops-audit-v1",
@@ -133,6 +136,7 @@ def audit(evidence_db,stock_db,*,experiment,freeze_epoch,asof_epoch,
             "asof_epoch":asof_epoch,
             "scheduled_from_epoch":scheduled_from_epoch,
             "policy_max_wait_seconds":policy_max_wait,
+            "schedule_stride_seconds":schedule_stride_seconds,
             "read_only":True,"promotions_approved":0,
             "independent_window_certified":False,"items":{}}
     with _readonly(evidence_db) as ev, _readonly(stock_db) as stock:
@@ -214,7 +218,7 @@ def audit(evidence_db,stock_db,*,experiment,freeze_epoch,asof_epoch,
             if scheduled_from_epoch is not None:
                 # The timer fires at :01/:06 etc; its evidence tick is :00/:05.
                 # Allow 180 sec after its scheduled call before flagging absent.
-                for scheduled in range(scheduled_from_epoch,asof_epoch-179,300):
+                for scheduled in range(scheduled_from_epoch,asof_epoch-179,schedule_stride_seconds):
                     tick=scheduled//300*300
                     if tick not in attempted_ticks:
                         missing_ticks.append(tick)
@@ -242,7 +246,7 @@ def audit(evidence_db,stock_db,*,experiment,freeze_epoch,asof_epoch,
                 "attempts":len(attempts_for_key),
                 "valid_decisions":sum(1 for r in forecasts if r[1]==key),
                 "expected_timer_ticks": (
-                  max(0,(asof_epoch-180-scheduled_from_epoch)//300+1)
+                  max(0,(asof_epoch-180-scheduled_from_epoch)//schedule_stride_seconds+1)
                   if scheduled_from_epoch is not None and
                      asof_epoch>=scheduled_from_epoch+180 else None),
                 "missing_timer_ticks":len(missing_ticks),
@@ -279,13 +283,16 @@ def main():
     p.add_argument("--asof-epoch",type=int)
     p.add_argument("--max-wait-seconds",type=int,default=43200)
     p.add_argument("--item",action="append",default=[])
+    p.add_argument("--schedule-stride-seconds",type=int,default=300,
+                   choices=(300,1200))
     p.add_argument("--output",help="Optional new JSON report; refuses overwrite")
     args=p.parse_args()
     asof=int(time.time()) if args.asof_epoch is None else args.asof_epoch
     report=audit(args.evidence_db,args.stock_db,experiment=args.experiment,
                  freeze_epoch=args.freeze_epoch,asof_epoch=asof,
                  scheduled_from_epoch=args.scheduled_from_epoch,
-                 policy_max_wait=args.max_wait_seconds,items=args.item)
+                 policy_max_wait=args.max_wait_seconds,items=args.item,
+                 schedule_stride_seconds=args.schedule_stride_seconds)
     summary={k:{f:v for f,v in result.items() if f not in
         ("eligible_row_summaries",)}
         for k,result in report["items"].items()}

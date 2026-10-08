@@ -1,14 +1,13 @@
 [Unit]
-Description=Torn Fren private shadow research capture (single tick)
+Description=Torn Fren isolated rotating museum and Japan research capture
 After=network.target torn-fren-web.service
-ConditionPathExists=/etc/torn-fren/private-shadow.env
+ConditionPathExists=/opt/torn-fren/data/stock_history.db
 
 [Service]
 Type=oneshot
 User=ubuntu
 Group=ubuntu
 WorkingDirectory=/opt/torn-fren
-EnvironmentFile=/etc/torn-fren/private-shadow.env
 StateDirectory=torn-fren-shadow
 StateDirectoryMode=0700
 UMask=0077
@@ -16,6 +15,10 @@ NoNewPrivileges=yes
 PrivateTmp=yes
 ProtectSystem=strict
 ProtectHome=yes
-TimeoutStartSec=275
-# V35 pilot: exact V18 champion Heather/Wolverine plus baseline-only Nessie/Xanax.\n# Four sequential calls, bounded by 275s, never changing player-facing forecasts.
-ExecStart=/usr/bin/python3 -m research.v33_private_shadow_sampler --evidence-db /var/lib/torn-fren-shadow/capture.db --experiment pilot-museum-japan-v35 --item "uni:Heather" --item "can:Wolverine Plushie" --item "uni:Nessie Plushie" --item "jap:Xanax"
+Nice=15
+CPUQuota=50%
+MemoryMax=512M
+TimeoutStartSec=75
+# V36: one item per tick, four items rotated over 20m. No secret env file.
+# Native V18 in a read-only child; V2 via bounded public history read only.
+ExecStart=/usr/bin/python3 -m research.v36_isolated_museum_sampler --db /opt/torn-fren/data/stock_history.db --evidence-db /var/lib/torn-fren-shadow/capture.db --experiment pilot-museum-japan-v36 --rotate
