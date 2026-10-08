@@ -197,14 +197,15 @@ def _camel(ctx,country,item,starts,cutoff):
     tl=ctx.timelines[(country,item)];travel=TRAVEL_SECONDS[country]
     ps=_template_bank(ctx,country,item)
     rows=[]
-    def choose(q):
-        candidates=[]
-        for e,p in ps.items():
-            result=p(q)
-            if result is not None:
-                candidates.append((result[1],result[2].get("maxfit",0),-result[0],result))
-        return max(candidates,key=lambda z:(z[0],z[1],z[2]))[3] if candidates else None
-    for s in starts:rows.append(_simulate(s,choose,tl,travel))
+    for s in starts:
+        def choose(q):
+            candidates=[]
+            for e,p in ps.items():
+                result=p(q)
+                if result is not None and result[0]<=s+MAX_WAIT:
+                    candidates.append((result[1],result[2].get("maxfit",0),-result[0],result))
+            return max(candidates,key=lambda z:(z[0],z[1],z[2]))[3] if candidates else None
+        rows.append(_simulate(s,choose,tl,travel))
     out=_summarize(rows)
     out.update({"status":"complete","source":"24_template_current_plan_selector"})
     return out
