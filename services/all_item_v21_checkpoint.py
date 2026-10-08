@@ -18,6 +18,7 @@ import statistics
 import time
 from concurrent.futures import ProcessPoolExecutor, wait, FIRST_COMPLETED
 from pathlib import Path
+from dataclasses import replace
 
 from services.remaining_item_v21 import (
     _corrected_worker, load_clean_item, load_gaps, observed_arrival_success,
@@ -303,6 +304,23 @@ def _report(state, prior, conn, gaps, args, cache, changed_key=None):
     }
 
 
+def _restock_neutral_worker(payload):
+    """Use corrected V21 scoring without subtracting a flat cost per wait hour.
+
+    This overrides model candidate utility only inside this subprocess.
+    Successful long waits for naturally slow restocks remain successes.
+    """
+    from services import plushie_flower_dynamic_planner_v19 as planner
+    original = planner.configs
+    def neutral_configs():
+        return [replace(c, delay_penalty_per_hour=0.0) for c in original()]
+    planner.configs = neutral_configs
+    try:
+        return _corrected_worker(payload)
+    finally:
+        planner.configs = original
+
+
 def main():
     ap = argparse.ArgumentParser(description="V21 all-item corrected checkpoint tournament")
     ap.add_argument("action", choices=("run", "report"))
@@ -334,6 +352,7 @@ def main():
         "seed_v21_sha256": _digest(a.seed_v21) if a.seed_v21 and Path(a.seed_v21).exists() else None,
         "min_qty": a.min_qty, "grace_seconds": a.grace_seconds,
         "options": _options(a),
+        "per_hour_wait_penalty": 0.0,
     }
     if out.exists() and a.resume:
         state = _json(out)
@@ -409,11 +428,11 @@ def main():
 
         if a.workers == 1:
             for inp in inputs:
-                store(*_corrected_worker(inp))
+                store(*_restock_neutral_worker(inp))
         else:
             with ProcessPoolExecutor(max_workers=a.workers) as executor:
                 all_futures = {
-                    executor.submit(_corrected_worker, inp): inp["key"]
+                    executor.submit(_restock_neutral_worker, inp): inp["key"]
                     for inp in inputs
                 }
                 unfinished = set(all_futures)
