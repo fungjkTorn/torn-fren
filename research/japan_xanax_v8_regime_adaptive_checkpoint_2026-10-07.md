@@ -79,3 +79,64 @@ The 21 post-cutoff opportunities have now been inspected and are no longer a pri
 3. robust/nonlinear challengers where computationally practical;
 4. future-cycle shadow validation of the frozen V8 candidate;
 5. do not expose calibrated probabilities until separately validated.
+
+
+## Historical blocked walk-forward stress test
+A reproduction run was performed directly against the latest uploaded SQLite snapshot with the same gap handling, provider-bounce suppression, 2500-unit observation-lag reconstruction, and causal label resolution rules.
+
+The executable frozen V7 benchmark reproduced exactly on the 21 post-cutoff opportunities:
+- exact: 7/21 = 33.3%
+- +10s: 8/21 = 38.1%
+- +1m: 8/21 = 38.1%
+- +3m: 10/21 = 47.6%
+
+A compact standardized rolling Ridge challenger was then tested with only causal timing features and the last 60 resolved samples. The strongest stable nearby setting in this reproduction was timing features / 60-sample history / alpha=3:
+- newest 21 exact: 13/21 = 61.9%
+- +10s: 14/21 = 66.7%
+- +1m: 14/21 = 66.7%
+- +3m: 16/21 = 76.2%
+
+On 79 pre-cutoff walk-forward opportunities where both models were available, four chronological blocks gave exact rates:
+
+Frozen V7:
+- 55.0%
+- 45.0%
+- 50.0%
+- 68.4%
+
+Rolling Ridge:
+- 50.0%
+- 35.0%
+- 45.0%
+- 68.4%
+
+This confirms an important tradeoff: Ridge is much better in the current short-lifetime regime, but is not globally superior to V7 across older regimes.
+
+## Regime-switch stress test
+A causal regime ratio was defined as:
+recent mean reconstructed lifetime over the last 5 cycles / preceding historical reconstructed lifetime mean.
+
+The newest 21 opportunities are overwhelmingly short-lifetime regime observations (ratio mostly below 0.9).
+
+Switch policy:
+- use Ridge when the causal regime ratio is below threshold;
+- otherwise use V7.
+
+Results:
+- threshold 0.70: pre exact 55.7%, post exact 42.9%, post +3m 52.4%
+- threshold 0.80: pre exact 54.4%, post exact 57.1%, post +3m 61.9%
+- threshold 0.90: pre exact 54.4%, post exact 61.9%, post +3m 76.2%
+- threshold 1.00: pre exact 53.2%, post exact 61.9%, post +3m 76.2%
+
+The 0.90 switch retains approximately V7-level historical exact performance while capturing nearly all of the current Ridge advantage. This is therefore the leading architecture, but the 0.90 threshold has now been inspected on the new regime and must be treated as development-selected rather than pristine validation.
+
+## Feature-ablation finding
+Adding first-observed quantity / inferred observation-lag features to Ridge did not improve the current regime as consistently as the timing-only model. Longer rolling histories (80-120 samples) adapted too slowly and performed materially worse on the new short-lifetime regime. The 60-resolved-sample horizon remains the strongest balance tested so far.
+
+## Current leading V8 architecture
+1. preserve V7 mechanics as the ordinary-regime baseline;
+2. calculate a causal recent-lifetime regime ratio;
+3. switch to a standardized rolling Ridge timing model in materially short-lifetime regimes;
+4. use approximately 60 fully resolved samples for Ridge training;
+5. keep 100% valid-opportunity coverage;
+6. freeze this architecture for future-cycle shadow validation rather than continuing to optimize on the same 21 post-cutoff opportunities.
