@@ -38,7 +38,7 @@ class AllItemCheckpointTests(unittest.TestCase):
         # On a change-only timeline, quantity stays 80 from t=100 to t=600.
         times, qtys = [0,100,600,1000], [0,80,0,0]
         x = _immediate_baseline(times, qtys, [], travel=100, min_qty=30,
-                                 grace=10, starts=[0,100,400,600])
+                                 grace=10, starts=[0,400,600,900])
         self.assertEqual(x["sessions"], 3)
         self.assertEqual(x["successes"], 2)
         self.assertAlmostEqual(x["rate"], 2/3)
