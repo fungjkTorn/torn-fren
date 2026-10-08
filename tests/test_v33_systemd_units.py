@@ -19,7 +19,9 @@ class SystemdSamplingSafetyTests(unittest.TestCase):
     def test_private_file_and_python_only(self):
         self.assertIn("EnvironmentFile=/etc/torn-fren/private-shadow.env",SERVICE)
         self.assertIn("research.v33_private_shadow_sampler",SERVICE)
-        self.assertIn("--item \"can:Bear Gall\"",SERVICE)
+        self.assertIn("--item \"uni:Heather\"",SERVICE)
+        self.assertIn("--item \"can:Wolverine Plushie\"",SERVICE)
+        self.assertIn("--item \"jap:Xanax\"",SERVICE)
         self.assertIn("--evidence-db /var/lib/torn-fren-shadow/capture.db",SERVICE)
         self.assertNotIn("stock_history.db",SERVICE)
         self.assertNotIn("sudo",SERVICE)
