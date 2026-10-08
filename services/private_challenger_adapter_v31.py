@@ -10,6 +10,8 @@ Research only, no scoring probability or public route change.
 """
 from __future__ import annotations
 import json
+import hashlib
+import re
 import os
 import subprocess
 import sys
@@ -18,6 +20,8 @@ from pathlib import Path
 
 NATIVE_FLAG="TORN_FREN_CHAMPION_SHADOW_NATIVE_ENABLED"
 DB_PATH_FLAG="TORN_FREN_CHAMPION_SHADOW_DB_PATH"
+# Master hashes must be pinned from the separate frozen research manifest.
+MASTER_SHA_ENV={v:f"TORN_FREN_CHAMPION_{v.upper()}_MASTER_SHA256" for v in ("v19","v20","v21")}
 MASTER_ENV={
     "v19":"TORN_FREN_CHAMPION_V19_MASTER_PATH",
     "v20":"TORN_FREN_CHAMPION_V20_MASTER_PATH",
@@ -43,6 +47,15 @@ def research_candidate(
     # Validate before launching; paths and credentials are never sent to HTTP client.
     if not Path(master).is_file() or not Path(db).is_file():
         return {"status":"PRIVATE_SOURCES_UNAVAILABLE","champion_executed":False}
+    expected_sha=env.get(MASTER_SHA_ENV[version],"").lower().strip()
+    if not re.fullmatch("[0-9a-f]{64}",expected_sha):
+        return {"status":"MISSING_PINNED_MASTER_SHA","champion_executed":False}
+    hasher=hashlib.sha256()
+    with open(master,"rb") as stream:
+        for block in iter(lambda:stream.read(1024*1024),b""):
+            hasher.update(block)
+    if hasher.hexdigest()!=expected_sha:
+        return {"status":"FROZEN_MASTER_SHA_MISMATCH","champion_executed":False}
     timestamp=int(time.time()) if now is None else int(now)
     args=[sys.executable,"-m","services.frozen_candidate_worker_v31",
           "--db",db,"--master",master,"--version",version,
