@@ -1,0 +1,36 @@
+name: V24 research replay validation
+
+on:
+  pull_request:
+    paths:
+      - "services/frozen_champion_shadow_v24.py"
+      - "services/stock_opportunity_geometry.py"
+      - "research/v24_shadow_scoreboard.py"
+      - "tests/test_frozen_champion_shadow_v24.py"
+      - "tests/test_stock_opportunity_geometry.py"
+      - "tests/test_v24_shadow_scoreboard.py"
+      - ".github/workflows/v24-replay-validation.yml"
+  push:
+    branches:
+      - research/v24-replay-validation
+
+permissions:
+  contents: read
+
+jobs:
+  v24-unit-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Compile replay modules
+        run: |
+          python -m py_compile services/frozen_champion_shadow_v24.py research/v24_shadow_scoreboard.py
+      - name: Run V24 isolated tests
+        run: |
+          python -m unittest discover -s tests -p "test_frozen_champion_shadow_v24.py" -v
+          python -m unittest discover -s tests -p "test_stock_opportunity_geometry.py" -v
+          python -m unittest discover -s tests -p "test_v24_shadow_scoreboard.py" -v
