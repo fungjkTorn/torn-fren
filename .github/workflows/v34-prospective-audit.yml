@@ -1,0 +1,27 @@
+name: V34 prospective operational audit
+
+on:
+  push:
+    branches: [research/v34-vm-prospective-audit-20261008]
+  pull_request:
+    paths:
+      - 'research/v34_prospective_ops_audit.py'
+      - 'tests/test_v34_prospective_ops_audit.py'
+      - '.github/workflows/v34-prospective-audit.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  scorer-safety:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: python -m unittest discover -s tests -p 'test_v34_prospective_ops_audit.py' -v
+      - run: python -m unittest discover -s tests -p 'test_v33_private_shadow_sampler.py' -v
+      - run: python -m unittest discover -s tests -p 'test_v31_shadow_evidence_capture.py' -v
+      - run: python -m py_compile research/v34_prospective_ops_audit.py
