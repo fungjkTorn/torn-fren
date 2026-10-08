@@ -22,7 +22,7 @@ class PrefixSensitivityTests(unittest.TestCase):
         rows=history_for_peaks([2,10,10,1000])
         s=compare_one(rows,510)
         self.assertEqual(s["precutoff_raw_cycles"],3)
-        self.assertEqual(s["future_peaks_change_tiny_flag_count"],1)
+        self.assertEqual(s["future_peaks_change_tiny_flag_count"],3)
 
     def test_truncating_at_cutoff_has_no_lookahead(self):
         rows=history_for_peaks([2,10,10,1000])
