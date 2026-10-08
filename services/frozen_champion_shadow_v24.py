@@ -25,7 +25,6 @@ import json
 import os
 import time
 from concurrent.futures import ProcessPoolExecutor, as_completed
-from dataclasses import dataclass
 from pathlib import Path
 
 from services.remaining_item_v21 import observed_arrival_success
@@ -80,7 +79,11 @@ def _worker(payload):
     history_service.DB_PATH=Path(payload["db"]).resolve()
     history_service._DB_READY=False
 
-    class TruthTimeline(planner.Timeline):
+    # Worker processes may handle several items; don't stack a new subclass
+    # of the previously monkey-patched Timeline on every iteration.
+    base_timeline=getattr(planner,"_frozen_v24_timeline_base",planner.Timeline)
+    planner._frozen_v24_timeline_base=base_timeline
+    class TruthTimeline(base_timeline):
         def success(self,arrival,grace):
             val=observed_arrival_success(
                 self.ts,self.qty,self.gaps,arrival,self.min_qty,grace
