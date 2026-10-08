@@ -1,7 +1,7 @@
 import json
 import unittest
 from pathlib import Path
-from research.v26_merge_champion_registry import merge_registry
+from research.v26_merge_champion_registry import merge_registry, refresh_quantity_feasibility
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -80,6 +80,17 @@ class V26RegistryTests(unittest.TestCase):
         value=merged["items"]["mex:Dahlia"]["frozen_generic_candidates"]["v19"]
         self.assertEqual(value["config"]["name"],"dyn9")
         self.assertEqual(len(value["sha256"]),64)
+
+    def test_new_quantity_observation_reclassifies_without_promoting(self):
+        p = json.loads(json.dumps(self.prior))
+        p[23]["old_provisional_family"] = "quantity_below_30"
+        p[23]["old_provisional_config"] = ""
+        key = p[23]["item_key"]
+        merged = merge_registry(p, self.plushies, {"v19": {}, "v20": {}, "v21": {}})
+        refresh_quantity_feasibility(merged, {key:100})
+        self.assertEqual(merged["items"][key]["candidate"]["model_family"],
+                         "quantity_requalified_needs_new_tournament")
+        self.assertEqual(merged["items"][key]["promotion_status"], "RESEARCH_ONLY_BLOCKED")
 
     def test_all_plushie_candidates_full_coverage(self):
         self.assertTrue(all(x["development_coverage"] == 1 for x in self.plushies["items"]))
