@@ -60,6 +60,14 @@ class NativeParityProvenanceTests(unittest.TestCase):
         self.assertEqual([x["start"] for x in aa],[x["start"] for x in bb])
         self.assertEqual(len(aa),5)
 
+    def test_v20_original_five_minute_cadence_proven_by_saved_plan_count(self):
+        from services.frozen_champion_shadow_v24 import OLD_NATIVE
+        self.assertEqual(OLD_NATIVE["v20"]["max_wait"],43200)
+        self.assertEqual(OLD_NATIVE["v20"]["replan_step"],300)
+        self.assertEqual(OLD_NATIVE["v20"]["max_wait"]//300+1,145)
+        self.assertEqual(OLD_NATIVE["v19"]["replan_step"],300)
+        self.assertEqual(OLD_NATIVE["v21"]["replan_step"],900)
+
     def test_sha256_of_existing_local_file(self):
         with tempfile.TemporaryDirectory() as td:
             p=Path(td)/"x"
