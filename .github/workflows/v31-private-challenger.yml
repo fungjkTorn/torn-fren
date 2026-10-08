@@ -10,6 +10,8 @@ on:
       - 'services/private_challenger_adapter_v31.py'
       - 'services/private_champion_shadow_v29.py'
       - 'tests/test_v31_private_challenger.py'
+      - 'tests/test_v31_shadow_evidence_capture.py'
+      - 'research/v31_shadow_evidence_capture.py'
       - '.github/workflows/v31-private-challenger.yml'
 
 permissions:
@@ -26,6 +28,7 @@ jobs:
           python-version: '3.11'
       - run: python -m pip install requests fastapi httpx numpy scikit-learn
       - run: python -m unittest discover -s tests -p 'test_v31_private_challenger.py' -v
+      - run: python -m unittest discover -s tests -p 'test_v31_shadow_evidence_capture.py' -v
       - run: python -m unittest discover -s tests -p 'test_v29_private_shadow.py' -v
       - run: python -m unittest discover -s tests -p 'test_v30_native_parity_probe.py' -v
       - run: python -m unittest discover -s tests -p 'test_v25_release_gate.py' -v
