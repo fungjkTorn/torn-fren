@@ -8,6 +8,7 @@ on:
     paths:
       - 'research/plushie_champions/**'
       - 'tests/test_v27_plushie_imports.py'
+      - 'tests/test_v28_locked_replay.py'
       - '.github/workflows/v27-plushie-specialists.yml'
 
 permissions:
@@ -24,5 +25,6 @@ jobs:
           python-version: '3.11'
       - run: python -m pip install -r research/plushie_champions/requirements-research.txt
       - run: python -m unittest discover -s tests -p 'test_v27_plushie_imports.py' -v
+      - run: python -m unittest discover -s tests -p 'test_v28_locked_replay.py' -v
       - run: python -m unittest discover -s tests -p 'test_v26_champion_manifest.py' -v
       - run: python -m unittest discover -s tests -p 'test_v25_release_gate.py' -v
