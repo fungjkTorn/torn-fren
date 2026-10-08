@@ -1,0 +1,31 @@
+name: V31 private frozen challenger safeguards
+
+on:
+  push:
+    branches:
+      - research/v31-frozen-shadow-adapter
+  pull_request:
+    paths:
+      - 'services/frozen_candidate_worker_v31.py'
+      - 'services/private_challenger_adapter_v31.py'
+      - 'services/private_champion_shadow_v29.py'
+      - 'tests/test_v31_private_challenger.py'
+      - '.github/workflows/v31-private-challenger.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  private-candidate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python -m pip install requests fastapi httpx numpy scikit-learn
+      - run: python -m unittest discover -s tests -p 'test_v31_private_challenger.py' -v
+      - run: python -m unittest discover -s tests -p 'test_v29_private_shadow.py' -v
+      - run: python -m unittest discover -s tests -p 'test_v30_native_parity_probe.py' -v
+      - run: python -m unittest discover -s tests -p 'test_v25_release_gate.py' -v
