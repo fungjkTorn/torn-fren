@@ -140,3 +140,42 @@ Adding first-observed quantity / inferred observation-lag features to Ridge did 
 4. use approximately 60 fully resolved samples for Ridge training;
 5. keep 100% valid-opportunity coverage;
 6. freeze this architecture for future-cycle shadow validation rather than continuing to optimize on the same 21 post-cutoff opportunities.
+
+
+## Recency-weighted Ridge refinement
+The latest snapshot was re-run with causal exponential recency weighting inside the rolling Ridge fit. This keeps the 60-resolved-sample training horizon but discounts older resolved examples rather than weighting all 60 equally.
+
+Leading development configuration:
+- rolling resolved history: 60
+- Ridge alpha: 0.3
+- exponential half-life: 40 resolved samples
+- timing-only causal features
+- 100% modeled opportunity coverage
+
+Newest 21 opportunities:
+- exact: 16/21 = 76.2%
+- +10s: 16/21 = 76.2%
+- +1m: 16/21 = 76.2%
+- +3m: 17/21 = 81.0%
+
+Chronological split:
+- first 10 new opportunities: exact 70.0%, +3m 80.0%
+- later 11 new opportunities: exact 9/11 = 81.8%, +3m 9/11 = 81.8%
+
+This is the strongest current Japan Xanax development result on the fresh regime and materially improves the unweighted rolling Ridge.
+
+A purely performance-selected rolling model selector across several Ridge horizons was also tested. It underperformed the fixed recency-weighted candidate on the new regime, generally producing ~48-62% exact depending lookback. This suggests that frequently switching among many models from short recent scoreboards adds noise; the compact recency-weighted Ridge is currently preferable.
+
+Important: the new 21 opportunities have been used for model development. These figures are therefore development/backtest evidence, not an untouched future validation set. The next collected cycles should be reserved for shadow validation of this frozen weighted configuration.
+
+## Current live candidate
+For the current short-lifetime regime, the leading live candidate is:
+- observation-lag/reconstructed timing ground truth retained;
+- standardized rolling Ridge;
+- last 60 fully resolved causal samples;
+- alpha 0.3;
+- exponential training half-life 40 samples;
+- timing-only feature set;
+- 100% opportunity coverage.
+
+V7 remains a useful fallback/reference for regime monitoring, but the recency-weighted V8 candidate is now the preferred Japan Xanax predictor while the short-lifetime regime persists.
