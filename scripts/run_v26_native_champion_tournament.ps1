@@ -29,7 +29,7 @@ $argv=@('-u','-m','services.frozen_champion_shadow_v24',
  '--expected-db-sha256','d1e9fa488b987d06234643174236bf1c1f72bec607cf476b7f2dd39adf7eb583',
  '--max-starts',"$MaxStarts",'--workers',"$Workers",
  '--min-qty','30','--grace-seconds','10',
- '--v20-replan-seconds','900',
+ '--v20-replan-seconds','300',
  '--output',$Output,'--resume')
 if($Scope -eq 'smoke') {
  $argv+=@('--only','arg:Tear Gas','--only','can:Fire Hydrant','--only','chi:Katana')
