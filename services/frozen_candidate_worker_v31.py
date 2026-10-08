@@ -18,7 +18,27 @@ import json
 import sqlite3
 from pathlib import Path
 
-from services.frozen_champion_shadow_v24 import _install_frozen_readonly_history, OLD_NATIVE
+# Standalone canary helper: do not import research-only V24 replay from main.
+# The existing V24 replay module is not part of the public V2 website path.
+OLD_NATIVE = {
+    "v19": {"max_wait":21600,"departure_grid":300,"replan_step":300},
+    "v20": {"max_wait":43200,"departure_grid":300,"replan_step":300},
+    "v21": {"max_wait":43200,"departure_grid":900,"replan_step":900},
+}
+
+
+def _install_frozen_readonly_history(history_service, db):
+    """Replace legacy history access only inside the isolated child process."""
+    path=Path(db).resolve(strict=True)
+    def read_only_connect():
+        connection=sqlite3.connect(path.as_uri()+"?mode=ro",uri=True,timeout=30)
+        connection.execute("PRAGMA query_only=ON")
+        return connection
+    history_service.DB_PATH=path
+    history_service._connect=read_only_connect
+    history_service.init_db=lambda:None
+    history_service._DB_READY=True
+    return path
 from services.remaining_item_v21 import observed_arrival_success
 
 LIVE_FRESHNESS_SECONDS=180
