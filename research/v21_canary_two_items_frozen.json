@@ -1,0 +1,65 @@
+{
+  "schema": "torn-fren-v21-private-research-canary-subset-v1",
+  "source_master_sha256": "dadf6fbcb6c6b5f68ed39871bae7185a1e23e773948ffffacabc8aaeca7362f7",
+  "source_description": "Exact frozen V21 configuration fields from full_master(1).json; holdout results intentionally excluded; for read-only private canary only",
+  "settings": {
+    "options": {
+      "min_qty": 30,
+      "grace": 10,
+      "holdout_fraction": 0.25,
+      "topn": 3,
+      "history_step": 600,
+      "replan_step": 900,
+      "eval_step": 1800,
+      "departure_grid": 900,
+      "max_wait": 43200,
+      "min_cycles": 6,
+      "min_points": 60,
+      "min_starts": 40
+    }
+  },
+  "results": {
+    "can:Fire Hydrant": {
+      "status": "complete",
+      "selected_on_training": {
+        "config": {
+          "name": "dyn13",
+          "k": 32,
+          "lookback_points": 1000,
+          "same_state": false,
+          "live_weight": 0.25,
+          "cycle_weight": 0.55,
+          "tod_weight": 0.2,
+          "age_scale": 1200,
+          "frac_scale": 0.5,
+          "slope_scale": 0.04,
+          "eta_scale": 60,
+          "prior_strength": 4,
+          "earliest_margin": 0.03,
+          "delay_penalty_per_hour": 0
+        }
+      }
+    },
+    "can:Bear Gall": {
+      "status": "complete",
+      "selected_on_training": {
+        "config": {
+          "name": "dyn12",
+          "k": 64,
+          "lookback_points": null,
+          "same_state": false,
+          "live_weight": 0.25,
+          "cycle_weight": 0.65,
+          "tod_weight": 0.1,
+          "age_scale": 1800,
+          "frac_scale": 0.6,
+          "slope_scale": 0.05,
+          "eta_scale": 90,
+          "prior_strength": 6,
+          "earliest_margin": 0.04,
+          "delay_penalty_per_hour": 0
+        }
+      }
+    }
+  }
+}
