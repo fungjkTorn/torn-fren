@@ -211,7 +211,7 @@ class TemplatePlanner:
             for x in cand:
                 if not groups or x[0]-groups[-1][-1][0]>STEP:groups.append([x])
                 else:groups[-1].append(x)
-            g=max(groups,key=lambda z:(sum(v for _,v in z)/len(z),len(z),-z[0]));delay,prob=g[len(g)//2]
+            g=max(groups,key=lambda z:(sum(v for _,v in z)/len(z),len(z),-z[0][0]));delay,prob=g[len(g)//2]
         else:delay,prob=0,.5
         feat={'fit':sum(x[2] for x in refs)/len(refs) if refs else 0.0,'maxfit':max((x[2] for x in refs),default=0.0),'raw':sum(x[3] for x in refs)/len(refs) if refs else 0.0,'refs':len(refs),'shift':sum(abs(x[1]) for x in refs)/len(refs)/max(self.shift_range,1) if refs else 0.0,'prob':prob,'delay':delay}
         self.cache[key]=(q+delay,float(prob),feat);return self.cache[key]
