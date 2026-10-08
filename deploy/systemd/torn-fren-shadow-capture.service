@@ -1,0 +1,21 @@
+[Unit]
+Description=Torn Fren private shadow research capture (single tick)
+After=network.target torn-fren-web.service
+ConditionPathExists=/etc/torn-fren/private-shadow.env
+
+[Service]
+Type=oneshot
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/opt/torn-fren
+EnvironmentFile=/etc/torn-fren/private-shadow.env
+StateDirectory=torn-fren-shadow
+StateDirectoryMode=0700
+UMask=0077
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+TimeoutStartSec=100
+# First pilot: a single frozen V21 Canadian item. No stock collector writes.
+ExecStart=/usr/bin/python3 -m research.v33_private_shadow_sampler --evidence-db /var/lib/torn-fren-shadow/capture.db --experiment pilot-beargall-v33 --item "can:Bear Gall"
