@@ -11,9 +11,6 @@ from web.private_shadow_v29 import router as research_shadow_router
 
 app = FastAPI(title="Torn Fren Stock Graph")
 
-# Private research canary: disabled by default, V2 player endpoints unchanged.
-app.include_router(research_shadow_router)
-
 STATIC_DIR = Path(__file__).parent / "static"
 
 
@@ -77,5 +74,9 @@ def api_admin_health():
 def admin_page():
     return FileResponse(STATIC_DIR / "admin.html")
 
+
+# Register the private route after normal API routes but before the root static mount.
+# Neither its registration nor a request to it modifies public V2 forecast routing.
+app.include_router(research_shadow_router)
 
 app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="static")
