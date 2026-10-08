@@ -139,8 +139,9 @@ def score_capture(evidence_db,stock_db,*,experiment,freeze_epoch,asof_epoch,
                 entry["status"]="PENDING_SESSION_HORIZON"
                 grouped[key].append(entry);continue
             if executed and cdep is not None and carr is not None:
-                if cdep<generated or cdep>generated+max_wait_seconds or carr<=cdep:
-                    entry["status"]="INVALID_RECOMMENDATION"
+                if cdep<recorded or cdep>generated+max_wait_seconds or carr<=cdep:
+                    entry["status"]="INVALID_OR_ALREADY_DEPARTED_RECOMMENDATION"
+                    entry["challenger_success"]=False
                 else:
                     entry["status"]="CHALLENGER_"+arrival_truth(con,country,item,carr,asof_epoch)["status"]
                     entry["arrival"]=carr
@@ -149,19 +150,26 @@ def score_capture(evidence_db,stock_db,*,experiment,freeze_epoch,asof_epoch,
             else:
                 entry["status"]="NO_CHALLENGER_RECOMMENDATION"
                 entry["challenger_success"]=False
-            if vdep is not None and varr is not None and vdep>=generated:
+            if vdep is not None and varr is not None and recorded<=vdep<=generated+max_wait_seconds and varr>vdep:
                 bt=arrival_truth(con,country,item,varr,asof_epoch)
                 entry["v2_status"]=bt["status"]
                 entry["v2_success"]=bt["success"]
+            else:
+                entry["v2_status"]="NO_OR_LATE_V2_RECOMMENDATION"
+                entry["v2_success"]=False
             grouped[key].append(entry)
         for key,entries in sorted(grouped.items()):
             resolved=[x for x in entries if x.get("challenger_success") is not None
                       and x.get("status") in ("CHALLENGER_RESOLVED_SUCCESS",
                                            "CHALLENGER_RESOLVED_MISS",
-                                           "NO_CHALLENGER_RECOMMENDATION")]
+                                           "NO_CHALLENGER_RECOMMENDATION",
+                                           "INVALID_OR_ALREADY_DEPARTED_RECOMMENDATION")]
             success=sum(x.get("challenger_success") is True for x in resolved)
             recommendations=sum(x["status"].startswith("CHALLENGER_RESOLVED") for x in resolved)
             n=len(resolved)
+            v2_graded=[x for x in resolved if x.get("v2_success") is not None]
+            v2_wins=sum(x["v2_success"] is True for x in v2_graded)
+            v2_recs=sum(x.get("v2_status") in ("RESOLVED_SUCCESS","RESOLVED_MISS") for x in v2_graded)
             out["items"][key]={
                 "captured":len(entries),
                 "resolved_eligible_sessions":n,
@@ -169,6 +177,10 @@ def score_capture(evidence_db,stock_db,*,experiment,freeze_epoch,asof_epoch,
                 "all_start_success":success/n if n else None,
                 "recommendations":recommendations,
                 "coverage":recommendations/n if n else None,
+                "v2_scored_matched_sessions":len(v2_graded),
+                "v2_successes":v2_wins if v2_graded else None,
+                "v2_all_start_rate":v2_wins/len(v2_graded) if v2_graded else None,
+                "v2_recommendation_coverage":v2_recs/len(v2_graded) if v2_graded else None,
                 "unscorable_or_pending":len(entries)-n,
                 "qualified_independent_windows":None,
                 "independent_window_certified":False,
