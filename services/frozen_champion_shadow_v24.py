@@ -224,7 +224,7 @@ def main():
     keys=args.only or [
         k for k,r in registry.items() if _resolve_config(r,masters)
     ]
-    settings={"cutoff":args.cutoff,"db_path":str(db),"db_sha256":db_sha,"db_size":db.stat().st_size,
+    settings={"cutoff":args.cutoff,"db_path":str(db),"db_sha256":db_sha,\n              "registry_sha256":_digest_file(args.registry),"db_size":db.stat().st_size,
               "db_mtime_ns":db.stat().st_mtime_ns,"max_starts":args.max_starts,
               "step":args.step,"min_qty":args.min_qty,"grace":args.grace_seconds,
               "master_shas":{v:hashlib.sha256(Path(getattr(args,v)).read_bytes()).hexdigest()
