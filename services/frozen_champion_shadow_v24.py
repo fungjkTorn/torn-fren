@@ -23,6 +23,7 @@ import argparse
 import hashlib
 import json
 import os
+import sqlite3
 import time
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
@@ -70,14 +71,43 @@ def _resolve_config(entry, masters):
     return version,cfg,item
 
 
+
+def _install_frozen_readonly_history(history_service, db):
+    """Force ALL legacy history reads to use a read-only SQLite connection.
+
+    history_service.init_db normally runs CREATE TABLE and PRAGMA journal_mode,
+    even during reads. The shadow replay must never initialize or migrate a
+    frozen snapshot or change a live collector DB.
+    """
+    path=Path(db).resolve()
+    if not path.is_file():
+        raise FileNotFoundError(path)
+    def read_only_connect():
+        conn=sqlite3.connect(path.as_uri()+"?mode=ro",uri=True,timeout=30)
+        conn.execute("PRAGMA query_only=ON")
+        return conn
+    history_service.DB_PATH=path
+    history_service._connect=read_only_connect
+    history_service.init_db=lambda: None
+    history_service._DB_READY=True
+    return path
+
+
+def _digest_file(path):
+    h=hashlib.sha256()
+    with open(path,"rb") as stream:
+        for block in iter(lambda:stream.read(8*1024*1024),b""):
+            h.update(block)
+    return h.hexdigest()
+
+
 def _worker(payload):
     from services import history_service
     from services import plushie_flower_dynamic_planner_v19 as planner
 
     key=payload["key"]
     country,item_name=key.split(":",1)
-    history_service.DB_PATH=Path(payload["db"]).resolve()
-    history_service._DB_READY=False
+    _install_frozen_readonly_history(history_service,payload["db"])
 
     # Worker processes may handle several items; don't stack a new subclass
     # of the previously monkey-patched Timeline on every iteration.
@@ -170,6 +200,8 @@ def main():
     for v in ("v19","v20","v21"):
         ap.add_argument("--"+v,required=True)
     ap.add_argument("--cutoff",type=int,required=True)
+    ap.add_argument("--expected-db-sha256",default="d1e9fa488b987d06234643174236bf1c1f72bec607cf476b7f2dd39adf7eb583",
+                    help="Frozen newer VM DB digest; never point at a live collector DB")
     ap.add_argument("--only",action="append",default=[])
     ap.add_argument("--output",default=DEFAULT_OUTPUT)
     ap.add_argument("--workers",type=int,default=2)
@@ -184,12 +216,15 @@ def main():
     db=Path(args.db).resolve()
     if not db.is_file():
         raise SystemExit("Missing latest snapshot; no test run started")
+    db_sha=_digest_file(db)
+    if args.expected_db_sha256 and db_sha.lower()!=args.expected_db_sha256.lower():
+        raise SystemExit(f"STOP: frozen snapshot checksum mismatch {db_sha}; make a stable archived copy first")
     registry=_champion_entries(_json(args.registry))
     masters={v:_json(getattr(args,v)) for v in OLD_NATIVE}
     keys=args.only or [
         k for k,r in registry.items() if _resolve_config(r,masters)
     ]
-    settings={"cutoff":args.cutoff,"db_path":str(db),"db_size":db.stat().st_size,
+    settings={"cutoff":args.cutoff,"db_path":str(db),"db_sha256":db_sha,"db_size":db.stat().st_size,
               "db_mtime_ns":db.stat().st_mtime_ns,"max_starts":args.max_starts,
               "step":args.step,"min_qty":args.min_qty,"grace":args.grace_seconds,
               "master_shas":{v:hashlib.sha256(Path(getattr(args,v)).read_bytes()).hexdigest()
