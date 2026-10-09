@@ -12,12 +12,14 @@ from services.history_service import (
 from services.forecast_auditor import (
     get_profiled_items,
     get_tracked_items,
-    invalidate_pending_forecasts_crossing_gap,
     is_tracked_item,
     resolve_forecast_audits,
 )
 from services.prediction_v2_live import build_live_prediction_v2
 from services.shadow_model_auditor import update_shadow_models
+from research.v38_gap_recovery import (
+    pending as gap_recovery_pending,
+)
 
 POLL_INTERVAL_SECONDS = 30
 
@@ -27,6 +29,19 @@ _AUDIT_PENDING = set()
 _AUDIT_LOCK = threading.Lock()
 _AUDIT_EVENT = threading.Event()
 _AUDIT_STOP = threading.Event()
+
+
+# Recovery invalidation is performed by a separate resource-capped
+# systemd one-shot worker. Never create expensive recovery threads here.
+# The heartbeat writer persists the gap AND its queue record atomically.
+def _schedule_gap_recovery(gap_start, gap_end):
+    print(
+        f"recovery audit durably queued: {int(gap_start)}..{int(gap_end)}; "
+        "external torn-fren-gap-recovery.timer will process it",
+        flush=True,
+    )
+    return {"status": "ENQUEUED", "gap_start": int(gap_start),
+            "gap_end": int(gap_end)}
 
 
 def _schedule_item_audits(changed_by_country):
@@ -91,6 +106,16 @@ def _audit_worker():
             return
 
         while True:
+            # Do not resolve new audit points against an unprocessed outage.
+            # Queued gaps remain visible and retryable after a poller restart.
+            try:
+                if gap_recovery_pending()["pending"]:
+                    _AUDIT_STOP.wait(timeout=2.0)
+                    continue
+            except Exception as exc:
+                print(f"recovery backlog check error: {type(exc).__name__}",flush=True)
+                _AUDIT_STOP.wait(timeout=2.0)
+                continue
             with _AUDIT_LOCK:
                 if not _AUDIT_PENDING:
                     _AUDIT_EVENT.clear()
@@ -212,18 +237,18 @@ def run():
                 )
 
                 try:
-                    invalidated = invalidate_pending_forecasts_crossing_gap(
-                        gap_start,
-                        gap_end,
-                        reason="collector heartbeat recovery gap",
+                    queued = _schedule_gap_recovery(gap_start, gap_end)
+                    print(
+                        f"Recovery audit queued for background processing: "
+                        f"{queued['gap_start']}..{queued['gap_end']}",
+                        flush=True,
                     )
-                    if invalidated:
-                        print(
-                            f"Invalidated {invalidated} pending forecast point(s) "
-                            "whose item cycle became ambiguous during the gap."
-                        )
                 except Exception as exc:
-                    print(f"Forecast gap invalidation error: {exc}")
+                    print(
+                        f"Recovery audit enqueue failed ({type(exc).__name__}); "
+                        "collector continues but forecast audit needs attention.",
+                        flush=True,
+                    )
 
             # Never block collection on prediction/model work. Even a recovery
             # burst is useful to the async worker; event-aware validation decides
