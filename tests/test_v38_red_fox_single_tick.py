@@ -23,7 +23,7 @@ class RedFoxSingleTickTests(unittest.TestCase):
                 builder.assert_not_called()
 
     def test_k18_and_global_weight_exact_and_causal_query(self):
-        context=SimpleNamespace(grid=[NOW-300],con=Mock())
+        context=SimpleNamespace(grid=[NOW],con=Mock())
         with patch.object(red,"inspect_live_source",return_value={"status":"FRESH"}):
             with patch.object(red.ResearchContext,"build",return_value=context):
                 with patch.object(red,"AnalogPlanner") as constructor:
