@@ -1,0 +1,35 @@
+name: V37 collector safety release
+
+on:
+  push:
+    branches: [release/v37-collector-safety-20261009]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install production dependencies
+        run: python -m pip install -r requirements.txt httpx
+      - name: Validate deterministic handle close and rollback
+        run: python -m unittest discover -s tests -p 'test_v37_sqlite_fd_hotfix.py' -v
+      - name: Validate frozen champion remains unaffected
+        run: python -m unittest discover -s tests -p 'test_v35_museum_japan_private_pilot.py' -v
+      - name: Validate V37 isolated research capture
+        run: python -m unittest discover -s tests -p 'test_v36_isolated_museum_sampler.py' -v
+      - name: Verify heartbeat continuity and fast path
+        run: python -m unittest discover -s tests -p 'test_v38_heartbeat_fastpath.py' -v
+      - name: Verify out-of-process durable recovery and crash lease
+        run: python -m unittest discover -s tests -p 'test_v38_gap_recovery.py' -v
+      - name: Verify grouped invalidation parity
+        run: python -m unittest discover -s tests -p 'test_v38_gap_invalidation_grouping.py' -v
+      - name: Compile collector without altering current production
+        run: python -m py_compile services/history_service.py services/forecast_auditor.py services/shadow_model_auditor.py services/medium_model_lab.py services/prediction_lab.py poller.py research/v38_gap_recovery.py
