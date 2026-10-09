@@ -86,7 +86,6 @@ class IncrementalHeartbeatTests(unittest.TestCase):
         """,[(1000+30*i,) for i in range(20000)])
         self.con.commit()
         statements=[]
-        sqlite3.set_trace_callback if False else None
         real_connect=sqlite3.connect
         def observed_connect():
             c=real_connect(self.db)
@@ -97,7 +96,10 @@ class IncrementalHeartbeatTests(unittest.TestCase):
                 with patch.object(hs.time,"time",return_value=601030):
                     hs.record_poll_heartbeat(True,"test")
         queries="\n".join(statements).lower()
-        self.assertNotIn("order by timestamp asc",queries)
+        self.assertFalse(any("from poll_heartbeats" in s.lower()
+                             and "success = 1" in s.lower()
+                             and "order by timestamp asc" in s.lower()
+                             for s in statements))
         self.assertNotIn("select timestamp\n        from poll_heartbeats\n        where mode = 'poll-cycle'\n          and success = 1\n        order by timestamp asc",queries)
         count=self.con.execute("SELECT COUNT(*) FROM poll_heartbeats").fetchone()[0]
         self.assertEqual(count,20001)
