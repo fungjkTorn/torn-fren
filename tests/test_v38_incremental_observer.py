@@ -66,6 +66,20 @@ class IncrementalObserverTests(unittest.TestCase):
         self.assertIsNone(get(self.con,key="uni:Heather",config="dyn3",
                               schema="v1",slot=300))
 
+    def test_same_quantity_poll_keeps_expensive_historical_cache(self):
+        observe(self.db,self.con)
+        self.assertTrue(put(self.con,key="uni:Heather",config="dyn3",
+                            schema="v1",slot=300,features={"prepared":True}))
+        with sqlite3.connect(self.db) as c:
+            c.execute("INSERT INTO stock_history VALUES(4,160,'uni','Heather',50)")
+        d=observe(self.db,self.con)
+        self.assertEqual(d["affected_keys"],[])
+        self.assertEqual(get(self.con,key="uni:Heather",config="dyn3",
+                             schema="v1",slot=300),{"prepared":True})
+        # Slot-specific live features still re-evaluate each 5-minute tick.
+        self.assertIsNone(get(self.con,key="uni:Heather",config="dyn3",
+                              schema="v1",slot=600))
+
     def test_collector_not_written_and_reset_detected(self):
         observe(self.db,self.con)
         with sqlite3.connect(self.db) as c:
