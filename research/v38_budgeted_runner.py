@@ -14,6 +14,7 @@ from pathlib import Path
 from research.v38_readonly_resource_probe import ALL as PINNED_WORKERS
 from research.v38_prediction_store import open_writer, record, read
 from research.v38_incremental_observer import observe
+from research.v38_adaptive_policy import next_due_seconds
 
 ROSTER=Path(__file__).with_name("v38_roster.json")
 
@@ -96,10 +97,12 @@ def run_tick(*, stock_db, sidecar_db, execute=False, active=(),
             last=row[0] if row else None
             elapsed=int((clock()-t0)*1000)
             model=roster[key]
+            delay=next_due_seconds(worker_status=str(output.get("status")),
+                active=key in active,stock_changed=key in delta["affected_keys"])
             status=record(side,key=key,family=model["model_family"],
                           config=model.get("config_name"),
                           output=output,now=now,stock_as_of=last,
-                          executed=True,elapsed_ms=elapsed)
+                          executed=True,elapsed_ms=elapsed,next_due=now+delay)
             results.append({"item_key":key,"status":status,"elapsed_ms":elapsed})
         return {"mode":"EXECUTED_RESEARCH_ONLY","delta":delta,
                 "plan":plan,"executed":results,"collector_written":False}
