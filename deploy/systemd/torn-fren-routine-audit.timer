@@ -1,0 +1,12 @@
+[Unit]
+Description=Process Torn Fren durable stock-change forecast audit queue
+
+[Timer]
+OnCalendar=*-*-* *:*:00
+AccuracySec=5s
+RandomizedDelaySec=0
+Persistent=false
+Unit=torn-fren-routine-audit.service
+
+[Install]
+WantedBy=timers.target
