@@ -1,0 +1,115 @@
+# V38 incident and nonblocking recovery design — 2026-10-09
+
+**Production: NOT CHANGED.** Existing `/opt/torn-fren` remains
+`profitability-v1` at `062f3a2`. The user manually restarted only
+`torn-fren-poller.service` after gathering evidence. That action restored
+fresh stock heartbeats; latest observed post-restart heartbeat age: 28s.
+No V38 rollout was authorized.
+
+## Verified incident chronology (UTC, user-supplied logs)
+
+- Last normal successful heartbeat before the 40-minute stall:
+  **18:55:17 UTC**, last changed stock 18:55:14. Research V18 native
+  proposals refused to run if heartbeat age exceeded 180s.
+- An earlier poll cycle completed in **177.7s**; a following successful
+  poll detected a 186s collection gap and recorded **39 pending forecast
+  points invalidated**.
+- That same recovery cycle then reported total wall time **2400.6s**
+  (40m 0.6s). This timing strongly implicates recovery-audit invalidation
+  and related expensive historical continuity reads, but per-stage timers
+  are not yet available: cannot prove exactly which operation consumed
+  the 2400s. The ordering of log lines implies the long wait occurred
+  *after* the successful heartbeat write and before the cycle completed.
+- Next provider fetch: YATA read timed out after 10s; Prometheus fallback
+  succeeded. Next gap 2386s recovered and normal stock collection resumed.
+  YATA timeout is **not** the cause of the prior 2400s event, since it
+  occurred on the subsequent poll.
+- Existing poller was `active/running` PID 759 despite stale stock; it
+  showed 7 threads (main and background audit/model threads), including
+  waiting-on-futex tasks.
+- After user-issued poller-only restart, next two polls completed in
+  **3.8s** and **2.2s**, latest heartbeat age **28s**, `Collector fresh:
+  True`; same V37 web/bot/shadow services not restarted.
+
+## Exact code-level hazard in V37
+
+In `poller.run()`, on `recovered_from_gap`, the **main 30-second
+collection thread** calls
+`forecast_auditor.invalidate_pending_forecasts_crossing_gap()` and
+waits for all pending run continuity checks. The latter calls
+`_interval_gaps_preserve_item_cycle` per pending forecast run,
+often repeating long historical-cycle scans for identical items.
+This can starve stock collection long after a successful heartbeat was
+recorded, and produces another gap when recovery finally completes.
+
+## Research-only V38 mitigation — no deployment
+
+- `services/forecast_auditor.py`: group pending forecasts by normalized
+  country/item key; evaluate expensive continuity once per item/gap; perform
+  point invalidations in one short writer transaction. Original
+  item-specific evidence thresholds, reasons, and `status='pending'`
+  guards preserved. Regression test includes 80 duplicate pending
+  Heather forecasts plus independent Xanax and recent forecasts;
+  duplicate reprocessing is idempotent.
+- `research/v38_gap_recovery.py`: SQLite-backed
+  `forecast_recovery_jobs_v38` queue with composite gap identity,
+  retry-after status and completion count. Jobs stay pending on failure
+  and can be retried after a process restart. Only existing forecast
+  audits change; historical stock rows are not fabricated or deleted.
+- `poller.py`: the main collector only queues newly detected gaps and
+  signals a separate daemon recovery worker. The audit worker defers
+  processing while recovery jobs are pending, then resumes on
+  completion. A slow, expensive gap evaluation therefore does not
+  synchronously stop 30-second stock polling. This still shares CPU and
+  SQLite with the main poller; it does not guarantee zero contention.
+- Earlier V38 heartbeat fastpath prevents full `poll_heartbeats`
+  history scans every successful poll and periodically reconciles
+  legacy-only failure history.
+- V38 regression tests:
+  `tests/test_v38_gap_recovery.py`,
+  `tests/test_v38_gap_invalidation_grouping.py`, and
+  `tests/test_v38_heartbeat_fastpath.py`. Existing V35 and V37
+  compatibility CI continues.
+
+## Remaining safety qualifications before production
+
+1. **No production speedup is measured.** The old 2400s cycle is
+   pathological and must be reproduced against sanitized realistic
+   history in a separate research worktree before promotion.
+2. The recovery worker currently runs as an in-process daemon thread:
+   while the collector loop no longer waits synchronously, memory/CPU
+   and SQLite locks remain shared. Consider a subprocess/systemd
+   memory/CPU/time-bound worker if real gap processing is still slow.
+3. A very narrow crash window remains between saving the successful
+   heartbeat and inserting the durable gap job. Before promotion,
+   add startup reconciliation of unqueued recent collection_gaps
+   or insert the job atomically in the heartbeat transaction.
+4. Ensure the queue drain and forecast-audit pause do not cause
+   unbounded audit backlog or fresh-reference V2 latency regression.
+5. The October 9 gap is unknown ground truth, not a model failure.
+   Preserve `COLLECTOR_STALE_OR_NO_HEARTBEAT` evidence and
+   `available_stale` V2 status. Do not backdate observations.
+6. Restore all four existing prospective native/baseline research
+   attempt streams first, before enabling V38 22-item research collection.
+
+## Safe immediate observation (read-only, no service changes)
+
+```bash
+cd /opt/torn-fren
+python3 - <<'PY'
+import sqlite3,time
+p='/opt/torn-fren/data/stock_history.db'
+with sqlite3.connect(f'file:{p}?mode=ro',uri=True) as db:
+    hb=db.execute("SELECT MAX(timestamp) FROM poll_heartbeats WHERE mode='poll-cycle' AND success=1").fetchone()[0]
+age=int(time.time())-hb if hb else None
+print('Heartbeat age seconds:',age)
+print('Fresh (<180s):',age is not None and 0<=age<=180)
+PY
+systemctl is-active torn-fren-poller.service torn-fren-shadow-capture.timer
+journalctl -u torn-fren-poller.service --since '5 minutes ago' --no-pager -o cat |
+    grep -E 'Poll cycle completed|COLLECTION RECOVERY|error' | tail -18
+```
+
+Check after at least one full 20-minute research rotation whether
+Heather and Wolverine actually log `champion_executed=1` again.
+Nessie and Japan Xanax are still specialist-not-integrated in V37.
