@@ -61,6 +61,11 @@ class IncrementalHeartbeatTests(unittest.TestCase):
         self.assertEqual(len(rows),1)
         self.assertEqual(rows[0][:2],(1030,1250))
         self.assertIn("220s",rows[0][2])
+        job=self.con.execute("""
+            SELECT gap_start,gap_end,status
+            FROM forecast_recovery_jobs_v38
+        """).fetchone()
+        self.assertEqual(job,(1030,1250,"pending"))
 
     def test_latest_gap_matches_full_legacy_sweep(self):
         for t in (1000,1030,1300,1330,1550,1580):
