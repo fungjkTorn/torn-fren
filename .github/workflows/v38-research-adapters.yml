@@ -32,9 +32,11 @@ jobs:
         run: python -m unittest discover -s tests -p 'test_v38_frozen_v18_rollout.py' -v
       - name: Verify new 3-item V19 research worker against original frozen engine
         run: python -m unittest discover -s tests -p 'test_v38_frozen_v19_rollout.py' -v
+      - name: Test 14-model read-only resource benchmark safety
+        run: python -m unittest discover -s tests -p 'test_v38_readonly_resource_probe.py' -v
       - name: Regression — currently deployed V35 V18 pilot still restricted to 2
         run: python -m unittest discover -s tests -p 'test_v35_museum_japan_private_pilot.py' -v
       - name: Regression — currently deployed V36/V37 capture unchanged
         run: python -m unittest discover -s tests -p 'test_v36_isolated_museum_sampler.py' -v
       - name: Compile standalone entry points
-        run: python -m py_compile research/v38_v18_single_tick.py research/v38_v19_single_tick.py research/v38_nessie_single_tick.py
+        run: python -m py_compile research/v38_v18_single_tick.py research/v38_v19_single_tick.py research/v38_nessie_single_tick.py research/v38_readonly_resource_probe.py
