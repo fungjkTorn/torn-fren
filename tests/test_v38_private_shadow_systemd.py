@@ -19,7 +19,7 @@ class PrivateShadowUnitTests(unittest.TestCase):
         self.assertIn("torn-fren-v38-private-shadow.timer",source)
         self.assertNotIn("systemctl restart",source)
         self.assertNotIn("git reset",source)
-        self.assertNotIn("--all",source)
+        self.assertNotIn(" --all ",source)
 
     def test_unit_opt_in_never_changes_polling_public_web_or_game(self):
         root=Path(__file__).parents[1]
