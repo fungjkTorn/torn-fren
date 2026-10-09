@@ -26,6 +26,8 @@ jobs:
         run: python -m unittest discover -s tests -p 'test_v39_durable_routine_audits.py' -v
       - name: Verify five-minute stock/gap versioned website cache without production flag
         run: python -m unittest discover -s tests -p 'test_v38_revision_fingerprint.py' -v
+      - name: Verify catalog singleflight, stale-retry and V37 default behavior
+        run: python -m unittest discover -s tests -p 'test_v38_catalog_cache.py' -v
       - name: Preserve collector SQLite deterministic close
         run: python -m unittest discover -s tests -p 'test_v37_sqlite_fd_hotfix.py' -v
       - name: Preserve V37 recovery queue/heartbeat and grouping
