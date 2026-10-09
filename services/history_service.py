@@ -24,6 +24,21 @@ _LEGACY_GAP_LAST_CHECK_MONOTONIC = None
 
 
 
+class _ClosingConnection(sqlite3.Connection):
+    """SQLite transaction context which also deterministically closes FDs.
+
+    The standard sqlite3 Connection.__exit__ manages the transaction but
+    leaves DB and WAL handles open. Reusing its exit semantics before close
+    prevents exhausting the collector's RLIMIT_NOFILE under load.
+    """
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        try:
+            return super().__exit__(exc_type, exc_value, traceback)
+        finally:
+            self.close()
+
+
 def _connect():
     """
     Open SQLite with a real busy timeout.
@@ -35,8 +50,12 @@ def _connect():
     millisecond-scale writer collision as a fatal error.
     """
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(DB_PATH, timeout=30.0)
-    conn.execute("PRAGMA busy_timeout = 30000")
+    conn = sqlite3.connect(DB_PATH, timeout=30.0, factory=_ClosingConnection)
+    try:
+        conn.execute("PRAGMA busy_timeout = 30000")
+    except BaseException:
+        conn.close()
+        raise
     return conn
 
 
