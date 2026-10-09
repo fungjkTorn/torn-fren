@@ -17,7 +17,7 @@ merged to `main` or deployed to the Oracle production checkout.
 - `research/v38_incremental_observer.py` observes collector row IDs in capped
   chunks using `mode=ro`. A partial bootstrap is explicitly not ready.
   The separate feature-cache API keys by item, model config, schema revision,
-  observation row ID, collection gap revision and clock slot.
+  last material-change row ID, collection gap revision and clock slot.
   **The 16 original model engines are not yet converted to consume cached
   feature arrays**. This is a safe underlying primitive, not a claim that
   repeated historical model preparation has been eliminated.
@@ -27,6 +27,11 @@ merged to `main` or deployed to the Oracle production checkout.
 - `research/v38_catalog_seed.py`: explicit 236-item registry seeded as
   fallback/watch/provisional states. Only 16 are marked benchmark-gated
   adapters, *not* approved for public beta.
+- `research/v38_adaptive_policy.py`: actionability stays at a five-minute
+  cadence; cold non-actionable models can defer up to 30 minutes (one hour
+  only with observed day-scale intervals). Normal identical-quantity poll
+  snapshots do not invalidate the historical cache; material quantity changes
+  and gap revisions do.
 - `research/v38_budgeted_runner.py`: opt-in **serial** work, at most four
   source-pinned workers by default, 20 seconds each and a global 85-second
   budget. Active requested items are prioritized; unfunded work remains
