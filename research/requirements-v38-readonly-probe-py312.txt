@@ -1,0 +1,8 @@
+# Minimal Python 3.12-compatible dependencies for the isolated five-model
+# V38 read-only VM benchmark (not the Discord bot, website, or production poller).
+#
+# This intentionally avoids audioop-lts==0.2.2, which needs Python >=3.13,
+# and omits scipy/scikit-learn: the first five frozen engines do not import it.
+# Additional two-expert plushie specialist work will need sklearn later.
+requests>=2.31,<3
+numpy>=2.0,<3
