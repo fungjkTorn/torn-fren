@@ -8,6 +8,7 @@ from zoneinfo import ZoneInfo
 from services.arrival_success_lab import TRAVEL_SECONDS
 from services.history_service import (
     DB_PATH,
+    _ClosingConnection,
     _build_validated_cycles,
     _get_all_item_rows_with_source,
     _prediction_anchor_is_currently_trustworthy,
@@ -26,7 +27,7 @@ SHADOW_MODELS = (
 
 
 def _connect():
-    conn = sqlite3.connect(DB_PATH, timeout=30.0)
+    conn = sqlite3.connect(DB_PATH, timeout=30.0, factory=_ClosingConnection)
     conn.row_factory = sqlite3.Row
     return conn
 
