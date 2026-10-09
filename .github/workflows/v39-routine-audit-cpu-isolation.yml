@@ -21,9 +21,11 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - name: Install minimal project API prerequisite
-        run: python -m pip install 'requests>=2.31,<3'
+        run: python -m pip install 'requests>=2.31,<3' 'fastapi>=0.100,<1'
       - name: Verify transactionally durable audit queue and collector CPU split
         run: python -m unittest discover -s tests -p 'test_v39_durable_routine_audits.py' -v
+      - name: Verify five-minute stock/gap versioned website cache without production flag
+        run: python -m unittest discover -s tests -p 'test_v38_revision_fingerprint.py' -v
       - name: Preserve collector SQLite deterministic close
         run: python -m unittest discover -s tests -p 'test_v37_sqlite_fd_hotfix.py' -v
       - name: Preserve V37 recovery queue/heartbeat and grouping
@@ -33,4 +35,4 @@ jobs:
           python -m unittest discover -s tests -p 'test_v38_gap_invalidation_grouping.py' -v
       - name: Compile core collector and worker
         run: |
-          python -m py_compile poller.py services/history_service.py services/durable_audit_queue_v39.py research/v38_gap_recovery.py
+          python -m py_compile poller.py services/history_service.py services/durable_audit_queue_v39.py research/v38_gap_recovery.py web/app.py web/v38_revision_fingerprint.py
