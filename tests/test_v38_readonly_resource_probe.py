@@ -6,10 +6,11 @@ from research.v38_readonly_resource_probe import PROBES,ALL,probe
 
 
 class V38ResourceProbeTests(unittest.TestCase):
-    def test_exact_14_supported_and_representative_five(self):
-        self.assertEqual(len(ALL),14)
+    def test_exact_15_supported_and_representative_five(self):
+        self.assertEqual(len(ALL),15)
         self.assertEqual(len(PROBES),5)
         self.assertIn("uni:Nessie Plushie",ALL)
+        self.assertIn("uae:Camel Plushie",ALL)
         self.assertNotIn("jap:Xanax",ALL)
 
     def test_sequential_bounded_worker_and_no_v2(self):
