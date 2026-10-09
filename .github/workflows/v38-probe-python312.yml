@@ -1,0 +1,44 @@
+name: V38 Python312 minimal read-only probe
+
+on:
+  push:
+    branches: [research/v38-full-roster-live-prep-20261009]
+    paths:
+      - 'research/requirements-v38-readonly-probe-py312.txt'
+      - 'research/v38_readonly_resource_probe.py'
+      - 'research/v38_shadow_canary_preflight.py'
+      - 'research/v38_nessie_single_tick.py'
+      - 'services/frozen_candidate_worker_v31.py'
+      - '.github/workflows/v38-probe-python312.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  import-and-safety:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install only five-item probe dependencies
+        run: python -m pip install -r research/requirements-v38-readonly-probe-py312.txt
+      - name: Import all five exact isolated model adapters without full requirements
+        run: |
+          python - <<'PY'
+          from research.v38_readonly_resource_probe import ALL, PROBES
+          from research.v38_shadow_canary_preflight import inspect
+          from importlib import import_module
+          assert len(PROBES) == 5, PROBES
+          for key in PROBES:
+              module = import_module(ALL[key])
+              assert hasattr(module, "predict"), (key, module)
+              print(key, "import OK")
+          PY
+      - name: Verify preflight and read-only probe guards on Python 3.12
+        run: |
+          python -m unittest discover -s tests -p 'test_v38_shadow_canary_preflight.py' -v
+          python -m unittest discover -s tests -p 'test_v38_readonly_resource_probe.py' -v
