@@ -1,0 +1,22 @@
+[Unit]
+Description=Torn Fren durable CPU-limited routine V2 forecast audit (V39)
+After=local-fs.target
+ConditionPathExists=/opt/torn-fren/data/stock_history.db
+
+[Service]
+Type=oneshot
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/opt/torn-fren
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/opt/torn-fren/venv/bin/python -m services.durable_audit_queue_v39 --once --max-jobs 4 --max-seconds 40
+Nice=17
+CPUQuota=35%
+MemoryMax=768M
+TimeoutStartSec=125
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectHome=yes
+ProtectSystem=strict
+ReadWritePaths=/var/lib/torn-fren
+UMask=0077
