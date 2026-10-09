@@ -30,6 +30,8 @@ jobs:
         run: python -m unittest discover -s tests -p 'test_v38_nessie_single_tick.py' -v
       - name: Verify exact Camel 24-template single-tick specialist
         run: python -m unittest discover -s tests -p 'test_v38_camel_single_tick.py' -v
+      - name: Verify restored original V20 Peony trajectory champion
+        run: python -m unittest discover -s tests -p 'test_v38_peony_single_tick.py' -v
       - name: Verify new 10-item V18 research worker against original frozen engine
         run: python -m unittest discover -s tests -p 'test_v38_frozen_v18_rollout.py' -v
       - name: Verify new 3-item V19 research worker against original frozen engine
@@ -41,4 +43,4 @@ jobs:
       - name: Regression — currently deployed V36/V37 capture unchanged
         run: python -m unittest discover -s tests -p 'test_v36_isolated_museum_sampler.py' -v
       - name: Compile standalone entry points
-        run: python -m py_compile research/v38_v18_single_tick.py research/v38_v19_single_tick.py research/v38_nessie_single_tick.py research/v38_readonly_resource_probe.py research/v38_camel_single_tick.py
+        run: python -m py_compile research/v38_v18_single_tick.py research/v38_v19_single_tick.py research/v38_nessie_single_tick.py research/v38_readonly_resource_probe.py research/v38_camel_single_tick.py research/v38_peony_single_tick.py services/plushie_flower_dynamic_planner_v20.py
