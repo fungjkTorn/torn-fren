@@ -69,6 +69,13 @@ def run_tick(*, stock_db, sidecar_db, execute=False, active=(),
         if not delta["caught_up"]:
             return {"mode":"SOURCE_BOOTSTRAP","delta":delta,
                     "executed":[],"collector_written":False}
+        # The collector saves stock_history rows only on quantity changes.
+        # Do not mark a quiet but successfully-polled item as stale, nor
+        # consider an old changed-row sufficient proof of fresh observation.
+        heartbeat=delta.get("verified_heartbeat")
+        if heartbeat is None or not 0 <= now-int(heartbeat) <= 180:
+            return {"mode":"COLLECTOR_STALE_OR_NO_HEARTBEAT",
+                    "delta":delta,"executed":[],"collector_written":False}
         snaps={p["item_key"]:p for p in read(sidecar_db,now) if "item_key" in p}
         plan=choose(roster,snaps,now=now,active=active,
                     changed=delta["affected_keys"],limit=max_jobs)
@@ -97,9 +104,9 @@ def run_tick(*, stock_db, sidecar_db, execute=False, active=(),
                 output={"status":"WORKER_TIMEOUT"}
             except (OSError,ValueError,json.JSONDecodeError):
                 output={"status":"WORKER_ERROR"}
-            row=side.execute("SELECT stock_as_of FROM v38_stock_state WHERE item_key=?",
-                             (key,)).fetchone()
-            last=row[0] if row else None
+            # Attest the current observation with the verified poll cycle,
+            # not the last item CHANGE row. A quiet market is still observed.
+            last=int(heartbeat)
             elapsed=int((clock()-t0)*1000)
             model=roster[key]
             delay=next_due_seconds(worker_status=str(output.get("status")),
