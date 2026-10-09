@@ -73,6 +73,25 @@ class SQLiteHandleSafety(unittest.TestCase):
             with self.assertRaises(sqlite3.ProgrammingError):
                 conn.execute("SELECT 1")
 
+    @unittest.skipUnless(os.path.isdir("/proc/self/fd"),"Linux fd probe")
+    def test_legacy_model_catalogs_release_sqlite_handles(self):
+        from services import prediction_lab, medium_model_lab
+        with hs._connect() as db:
+            db.execute("CREATE TABLE stock_history(country TEXT, item_name TEXT)")
+            db.execute("INSERT INTO stock_history VALUES ('uni','Heather')")
+        with patch.object(prediction_lab,"DB_PATH",self.db):
+            with patch.object(medium_model_lab,"DB_PATH",self.db):
+                before=len(os.listdir("/proc/self/fd"))
+                for _ in range(200):
+                    self.assertEqual(
+                        prediction_lab.list_tracked_items(min_rows=1)[0]["item_name"],
+                        "Heather")
+                    self.assertEqual(
+                        medium_model_lab.list_tracked_items(min_rows=1)[0][1],
+                        "Heather")
+                after=len(os.listdir("/proc/self/fd"))
+                self.assertLessEqual(after,before+8,(before,after))
+
     def test_initialization_and_recovery_reuse_closed_connections(self):
         with patch.object(hs,"_DB_READY",False):
             hs.init_db()
