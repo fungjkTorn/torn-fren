@@ -1,0 +1,36 @@
+name: V38 expanded live-inference adapters
+
+on:
+  push:
+    branches: [research/v38-full-roster-live-prep-20261009]
+  pull_request:
+    paths:
+      - 'research/v38_*'
+      - 'services/private_v18_champion_worker_v35.py'
+      - 'tests/test_v38_*'
+      - '.github/workflows/v38-research-adapters.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  adapters:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install existing application dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Verify new 10-item V18 research worker against original frozen engine
+        run: python -m unittest discover -s tests -p 'test_v38_frozen_v18_rollout.py' -v
+      - name: Verify new 3-item V19 research worker against original frozen engine
+        run: python -m unittest discover -s tests -p 'test_v38_frozen_v19_rollout.py' -v
+      - name: Regression — currently deployed V35 V18 pilot still restricted to 2
+        run: python -m unittest discover -s tests -p 'test_v35_museum_japan_private_pilot.py' -v
+      - name: Regression — currently deployed V36/V37 capture unchanged
+        run: python -m unittest discover -s tests -p 'test_v36_isolated_museum_sampler.py' -v
+      - name: Compile standalone entry points
+        run: python -m py_compile research/v38_v18_single_tick.py research/v38_v19_single_tick.py
