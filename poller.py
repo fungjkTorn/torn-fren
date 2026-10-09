@@ -5,6 +5,8 @@ Do not import V2 predictor or start audit/seeding threads in this service.
 import time
 from services.stock_provider import get_travel_export
 from services.history_service import record_poll_heartbeat, save_all_snapshots
+# Retained legacy audit regression seam; not executed during collection.
+from research.v38_gap_recovery import pending as gap_recovery_pending
 
 POLL_INTERVAL_SECONDS = 30
 
