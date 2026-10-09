@@ -62,6 +62,8 @@ jobs:
         run: python -m unittest discover -s tests -p 'test_v38_catalog_cache.py' -v
       - name: Verify resource guard refuses new jobs at the measured VM load
         run: python -m unittest discover -s tests -p 'test_v38_capacity_guard.py' -v
+      - name: Guard against production SQLite file descriptor regression
+        run: python -m unittest discover -s tests -p 'test_v37_sqlite_fd_hotfix.py' -v
       - name: Verify O(1) heartbeat gap reconciliation against original history sweep
         run: python -m unittest discover -s tests -p 'test_v38_heartbeat_fastpath.py' -v
       - name: Verify slow recovery never stalls polling or loses evidence
