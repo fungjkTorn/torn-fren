@@ -144,7 +144,16 @@ def bootstrap():
     from services.forecast_auditor import get_profiled_items,get_tracked_items
     items=set((c.lower(),n) for c,n in get_profiled_items())
     items.update((c.lower(),n) for c,n in get_tracked_items())
+    # Recover transient stock changes that may still have been waiting in
+    # the OLD poller's in-memory queue at cutover. Primary-key DESC LIMIT is
+    # bounded and avoids scanning the entire growing historical database.
+    with hs._connect() as con:
+        recent=con.execute("""
+          SELECT country,item_name,timestamp FROM stock_history
+          ORDER BY id DESC LIMIT 3000
+        """).fetchall()
     now=int(time.time())
+    items.update((c.lower(),n) for c,n,t in recent if t>=now-1800)
     with hs._connect() as con:
         if con.execute("""
           SELECT 1 FROM routine_audit_meta_v39 WHERE key='bootstrap_done'
