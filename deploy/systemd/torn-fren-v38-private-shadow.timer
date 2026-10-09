@@ -2,7 +2,7 @@
 Description=Optional V38 source-pinned five-model private research snapshots
 
 [Timer]
-OnCalendar=*-*-* *:*:00
+OnCalendar=*-*-* *:0/5:00
 AccuracySec=5s
 RandomizedDelaySec=0
 Persistent=false
