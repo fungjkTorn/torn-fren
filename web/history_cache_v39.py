@@ -20,7 +20,7 @@ class HistoryCache:
         self.max_entries=int(max_entries)
         self._data=OrderedDict()
         self._lock=threading.RLock()
-        self._item_locks={}
+        self._item_locks=[threading.Lock() for _ in range(32)]
 
     def _slice(self,base,*,minutes,now):
         cutoff=int(now)-int(minutes)*60
@@ -56,7 +56,7 @@ class HistoryCache:
             if cached and cached["revision"]==revision:
                 self._data.move_to_end(key)
                 return self._slice(cached["base"],minutes=minutes,now=now)
-            item_lock=self._item_locks.setdefault(key,threading.Lock())
+            item_lock=self._item_locks[hash(key)%len(self._item_locks)]
         # Different items can rebuild concurrently; identical requests share
         # one cold rebuild per item.
         with item_lock:
