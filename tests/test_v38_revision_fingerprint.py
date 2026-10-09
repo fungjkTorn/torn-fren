@@ -20,7 +20,7 @@ class SourceVersionTests(unittest.TestCase):
         with sqlite3.connect(self.db) as con:
             con.execute("CREATE TABLE poll_heartbeats(timestamp INTEGER,mode TEXT,success INTEGER)")
             con.execute("CREATE TABLE collection_gaps(id INTEGER PRIMARY KEY,end_timestamp INTEGER)")
-            con.execute("INSERT INTO poll_heartbeats VALUES(1000,'poll-cycle',1)")
+            con.execute("INSERT INTO poll_heartbeats VALUES(1030,'poll-cycle',1)")
         self.state={"timestamp":700,"quantity":35,"cost":900,"source":"yata"}
 
     def rev(self, now=1030, **updates):
@@ -86,6 +86,31 @@ class SourceVersionTests(unittest.TestCase):
                         "uni","Heather",revision=(*rev[:-1],4))
                     self.assertFalse(stale)
                     self.assertEqual(len(calls),2)
+
+    def test_analysis_cache_reuses_graph_and_preserves_response_shape(self):
+        rev=("uni","heather",700,35,900,"yata",0,0,3)
+        calls=[]
+        class ImmediateExecutor:
+            def submit(self,fn,*args):
+                calls.append((fn,args))
+                future=Future()
+                future.set_result({"current_stock":35,
+                                   "events":[],"prediction":{"status":"baseline"}})
+                return future
+        with patch.object(webapp,"_PREDICTION_EXECUTOR",ImmediateExecutor()):
+            with patch.object(webapp,"_ANALYSIS_CACHE",{}):
+                with patch.object(webapp,"_ANALYSIS_FUTURES",{}):
+                    for _ in range(25):
+                        graph,warming=webapp._get_analysis_nonblocking(
+                            "uni","Heather",revision=rev)
+                        self.assertFalse(warming)
+                        self.assertEqual(graph["current_stock"],35)
+                        self.assertNotIn("display_prediction",graph)
+                    self.assertEqual(len(calls),1)
+                    graph,warming=webapp._get_analysis_nonblocking(
+                        "uni","Heather",revision=(*rev[:-1],4))
+                    self.assertEqual(len(calls),2)
+                    self.assertFalse(warming)
 
     def test_unversioned_production_default_uses_existing_ttl(self):
         self.assertIsNone(webapp._get_prediction_nonblocking.__defaults__[0])
