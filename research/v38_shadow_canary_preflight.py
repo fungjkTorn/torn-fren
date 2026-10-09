@@ -85,6 +85,8 @@ def main() -> None:
     args = parser.parse_args()
     report = inspect(args.db)
     print(json.dumps(report,indent=2,sort_keys=True))
+    if report["status"] != "READY_FOR_BOUNDED_READONLY_PROBE":
+        raise SystemExit(2)
 
 
 if __name__ == "__main__":
