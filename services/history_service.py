@@ -16,6 +16,12 @@ _DB_READY = False
 # Missing successful poll coverage longer than this is a real collection gap.
 GENERIC_COLLECTION_GAP_SECONDS = 180
 
+# This scan repairs an already-fixed September collector incident, rather
+# than monitoring active ordinary polling. Avoid an old-data table scan every
+# 30 seconds; scan on first use, periodically, and immediately on poll failure.
+_LEGACY_GAP_RECONCILE_INTERVAL_SECONDS = 600
+_LEGACY_GAP_LAST_CHECK_MONOTONIC = None
+
 
 
 def _connect():
@@ -321,6 +327,20 @@ def _reconcile_heartbeat_collection_gaps_conn(conn):
             """,
             (previous_ts, recovery_ts, reason, now, now),
         )
+
+
+
+
+def _maybe_reconcile_legacy_collection_gaps_conn(conn, *, unsuccessful_poll=False):
+    """Repair legacy failure history without a 30-second full-history sweep."""
+    global _LEGACY_GAP_LAST_CHECK_MONOTONIC
+    now = time.monotonic()
+    due = (_LEGACY_GAP_LAST_CHECK_MONOTONIC is None
+           or now - _LEGACY_GAP_LAST_CHECK_MONOTONIC
+              >= _LEGACY_GAP_RECONCILE_INTERVAL_SECONDS)
+    if due or unsuccessful_poll:
+        _reconcile_known_collection_gaps_conn(conn)
+        _LEGACY_GAP_LAST_CHECK_MONOTONIC = now
 
 
 
@@ -865,7 +885,9 @@ def record_poll_heartbeat(success: bool, source: str = "none", error: str = None
         # Historical changed_items incidents still need their specialized
         # reconciliation. Do NOT re-read the entire successful heartbeat
         # history on each poll: insert only this new success-to-success gap.
-        _reconcile_known_collection_gaps_conn(conn)
+        _maybe_reconcile_legacy_collection_gaps_conn(
+            conn, unsuccessful_poll=not success
+        )
         if success:
             _reconcile_new_success_heartbeat_conn(conn, previous_success_ts, now)
 
