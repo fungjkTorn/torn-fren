@@ -23,6 +23,27 @@ V38, start extra workers or restart services without explicit user approval.
   PID 289020 (48.8% RSS 313600 KiB), and PID 124634
   (0.4%, RSS 212092 KiB). PID-to-service mapping **unknown**; these CPU
   percentages are process reports, not proof of simultaneously available CPU.
+- **Follow-up cgroup attribution, verified by user:** PID 106384 is
+  `torn-fren-poller.service` (90.5% lifetime CPU, 426600 KiB RSS);
+  PID 289020 is `torn-fren-web.service` (48.9% lifetime CPU,
+  313620 KiB RSS); PID 124634 is `torn-fren-arbitrage.service`
+  (0.4%, 212092 KiB RSS). Bot MainPID 162431. Research capture
+  `MainPID=0` is normal for an inactive oneshot between timer ticks.
+- `/proc/pressure/cpu`: **some avg10/60/300=100.00**;
+  **full avg10/60/300=0.00**. This indicates sustained runnable
+  CPU waiting, not all runnable threads stalled. Percent CPU via
+  `ps` is lifetime-average, so thread-level current samples still
+  needed to identify the active poller hotspot.
+- Verified V37 code: `poller._audit_worker` runs
+  `update_prediction_audits_for_item`, `resolve_forecast_audits`
+  and for tracked items `build_live_prediction_v2` for changed
+  stock quantities; this may repeat expensive validated-cycle builds.
+  `history_service.record_poll_heartbeat` also invokes both
+  `_reconcile_known_collection_gaps_conn` and
+  `_reconcile_heartbeat_collection_gaps_conn` **every 30-second
+  successful poll**; latter reads all successful heartbeat history
+  and reconciles previous gaps again. These are code-level candidates,
+  not yet demonstrated timing contributions.
 - This observed load means there is **no safe extra CPU headroom now**.
   Do not start a 16- or 22-model high-cost benchmark or a 236-item loop.
 
@@ -91,3 +112,27 @@ Identify production process CPU demand, validate catalog caching gain
 in separate/isolated context, check web p95/p99 and post-probe status, and
 prove per-family model wall time/RSS without exhausting host capacity.
 Do not change `profitability-v1` or systemd until confirmation.
+
+## Follow-up read-only attribution while system is running
+
+```bash
+# Identify whether the poller main polling thread or the audit thread is hot.
+ps -L -p 106384 -o pid,tid,stat,%cpu,etime,comm --sort=-%cpu
+ps -L -p 289020 -o pid,tid,stat,%cpu,etime,comm --sort=-%cpu
+
+# Avoid secrets/process command-line/environment disclosure in logs.
+journalctl -u torn-fren-poller.service --since '10 minutes ago' --no-pager -o cat |
+  grep -E 'Poll cycle completed|inserted |prediction audit |forecast audit |shadow audit |Poll cycle save error' |
+  tail -80
+
+# Per-process 1 second CPU sample only if sysstat is present.
+if command -v pidstat >/dev/null 2>&1; then
+  pidstat -u -t -p 106384,289020 1 5
+else
+  echo 'pidstat not installed; ps -L provides lifetime thread signal'
+fi
+```
+
+Do **not** disable audits or gap reconciliation until output parity and
+collection-freshness regressions have been tested on V38. A shorter heartbeat
+path and audit work coalescing may help, but their CPU savings remain unmeasured.
