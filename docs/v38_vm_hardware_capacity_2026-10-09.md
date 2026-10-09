@@ -136,3 +136,48 @@ fi
 Do **not** disable audits or gap reconciliation until output parity and
 collection-freshness regressions have been tested on V38. A shorter heartbeat
 path and audit work coalescing may help, but their CPU savings remain unmeasured.
+
+## Second user sample: Oct 9, 2026
+
+- OCI console confirms `VM.Standard.A1.Flex`, **1 OCPU / 6 GB RAM**,
+  Always Free-eligible, account banner **Free Trial** (not an entitlement
+  confirmation for extra resources). OCPU selection says **"OCPU count
+  is restricted by account limits."** "41 max" is technical shape maximum,
+  not the Always Free allowance.
+- **2026 Oracle official Always Free allocation:** **1,500 Ampere OCPU-hours
+  and 9,000 GB-hours monthly**, equivalent to **2 OCPUs / 12 GB RAM total**
+  running continuously, *across instances*. Oracle reduced the older
+  4-OCPU/24-GB allocation. See:
+  https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier_topic-Always_Free_Resources.htm
+- Verify the *account's actual* available A1 resources under
+  **Governance & Administration > Tenancy Management >
+  Limits, Quotas and Usage > Compute**, particularly
+  `standard-a1-core-count` and `standard-a1-memory-count`;
+  service limit versus used and available. If only 1 is available,
+  diagnose account quota and other instance usage, **do not attempt**
+  an unapproved resize or chargeable alternative.
+  Guide:
+  https://docs.oracle.com/en-us/iaas/Content/General/service-limits/view-tenancy.htm
+- `ps -L` on poller PID 106384 returned **only one live thread**,
+  while V38 source has polling and audit background threads; its runtime
+  started >11 days before the current V37 deployment and may have loaded
+  older code, or audit thread may have exited. Do not assume the current
+  source's audit worker runs in that process. Do not restart poller blindly.
+- Seven collector cycles completed in **20.9, 20.1, 22.4, 11.9,
+  13.5, 20.3, 21.1 seconds** of each 30-second target window.
+  Many items were unchanged each poll; significant CPU expenditure persists.
+  The exact share from poller sqlite insert/lookups, reconciliation, fetch,
+  and audit must be timed before stating causality.
+- Research-only optimized `services/history_service.py`:
+  every successful heartbeat now checks only the immediately preceding
+  verified successful heartbeat for >180s gap and inserts the exact
+  boundary only when needed (O(1) normal case). Explicit
+  `reconcile_collection_gaps()` still performs full historical
+  backfill. September-specific changed_items failure repairs are
+  scheduled at process startup and then every 600s or immediately on
+  failed poll, not every 30s. The existing collector event semantics,
+  heartbeat failure evidence, and database schema are unchanged.
+  Synthetic parity regression tests in
+  `tests/test_v38_heartbeat_fastpath.py`.
+- These are *branch-only* code changes; real VM CPU savings remain
+  unmeasured, and no existing service has restarted.
