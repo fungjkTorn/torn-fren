@@ -1,4 +1,6 @@
 from pathlib import Path
+import os
+from research.v38_prediction_store import read as read_v38_snapshots
 import copy
 import threading
 import time
@@ -346,6 +348,23 @@ def api_catalog():
             "market_price_error": (market_meta or {}).get("error"),
         },
     }
+
+
+@app.get("/api/research/v38/predictions")
+def api_v38_research_predictions(country: str | None = None, item: str | None = None):
+    """Opt-in beta: SQLite snapshot reads only. No champion/V2 computation."""
+    if os.environ.get("TORN_FREN_V38_EXPERIMENTAL_API") != "1":
+        raise HTTPException(status_code=404, detail="Experimental API disabled")
+    location = os.environ.get("TORN_FREN_V38_SNAPSHOT_DB")
+    if not location:
+        return {"experimental": True, "status": "SIDECAR_NOT_CONFIGURED",
+                "fallback_required": True}
+    if bool(country) != bool(item):
+        raise HTTPException(status_code=400, detail="country and item must be paired")
+    key = f"{country.strip().lower()}:{item.strip()}" if country and item else None
+    snapshot = read_v38_snapshots(location, int(time.time()), key=key, limit=236)
+    return {"experimental": True, "probability_calibrated": False,
+            "source": "PRECOMPUTED_SIDECAR_ONLY", "latest": snapshot}
 
 
 @app.get("/api/admin/health")
