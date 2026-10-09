@@ -2,7 +2,7 @@
 
 This is NOT the scheduled collector and never writes the stock DB or research
 ledger. Executes up to five representative models by default, sequentially;
---all deliberately expands to all 14 frozen V18/V19/Nessie candidates.
+--all deliberately expands to all 15 frozen V18/V19/Nessie/Camel candidates.
 No baseline HTTP requests, no secrets, no web service restarts.
 """
 from __future__ import annotations
@@ -20,7 +20,8 @@ PROBES=("uni:Heather","can:Wolverine Plushie",
         "arg:Ceibo Flower","jap:Cherry Blossom","uni:Nessie Plushie")
 ALL={**{k:"research.v38_v18_single_tick" for k in V18_APPROVED},
      **{k:"research.v38_v19_single_tick" for k in V19_APPROVED},
-     "uni:Nessie Plushie":"research.v38_nessie_single_tick"}
+     "uni:Nessie Plushie":"research.v38_nessie_single_tick",
+     "uae:Camel Plushie":"research.v38_camel_single_tick"}
 
 
 def probe(db: str, keys, *, per_item_seconds=20.0, budget_seconds=100.0,
@@ -67,7 +68,7 @@ def probe(db: str, keys, *, per_item_seconds=20.0, budget_seconds=100.0,
 def main():
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument("--db",default="/opt/torn-fren/data/stock_history.db")
-    p.add_argument("--all",action="store_true",help="Explicitly test all 14 models")
+    p.add_argument("--all",action="store_true",help="Explicitly test all 15 models")
     p.add_argument("--timeout",type=float,default=20)
     p.add_argument("--budget",type=float,default=100)
     args=p.parse_args()
