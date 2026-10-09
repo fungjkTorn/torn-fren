@@ -45,7 +45,7 @@ def choose(roster, snapshots, *, now, active=(), changed=(), limit=4):
 
 
 def run_tick(*, stock_db, sidecar_db, execute=False, active=(),
-             max_rows=10000, max_jobs=4, worker_seconds=20,
+             approved_keys=None, max_rows=10000, max_jobs=4, worker_seconds=20,
              budget_seconds=85, now=None, runner=subprocess.run,
              clock=time.monotonic, capacity_probe=capacity_status):
     if not 1<=max_jobs<=16 or not 1<=worker_seconds<=60:
@@ -54,6 +54,15 @@ def run_tick(*, stock_db, sidecar_db, execute=False, active=(),
         raise ValueError("invalid total wall budget")
     now=int(time.time() if now is None else now)
     roster=json.loads(ROSTER.read_text(encoding="utf-8"))["items"]
+    # Explicit allowlisting supports a first-five isolation test without
+    # accidentally executing every runnable model in the 21-item roster.
+    # Unknown keys abort before any collector or research DB access.
+    if approved_keys is not None:
+        approved=set(approved_keys)
+        unknown=approved.difference(roster)
+        if unknown:
+            raise ValueError(f"unknown research allowlisted items: {sorted(unknown)}")
+        roster={key:meta for key,meta in roster.items() if key in approved}
     # Plan-only does not even create the sidecar or access the stock database.
     if not execute:
         snapshots={p["item_key"]:p for p in read(sidecar_db,now) if "item_key" in p}
@@ -128,6 +137,8 @@ def main():
     p.add_argument("--sidecar",required=True)
     p.add_argument("--execute",action="store_true")
     p.add_argument("--active",action="append",default=[])
+    p.add_argument("--allow-item",action="append",default=None,
+                   help="Repeat to limit runs to an explicitly approved subset")
     p.add_argument("--max-rows",type=int,default=10000)
     p.add_argument("--max-jobs",type=int,default=4)
     p.add_argument("--per-worker",type=float,default=20)
@@ -136,7 +147,7 @@ def main():
     out=run_tick(stock_db=args.db,sidecar_db=args.sidecar,
                  execute=args.execute,active=args.active,max_rows=args.max_rows,
                  max_jobs=args.max_jobs,worker_seconds=args.per_worker,
-                 budget_seconds=args.budget)
+                 approved_keys=args.allow_item,budget_seconds=args.budget)
     print(json.dumps(out,sort_keys=True,indent=2))
 
 
