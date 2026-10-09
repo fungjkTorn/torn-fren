@@ -42,5 +42,7 @@ jobs:
         run: python -m unittest discover -s tests -p 'test_v35_museum_japan_private_pilot.py' -v
       - name: Regression — currently deployed V36/V37 capture unchanged
         run: python -m unittest discover -s tests -p 'test_v36_isolated_museum_sampler.py' -v
+      - name: Verify read-only bounded VM resource probe
+        run: python -m unittest discover -s tests -p 'test_v38_resource_probe.py' -v
       - name: Compile standalone entry points
-        run: python -m py_compile research/v38_v18_single_tick.py research/v38_v19_single_tick.py research/v38_nessie_single_tick.py research/v38_readonly_resource_probe.py research/v38_camel_single_tick.py research/v38_peony_single_tick.py services/plushie_flower_dynamic_planner_v20.py
+        run: python -m py_compile research/v38_v18_single_tick.py research/v38_v19_single_tick.py research/v38_readonly_resource_probe.py research/v38_nessie_single_tick.py research/v38_readonly_resource_probe.py research/v38_camel_single_tick.py research/v38_peony_single_tick.py services/plushie_flower_dynamic_planner_v20.py
