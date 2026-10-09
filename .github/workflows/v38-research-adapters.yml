@@ -48,5 +48,7 @@ jobs:
         run: python -m unittest discover -s tests -p 'test_v38_prediction_store.py' -v
       - name: Verify incremental observer and causal versioned feature cache
         run: python -m unittest discover -s tests -p 'test_v38_incremental_observer.py' -v
+      - name: Verify opt-in bounded research scheduler
+        run: python -m unittest discover -s tests -p 'test_v38_budgeted_runner.py' -v
       - name: Compile standalone entry points
-        run: python -m py_compile research/v38_v18_single_tick.py research/v38_v19_single_tick.py research/v38_readonly_resource_probe.py research/v38_nessie_single_tick.py research/v38_readonly_resource_probe.py research/v38_camel_single_tick.py research/v38_peony_single_tick.py services/plushie_flower_dynamic_planner_v20.py
+        run: python -m py_compile research/v38_v18_single_tick.py research/v38_v19_single_tick.py research/v38_readonly_resource_probe.py research/v38_nessie_single_tick.py research/v38_readonly_resource_probe.py research/v38_camel_single_tick.py research/v38_peony_single_tick.py services/plushie_flower_dynamic_planner_v20.py research/v38_budgeted_runner.py research/v38_prediction_store.py research/v38_incremental_observer.py research/v38_feature_cache.py
