@@ -276,3 +276,29 @@ cadence; no FD growth back toward 1024; normal website health;
 V37 shadow Heather/Wolverine `champion_executed=1` after a full
 20-minute item rotation. Keep 236-item V38 inference disabled until
 these criteria hold.
+
+## Sustained production stability confirmation — October 9, later sample
+
+After at least 15 minutes on deployed V37 collector-safety release
+`a93879d`, user measured (read-only):
+
+- **30 successful `poll-cycle` heartbeats in the trailing 900s**, exactly
+  expected at a 30s cadence.
+- Latest successful heartbeat **19s old**, fresh within the 180s gate.
+- Main poller had **6 open FDs** vs **681 before repair**.
+- Latest `uni:Heather` V18 entry: `RESEARCH_PROPOSAL_ONLY`, 
+  `champion_executed=1`.
+- Latest `can:Wolverine Plushie` V18 entry: `RESEARCH_PROPOSAL_ONLY`,
+  `champion_executed=1`.
+- Older `COLLECTOR_STALE_OR_NO_HEARTBEAT` entries remain correctly in the
+  evidence ledger; these are censored/deferred attempts rather than wrong
+  model predictions.
+- Recovery queue prior sample had exactly one `done` job with zero pending,
+  `251` invalidated ambiguous forecast points.
+
+This meets the **initial operational gate** for pursuing a separate
+V38 shadow research canary. It does not imply 24h+ reliability,
+favorable live success rates, or authorization to deploy 22 / 236 models.
+No V38 public routing, cron/timer, or release switches were enabled.
+The V38 research branch must retain the V37 deterministic SQLite
+connection fix prior to any canary to avoid reintroducing the leak.
