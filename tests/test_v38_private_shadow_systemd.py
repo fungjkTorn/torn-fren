@@ -7,6 +7,20 @@ from research.v38_readonly_resource_probe import PROBES
 
 
 class PrivateShadowUnitTests(unittest.TestCase):
+    def test_research_operator_script_refuses_busy_or_unfixed_production(self):
+        root=Path(__file__).parents[1]
+        source=(root/"deploy/scripts/arm_v38_five_model_canary.sh").read_text()
+        self.assertIn("e9ba974c96553ea36f31951b94901b7379b22624",source)
+        self.assertIn("research.v38_shadow_canary_preflight",source)
+        self.assertIn("research.v38_readonly_resource_probe",source)
+        self.assertIn("timeout 120s",source)
+        self.assertIn("--timeout 9 --budget 48",source)
+        self.assertIn("FIVE-WORKER BENCHMARK ACCEPTED",source)
+        self.assertIn("torn-fren-v38-private-shadow.timer",source)
+        self.assertNotIn("systemctl restart",source)
+        self.assertNotIn("git reset",source)
+        self.assertNotIn("--all",source)
+
     def test_unit_opt_in_never_changes_polling_public_web_or_game(self):
         root=Path(__file__).parents[1]
         source=(root/"deploy/systemd/torn-fren-v38-private-shadow.service").read_text()
