@@ -104,6 +104,26 @@ class IncrementalHeartbeatTests(unittest.TestCase):
         count=self.con.execute("SELECT COUNT(*) FROM poll_heartbeats").fetchone()[0]
         self.assertEqual(count,20001)
 
+    def test_legacy_history_scan_is_throttled_but_failure_immediate(self):
+        tick=[100.0]
+        with patch.object(hs,"_LEGACY_GAP_LAST_CHECK_MONOTONIC",None):
+            with patch.object(hs.time,"monotonic",side_effect=lambda:tick[0]):
+                with patch.object(hs,"_reconcile_known_collection_gaps_conn") as full:
+                    self._record(1000)
+                    self.assertEqual(full.call_count,1)
+                    tick[0]=120.0
+                    self._record(1030)
+                    self.assertEqual(full.call_count,1)
+                    tick[0]=140.0
+                    self._record(1060,False)
+                    self.assertEqual(full.call_count,2)
+                    tick[0]=141.0
+                    self._record(1090)
+                    self.assertEqual(full.call_count,2)
+                    tick[0]=742.0
+                    self._record(1120)
+                    self.assertEqual(full.call_count,3)
+
     def test_manual_full_history_recovery_still_works(self):
         self.con.executemany("""
             INSERT INTO poll_heartbeats(timestamp,source,success,mode)
