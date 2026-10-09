@@ -323,6 +323,32 @@ def _reconcile_heartbeat_collection_gaps_conn(conn):
         )
 
 
+
+def _reconcile_new_success_heartbeat_conn(conn, previous_success_ts, recovery_ts):
+    """O(1) fast path for an ordinary collector heartbeat.
+
+    Full historical reconstruction remains available through
+    reconcile_collection_gaps(); a new successful poll only adds a gap if the
+    immediately preceding success was more than 180 seconds earlier.
+    Preserve the exact gap reason, boundaries, and first recovery observation.
+    """
+    if previous_success_ts is None:
+        return
+    elapsed = int(recovery_ts) - int(previous_success_ts)
+    if elapsed <= GENERIC_COLLECTION_GAP_SECONDS:
+        return
+    reason = f"collector heartbeat gap ({elapsed}s without verified successful polling)"
+    conn.execute(
+        """
+        INSERT OR IGNORE INTO collection_gaps
+            (start_timestamp, end_timestamp, reason, created_at, closed_at)
+        VALUES (?, ?, ?, ?, ?)
+        """,
+        (int(previous_success_ts), int(recovery_ts), reason,
+         int(recovery_ts), int(recovery_ts)),
+    )
+
+
 def get_collector_recovery_status(now_timestamp=None):
     """
     Return whether the collector is currently stale enough that startup
@@ -836,8 +862,12 @@ def record_poll_heartbeat(success: bool, source: str = "none", error: str = None
             (now, source or "none", 1 if success else 0, error, "poll-cycle"),
         )
 
+        # Historical changed_items incidents still need their specialized
+        # reconciliation. Do NOT re-read the entire successful heartbeat
+        # history on each poll: insert only this new success-to-success gap.
         _reconcile_known_collection_gaps_conn(conn)
-        _reconcile_heartbeat_collection_gaps_conn(conn)
+        if success:
+            _reconcile_new_success_heartbeat_conn(conn, previous_success_ts, now)
 
     elapsed = (
         now - previous_success_ts
