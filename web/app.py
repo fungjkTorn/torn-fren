@@ -16,11 +16,13 @@ from services.profitability import enrich_items_with_profitability, profitabilit
 from web.private_shadow_v29 import champion_shadow
 from web.v38_revision_fingerprint import revision as v38_source_revision
 from web.catalog_cache_v38 import CatalogCache
+from web.history_cache_v39 import HistoryCache
 import os
 
 app = FastAPI(title="Torn Fren Stock Graph")
 
 _V38_CATALOG_CACHE = CatalogCache(ttl=30, max_stale=180)
+_V39_HISTORY_CACHE = HistoryCache(max_entries=64)
 
 STATIC_DIR = Path(__file__).parent / "static"
 
@@ -293,14 +295,20 @@ def api_history(
         raise HTTPException(status_code=400, detail="Item name is required.")
 
     hours = minutes / 60
-    rows = get_item_history_since(country, item, hours)
     latest_item_state = get_latest_item_snapshot(country, item) or {}
     research_cache = os.environ.get("TORN_FREN_V38_REVISION_CACHE") == "1"
     source_status, revision_token = ("DISABLED", None)
+    now_ts=time.time()
     if research_cache:
         source_status, revision_token = v38_source_revision(
             DB_PATH,country=country,item=item,
-            item_state=latest_item_state,now=int(time.time()))
+            item_state=latest_item_state,now=int(now_ts))
+    if research_cache and source_status == "FRESH":
+        rows = _V39_HISTORY_CACHE.get(
+            country,item,minutes,revision_token,
+            get_item_history_since,now=now_ts)
+    else:
+        rows = get_item_history_since(country, item, hours)
     if research_cache and source_status != "FRESH":
         base_analysis, analysis_warming = None, True
     else:
