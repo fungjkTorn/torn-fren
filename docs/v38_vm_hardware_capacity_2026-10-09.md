@@ -181,3 +181,64 @@ path and audit work coalescing may help, but their CPU savings remain unmeasured
   `tests/test_v38_heartbeat_fastpath.py`.
 - These are *branch-only* code changes; real VM CPU savings remain
   unmeasured, and no existing service has restarted.
+
+## Post-resize empirical baseline — 2026-10-09 17:18 UTC
+
+User explicitly resized their original Oracle Always Free-eligible
+VM.Standard.A1.Flex from 1 OCPU/6 GB to **2 OCPUs/12 GB** and rebooted.
+These are actual user-pasted post-reboot CLI observations; no V38 release.
+
+- `nproc=2`, Linux reports 11 GiB RAM / 10 GiB available,
+  ~972 MiB used, no swap.
+- Prod still **`profitability-v1` at `062f3a2`**. Website, Discord
+  bot, poller, shadow-capture timer all `active`.
+- Shadow capture timer: previous run 17:16 UTC, completed 17:16:03,
+  `Result=success`, `ExecMainStatus=0`.
+- Catalog HTTP times (seconds): `0.180515, 0.178922, 0.180621,
+  0.181566, 0.183028, 0.182673, 0.183129, 0.182559, 0.182919,
+  0.181980`; mean approx **0.182 s** versus pre-upgrade approx
+  **0.926 s**, or **5.1× lower observed latency**. Warm/cold, active
+  load and process restarts also differ, so do not claim CPU scaling
+  explains *all* improvement; repeated snapshots are one endpoint only.
+- Last 10 poll cycle wall times (seconds): `6.8, 11.4, 10.1, 1.0,
+  10.8, 1.3, 1.0, 11.9, 1.9, 11.9`, mean **6.71 s** versus seven
+  pre-upgrade `20.9, 20.1, 22.4, 11.9, 13.5, 20.3, 21.1`,
+  mean **18.6 s**. No collection cadence change observed; 30-second
+  target remains.
+- CPU PSI `some avg10=47.92 avg60=50.42 avg300=32.64` and
+  `full=0`. Four after-first vmstat samples show ~20–31% CPU
+  idle on two cores, but persistent runnable contention remains.
+  Uptime only 5 min; load `4.97,2.96,1.30` not steady state.
+- Top Python processes in user snapshot: PID 759 **129% lifetime
+  CPU**, PID 760 **41.2% lifetime CPU**, services not yet confirmed
+  post-reboot. Together ~170% of a 200% CPU allotment averaged since
+  boot, corroborating limited headroom.
+- **V38 guard** `normalized load > 0.8 OCPU` currently rejects
+  any opt-in research execution since 4.97/2 > 0.8; this is
+  intentional fail-closed behavior. Consider rerunning once stable
+  rather than lowering the cutoff blindly. Cache/snapshot reads and
+  registry status remain cheaper alternatives to model execution.
+- No V38 production changes, no paid upgrades authorized.
+
+### Best next observations, read-only
+
+```bash
+echo "===== POST-REBOOT PIDS ====="
+systemctl show torn-fren-poller.service torn-fren-web.service torn-fren-bot.service -p Id -p MainPID
+ps -L -p 759,760 -o pid,tid,stat,%cpu,etime,comm --sort=-%cpu
+
+echo "===== FETCH SUCCESS VS FALLBACK ====="
+journalctl -u torn-fren-poller.service --since '10 minutes ago' --no-pager -o short-iso |
+  grep -E 'Fetching travel|YATA|Prometheus|Saving all country|Poll cycle completed|Poll cycle save error' |
+  tail -100
+
+echo "===== STABLE CPU AFTER UPTIME 15m ====="
+uptime
+cat /proc/pressure/cpu
+vmstat 1 5
+```
+
+Observe whether 10–12-second cycles correlate with YATA failure,
+Prometheus fallback, audit work, or history reconciliation; no
+attribution until per-stage timing evidence. Keep 22-champion
+benchmarks disabled on public VM until pressure and budget justify it.
