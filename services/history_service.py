@@ -18,6 +18,22 @@ GENERIC_COLLECTION_GAP_SECONDS = 180
 
 
 
+class _ClosingConnection(sqlite3.Connection):
+    """SQLite context manager that *also* releases OS file descriptors.
+
+    sqlite3.Connection.__exit__ only commits/rolls back; it does not close.
+    The collector and forecast workers call `with _connect()` thousands
+    of times, so hold database/WAL/SHM handles for no longer than a query.
+    Preserve normal transaction success/rollback semantics before closing.
+    """
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        try:
+            return super().__exit__(exc_type, exc_value, traceback)
+        finally:
+            self.close()
+
+
 def _connect():
     """
     Open SQLite with a real busy timeout.
@@ -29,8 +45,14 @@ def _connect():
     millisecond-scale writer collision as a fatal error.
     """
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(DB_PATH, timeout=30.0)
-    conn.execute("PRAGMA busy_timeout = 30000")
+    conn = sqlite3.connect(
+        DB_PATH, timeout=30.0, factory=_ClosingConnection
+    )
+    try:
+        conn.execute("PRAGMA busy_timeout = 30000")
+    except BaseException:
+        conn.close()
+        raise
     return conn
 
 
