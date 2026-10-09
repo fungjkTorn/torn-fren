@@ -15,7 +15,7 @@ class PrivateShadowUnitTests(unittest.TestCase):
         self.assertIn("research.v38_readonly_resource_probe",source)
         self.assertIn("timeout 190s",source)
         self.assertIn("--timeout 25 --budget 150",source)
-        self.assertIn("FIVE-WORKER BENCHMARK ACCEPTED",source)
+        self.assertIn("FIVE-MODEL READ-ONLY BENCHMARK ACCEPTED",source)
         self.assertIn("research.v38_v39_host_gate",source)
         self.assertIn('DB="/opt/torn-fren/data/stock_history.db"',source)
         self.assertIn("curl -fsS",source)
