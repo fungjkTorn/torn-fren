@@ -18,9 +18,7 @@ from services.forecast_auditor import (
 from services.prediction_v2_live import build_live_prediction_v2
 from services.shadow_model_auditor import update_shadow_models
 from research.v38_gap_recovery import (
-    enqueue as enqueue_gap_recovery,
     pending as gap_recovery_pending,
-    process_one as process_gap_recovery,
 )
 
 POLL_INTERVAL_SECONDS = 30
@@ -33,47 +31,17 @@ _AUDIT_EVENT = threading.Event()
 _AUDIT_STOP = threading.Event()
 
 
-_RECOVERY_EVENT = threading.Event()
-_RECOVERY_STOP = threading.Event()
-
-
-def _recovery_worker():
-    """Slow gap audits run independently of the 30-second collector cycle.
-
-    Jobs survive restart in SQLite, and a failed job retains a retry marker.
-    Keep stock polling alive even if historical item continuity takes minutes.
-    """
-    while not _RECOVERY_STOP.is_set():
-        try:
-            outcome = process_gap_recovery()
-            if outcome["status"] == "COMPLETED":
-                print(
-                    f"recovery audit completed: gap="
-                    f"{outcome['gap_start']}..{outcome['gap_end']} "
-                    f"invalidated={outcome['invalidated_count']}",
-                    flush=True,
-                )
-                _AUDIT_EVENT.set()
-                continue
-            if outcome["status"] == "RETRY_SCHEDULED":
-                print(
-                    f"recovery audit retry scheduled: gap="
-                    f"{outcome['gap_start']}..{outcome['gap_end']} "
-                    f"error={outcome['error_type']}",
-                    flush=True,
-                )
-        except Exception as exc:
-            print(f"recovery audit queue error: {type(exc).__name__}", flush=True)
-        _RECOVERY_EVENT.wait(timeout=15.0)
-        _RECOVERY_EVENT.clear()
-
-
+# Recovery invalidation is performed by a separate resource-capped
+# systemd one-shot worker. Never create expensive recovery threads here.
+# The heartbeat writer persists the gap AND its queue record atomically.
 def _schedule_gap_recovery(gap_start, gap_end):
-    # The queue record is the durable handoff; never run continuity checks
-    # or invalidate forecast points inside this 30-second poll iteration.
-    result = enqueue_gap_recovery(gap_start, gap_end)
-    _RECOVERY_EVENT.set()
-    return result
+    print(
+        f"recovery audit durably queued: {int(gap_start)}..{int(gap_end)}; "
+        "external torn-fren-gap-recovery.timer will process it",
+        flush=True,
+    )
+    return {"status": "ENQUEUED", "gap_start": int(gap_start),
+            "gap_end": int(gap_end)}
 
 
 def _schedule_item_audits(changed_by_country):
@@ -212,9 +180,6 @@ def _seed_audits_async():
 def run():
     print(f"Starting poller — one export call every {POLL_INTERVAL_SECONDS}s. Press Ctrl+C to stop.")
 
-    threading.Thread(
-        target=_recovery_worker, name="torn-fren-recovery-worker", daemon=True
-    ).start()
     worker = threading.Thread(target=_audit_worker, name="torn-fren-audit-worker", daemon=True)
     worker.start()
     threading.Thread(
