@@ -94,3 +94,40 @@ injection, `strace`, DB writes or elevated thread scheduling.
 5. Reattempt V38 five-model benchmark only when CPU threshold returns
    below the guard **without relaxing it**. Do not promote additional
    live champion models during measured CPU saturation.
+
+## V39 CPU isolation deployment confirmed — 2026-10-09 23:53 UTC
+
+Operator deployed **exact production SHA `e9ba974c96553ea36f31951b94901b7379b22624`** (separate V37-derived release), after backups at
+`/home/ubuntu/torn-fren-pre-v39/20261009T235159Z`:
+stock DB **153,849,856 B** and shadow DB **151,552 B**, both
+`PRAGMA quick_check=ok`.
+
+Services reported all active; new routine-audit timer enabled;
+collector fresh at 1s then 27s; website's immediate deployment-script curl
+returned HTTP 000 but retry **~1m later returned HTTP 200**.
+New Uvicorn PID **5191** was listening on `127.0.0.1:8000` with clean
+startup, no observed Python exception. The previous HTTP 000 was
+a **startup race**, not an enduring outage. No rollback indicated.
+
+`vmstat` first 1s line included old rolling data, then 4 successive
+live samples had **81–82% idle CPU**, 11–13% user and 6–7% system, 0%
+I/O wait — a dramatic initial improvement vs predeploy 97–100% busy.
+Load1 1.61, load5 3.07, load15 3.43; latter still include prior CPU
+saturation, so longer steady-state monitoring required.
+
+**Important unverified backlog:** `routine_audit_jobs_v39` returned
+**`pending=376, running=1`** shortly after the new timer bootstrap.
+The bootstrap deliberately enqueues previously tracked/profiled forecast
+items and recent transitions. Distinguish expected one-time backlog from
+an expensive audit worker repeatedly timing out/retrying.
+Before V38 live shadow canary, inspect `journalctl -u
+torn-fren-routine-audit.service` for actual `BATCH_COMPLETED` and
+`COMPLETED` jobs, monitor `done` growth / oldest pending age over
+15–30m, and ensure current priority-10 stock transitions can advance
+despite hundreds of priority-0 bootstrap tasks.
+
+Safety gate: **Do not activate V38 5-item timer until website + 30-second
+collector remain healthy under normal traffic, worker makes progress,
+and sustained load1<=1.6.** No new model deployment at this point.
+
+All these are user-provided VM telemetry, not an assistant remote session.
