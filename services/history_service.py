@@ -83,6 +83,11 @@ def init_db():
             conn.execute("PRAGMA journal_mode = WAL")
             conn.execute("PRAGMA synchronous = NORMAL")
 
+            # Routine V2/audit work is written transactionally alongside
+            # stock changes and drained only by a quota-limited systemd job.
+            from services.durable_audit_queue_v39 import ensure_schema
+            ensure_schema(conn)
+
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS stock_history (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -870,6 +875,8 @@ def save_snapshot_from_export(country: str, country_data: dict, source: str):
             # A price-only row is persisted for pricing/profit history but does
             # not represent a new restock/depletion observation.
             if quantity_changed:
+                from services.durable_audit_queue_v39 import enqueue
+                enqueue(conn,country,item_name,timestamp)
                 changed_items.append(item_name)
 
     print(f"{country}: inserted {inserted}, skipped {skipped} unchanged")
