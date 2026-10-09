@@ -45,7 +45,7 @@ class BudgetedRunnerTests(unittest.TestCase):
 
     def test_capped_bootstrap_and_valid_proposal(self):
         first=run_tick(stock_db=self.stock,sidecar_db=self.side,
-                       execute=True,max_rows=1,now=NOW)
+                       execute=True,capacity_probe=lambda:{"allowed":True},max_rows=1,now=NOW)
         self.assertEqual(first["mode"],"SOURCE_BOOTSTRAP")
         self.assertEqual(first["executed"],[])
         def fake(args,**kwargs):
@@ -57,7 +57,7 @@ class BudgetedRunnerTests(unittest.TestCase):
                 '"recommended_arrival_timestamp":'+str(NOW+6960)+','
                 '"quantity_threshold":30,"grace_seconds":10,'
                 '"replan_step_seconds":300,"probability_calibrated":false}'))
-        out=run_tick(stock_db=self.stock,sidecar_db=self.side,execute=True,
+        out=run_tick(stock_db=self.stock,sidecar_db=self.side,execute=True,capacity_probe=lambda:{"allowed":True},
                      max_rows=10,max_jobs=1,active=["uni:Heather"],
                      now=NOW,runner=fake,clock=lambda:0)
         self.assertEqual(out["mode"],"EXECUTED_RESEARCH_ONLY")
@@ -66,20 +66,29 @@ class BudgetedRunnerTests(unittest.TestCase):
         self.assertFalse(read(self.side,NOW,"uni:Heather")["fallback_required"])
 
     def test_invalid_subprocess_remains_abstention(self):
-        out=run_tick(stock_db=self.stock,sidecar_db=self.side,execute=True,
+        out=run_tick(stock_db=self.stock,sidecar_db=self.side,execute=True,capacity_probe=lambda:{"allowed":True},
                      max_jobs=1,active=["uni:Heather"],now=NOW,
                      runner=lambda *a,**k: Mock(returncode=5,stdout=""),
                      clock=lambda:0)
         self.assertEqual(out["executed"][0]["status"],"WORKER_ERROR")
         self.assertTrue(read(self.side,NOW,"uni:Heather")["fallback_required"])
 
+    def test_cpu_pressure_defers_before_creating_sidecar(self):
+        out=run_tick(stock_db=self.stock,sidecar_db=self.side,execute=True,
+                     now=NOW,capacity_probe=lambda:{
+                         "allowed":False,"one_minute_load":4.5,
+                         "cpu_slots":1,"normalized_load":4.5})
+        self.assertEqual(out["mode"],"DEFERRED_CPU_PRESSURE")
+        self.assertFalse(self.side.exists())
+        self.assertEqual(out["executed"],[])
+
     def test_resource_limits_and_adapters_are_pinned(self):
         self.assertEqual(len(PINNED_WORKERS),16)
         with self.assertRaises(ValueError):
-            run_tick(stock_db=self.stock,sidecar_db=self.side,execute=True,
+            run_tick(stock_db=self.stock,sidecar_db=self.side,execute=True,capacity_probe=lambda:{"allowed":True},
                      max_jobs=17)
         with self.assertRaises(ValueError):
-            run_tick(stock_db=self.stock,sidecar_db=self.side,execute=True,
+            run_tick(stock_db=self.stock,sidecar_db=self.side,execute=True,capacity_probe=lambda:{"allowed":True},
                      worker_seconds=50,budget_seconds=20)
 
 
