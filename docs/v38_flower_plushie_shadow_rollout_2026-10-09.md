@@ -80,8 +80,10 @@ git fetch origin research/v38-full-roster-live-prep-20261009
 git worktree add --detach /home/ubuntu/torn-fren-v38-probe FETCH_HEAD
 cd /home/ubuntu/torn-fren-v38-probe
 python3 -m venv .venv
-.venv/bin/python -m pip install -r requirements.txt
-.venv/bin/python -m pip install -r research/plushie_champions/requirements-research.txt
+# Python 3.12 on ARM cannot install production's audioop-lts==0.2.2.
+# Initial 5-worker probe requires only requests + numpy; do not install
+# production Discord/web requirements in this isolated venv.
+.venv/bin/python -m pip install -r research/requirements-v38-readonly-probe-py312.txt
 echo "==== FIRST: FAILURE-CLOSED LIVE ADMISSION CHECK ===="
 .venv/bin/python -m research.v38_shadow_canary_preflight \
     --db /opt/torn-fren/data/stock_history.db
@@ -131,3 +133,27 @@ in the preflight; benchmark reads stock in mode=ro.
 Current checkpoint: first five isolated tests can start as soon as
 worktree and Python dependencies are ready and host admission is green.
 No new V38 timers or public pages are enabled by this document.
+
+### Oct 9 isolated-worktree pip failure and recovery
+
+The first VM setup correctly created detached worktree
+`/home/ubuntu/torn-fren-v38-probe` at research SHA `856912b`,
+but `pip install -r requirements.txt` aborted before running the
+preflight or any inference. VM Python is **3.12** on ARM64, whereas
+`audioop-lts==0.2.2` requires Python >=3.13. No production impact and
+no predictions were generated.
+
+**Reuse the existing worktree; DO NOT run `git worktree add` again.**
+Upgrade *only* the detached research checkout to the Python312 deps
+checkpoint, install the minimal file above, then run the preflight and
+five-model probe. There is no reason to upgrade production Python or
+install Discord dependencies for source-pinned research-only engines.
+
+Recommended worktree update is `git fetch origin
+research/v38-full-roster-live-prep-20261009`, followed by
+`git -C /home/ubuntu/torn-fren-v38-probe merge --ff-only FETCH_HEAD`
+only if this detached worktree is clean. In a detached HEAD fast-forward
+merge works because its original SHA is ancestor of FETCH_HEAD; verify
+first. Alternative: keep the original worktree checkout and install
+`requests>=2.31,<3` and `numpy>=2,<3` manually, then execute the
+five-item probe unchanged. Python312 CI is source checked.
