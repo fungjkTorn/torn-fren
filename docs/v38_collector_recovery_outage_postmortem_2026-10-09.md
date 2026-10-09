@@ -202,3 +202,45 @@ No production code edits / forced restart made by the assistant.
    outage scenarios, DB backup, bounded resource canary, and explicit
    user authorization. Do not enable 22-champion schedule while live
    collector continues stalling.
+
+## V37 collector-safety production deployment — verified at 2026-10-09 ~22:36 UTC
+
+User personally performed a guarded, fast-forward release from
+`profitability-v1` SHA `062f3a2` to **`a93879d`** from
+`release/v37-collector-safety-20261009`. They checked exact original and
+release SHAs, branch and clean worktree; `git fetch`, local backup branch,
+`git merge --ff-only FETCH_HEAD`; installed bounded recovery service/timer;
+restarted only `torn-fren-poller.service` and enabled timer. The compiler
+and systemd unit validation reported no errors (systemd gave unrelated Oracle
+unified-agent executable-permission warnings).
+
+Consistent, read-checked backups produced *before* deploy:
+- `/home/ubuntu/torn-fren-pre-collector-safety/20261009T223349Z/stock_history.db`
+  size **153,378,816 bytes**, `PRAGMA quick_check=ok`.
+- `/home/ubuntu/torn-fren-pre-collector-safety/20261009T223349Z/shadow_capture.db`
+  size **143,360 bytes**, `PRAGMA quick_check=ok`.
+
+Post-restart after 90 seconds:
+- `systemctl is-active`: **active** for poller, web, bot, existing
+  V37 four-item shadow timer, and new gap-recovery timer.
+- Collector last success age **26 seconds**, verified fresh (<180s).
+- Poller /proc file descriptors **3** vs prior **681**, consistent with
+  deterministic SQLite closure operating in the real process.
+- Six recent poll cycle times `4.7,5.3,2.8,0.2,1.0,0.3` seconds,
+  mean **2.38 seconds**. The recovery observation reported
+  `COLLECTION RECOVERY: 1611s without verified polling`, followed by
+  successive near-30-second healthy polling intervals. This initial
+  observation demonstrates that the known recovery gap was not
+  synchronously blocking the poller at the time of the snapshot.
+- Website catalog `HTTP 200 | 0.228088s`.
+- New timer had `LAST Fri 2026-10-09 22:35:02 UTC`, **NEXT -** in
+  `systemctl list-timers --all` despite active status. Must verify
+  `systemctl show` `NextElapseUSecRealtime`, timer state,
+  oneshot service result/logs, and pending recovery-job count. Active
+  timer alone does NOT prove recovery backlog drained.
+
+**Do not claim sustained outage elimination yet.** Recheck after at least
+15–30 minutes under production traffic; verify that outstanding recovery
+jobs reach `done` and prospective V18 champion-executed observations
+resume. No prod V38 model deployments. Do not change user's production
+release commit except through newly authorized controlled deployment.
