@@ -114,6 +114,60 @@ Check after at least one full 20-minute research rotation whether
 Heather and Wolverine actually log `champion_executed=1` again.
 Nessie and Japan Xanax are still specialist-not-integrated in V37.
 
+
+## Third stall sample: ~22:xx UTC, October 9
+
+User's live poller PID 2492, uptime 2h37, 7 Python threads. Recent
+journal showed:
+- `Poll cycle completed in 1858.2s; sleeping 0.0s...`
+- `Invalidated 100 pending forecast point(s) whose item cycle became
+  ambiguous during the gap.`
+- Following cycle saved all country snapshots, detected `COLLECTION
+  RECOVERY: 1836s without verified polling`, and was still waiting
+  when heartbeat age was **449 seconds**.
+- Background forecast/model traceback repeatedly showed
+  `sqlite3.OperationalError: unable to open database file` from
+  `services.history_service._connect` during expensive cycle rebuild.
+  This error does NOT mean SQLITE_BUSY. Possible transient storage,
+  inode, access, file descriptor, or resource exhaustion remain unproven
+  until local VM diagnostics (`df -h`, `df -i`, `ls`,
+  `/proc/<PID>/fd`, process open-files soft limit and independent
+  read-only SQLite SELECT 1) are received.
+- Live forward-test records again mark V18 models
+  `COLLECTOR_STALE_OR_NO_HEARTBEAT` while V37 timer still runs.
+  Preserve gaps as unknown historical outcomes; no synthetic backfill.
+
+## Updated V38 mitigation: completely separate recovery worker
+
+Previous V38 design used an in-process daemon thread. Research
+branch now has a **separate systemd oneshot service/timer**:
+`deploy/systemd/torn-fren-gap-recovery.service` and
+`deploy/systemd/torn-fren-gap-recovery.timer`.
+This completely removes historical gap invalidation from the poller
+process, not merely its main thread. The low-priority recovery process
+uses `CPUQuota=50%`, `MemoryMax=768M`,
+`TimeoutStartSec=180`, `Nice=15`, and one durable pending job per
+timer invocation. One timer firing every minute is a bounded attempt,
+not a promise of completion; timed-out work gets a retry lease
+before the audit to avoid immediate retry storms. The durable
+`forecast_recovery_jobs_v38` table and gap heartbeat are committed
+atomically. Retry rescores only pending points, never fabricates
+outcomes. The in-process poller audit thread refuses to process
+unresolved forecast attempts until the pending recovery jobs finish.
+
+**Important**: the new recovery timer must be installed and enabled
+together with any eventual poller code promotion. If no recovery
+service is enabled, the pending queue can delay ordinary forecast
+audit progress indefinitely. No production rollout authorized or
+performed yet. Never turn on the timer against the old V37 code
+without an explicit migration plan, and do not switch the prod branch
+to the 236-item V38 research branch directly.
+
+Remaining follow-up: prospective performance test on sanitized history,
+verify unit security hardening and external job can complete with resource
+caps, inspect SQLite connection errors, characterize recovery catch-up,
+safe rollback plan, and confirm public site and independent V37 evidence.
+
 ## Second live incident — 2026-10-09 22:11 UTC
 
 After a successful user-initiated V37 poller-only restart, live V18
