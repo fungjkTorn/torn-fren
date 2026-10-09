@@ -15,6 +15,7 @@ from research.v38_readonly_resource_probe import ALL as PINNED_WORKERS
 from research.v38_prediction_store import open_writer, record, read
 from research.v38_incremental_observer import observe
 from research.v38_adaptive_policy import next_due_seconds
+from research.v38_capacity_guard import inspect as capacity_status
 
 ROSTER=Path(__file__).with_name("v38_roster.json")
 
@@ -46,7 +47,7 @@ def choose(roster, snapshots, *, now, active=(), changed=(), limit=4):
 def run_tick(*, stock_db, sidecar_db, execute=False, active=(),
              max_rows=10000, max_jobs=4, worker_seconds=20,
              budget_seconds=85, now=None, runner=subprocess.run,
-             clock=time.monotonic):
+             clock=time.monotonic, capacity_probe=capacity_status):
     if not 1<=max_jobs<=16 or not 1<=worker_seconds<=60:
         raise ValueError("invalid concurrency/resource limits")
     if not worker_seconds<=budget_seconds<=240:
@@ -58,6 +59,10 @@ def run_tick(*, stock_db, sidecar_db, execute=False, active=(),
         snapshots={p["item_key"]:p for p in read(sidecar_db,now) if "item_key" in p}
         return {"mode":"PLAN_ONLY","plan":choose(roster,snapshots,now=now,
                 active=active,limit=max_jobs),"collector_written":False}
+    capacity=capacity_probe()
+    if not capacity["allowed"]:
+        return {"mode":"DEFERRED_CPU_PRESSURE","capacity":capacity,
+                "executed":[],"collector_written":False}
     side=open_writer(sidecar_db)
     try:
         delta=observe(stock_db,side,max_rows=max_rows)
