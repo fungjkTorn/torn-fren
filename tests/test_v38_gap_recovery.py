@@ -1,7 +1,6 @@
 """Safety regression for long collector gaps: durable queue and no fake scores."""
 import sqlite3
 import tempfile
-import threading
 import unittest
 from pathlib import Path
 from unittest.mock import Mock, patch
@@ -63,36 +62,45 @@ class GapQueueTests(unittest.TestCase):
                 enqueue(start,end,connect=self.connect)
         self.assertFalse(self.path.exists())
 
-    def test_poller_schedule_never_invokes_expensive_auditor(self):
-        with patch.object(poller,"enqueue_gap_recovery",
-                          return_value={"status":"ENQUEUED",
-                                        "gap_start":100,"gap_end":400}) as write:
-            with patch.object(poller,"_RECOVERY_EVENT",threading.Event()) as evt:
-                self.assertEqual(poller._schedule_gap_recovery(100,400)
-                                 ["status"],"ENQUEUED")
-                write.assert_called_once_with(100,400)
-                self.assertTrue(evt.is_set())
+    def test_gap_notification_does_not_run_historical_validation(self):
+        with patch.object(poller,"gap_recovery_pending") as backlog:
+            info=poller._schedule_gap_recovery(100,400)
+            self.assertEqual(info["status"],"ENQUEUED")
+            backlog.assert_not_called()
 
-    def test_poller_recovery_thread_records_job_and_keeps_running(self):
-        event=threading.Event()
-        stop=threading.Event()
-        with patch.object(poller,"_RECOVERY_EVENT",event):
-            with patch.object(poller,"_RECOVERY_STOP",stop):
-                with patch.object(poller,"process_gap_recovery",
-                    side_effect=[{"status":"COMPLETED","gap_start":100,
-                                  "gap_end":400,"invalidated_count":39},
-                                 {"status":"NO_DUE_GAPS"}]) as process:
-                    t=threading.Thread(target=poller._recovery_worker,daemon=True)
-                    t.start()
-                    import time
-                    deadline=time.monotonic()+2
-                    while process.call_count<2 and time.monotonic()<deadline:
-                        time.sleep(0.005)
-                    stop.set()
-                    event.set()
-                    t.join(2)
-                    self.assertFalse(t.is_alive())
-                    self.assertGreaterEqual(process.call_count,2)
+    def test_crash_does_not_erase_claimed_work(self):
+        enqueue(100,400,connect=self.connect)
+        def killed(*args,**kwargs):
+            raise KeyboardInterrupt("simulated hard stop")
+        with self.assertRaises(KeyboardInterrupt):
+            process_one(connect=self.connect,invalidator=killed,now=500)
+        self.assertEqual(pending(connect=self.connect,now=501),
+                         {"pending":1,"ready":0})
+        completed=process_one(connect=self.connect,
+                              invalidator=lambda *a,**kw:2,now=801)
+        self.assertEqual(completed["status"],"COMPLETED")
+        with self.connect() as db:
+            status,attempts=db.execute(
+                "SELECT status,attempts FROM forecast_recovery_jobs_v38"
+            ).fetchone()
+        self.assertEqual((status,attempts),("done",2))
+
+    def test_recovery_systemd_process_is_isolated_and_bounded(self):
+        root=Path(__file__).resolve().parents[1]
+        service=(root/"deploy/systemd/torn-fren-gap-recovery.service").read_text()
+        timer=(root/"deploy/systemd/torn-fren-gap-recovery.timer").read_text()
+        self.assertIn("CPUQuota=50%",service)
+        self.assertIn("MemoryMax=768M",service)
+        self.assertIn("TimeoutStartSec=180",service)
+        self.assertIn("Nice=15",service)
+        self.assertIn("research.v38_gap_recovery --once",service)
+        self.assertIn("ReadWritePaths=/opt/torn-fren/data",service)
+        self.assertIn("torn-fren-gap-recovery.service",timer)
+        import inspect
+        source=inspect.getsource(poller.run)
+        self.assertNotIn("invalidate_pending_forecasts_crossing_gap(",source)
+        self.assertNotIn("_recovery_worker",source)
+        self.assertNotIn("process_gap_recovery",source)
 
 
 if __name__=="__main__":
