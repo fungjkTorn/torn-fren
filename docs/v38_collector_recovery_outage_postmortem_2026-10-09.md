@@ -113,3 +113,38 @@ journalctl -u torn-fren-poller.service --since '5 minutes ago' --no-pager -o cat
 Check after at least one full 20-minute research rotation whether
 Heather and Wolverine actually log `champion_executed=1` again.
 Nessie and Japan Xanax are still specialist-not-integrated in V37.
+
+## Second live incident — 2026-10-09 22:11 UTC
+
+After a successful user-initiated V37 poller-only restart, live V18
+champions executed again: `uni:Heather` at **21:21:05 UTC** and
+`can:Wolverine Plushie` at **21:26:09 UTC**, both
+`RESEARCH_PROPOSAL_ONLY` / `champion_executed=1`.
+
+At the user's next read-only diagnostic after 22:11 UTC, current heartbeat
+age was **332 seconds** (`Fresh: False`). Heather and Wolverine had
+`COLLECTOR_STALE_OR_NO_HEARTBEAT` and
+`champion_executed=0` at 21:41/21:46 and 22:01/22:06 UTC.
+Both specialist-unintegrated items (`uni:Nessie Plushie`, `jap:Xanax`)
+continued recording baseline-only research attempts. This is **another
+collector stall**, not a shadow timer stoppage. The exact blocking operation
+during incident #2 is not yet observed; DO NOT ascribe it to recovery
+invalidation without current poller journal/thread snapshots.
+
+The user was asked to capture:
+- `ps -L` on the active poller PID including TID, CPU and wait-channel;
+- last 70 journal lines from the poller over 20 minutes;
+- current read-only `poll_heartbeats` latest success age.
+
+No production code edits / forced restart made by the assistant.
+
+**Priority order:**
+1. Capture stall evidence before service restart while stale.
+2. Restore verified successful heartbeats safely, accepting and preserving
+   any uncertain stock-outage evidence.
+3. Reproduce and profile the known 40-minute outage path in an isolated
+   VM copy (not on the running collector).
+4. Production promotion of V38 mitigation must first pass known/unknown
+   outage scenarios, DB backup, bounded resource canary, and explicit
+   user authorization. Do not enable 22-champion schedule while live
+   collector continues stalling.
