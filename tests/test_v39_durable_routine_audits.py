@@ -108,6 +108,31 @@ class DurableAuditTests(unittest.TestCase):
         self.assertEqual(result["status"],"DEFERRED_RECOVERY_OR_STALE_COLLECTOR")
         self.assertEqual(q.status(),{"pending":1})
 
+    def test_bootstrap_preserves_recent_changed_items_without_requeueing_old(self):
+        x={"stocks":[{"id":7,"name":"Heather","quantity":30,"cost":50}]}
+        hs.save_snapshot_from_export("uni",x,"yata")
+        with patch("services.forecast_auditor.get_profiled_items",return_value=[]):
+            with patch("services.forecast_auditor.get_tracked_items",return_value=[]):
+                self.assertGreaterEqual(q.bootstrap(),1)
+                self.assertEqual(q.bootstrap(),0)
+        with hs._connect() as con:
+            row=con.execute(
+                "SELECT generation,status FROM routine_audit_jobs_v39"
+            ).fetchone()
+        self.assertEqual(row,(1,"pending"))
+
+    def test_worker_drains_one_job_without_running_audit_in_poller(self):
+        with hs._connect() as con:
+            q.enqueue(con,"uni","Heather",now=100)
+        with patch("research.v38_gap_recovery.pending",return_value={"pending":0}):
+            with patch("services.history_service.get_collector_recovery_status",
+                       return_value={"stale":False}):
+                with patch.object(q,"bootstrap",return_value=0):
+                    out=q.drain(max_jobs=1,
+                        runner=lambda c,i:{"checked":(c,i)})
+        self.assertEqual(out["results"][0]["status"],"COMPLETED")
+        self.assertEqual(out["queue"],{"done":1})
+
     def test_quota_and_timer_declared_without_full_model_rollout(self):
         root=Path(__file__).parents[1]
         service=(root/"deploy/systemd/torn-fren-routine-audit.service").read_text()
