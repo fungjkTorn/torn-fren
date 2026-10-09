@@ -244,3 +244,35 @@ Post-restart after 90 seconds:
 jobs reach `done` and prospective V18 champion-executed observations
 resume. No prod V38 model deployments. Do not change user's production
 release commit except through newly authorized controlled deployment.
+
+
+## Confirmed production recovery queue drained — 2026-10-09 22:38 UTC
+
+User-run read-only follow-up after V37 collector-safety deployment SHA
+`a93879d` confirmed:
+
+- `torn-fren-gap-recovery.timer`: `ActiveState=active`,
+  `SubState=waiting`; last trigger `22:38:02 UTC`, next trigger
+  `22:39:00 UTC`. An earlier transient `NEXT -` timer display was
+  not an enduring timer failure.
+- `torn-fren-gap-recovery.service`: `Result=success`,
+  `ExecMainStatus=0`, inactive/dead after a normal one-shot completion.
+- Log first showed `NO_DUE_GAPS`; then a completed gap job:
+  `gap_start=1791583631`, `gap_end=1791585242`,
+  `invalidated_count=251`, `status=COMPLETED`. CPU consumption for
+  that run was `1min 10.714s`. Subsequent scheduled invocations
+  returned `NO_DUE_GAPS`.
+- Read-only `forecast_recovery_jobs_v38` queue query:
+  exactly **one job `done`**, `attempts=1`, `last_error=NULL`;
+  zero pending jobs. Forecast invalidation prevents false scoring
+  during collector outages; it does NOT mean 251 wrong forecasts.
+- These observations prove the separate resource-limited worker can
+  drain the real production backlog and that the timer can invoke
+  it repeatedly. They do not by themselves prove 30–60-minute poller
+  stability or fresh V18 champion inference afterward.
+
+Next checks: poller heartbeat age less than 180s; typical 30s
+cadence; no FD growth back toward 1024; normal website health;
+V37 shadow Heather/Wolverine `champion_executed=1` after a full
+20-minute item rotation. Keep 236-item V38 inference disabled until
+these criteria hold.
