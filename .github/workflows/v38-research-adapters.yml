@@ -50,6 +50,8 @@ jobs:
         run: python -m unittest discover -s tests -p 'test_v38_prediction_store.py' -v
       - name: Verify incremental observer and causal versioned feature cache
         run: python -m unittest discover -s tests -p 'test_v38_incremental_observer.py' -v
+      - name: Verify future private five-item capped systemd timer and exact quoted allowlist
+        run: python -m unittest discover -s tests -p 'test_v38_private_shadow_systemd.py' -v
       - name: Verify opt-in bounded research scheduler
         run: python -m unittest discover -s tests -p 'test_v38_budgeted_runner.py' -v
       - name: Verify optional V38 beta snapshot API stays disabled by default
