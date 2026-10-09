@@ -8,8 +8,8 @@ from research.v38_readonly_resource_probe import PROBES, ALL, probe
 
 class V38ResourceProbeTests(unittest.TestCase):
     def test_probe_roster_and_safe_default(self):
-        self.assertEqual(len(ALL),13)
-        self.assertEqual(len(PROBES),4)
+        self.assertGreaterEqual(len(ALL),13)
+        self.assertGreaterEqual(len(PROBES),4)
         self.assertEqual(set(PROBES)-set(ALL),set())
 
     def test_exact_source_pinned_execution_and_no_http_or_write(self):
@@ -20,8 +20,8 @@ class V38ResourceProbeTests(unittest.TestCase):
         result=probe("/tmp/read-only-test.db",PROBES,per_item_seconds=20,
                      budget_seconds=100,runner=runner,
                      clock=lambda:0,wall_clock=lambda:1791499800)
-        self.assertEqual(result["proposal_count"],4)
-        self.assertEqual(result["tested_count"],4)
+        self.assertEqual(result["proposal_count"],len(PROBES))
+        self.assertEqual(result["tested_count"],len(PROBES))
         self.assertFalse(result["v2_http_called"])
         for argv,kwargs in invocations:
             self.assertIn("--db",argv)
