@@ -15,9 +15,12 @@ from services.forecast_auditor import get_recent_active_forecasts
 from services.profitability import enrich_items_with_profitability, profitability_for_item
 from web.private_shadow_v29 import champion_shadow
 from web.v38_revision_fingerprint import revision as v38_source_revision
+from web.catalog_cache_v38 import CatalogCache
 import os
 
 app = FastAPI(title="Torn Fren Stock Graph")
+
+_V38_CATALOG_CACHE = CatalogCache(ttl=30, max_stale=180)
 
 STATIC_DIR = Path(__file__).parent / "static"
 
@@ -381,8 +384,7 @@ def api_history(
     }
 
 
-@app.get("/api/catalog")
-def api_catalog():
+def _build_catalog_uncached():
     catalog = get_stock_catalog()
     countries = []
     market_meta = None
@@ -400,6 +402,14 @@ def api_catalog():
             "market_price_error": (market_meta or {}).get("error"),
         },
     }
+
+
+@app.get("/api/catalog")
+def api_catalog():
+    # Opt-in research variant. No change to production until explicit approval.
+    if os.environ.get("TORN_FREN_V38_CATALOG_CACHE") == "1":
+        return _V38_CATALOG_CACHE.get(_build_catalog_uncached)
+    return _build_catalog_uncached()
 
 
 @app.get("/api/admin/health")
