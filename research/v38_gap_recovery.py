@@ -6,6 +6,8 @@ Never modify collector stock history or fabricate resolved outcomes.
 """
 from __future__ import annotations
 
+import argparse
+import json
 import time
 
 from services import history_service
@@ -66,22 +68,34 @@ def process_one(*, connect=None, invalidator=None, now=None, retry_delay=300):
     now=int(time.time() if now is None else now)
     with connect() as db:
         db.execute(SCHEMA)
+        # A lease protects against a worker timeout or a kill -9 halfway
+        # through expensive cycle validation. Jobs remain pending and
+        # automatically become eligible again after the retry delay.
         row=db.execute("""
             SELECT gap_start,gap_end,reason
             FROM forecast_recovery_jobs_v38
             WHERE status='pending' AND retry_after<=?
             ORDER BY gap_start,gap_end LIMIT 1
         """,(now,)).fetchone()
+        if row is not None:
+            start,end,reason=int(row[0]),int(row[1]),str(row[2])
+            updated=db.execute("""
+                UPDATE forecast_recovery_jobs_v38
+                SET attempts=attempts+1,retry_after=?
+                WHERE gap_start=? AND gap_end=? AND status='pending'
+                  AND retry_after<=?
+            """,(now+max(30,int(retry_delay)),start,end,now))
+            if not updated.rowcount:
+                row=None
     if row is None:
         return {"status":"NO_DUE_GAPS"}
-    start,end,reason=int(row[0]),int(row[1]),str(row[2])
     try:
         count=int(invalidator(start,end,reason=reason))
     except Exception as exc:
         with connect() as db:
             db.execute("""
                 UPDATE forecast_recovery_jobs_v38
-                SET attempts=attempts+1,retry_after=?,last_error=?
+                SET retry_after=?,last_error=?
                 WHERE gap_start=? AND gap_end=? AND status='pending'
             """,(now+max(30,int(retry_delay)),type(exc).__name__,start,end))
         return {"status":"RETRY_SCHEDULED","gap_start":start,
@@ -89,9 +103,23 @@ def process_one(*, connect=None, invalidator=None, now=None, retry_delay=300):
     with connect() as db:
         db.execute("""
             UPDATE forecast_recovery_jobs_v38
-            SET status='done',attempts=attempts+1,
+            SET status='done',
                 completed_at=?,invalidated_count=?,last_error=NULL
             WHERE gap_start=? AND gap_end=? AND status='pending'
         """,(now,count,start,end))
     return {"status":"COMPLETED","gap_start":start,"gap_end":end,
             "invalidated_count":count}
+
+
+def main():
+    parser=argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--once",action="store_true",required=True)
+    args=parser.parse_args()
+    result=process_one()
+    print(json.dumps(result,sort_keys=True),flush=True)
+    # A failed classification stays in the durable queue for timed retry.
+    # The systemd timer can safely continue even after a classification error.
+
+
+if __name__=="__main__":
+    main()
