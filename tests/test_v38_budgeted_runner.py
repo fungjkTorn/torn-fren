@@ -22,6 +22,9 @@ class BudgetedRunnerTests(unittest.TestCase):
                 id INTEGER PRIMARY KEY,timestamp INTEGER,country TEXT,
                 item_name TEXT,quantity INTEGER)""")
             c.execute("CREATE TABLE collection_gaps(id INTEGER PRIMARY KEY)")
+            c.execute("""CREATE TABLE poll_heartbeats(
+                timestamp INTEGER,mode TEXT,success INTEGER)""")
+            c.execute("INSERT INTO poll_heartbeats VALUES(?,'poll-cycle',1)",(NOW-20,))
             c.execute("INSERT INTO stock_history VALUES(1,?,?,?,?)",
                       (NOW-30,"uni","Heather",40))
             c.execute("INSERT INTO stock_history VALUES(2,?,?,?,?)",
@@ -64,6 +67,36 @@ class BudgetedRunnerTests(unittest.TestCase):
         self.assertEqual(out["executed"][0]["item_key"],"uni:Heather")
         self.assertEqual(out["executed"][0]["status"],"RESEARCH_PROPOSAL_ONLY")
         self.assertFalse(read(self.side,NOW,"uni:Heather")["fallback_required"])
+
+    def test_quiet_stock_can_still_have_fresh_collector_observation(self):
+        # An item unchanged for days is still fresh if a real poll succeeded.
+        with sqlite3.connect(self.stock) as db:
+            db.execute("UPDATE stock_history SET timestamp=?",(NOW-86400,))
+        def fake(args,**kwargs):
+            return Mock(returncode=0,stdout=(
+                '{"status":"RESEARCH_PROPOSAL_ONLY",'
+                '"recommended_departure_timestamp":'+str(NOW+600)+','
+                '"recommended_arrival_timestamp":'+str(NOW+6960)+','
+                '"quantity_threshold":30,"grace_seconds":10,'
+                '"replan_step_seconds":300,"probability_calibrated":false}'))
+        result=run_tick(stock_db=self.stock,sidecar_db=self.side,
+                execute=True,capacity_probe=lambda:{"allowed":True},
+                active=["uni:Heather"],max_jobs=1,now=NOW,
+                runner=fake,clock=lambda:0.)
+        self.assertEqual(result["executed"][0]["status"],
+                         "RESEARCH_PROPOSAL_ONLY")
+        self.assertEqual(read(self.side,NOW,"uni:Heather")["stock_as_of"],NOW-20)
+
+    def test_stale_heartbeat_refuses_to_execute_even_when_stock_changes(self):
+        with sqlite3.connect(self.stock) as db:
+            db.execute("UPDATE poll_heartbeats SET timestamp=?",(NOW-500,))
+        never=Mock()
+        result=run_tick(stock_db=self.stock,sidecar_db=self.side,
+                        execute=True,capacity_probe=lambda:{"allowed":True},
+                        now=NOW,runner=never)
+        self.assertEqual(result["mode"],"COLLECTOR_STALE_OR_NO_HEARTBEAT")
+        self.assertEqual(result["executed"],[])
+        never.assert_not_called()
 
     def test_invalid_subprocess_remains_abstention(self):
         out=run_tick(stock_db=self.stock,sidecar_db=self.side,execute=True,capacity_probe=lambda:{"allowed":True},
