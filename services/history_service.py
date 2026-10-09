@@ -15,6 +15,8 @@ _DB_READY = False
 
 # Missing successful poll coverage longer than this is a real collection gap.
 GENERIC_COLLECTION_GAP_SECONDS = 180
+_LEGACY_GAP_RECONCILE_INTERVAL_SECONDS = 600
+_LEGACY_GAP_LAST_CHECK_MONOTONIC = None
 
 
 
@@ -343,6 +345,59 @@ def _reconcile_heartbeat_collection_gaps_conn(conn):
             """,
             (previous_ts, recovery_ts, reason, now, now),
         )
+
+
+def _maybe_reconcile_legacy_collection_gaps_conn(conn, *, unsuccessful_poll=False):
+    """Repair legacy failure history without a 30-second full-history sweep."""
+    global _LEGACY_GAP_LAST_CHECK_MONOTONIC
+    now = time.monotonic()
+    due = (_LEGACY_GAP_LAST_CHECK_MONOTONIC is None
+           or now - _LEGACY_GAP_LAST_CHECK_MONOTONIC
+              >= _LEGACY_GAP_RECONCILE_INTERVAL_SECONDS)
+    if due or unsuccessful_poll:
+        _reconcile_known_collection_gaps_conn(conn)
+        _LEGACY_GAP_LAST_CHECK_MONOTONIC = now
+
+
+
+def _reconcile_new_success_heartbeat_conn(conn, previous_success_ts, recovery_ts):
+    """O(1) fast path for an ordinary collector heartbeat.
+
+    Full historical reconstruction remains available through
+    reconcile_collection_gaps(); a new successful poll only adds a gap if the
+    immediately preceding success was more than 180 seconds earlier.
+    Preserve the exact gap reason, boundaries, and first recovery observation.
+    """
+    if previous_success_ts is None:
+        return
+    elapsed = int(recovery_ts) - int(previous_success_ts)
+    if elapsed <= GENERIC_COLLECTION_GAP_SECONDS:
+        return
+    reason = f"collector heartbeat gap ({elapsed}s without verified successful polling)"
+    conn.execute(
+        """
+        INSERT OR IGNORE INTO collection_gaps
+            (start_timestamp, end_timestamp, reason, created_at, closed_at)
+        VALUES (?, ?, ?, ?, ?)
+        """,
+        (int(previous_success_ts), int(recovery_ts), reason,
+         int(recovery_ts), int(recovery_ts)),
+    )
+
+    # The gap and its pending forecast-recovery job commit in the same
+    # successful-heartbeat transaction. A crash between heartbeat commit and
+    # poller notification cannot silently drop the invalidation job.
+    from research.v38_gap_recovery import SCHEMA as recovery_job_schema
+    conn.execute(recovery_job_schema)
+    conn.execute(
+        """
+        INSERT OR IGNORE INTO forecast_recovery_jobs_v38
+        (gap_start, gap_end, reason, status)
+        VALUES (?, ?, ?, 'pending')
+        """,
+        (int(previous_success_ts), int(recovery_ts),
+         "collector heartbeat recovery gap"),
+    )
 
 
 def get_collector_recovery_status(now_timestamp=None):
@@ -858,8 +913,14 @@ def record_poll_heartbeat(success: bool, source: str = "none", error: str = None
             (now, source or "none", 1 if success else 0, error, "poll-cycle"),
         )
 
-        _reconcile_known_collection_gaps_conn(conn)
-        _reconcile_heartbeat_collection_gaps_conn(conn)
+        # Historical changed_items incidents still need their specialized
+        # reconciliation. Do NOT re-read the entire successful heartbeat
+        # history on each poll: insert only this new success-to-success gap.
+        _maybe_reconcile_legacy_collection_gaps_conn(
+            conn, unsuccessful_poll=not success
+        )
+        if success:
+            _reconcile_new_success_heartbeat_conn(conn, previous_success_ts, now)
 
     elapsed = (
         now - previous_success_ts
