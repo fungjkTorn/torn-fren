@@ -106,6 +106,27 @@ class BudgetedRunnerTests(unittest.TestCase):
         self.assertEqual(out["executed"][0]["status"],"WORKER_ERROR")
         self.assertTrue(read(self.side,NOW,"uni:Heather")["fallback_required"])
 
+    def test_first_five_allowlist_never_runs_unapproved_candidates(self):
+        from research.v38_readonly_resource_probe import PROBES
+        seen=[]
+        def simulated(args,**kwargs):
+            seen.append(args)
+            return Mock(returncode=0,stdout='{"status":"NO_RECOMMENDATION"}')
+        result=run_tick(stock_db=self.stock,sidecar_db=self.side,
+            execute=True,capacity_probe=lambda:{"allowed":True},
+            approved_keys=PROBES,active=["uni:Heather"],
+            max_jobs=5,budget_seconds=120,now=NOW,
+            runner=simulated,clock=lambda:0.)
+        self.assertEqual(result["mode"],"EXECUTED_RESEARCH_ONLY")
+        self.assertLessEqual(len(result["executed"]),5)
+        self.assertEqual(
+            {x["item_key"] for x in result["executed"]},
+            set(PROBES))
+        with self.assertRaises(ValueError):
+            run_tick(stock_db=self.stock,sidecar_db=self.side,
+                approved_keys=["uni:Unsupported Plushie"],now=NOW)
+        self.assertFalse(any("Xanax" in str(args) for args in seen))
+
     def test_cpu_pressure_defers_before_creating_sidecar(self):
         out=run_tick(stock_db=self.stock,sidecar_db=self.side,execute=True,
                      now=NOW,capacity_probe=lambda:{
