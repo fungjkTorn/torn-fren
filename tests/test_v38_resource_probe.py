@@ -33,8 +33,8 @@ class V38ResourceProbeTests(unittest.TestCase):
         counts=[0]
         def clock():
             counts[0]+=1
-            # After first item, elapsed > 3s: all remaining jobs must be skipped.
-            return 0 if counts[0]==1 else 5
+            # First item may begin; all following items exceed the shared budget.
+            return 0 if counts[0]<=3 else 5
         result=probe("/tmp/read-only-test.db",PROBES,
                      per_item_seconds=3,budget_seconds=3,
                      runner=lambda *a,**k: Mock(returncode=0,stdout='{}'),
