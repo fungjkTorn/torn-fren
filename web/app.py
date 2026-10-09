@@ -8,12 +8,14 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
-from services.history_service import get_item_history_since, get_stock_catalog, get_stock_graph_analysis, get_latest_item_snapshot
+from services.history_service import DB_PATH, get_item_history_since, get_stock_catalog, get_stock_graph_analysis, get_latest_item_snapshot
 from services.prediction_v2_live import build_live_prediction_v2
 from services.admin_health import build_admin_health
 from services.forecast_auditor import get_recent_active_forecasts
 from services.profitability import enrich_items_with_profitability, profitability_for_item
 from web.private_shadow_v29 import champion_shadow
+from web.v38_revision_fingerprint import revision as v38_source_revision
+import os
 
 app = FastAPI(title="Torn Fren Stock Graph")
 
@@ -35,45 +37,58 @@ def _analysis_worker(country, item):
     return get_stock_graph_analysis(country, item, 168)
 
 
-def _store_analysis_result(key, future):
+def _store_analysis_result(key, future, revision=None):
     try:
         value = future.result()
     except Exception:
         value = None
     with _PREDICTION_LOCK:
         if value is not None:
-            _ANALYSIS_CACHE[key] = {"cached_at": time.time(), "value": value}
+            _ANALYSIS_CACHE[key] = {"cached_at": time.time(), "value": value,
+                                    "source_revision": revision}
         if _ANALYSIS_FUTURES.get(key) is future:
             _ANALYSIS_FUTURES.pop(key, None)
 
 
-def _ensure_analysis_future(country, item):
+def _ensure_analysis_future(country, item, revision=None):
     key = _prediction_key(country, item)
     with _PREDICTION_LOCK:
         future = _ANALYSIS_FUTURES.get(key)
         if future is None or future.done():
             future = _PREDICTION_EXECUTOR.submit(_analysis_worker, country, item)
             _ANALYSIS_FUTURES[key] = future
-            future.add_done_callback(lambda f, k=key: _store_analysis_result(k, f))
+            future.add_done_callback(
+                lambda f, k=key, rev=revision: _store_analysis_result(k, f, rev)
+            )
     return key, future
 
 
-def _get_analysis_nonblocking(country, item):
+def _get_analysis_nonblocking(country, item, revision=None):
     key = _prediction_key(country, item)
     now = time.time()
     with _PREDICTION_LOCK:
         cached = _ANALYSIS_CACHE.get(key)
 
-    if cached:
+    if revision is not None:
+        if cached and cached.get("source_revision") == revision:
+            return cached["value"], False
+    elif cached:
         age = now - cached["cached_at"]
         if age > _ANALYSIS_CACHE_TTL_SECONDS:
             _ensure_analysis_future(country, item)
         return cached["value"], age > _ANALYSIS_CACHE_TTL_SECONDS
 
-    key, future = _ensure_analysis_future(country, item)
+    key, future = _ensure_analysis_future(country, item, revision=revision)
     try:
         value = future.result(timeout=0.35)
-        return _roll_prediction_to_now(value, now), False
+        if revision is not None:
+            with _PREDICTION_LOCK:
+                current = _ANALYSIS_CACHE.get(key)
+            if not current or current.get("source_revision") != revision:
+                return None, True
+        # Graph analysis is not a forecast; do NOT add prediction countdown
+        # fields to its original response, including on a cold cache miss.
+        return value, False
     except FutureTimeoutError:
         return None, True
 
@@ -189,7 +204,7 @@ def _roll_prediction_to_now(prediction_v2, now=None):
     return result
 
 
-def _store_prediction_result(key, future):
+def _store_prediction_result(key, future, revision=None):
     try:
         value = future.result()
     except Exception as exc:
@@ -198,34 +213,44 @@ def _store_prediction_result(key, future):
             "note": f"Prediction v2 background calculation failed: {exc}",
         }
     with _PREDICTION_LOCK:
-        _PREDICTION_CACHE[key] = {"cached_at": time.time(), "value": value}
+        _PREDICTION_CACHE[key] = {"cached_at": time.time(), "value": value,
+                                  "source_revision": revision}
         if _PREDICTION_FUTURES.get(key) is future:
             _PREDICTION_FUTURES.pop(key, None)
 
 
-def _ensure_prediction_future(country, item):
+def _ensure_prediction_future(country, item, revision=None):
     key = _prediction_key(country, item)
     with _PREDICTION_LOCK:
         future = _PREDICTION_FUTURES.get(key)
         if future is None or future.done():
             future = _PREDICTION_EXECUTOR.submit(build_live_prediction_v2, country, item)
             _PREDICTION_FUTURES[key] = future
-            future.add_done_callback(lambda f, k=key: _store_prediction_result(k, f))
+            future.add_done_callback(
+                lambda f, k=key, rev=revision: _store_prediction_result(k, f, rev)
+            )
     return key, future
 
 
-def _get_prediction_nonblocking(country, item):
+def _get_prediction_nonblocking(country, item, revision=None):
     key = _prediction_key(country, item)
     now = time.time()
     with _PREDICTION_LOCK:
         cached = _PREDICTION_CACHE.get(key)
 
-    if cached and now - cached["cached_at"] <= _PREDICTION_CACHE_TTL_SECONDS:
+    # Experimental source-versioned policy. Reuse an unchanged item within
+    # its five-minute planning slot; never pass a superseded revision as fresh.
+    if revision is not None:
+        if cached and cached.get("source_revision") == revision:
+            error=cached["value"].get("status") == "error"
+            if not error or now-cached["cached_at"] <= _PREDICTION_CACHE_TTL_SECONDS:
+                return _roll_prediction_to_now(cached["value"], now), False
+    elif cached and now - cached["cached_at"] <= _PREDICTION_CACHE_TTL_SECONDS:
         return _roll_prediction_to_now(cached["value"], now), False
 
-    key, future = _ensure_prediction_future(country, item)
+    key, future = _ensure_prediction_future(country, item, revision=revision)
 
-    if cached:
+    if cached and (revision is None or cached.get("source_revision") == revision):
         # Serve the last known prediction immediately while a fresh one is
         # calculated in the background. The graph auto-refresh will pick up
         # the refreshed result without blocking stock history rendering.
@@ -237,7 +262,13 @@ def _get_prediction_nonblocking(country, item):
     # holding the graph request for tens of seconds or minutes.
     try:
         value = future.result(timeout=0.35)
-        return value, False
+        if revision is not None:
+            with _PREDICTION_LOCK:
+                current = _PREDICTION_CACHE.get(key)
+            if not current or current.get("source_revision") != revision:
+                return {"status":"warming","display_prediction":None,
+                        "note":"Waiting for current stock revision forecast."},True
+        return _roll_prediction_to_now(value, now), False
     except FutureTimeoutError:
         return {
             "status": "warming",
@@ -261,7 +292,17 @@ def api_history(
     hours = minutes / 60
     rows = get_item_history_since(country, item, hours)
     latest_item_state = get_latest_item_snapshot(country, item) or {}
-    base_analysis, analysis_warming = _get_analysis_nonblocking(country, item)
+    research_cache = os.environ.get("TORN_FREN_V38_REVISION_CACHE") == "1"
+    source_status, revision_token = ("DISABLED", None)
+    if research_cache:
+        source_status, revision_token = v38_source_revision(
+            DB_PATH,country=country,item=item,
+            item_state=latest_item_state,now=int(time.time()))
+    if research_cache and source_status != "FRESH":
+        base_analysis, analysis_warming = None, True
+    else:
+        base_analysis, analysis_warming = _get_analysis_nonblocking(
+            country, item,revision=revision_token)
     analysis = _analysis_for_window(base_analysis, minutes) if base_analysis else {
         "current_stock": rows[-1]["quantity"] if rows else None,
         "current_cost": latest_item_state.get("cost"),
@@ -289,7 +330,17 @@ def api_history(
     # issue cannot take the graph down.  The old prediction is retained as
     # baseline_prediction for diagnostics.
     try:
-        prediction_v2, prediction_stale = _get_prediction_nonblocking(country, item)
+        if research_cache and source_status != "FRESH":
+            prediction_v2 = {
+                "status":source_status, "display_prediction":None,"predictions":[],
+                "note":"Verified stock source unavailable; no live departure forecast."
+            }
+            prediction_stale = True
+        elif research_cache:
+            prediction_v2, prediction_stale = _get_prediction_nonblocking(
+                country,item,revision=revision_token)
+        else:
+            prediction_v2, prediction_stale = _get_prediction_nonblocking(country,item)
         analysis["baseline_prediction"] = analysis.get("prediction")
         analysis["prediction_v2"] = prediction_v2
         analysis["prediction_v2_stale"] = bool(prediction_stale)
@@ -304,7 +355,10 @@ def api_history(
                 "excluded_sample_count": None,
                 "note": prediction_v2.get("note"),
             }
-        elif prediction_v2.get("status") == "warming":
+        elif prediction_v2 and prediction_v2.get("status") in (
+            "warming","COLLECTOR_STALE_OR_NO_HEARTBEAT",
+            "NO_VERIFIABLE_REVISION","FUTURE_STOCK","NO_ITEM_STATE"
+        ):
             # Do not expose the older baseline predictor as if it were the
             # current Prediction v2 result while the expensive profile warms.
             analysis["prediction"] = None
