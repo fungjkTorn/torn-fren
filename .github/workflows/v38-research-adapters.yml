@@ -50,5 +50,9 @@ jobs:
         run: python -m unittest discover -s tests -p 'test_v38_incremental_observer.py' -v
       - name: Verify opt-in bounded research scheduler
         run: python -m unittest discover -s tests -p 'test_v38_budgeted_runner.py' -v
+      - name: Verify optional V38 beta snapshot API stays disabled by default
+        run: python -m unittest discover -s tests -p 'test_v38_experimental_api.py' -v
+      - name: Verify Red Fox benchmark-gated source config
+        run: python -m unittest discover -s tests -p 'test_v38_red_fox_single_tick.py' -v
       - name: Compile standalone entry points
-        run: python -m py_compile research/v38_v18_single_tick.py research/v38_v19_single_tick.py research/v38_readonly_resource_probe.py research/v38_nessie_single_tick.py research/v38_readonly_resource_probe.py research/v38_camel_single_tick.py research/v38_peony_single_tick.py services/plushie_flower_dynamic_planner_v20.py research/v38_budgeted_runner.py research/v38_prediction_store.py research/v38_incremental_observer.py research/v38_feature_cache.py
+        run: python -m py_compile research/v38_v18_single_tick.py research/v38_v19_single_tick.py research/v38_readonly_resource_probe.py research/v38_nessie_single_tick.py research/v38_readonly_resource_probe.py research/v38_camel_single_tick.py research/v38_peony_single_tick.py services/plushie_flower_dynamic_planner_v20.py research/v38_budgeted_runner.py research/v38_prediction_store.py research/v38_incremental_observer.py research/v38_feature_cache.py research/v38_red_fox_single_tick.py web/app.py
