@@ -58,6 +58,21 @@ class SQLiteHandleSafety(unittest.TestCase):
         with sqlite3.connect(self.db) as reader:
             self.assertEqual(reader.execute("SELECT COUNT(*) FROM checks").fetchone()[0],7)
 
+    @unittest.skipUnless(os.path.isdir("/proc/self/fd"),"Linux fd probe")
+    def test_japan_shadow_connection_releases_database_handles(self):
+        from services import shadow_model_auditor as shadow
+        with patch.object(shadow,"DB_PATH",self.db):
+            with hs._connect() as setup:
+                setup.execute("CREATE TABLE checks(value INTEGER)")
+            baseline=len(os.listdir("/proc/self/fd"))
+            for i in range(500):
+                with shadow._connect() as conn:
+                    self.assertEqual(conn.execute("SELECT 1 AS result").fetchone()["result"],1)
+            last=len(os.listdir("/proc/self/fd"))
+            self.assertLessEqual(last,baseline+8,(baseline,last))
+            with self.assertRaises(sqlite3.ProgrammingError):
+                conn.execute("SELECT 1")
+
     def test_initialization_and_recovery_reuse_closed_connections(self):
         with patch.object(hs,"_DB_READY",False):
             hs.init_db()
