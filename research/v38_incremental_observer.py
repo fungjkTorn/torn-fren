@@ -36,6 +36,16 @@ def observe(stock_db, sidecar, max_rows=10000):
         src.execute("PRAGMA query_only=ON")
         maximum=src.execute("SELECT COALESCE(MAX(id),0) FROM stock_history").fetchone()[0]
         gaps=src.execute("SELECT COALESCE(MAX(id),0) FROM collection_gaps").fetchone()[0]
+        # Stock rows are change-only: a quiet item may be perfectly fresh for
+        # hours. Its most recent changed-row timestamp is NOT its last observed
+        # timestamp. Successful collector heartbeats prove the live read state.
+        try:
+            observed=src.execute("""
+                SELECT MAX(timestamp) FROM poll_heartbeats
+                WHERE mode='poll-cycle' AND success=1
+            """).fetchone()[0]
+        except sqlite3.OperationalError:
+            observed=None
         old=sidecar.execute("SELECT last_id,gap_rev FROM v38_source_cursor WHERE singleton=1").fetchone()
         last_id=old[0] if old else 0
         reset=maximum<last_id
@@ -75,4 +85,5 @@ def observe(stock_db, sidecar, max_rows=10000):
             caught_up=excluded.caught_up""",(last_id,gaps,int(last_id>=maximum)))
     return {"processed":len(rows),"last_id":last_id,
             "observed_max_id":maximum,"caught_up":last_id>=maximum,
-            "gap_revision":gaps,"affected_keys":sorted(affected),"reset":reset}
+            "gap_revision":gaps,"affected_keys":sorted(affected),"reset":reset,
+            "verified_heartbeat":int(observed) if observed is not None else None}
