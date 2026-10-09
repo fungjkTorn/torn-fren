@@ -11,7 +11,8 @@ from pathlib import Path
 def initialize(con):
     con.execute("""CREATE TABLE IF NOT EXISTS v38_source_cursor(
         singleton INTEGER PRIMARY KEY CHECK(singleton=1),
-        last_id INTEGER NOT NULL, gap_rev INTEGER NOT NULL
+        last_id INTEGER NOT NULL, gap_rev INTEGER NOT NULL,
+        caught_up INTEGER NOT NULL DEFAULT 0
     )""")
     con.execute("""CREATE TABLE IF NOT EXISTS v38_stock_state(
         item_key TEXT PRIMARY KEY, last_id INTEGER NOT NULL,
@@ -62,9 +63,10 @@ def observe(stock_db, sidecar, max_rows=10000):
         elif affected:
             sidecar.executemany("DELETE FROM v38_feature_cache WHERE item_key=?",
                                 [(k,) for k in affected])
-        sidecar.execute("""INSERT INTO v38_source_cursor VALUES(1,?,?)
+        sidecar.execute("""INSERT INTO v38_source_cursor VALUES(1,?,?,?)
             ON CONFLICT(singleton) DO UPDATE SET
-            last_id=excluded.last_id,gap_rev=excluded.gap_rev""",(last_id,gaps))
+            last_id=excluded.last_id,gap_rev=excluded.gap_rev,
+            caught_up=excluded.caught_up""",(last_id,gaps,int(last_id>=maximum)))
     return {"processed":len(rows),"last_id":last_id,
             "observed_max_id":maximum,"caught_up":last_id>=maximum,
             "gap_revision":gaps,"affected_keys":sorted(affected),"reset":reset}
