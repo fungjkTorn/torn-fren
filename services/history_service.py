@@ -368,6 +368,21 @@ def _reconcile_new_success_heartbeat_conn(conn, previous_success_ts, recovery_ts
          int(recovery_ts), int(recovery_ts)),
     )
 
+    # The gap and its pending forecast-recovery job commit in the same
+    # successful-heartbeat transaction. A crash between heartbeat commit and
+    # poller notification cannot silently drop the invalidation job.
+    from research.v38_gap_recovery import SCHEMA as recovery_job_schema
+    conn.execute(recovery_job_schema)
+    conn.execute(
+        """
+        INSERT OR IGNORE INTO forecast_recovery_jobs_v38
+        (gap_start, gap_end, reason, status)
+        VALUES (?, ?, ?, 'pending')
+        """,
+        (int(previous_success_ts), int(recovery_ts),
+         "collector heartbeat recovery gap"),
+    )
+
 
 def get_collector_recovery_status(now_timestamp=None):
     """
