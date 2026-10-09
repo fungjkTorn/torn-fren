@@ -90,6 +90,21 @@ class IncrementalObserverTests(unittest.TestCase):
         with sqlite3.connect(self.db) as c:
             self.assertEqual(c.execute("SELECT COUNT(*) FROM stock_history").fetchone()[0],2)
 
+    def test_observer_reports_last_verified_poll_independent_of_stock_change(self):
+        with sqlite3.connect(self.db) as src:
+            src.execute("""CREATE TABLE poll_heartbeats(
+                timestamp INTEGER,mode TEXT,success INTEGER)""")
+            src.execute("INSERT INTO poll_heartbeats VALUES(350,'poll-cycle',1)")
+            src.execute("INSERT INTO poll_heartbeats VALUES(380,'poll-cycle',0)")
+        d=observe(self.db,self.con)
+        self.assertEqual(d["verified_heartbeat"],350)
+        d2=observe(self.db,self.con)
+        self.assertEqual(d2["verified_heartbeat"],350)
+        self.assertEqual(d2["affected_keys"],[])
+        with sqlite3.connect(self.db) as src:
+            src.execute("INSERT INTO poll_heartbeats VALUES(420,'poll-cycle',1)")
+        self.assertEqual(observe(self.db,self.con)["verified_heartbeat"],420)
+
     def test_unbounded_scan_denied(self):
         with self.assertRaises(ValueError):
             observe(self.db,self.con,max_rows=50001)
