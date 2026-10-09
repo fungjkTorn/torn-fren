@@ -50,10 +50,16 @@ def observe(stock_db, sidecar, max_rows=10000):
             sidecar.execute("DELETE FROM v38_feature_cache")
         for rowid,stamp,country,item,qty in rows:
             key=f"{str(country).lower()}:{item}"
-            affected.add(key)
+            existing=sidecar.execute(
+                "SELECT quantity FROM v38_stock_state WHERE item_key=?", (key,)
+            ).fetchone()
+            if existing is None or existing[0]!=int(qty):
+                affected.add(key)
             sidecar.execute("""INSERT INTO v38_stock_state VALUES(?,?,?,?)
                 ON CONFLICT(item_key) DO UPDATE SET
-                last_id=excluded.last_id,stock_as_of=excluded.stock_as_of,
+                last_id=CASE WHEN excluded.quantity!=v38_stock_state.quantity
+                    THEN excluded.last_id ELSE v38_stock_state.last_id END,
+                stock_as_of=excluded.stock_as_of,
                 quantity=excluded.quantity
                 WHERE excluded.stock_as_of>=v38_stock_state.stock_as_of""",
                 (key,int(rowid),int(stamp),int(qty)))
