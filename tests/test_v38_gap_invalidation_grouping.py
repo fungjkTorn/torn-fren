@@ -44,7 +44,7 @@ class InvalidationGroupTests(unittest.TestCase):
 
     def test_one_continuity_check_per_item_with_all_pending_runs_updated(self):
         def continuity(country,item,start,end):
-            return {"valid":item=="Xanax",
+            return {"valid":item=="xanax",
                     "reason":"ambiguous outage",
                     "max_gap_seconds":end-start}
         checks=Mock(side_effect=continuity)
