@@ -104,7 +104,7 @@ class Full20SmokeTests(unittest.TestCase):
                 "cached_decisions":1176,"missing_decisions":0,
                 "chosen_expert_index":20,"source_parity_one_slot":True}
 
-    def run(self,**kwargs):
+    def run_probe(self,**kwargs):
         return m.run(
             source=self.source,snapshot=self.snapshot,
             sidecar=self.sidecar,cache=self.cache,
@@ -117,7 +117,7 @@ class Full20SmokeTests(unittest.TestCase):
         before_cache=self.cache.read_bytes()
         with sqlite3.connect(self.source) as con:
             before_data=con.execute("SELECT * FROM stock_history").fetchall()
-        out=self.run()
+        out=self.run_probe()
         self.assertEqual(out["status"],"V69_FULL20_ISOLATED_SMOKE_PASSED")
         self.assertEqual(out["proposal_count"],20)
         self.assertEqual(out["persisted_count"],20)
@@ -134,21 +134,21 @@ class Full20SmokeTests(unittest.TestCase):
 
     def test_incomplete_nineteen_does_not_run_monkey(self):
         self.inject_baseline_missing=True
-        out=self.run()
+        out=self.run_probe()
         self.assertEqual(out["status"],"V69_BASELINE_NOT_READY")
         self.assertEqual(self.calls,["original19","snapshot"])
         self.assertEqual(out["baseline_count"],18)
 
     def test_incomplete_monkey_abstains_and_leaves_original19(self):
         self.inject_no_monkey=True
-        out=self.run()
+        out=self.run_probe()
         self.assertEqual(out["status"],"V69_MONKEY_NOT_READY")
         with sqlite3.connect(self.sidecar) as c:
             self.assertEqual(c.execute("SELECT COUNT(*) FROM latest_predictions").fetchone()[0],19)
 
     def test_unexpected_twenty_first_item_blocks_success(self):
         self.inject_extra_row=True
-        out=self.run()
+        out=self.run_probe()
         self.assertEqual(out["status"],"V69_SIDECAR_MISMATCH")
         self.assertEqual(out["persisted_count"],21)
         self.assertFalse(out["persisted_keys_exact"])
@@ -180,7 +180,7 @@ class Full20SmokeTests(unittest.TestCase):
         self.assertNotIn("monkey",self.calls)
 
     def test_readback_rejects_stale_persisted_rows(self):
-        out=self.run()
+        out=self.run_probe()
         self.assertEqual(out["status"],"V69_FULL20_ISOLATED_SMOKE_PASSED")
         check=m.verify_rows(self.sidecar,set(self.original_keys)|{m.MONKEY},
                             clock=lambda:NOW+250)
