@@ -105,6 +105,36 @@ class IncrementalObserverTests(unittest.TestCase):
             src.execute("INSERT INTO poll_heartbeats VALUES(420,'poll-cycle',1)")
         self.assertEqual(observe(self.db,self.con)["verified_heartbeat"],420)
 
+    def test_large_cold_db_grouped_bootstrap_does_not_replay_tens_of_ticks(self):
+        with sqlite3.connect(self.db) as src:
+            src.executemany("""
+                INSERT INTO stock_history VALUES(?,?,?,?,?)
+            """,[(i,100+i,"uni","Heather",30 if i%2 else 0)
+                 for i in range(4,1601)])
+        result=observe(self.db,self.con,max_rows=1000,fast_bootstrap=True)
+        self.assertTrue(result["fast_bootstrap"])
+        self.assertEqual(result["last_id"],1600)
+        self.assertEqual(result["observed_max_id"],1600)
+        self.assertTrue(result["caught_up"])
+        self.assertEqual(result["processed"],2)
+        self.assertEqual(set(result["affected_keys"]),{"uni:Heather","can:Crocus"})
+        self.assertEqual(self.con.execute(
+            "SELECT COUNT(*) FROM v38_stock_state").fetchone()[0],2)
+        self.assertEqual(self.con.execute("""
+            SELECT quantity FROM v38_stock_state WHERE item_key='uni:Heather'
+        """).fetchone()[0],0)
+        with sqlite3.connect(self.db) as src:
+            self.assertEqual(src.execute(
+                "SELECT COUNT(*) FROM stock_history").fetchone()[0],1600)
+            src.execute("""
+                INSERT INTO stock_history VALUES(1601,1701,'uni','Heather',30)
+            """)
+        result2=observe(self.db,self.con,max_rows=1000,fast_bootstrap=True)
+        self.assertFalse(result2["fast_bootstrap"])
+        self.assertEqual(result2["processed"],1)
+        self.assertEqual(result2["affected_keys"],["uni:Heather"])
+        self.assertEqual(result2["last_id"],1601)
+
     def test_unbounded_scan_denied(self):
         with self.assertRaises(ValueError):
             observe(self.db,self.con,max_rows=50001)
