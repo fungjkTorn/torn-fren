@@ -47,8 +47,11 @@ def same_plan(a,b):
 
 
 def audit(snapshot,cache,*,clock=time.time,fast_planner=FastTemplatePlanner,
-          original_planner=TemplatePlanner, compare_planners=True):
-    country,item,days=TARGETS["monkey"]
+          original_planner=TemplatePlanner, compare_planners=True,
+          target="monkey"):
+    if target not in TARGETS:
+        raise ValueError("unsupported selector target")
+    country,item,days=TARGETS[target]
     key=f"{country}:{item}"
     snapshot=Path(snapshot).resolve(strict=True)
     cache=Path(cache).resolve(strict=True)
@@ -186,7 +189,7 @@ def audit(snapshot,cache,*,clock=time.time,fast_planner=FastTemplatePlanner,
             # the originally planned slot has already passed.
             if not int(clock())<=departure<=asof+MAX_WAIT:
                 return safe_result("V66_DEPARTURE_OUT_OF_BOUNDS",**result)
-            return safe_result("V66_MONKEY_SELECTOR_VALIDATED",
+            return safe_result("V66_"+target.upper()+"_SELECTOR_VALIDATED",
                 **result,
                 recommended_departure_timestamp=departure,
                 # candidate only; never confused with public probabilities.
