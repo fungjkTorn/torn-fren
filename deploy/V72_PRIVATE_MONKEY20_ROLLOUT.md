@@ -38,9 +38,9 @@ NOT modified. No public website or bot consumes the V72 private sidecar.
 ## Guarded VM procedure
 - Fetch the research branch and apply deploy/scripts/v49_safe_update.sh.
 - Run the V72 unit tests in tests/test_v72_private_mirror20_shadow_tick.py.
-- One-shot smoke V72 under a 25% CPU, 1GiB memory, Nice=19, 240s timeout,
-  read-only collector sandbox, preferably while V65 service is idle.
-  Keep V38 and V48 timers enabled.
+- Run bash deploy/scripts/v72_private20_smoke.sh. It enforces 25% CPU,
+  1GiB memory, Nice=19, a 240s timeout, read-only collector, and an idle
+  V65 service preflight. Keep V38 and V48 timers enabled.
 - Require V72_EXECUTED_RESEARCH_ONLY, original_19_proposal_count=19,
   monkey_status=V68_MONKEY_ISOLATED_RECORD_READY, proposal_count=20,
   snapshot_fresh_after_cycle=true, no errors/stale statuses.
