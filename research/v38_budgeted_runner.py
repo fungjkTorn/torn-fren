@@ -18,6 +18,8 @@ from research.v38_adaptive_policy import next_due_seconds
 from research.v38_capacity_guard import inspect as capacity_status
 
 ROSTER=Path(__file__).with_name("v38_roster.json")
+RED_FOX_KEY="uni:Red Fox Plushie"
+RED_FOX_WORKER="research.v38_red_fox_single_tick"
 
 # V42 requires an explicit opt-in. Default 16-candidate worker routing and
 # all V38 callers stay unchanged; Japan Xanax is NOT a generic candidate.
@@ -58,9 +60,12 @@ def choose(roster, snapshots, *, now, active=(), changed=(), limit=4, routes=Non
 
 def run_tick(*, stock_db, sidecar_db, execute=False, active=(),
              approved_keys=None, max_rows=10000, max_jobs=4, worker_seconds=20,
-             budget_seconds=85, now=None, with_xanax=False, runner=subprocess.run,
+             budget_seconds=85, now=None, with_xanax=False, with_redfox=False, runner=subprocess.run,
              clock=time.monotonic, capacity_probe=capacity_status):
-    if not 1<=max_jobs<=(18 if with_xanax else 16) or not 1<=worker_seconds<=60:
+    if with_redfox and not with_xanax:
+        raise ValueError("Red Fox requires the measured 18-worker base")
+    capacity=19 if with_redfox else 18 if with_xanax else 16
+    if not 1<=max_jobs<=capacity or not 1<=worker_seconds<=60:
         raise ValueError("invalid concurrency/resource limits")
     if not worker_seconds<=budget_seconds<=240:
         raise ValueError("invalid total wall budget")
@@ -71,6 +76,10 @@ def run_tick(*, stock_db, sidecar_db, execute=False, active=(),
     if with_xanax:
         roster={**roster, **V42_XANAX_ROSTER}
         workers.update(V42_XANAX_ROUTES)
+    if with_redfox:
+        # The original k18/global-0.5 adapter was separately VM benchmarked.
+        # This flag never changes the default 16 or existing 18-item routing.
+        workers[RED_FOX_KEY]=RED_FOX_WORKER
     # Explicit allowlisting supports a first-five isolation test without
     # accidentally executing every runnable model in the 21-item roster.
     # Unknown keys abort before any collector or research DB access.
@@ -169,6 +178,7 @@ def main():
     p.add_argument("--execute",action="store_true")
     p.add_argument("--active",action="append",default=[])
     p.add_argument("--with-xanax",action="store_true",help="Opt into two frozen generic v19 Canada and UK candidates; NOT Japan")
+    p.add_argument("--with-redfox",action="store_true",help="Opt into source-pinned Red Fox k18 global-regime analog after VM resource gate")
     p.add_argument("--allow-item",action="append",default=None,
                    help="Repeat to limit runs to an explicitly approved subset")
     p.add_argument("--max-rows",type=int,default=10000)
@@ -180,7 +190,8 @@ def main():
                  execute=args.execute,active=args.active,max_rows=args.max_rows,
                  max_jobs=args.max_jobs,worker_seconds=args.per_worker,
                  approved_keys=args.allow_item,budget_seconds=args.budget,
-                 with_xanax=args.with_xanax)
+                 with_xanax=args.with_xanax,
+                 with_redfox=args.with_redfox)
     print(json.dumps(out,sort_keys=True,indent=2))
 
 
