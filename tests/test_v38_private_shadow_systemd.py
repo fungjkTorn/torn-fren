@@ -10,7 +10,7 @@ class PrivateShadowUnitTests(unittest.TestCase):
     def test_research_operator_script_refuses_busy_or_unfixed_production(self):
         root=Path(__file__).parents[1]
         source=(root/"deploy/scripts/arm_v38_five_model_canary.sh").read_text()
-        self.assertIn("e9ba974c96553ea36f31951b94901b7379b22624",source)
+        self.assertIn("dd84271a40b6e5dac2551c9fbb1291f47463c057",source)
         self.assertIn("research.v38_shadow_canary_preflight",source)
         self.assertIn("research.v38_readonly_resource_probe",source)
         self.assertIn("timeout 190s",source)
@@ -25,7 +25,7 @@ class PrivateShadowUnitTests(unittest.TestCase):
         self.assertIn("research.v38_v39_host_gate",source)
         self.assertIn('DB="/opt/torn-fren/data/stock_history.db"',source)
         self.assertIn("curl -fsS",source)
-        self.assertIn("e9ba974c96553ea36f31951b94901b7379b22624",source)
+        self.assertIn("dd84271a40b6e5dac2551c9fbb1291f47463c057",source)
         self.assertIn("torn-fren-v38-private-shadow.timer",source)
         self.assertNotIn("systemctl restart",source)
         self.assertNotIn("git reset",source)
