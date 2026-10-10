@@ -6,7 +6,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from research import v66_chamois_readonly_selector_probe as v66
+from research import v66_monkey_readonly_selector_probe as v66
 from research.v47_online_expert_cache import CACHE_TABLE, STATE_TABLE, gap_fingerprint
 from research.v45_online_template_probe import EXPERTS
 from research.plushie_champions.common import DAY
