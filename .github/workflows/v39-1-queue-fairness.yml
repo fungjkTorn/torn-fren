@@ -36,5 +36,10 @@ jobs:
           python -m unittest discover -s tests -p 'test_v38_gap_recovery.py' -v
           python -m unittest discover -s tests -p 'test_v38_heartbeat_fastpath.py' -v
           python -m unittest discover -s tests -p 'test_v38_gap_invalidation_grouping.py' -v
+      - name: Verify V39.1 hotfix deployment and rollback do not impact web/bot/stock DB
+        run: |
+          python -m unittest discover -s tests -p 'test_v39_1_release_checks.py' -v
+          bash -n deploy/scripts/deploy_v39_1_queue_fairness.sh
+          bash -n deploy/scripts/rollback_v39_1_queue_fairness.sh
       - name: Compile audited modules
         run: python -m py_compile services/durable_audit_queue_v39.py services/history_service.py poller.py web/app.py
