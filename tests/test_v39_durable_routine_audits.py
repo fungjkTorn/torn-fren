@@ -133,13 +133,89 @@ class DurableAuditTests(unittest.TestCase):
         self.assertEqual(out["results"][0]["status"],"COMPLETED")
         self.assertEqual(out["queue"],{"done":1})
 
+    def test_same_priority_queues_oldest_first(self):
+        with hs._connect() as con:
+            q.enqueue(con,"mex","Jaguar Plushie",now=100)
+            q.enqueue(con,"cay","Stingray Plushie",now=110)
+        first=q.claim(now=120)
+        self.assertEqual(first["item_name"],"Jaguar Plushie")
+        q.finish(first,now=125)
+        second=q.claim(now=130)
+        self.assertEqual(second["item_name"],"Stingray Plushie")
+
+    def test_frozen_canary_beats_older_catalog_backlog(self):
+        with hs._connect() as con:
+            q.enqueue(con,"mex","Jaguar Plushie",now=100)
+            q.enqueue(con,"uni","Heather",now=200)
+        first=q.claim(now=205)
+        self.assertEqual((first["country"],first["item_name"]),("uni","Heather"))
+        self.assertEqual(first["generation"],1)
+        with hs._connect() as con:
+            priority=con.execute("""
+                SELECT priority FROM routine_audit_jobs_v39
+                WHERE country='uni' AND item_name='Heather'
+            """).fetchone()[0]
+        self.assertEqual(priority,q.CANARY_PRIORITY)
+
+    def test_repeated_change_does_not_make_waiting_job_new(self):
+        with hs._connect() as con:
+            q.enqueue(con,"mex","Jaguar Plushie",now=100)
+            q.enqueue(con,"cay","Stingray Plushie",now=110)
+            q.enqueue(con,"mex","Jaguar Plushie",now=120)
+            row=con.execute("""
+                SELECT queued_at,generation
+                FROM routine_audit_jobs_v39
+                WHERE country='mex' AND item_name='Jaguar Plushie'
+            """).fetchone()
+        self.assertEqual(row,(100,2))
+        self.assertEqual(q.claim(now=121)["item_name"],"Jaguar Plushie")
+
+    def test_completed_job_new_change_starts_new_queue_age(self):
+        with hs._connect() as con:
+            q.enqueue(con,"mex","Jaguar Plushie",now=100)
+        job=q.claim(now=110)
+        self.assertTrue(q.finish(job,now=115))
+        with hs._connect() as con:
+            q.enqueue(con,"mex","Jaguar Plushie",now=180)
+            row=con.execute("""
+                SELECT queued_at,generation
+                FROM routine_audit_jobs_v39
+                WHERE country='mex' AND item_name='Jaguar Plushie'
+            """).fetchone()
+        self.assertEqual(row,(180,2))
+
+    def test_legacy_high_priority_items_promoted_without_loss(self):
+        with hs._connect() as con:
+            con.execute("""
+                INSERT INTO routine_audit_jobs_v39(
+                  country,item_name,queued_at,generation,priority,status
+                ) VALUES('jap','Xanax',100,7,10,'pending')
+            """)
+            con.execute("""
+                INSERT INTO routine_audit_jobs_v39(
+                  country,item_name,queued_at,generation,priority,status
+                ) VALUES('mex','Jaguar Plushie',90,3,10,'pending')
+            """)
+        self.assertEqual(q.promote_canary_pending(),1)
+        self.assertEqual(q.promote_canary_pending(),0)
+        with hs._connect() as con:
+            rows=con.execute("""
+                SELECT country,queued_at,generation,priority,status
+                FROM routine_audit_jobs_v39 ORDER BY country
+            """).fetchall()
+        self.assertEqual(rows,[
+            ("jap",100,7,100,"pending"),
+            ("mex",90,3,10,"pending"),
+        ])
+        self.assertEqual(q.claim(now=150)["item_name"],"Xanax")
+
     def test_quota_and_timer_declared_without_full_model_rollout(self):
         root=Path(__file__).parents[1]
         service=(root/"deploy/systemd/torn-fren-routine-audit.service").read_text()
         timer=(root/"deploy/systemd/torn-fren-routine-audit.timer").read_text()
         self.assertIn("CPUQuota=35%",service)
         self.assertIn("MemoryMax=768M",service)
-        self.assertIn("ReadWritePaths=/var/lib/torn-fren",service)
+        self.assertIn("ReadWritePaths=/opt/torn-fren/data /var/lib/torn-fren",service)
         self.assertIn("services.durable_audit_queue_v39 --once",service)
         self.assertIn("OnCalendar=*-*-* *:*:00",timer)
 
