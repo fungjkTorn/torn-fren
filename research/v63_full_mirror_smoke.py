@@ -30,10 +30,10 @@ HEARTBEAT_MAX_AGE=180
 
 def exact_roster():
     # Refuse silently altered/replaced champion mappings.
-    keys=tuple(sorted(set(PINN)|set(XANAX)|{RED_FOX_KEY}))
-    if len(PINN)!=16 or len(XANAX)!=2 or len(keys)!=19:
+    keys=tuple(sorted(set(PINNED)|set(XANAX)|{RED_FOX_KEY}))
+    if len(PINNED)!=16 or len(XANAX)!=2 or len(keys)!=19:
         raise ValueError("unexpected research roster size")
-    if RED_FOX_KEY in PINN or RED_FOX_KEY in XANAX or set(PINN)&set(XANAX):
+    if RED_FOX_KEY in PINNED or RED_FOX_KEY in XANAX or set(PINNED)&set(XANAX):
         raise ValueError("overlapping research model keys")
     return keys
 
