@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import sqlite3
 from pathlib import Path
-from research.v38_snapshot_schema import LATEST_TABLE, ATTEMPT_TABLE
+from research.v38_snapshot_schema import LATEST_TABLE, ATTEMPT_TABLE, CANDIDATE_TABLE
 
 STEP, HORIZON, MIN_QTY, GRACE = 300, 28800, 30, 10
 
@@ -16,6 +16,8 @@ def open_writer(path):
     con.execute("PRAGMA busy_timeout=3000")
     con.execute(LATEST_TABLE)
     con.execute(ATTEMPT_TABLE)
+    con.execute(CANDIDATE_TABLE)
+    con.execute("CREATE INDEX IF NOT EXISTS v42_candidate_arrival ON v42_candidate_decisions(arrival)")
     con.execute("CREATE INDEX IF NOT EXISTS v38_due ON latest_predictions(next_due_at)")
     con.execute("CREATE INDEX IF NOT EXISTS v38_attempt_at ON inference_attempts(attempted_at)")
     con.commit()
@@ -72,6 +74,16 @@ def record(con, *, key, family, config, output, now, stock_as_of,
             INSERT INTO inference_attempts(item_key,attempted_at,status,elapsed_ms)
             VALUES(?,?,?,?)
         """, (key, now, status, elapsed_ms))
+        # Freeze as-issued candidate evidence even after future five-minute
+        # replans. Abstentions have NULL departure/arrival and remain visible.
+        # These are forecast candidates, NOT observed player departure actions.
+        con.execute("""
+            INSERT OR IGNORE INTO v42_candidate_decisions(
+                item_key,computed_at,model_family,model_config,stock_as_of,
+                status,departure,arrival,valid_until,actual_player_departure)
+            VALUES(?,?,?,?,?,?,?,?,?,0)
+        """, (key,now,family,config,stock_as_of,status,
+              dep,arr,now+STEP))
     return status
 
 

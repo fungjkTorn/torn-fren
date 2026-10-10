@@ -46,6 +46,10 @@ jobs:
         run: python -m unittest discover -s tests -p 'test_v38_resource_probe.py' -v
       - name: Verify precomputed sidecar causal/freshness and read-only fallback
         run: python -m unittest discover -s tests -p 'test_v38_prediction_store.py' -v
+      - name: Verify append-only prospective candidate capture
+        run: python -m unittest discover -s tests -p 'test_v38_prediction_store.py' -v
+      - name: Validate guarded 16-item deployment script
+        run: bash -n deploy/scripts/v42_expand_16_shadow.sh
       - name: Verify incremental observer and causal versioned feature cache
         run: python -m unittest discover -s tests -p 'test_v38_incremental_observer.py' -v
       - name: Confirm V39 audit backlog gate fails closed before private launch

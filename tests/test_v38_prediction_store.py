@@ -80,6 +80,42 @@ class PredictionStoreTests(unittest.TestCase):
         self.assertEqual(read(self.path,NOW,"uni:Heather")["worker_status"],
                          "RESEARCH_PROPOSAL_ONLY")
 
+
+    def test_historical_predictions_frozen_for_audit(self):
+        self.put()
+        self.put(now=NOW+300,stock_as_of=NOW+295,
+            output={**OUTPUT,"recommended_departure_timestamp":NOW+900,
+                           "recommended_arrival_timestamp":NOW+7260})
+        with sqlite3.connect(self.path) as c:
+            rows=c.execute("""SELECT computed_at,departure,arrival,actual_player_departure
+                FROM v42_candidate_decisions WHERE item_key=?
+                ORDER BY computed_at""",("uni:Heather",)).fetchall()
+        self.assertEqual(rows,[(NOW,NOW+600,NOW+6960,0),
+                               (NOW+300,NOW+900,NOW+7260,0)])
+
+    def test_original_recommendation_not_replaced_on_duplicate(self):
+        self.put()
+        self.put(output={**OUTPUT,
+           "recommended_departure_timestamp":NOW+1200,
+           "recommended_arrival_timestamp":NOW+7560})
+        with sqlite3.connect(self.path) as c:
+            rows=c.execute("SELECT departure,arrival FROM v42_candidate_decisions").fetchall()
+        self.assertEqual(rows,[(NOW+600,NOW+6960)])
+
+    def test_failed_forecast_is_stored_without_fake_departure(self):
+        self.put(output={"status":"WORKER_TIMEOUT"})
+        with sqlite3.connect(self.path) as c:
+            row=c.execute("""SELECT status,departure,arrival,actual_player_departure
+                FROM v42_candidate_decisions""").fetchone()
+        self.assertEqual(row,("WORKER_TIMEOUT",None,None,0))
+        self.assertTrue(read(self.path,NOW,"uni:Heather")["fallback_required"])
+
+    def test_incompatible_forecast_timing_is_not_written(self):
+        self.put(output={**OUTPUT,"grace_seconds":300})
+        with sqlite3.connect(self.path) as c:
+            row=c.execute("SELECT status,departure,arrival FROM v42_candidate_decisions").fetchone()
+        self.assertEqual(row,("INCOMPATIBLE_CHAMPION_CONTRACT",None,None))
+
     def test_prune_only_attempts(self):
         self.put()
         self.assertEqual(prune_attempts(self.con,NOW+1),1)
