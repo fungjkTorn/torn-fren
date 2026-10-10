@@ -169,5 +169,9 @@ jobs:
         run: python -m unittest discover -s tests -p 'test_v70_monkey_first_full20_smoke.py' -v
       - name: V71 as-issued audit explains expired departure without hiding invalid prediction
         run: python -m unittest discover -s tests -p 'test_v71_full20_issued_audit.py' -v
+      - name: V72 private 20-model scheduled candidate with original 19 rollback
+        run: python -m unittest discover -s tests -p 'test_v72_private_mirror20_shadow_tick.py' -v
+      - name: Syntax check V72 guarded enable and rollback
+        run: bash -n deploy/scripts/v72_private20_transition.sh
       - name: Compile standalone entry points
         run: python -m py_compile research/v38_v18_single_tick.py research/v38_v19_single_tick.py research/v38_readonly_resource_probe.py research/v38_nessie_single_tick.py research/v38_readonly_resource_probe.py research/v38_camel_single_tick.py research/v38_peony_single_tick.py services/plushie_flower_dynamic_planner_v20.py research/v38_budgeted_runner.py research/v38_prediction_store.py research/v38_incremental_observer.py research/v38_feature_cache.py research/v38_red_fox_single_tick.py research/v38_catalog_seed.py research/v38_adaptive_policy.py research/v38_capacity_guard.py research/v38_idle_admission.py research/v38_shadow_canary_preflight.py web/app.py web/catalog_cache_v38.py web/v38_revision_fingerprint.py
