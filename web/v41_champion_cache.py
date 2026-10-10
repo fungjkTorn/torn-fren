@@ -53,10 +53,10 @@ def _present(row, now, live_heartbeat):
         status = "COLLECTOR_UNVERIFIED"
     elif live_heartbeat > now:
         status = "FUTURE_COLLECTOR_HEARTBEAT"
-    elif live_heartbeat < int(as_of):
-        status = "COLLECTOR_HEARTBEAT_REGRESSION"
     elif now - live_heartbeat > FRESHNESS:
         status = "COLLECTOR_STALE"
+    elif live_heartbeat < int(as_of):
+        status = "COLLECTOR_HEARTBEAT_REGRESSION"
     elif status == VALID_STATUS:
         if (int(d["executed"]) != 1 or not isinstance(departure, int)
                 or not isinstance(arrival, int)
