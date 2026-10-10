@@ -55,7 +55,11 @@ def observe(stock_db, sidecar, max_rows=10000, *, fast_bootstrap=False):
         # 5-minute tick could defer first shadow predictions for hours. Instead
         # summarize the latest known row per item in one bounded SQL query.
         # This changes ONLY private sidecar initial state, never collector DB.
-        fresh_compact = bool(fast_bootstrap and old is None and maximum>max_rows)
+        # Small explicit max_rows values are diagnostic chunk limits. Never
+        # bypass a deliberately tiny row budget during unit tests/probes.
+        fresh_compact = bool(
+            fast_bootstrap and max_rows>=1000 and old is None and maximum>max_rows
+        )
         if fresh_compact:
             rows=src.execute("""
                 SELECT s.id,s.timestamp,s.country,s.item_name,s.quantity
