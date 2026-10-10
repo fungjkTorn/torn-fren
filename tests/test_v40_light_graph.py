@@ -22,7 +22,9 @@ class V40LiteWeb(unittest.TestCase):
                 patch.object(webapp,"_get_analysis_nonblocking") as analysis,
                 patch.object(webapp,"_get_prediction_nonblocking") as predict,
                 patch.object(webapp,"profitability_for_item",return_value=({"net_profit_per_item":123},{})),
-                patch.object(webapp,"get_recent_active_forecasts",return_value=[]) as audits
+                patch.object(webapp,"get_recent_active_forecasts",return_value=[]) as audits,
+                patch.object(webapp,"get_collector_recovery_status",
+                             return_value={"last_success_timestamp":1791590010}) as heartbeat
             ):
                 cached.get.return_value=rows
                 analysis.return_value=({"current_stock":30,"events":[],"prediction":None},False)
@@ -35,6 +37,7 @@ class V40LiteWeb(unittest.TestCase):
         self.assertEqual(response["rows"][0]["quantity"],30)
         self.assertEqual(response["analysis"]["profitability"]["net_profit_per_item"],123)
         self.assertEqual(response["analysis"]["current_stock"],30)
+        self.assertEqual(response["analysis"]["collector_last_success_timestamp"],1791590010)
         self.assertEqual(response["analysis"]["prediction_v2"]["status"],"backup_available")
         self.assertIsNone(response["analysis"]["prediction"])
         self.assertEqual(response["analysis"]["forecast_history"],[])

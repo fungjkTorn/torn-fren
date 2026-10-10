@@ -8,7 +8,7 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
-from services.history_service import DB_PATH, get_item_history_since, get_stock_catalog, get_stock_graph_analysis, get_latest_item_snapshot
+from services.history_service import DB_PATH, get_item_history_since, get_stock_catalog, get_stock_graph_analysis, get_latest_item_snapshot, get_collector_recovery_status
 from services.prediction_v2_live import build_live_prediction_v2
 from services.admin_health import build_admin_health
 from services.forecast_auditor import get_recent_active_forecasts
@@ -335,6 +335,12 @@ def api_history(
         "analysis_warming": True,
     }
     analysis["analysis_warming"] = bool(analysis_warming)
+    if light_request:
+        # The browser's Live indicator must continue reflecting verified
+        # polling even when full cycle statistics are intentionally paused.
+        recovery = get_collector_recovery_status()
+        analysis["collector_last_success_timestamp"] = recovery.get("last_success_timestamp")
+        analysis["collector_last_success_source"] = "poll-cycle"
     analysis["legacy_v2_backup_available"] = light_graph_enabled
     analysis["light_graph_mode"] = bool(light_request)
     # Price is a cheap latest-state lookup and should appear immediately even
