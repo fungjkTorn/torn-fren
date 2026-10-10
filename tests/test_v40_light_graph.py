@@ -28,7 +28,7 @@ class V40LiteWeb(unittest.TestCase):
                 analysis.return_value=({"current_stock":30,"events":[],"prediction":None},False)
                 predict.return_value=({"status":"waiting_for_restock","display_prediction":None},False)
                 result=webapp.api_history(country="uni",item="Heather",minutes=60,legacy_v2=legacy)
-                return result,analysis.call_count,predict.call_count,audits.call_count,cached.call_count
+                return result,analysis.call_count,predict.call_count,audits.call_count,cached.get.call_count
 
     def test_default_lite_preserves_history_and_profit_without_v2_threads(self):
         response,graph,pred,audits,cached=self.serve()
