@@ -3,7 +3,7 @@
 # Must follow a healthy V39 production CPU release and successful off-prod
 # read-only frozen model workload. Stops without timer activation on failure.
 set -euo pipefail
-V39_PROD_SHA="e9ba974c96553ea36f31951b94901b7379b22624"
+V39_PROD_SHA="dd84271a40b6e5dac2551c9fbb1291f47463c057"
 REF="research/v38-full-roster-live-prep-20261009"
 TARGET="${1:-}"
 ROOT="/home/ubuntu/torn-fren-v38-probe"
