@@ -80,7 +80,7 @@ class ChamoisIsolatedTests(unittest.TestCase):
             row=db.execute("""SELECT item_key,status,model_family,model_config,
                        departure,arrival,stock_as_of FROM latest_predictions""").fetchone()
         self.assertEqual(row,(
-            "arg:Monkey Plushie","RESEARCH_PROPOSAL_ONLY",
+            "swi:Chamois Plushie","RESEARCH_PROPOSAL_ONLY",
             m.FAMILY,m.CONFIG,NOW+1800,NOW+1800+6960,HEARTBEAT))
         with sqlite3.connect(f"file:{self.source}?mode=ro",uri=True) as source:
             live_after=(
@@ -94,19 +94,19 @@ class ChamoisIsolatedTests(unittest.TestCase):
     def test_incomplete_cache_never_writes_prediction(self):
         proof=dict(self.proof,status="V66_CACHE_NOT_READY",missing_decisions=24)
         out,_=self.run_canary(proof)
-        self.assertEqual(out["status"],"V74_MONKEY_ABSTAIN")
+        self.assertEqual(out["status"],"V74_CHAMOIS_ABSTAIN")
         self.assertFalse(self.sidecar.exists())
 
     def test_missing_source_parity_never_writes_prediction(self):
         proof=dict(self.proof,source_parity_one_slot=False)
         out,_=self.run_canary(proof)
-        self.assertEqual(out["status"],"V68_REJECTED_INCOMPLETE_PROOF")
+        self.assertEqual(out["status"],"V74_REJECTED_INCOMPLETE_PROOF")
         self.assertFalse(self.sidecar.exists())
 
     def test_departure_in_the_past_never_writes_prediction(self):
         proof=dict(self.proof,recommended_departure_timestamp=NOW-1)
         out,_=self.run_canary(proof)
-        self.assertEqual(out["status"],"V68_STALE_OR_PASSED_DEPARTURE")
+        self.assertEqual(out["status"],"V74_STALE_OR_PASSED_DEPARTURE")
         self.assertFalse(self.sidecar.exists())
 
     def test_snapshot_stale_before_inference_never_calls_validator(self):
@@ -114,7 +114,7 @@ class ChamoisIsolatedTests(unittest.TestCase):
         out=m.canary(source=self.source,snapshot=self.mirror,cache=self.cache,
                      sidecar=self.sidecar,snapshotter=self.backup,
                      validator=proof,clock=lambda:NOW+300)
-        self.assertEqual(out["status"],"V68_STALE_SNAPSHOT_BEFORE_VALIDATION")
+        self.assertEqual(out["status"],"V74_STALE_SNAPSHOT_BEFORE_VALIDATION")
         proof.assert_not_called()
         self.assertFalse(self.sidecar.exists())
 
@@ -123,7 +123,7 @@ class ChamoisIsolatedTests(unittest.TestCase):
         out=m.canary(source=self.source,snapshot=self.mirror,cache=self.cache,
              sidecar=self.sidecar,snapshotter=lambda a,b:{"published":False,
                   "status":"SOURCE_HEARTBEAT_STALE"},validator=calls)
-        self.assertEqual(out["status"],"V68_NO_FRESH_SNAPSHOT")
+        self.assertEqual(out["status"],"V74_NO_FRESH_SNAPSHOT")
         calls.assert_not_called()
         self.assertFalse(self.sidecar.exists())
 
@@ -135,7 +135,7 @@ class ChamoisIsolatedTests(unittest.TestCase):
     def test_unverified_different_key_does_not_write(self):
         proof=dict(self.proof,item_key="arg:Monkey Plushie")
         out,_=self.run_canary(proof)
-        self.assertEqual(out["status"],"V68_REJECTED_INCOMPLETE_PROOF")
+        self.assertEqual(out["status"],"V74_REJECTED_INCOMPLETE_PROOF")
         self.assertFalse(self.sidecar.exists())
 
     def test_no_ghost_prediction_from_validation_exception(self):
@@ -144,7 +144,7 @@ class ChamoisIsolatedTests(unittest.TestCase):
         out=m.canary(source=self.source,snapshot=self.mirror,cache=self.cache,
               sidecar=self.sidecar,snapshotter=self.backup,validator=bad,
               clock=lambda:NOW)
-        self.assertEqual(out["status"],"V68_VALIDATION_ERROR")
+        self.assertEqual(out["status"],"V74_VALIDATION_ERROR")
         self.assertFalse(self.sidecar.exists())
         self.assertNotIn("no publication",str(out))
 

@@ -34,7 +34,7 @@ def safe(status,**fields):
             "collector_written":False,"public_routing_changed":False,
             "website_sidecar_written":False,"v65_sidecar_written":False,
             "v72_sidecar_written":False,"v48_cache_written":False,
-            "model_21_scheduled":False,**fields}
+            "model_21_public_admitted":False,**fields}
 
 
 def fail(stage,exc):

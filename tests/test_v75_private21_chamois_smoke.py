@@ -122,7 +122,7 @@ class TwentyOneResearchTests(unittest.TestCase):
                          set(v72.exact_roster())|{v72.monkey.KEY,chamois.KEY})
         self.assertFalse(out["website_sidecar_written"])
         self.assertFalse(out["v72_sidecar_written"])
-        self.assertFalse(out["model_21_scheduled"])
+        self.assertFalse(out["model_21_public_admitted"])
 
     def test_chamois_cache_gap_explicit_abstention_preserves_20(self):
         self.chamois_ready=False

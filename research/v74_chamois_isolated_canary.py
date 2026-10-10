@@ -87,7 +87,7 @@ def canary(*,source=SOURCE,snapshot=SNAPSHOT,cache=CACHE,sidecar=SIDECAR,
         "elapsed_seconds":round(time.monotonic()-began,2),
     }
     if status!="V66_CHAMOIS_SELECTOR_VALIDATED":
-        return no_write_result("V74_MONKEY_ABSTAIN",**evidence_fields)
+        return no_write_result("V74_CHAMOIS_ABSTAIN",**evidence_fields)
     if (proof.get("item_key")!=KEY or proof.get("missing_decisions")!=0 or
         proof.get("invalid_rows")!=0 or proof.get("source_parity_one_slot") is not True or
         not isinstance(proof.get("chosen_expert_index"),int) or
