@@ -41,8 +41,25 @@ export OPENBLAS_NUM_THREADS=1
 export OMP_NUM_THREADS=1
 export MKL_NUM_THREADS=1
 
-echo "===== V39 FORECAST AUDITS MUST BE MAKING PROGRESS ====="
-.venv/bin/python -m research.v38_v39_host_gate --db "$DB"
+echo "===== WAIT UP TO TEN MINUTES FOR V39.1 TARGET AUDITS ====="
+# This is a passive admission wait, not a workload. No model execution,
+# changes to the DB, or relaxation of the 20-minute urgent-target gate.
+AUDITS_READY=0
+for attempt in $(seq 1 21); do
+  echo "Target audit readiness $attempt/21"
+  if .venv/bin/python -m research.v38_v39_host_gate --db "$DB"; then
+    AUDITS_READY=1
+    break
+  fi
+  if [ "$attempt" -eq 21 ]; then break; fi
+  test "$(systemctl is-active torn-fren-poller.service)" = active || exit 2
+  test "$(systemctl is-active torn-fren-routine-audit.timer)" = active || exit 2
+  sleep 30
+done
+if [ "$AUDITS_READY" -ne 1 ]; then
+  echo "STOP: priority-100 audit jobs did not reach the safety gate in ten minutes" >&2
+  exit 2
+fi
 
 echo "===== WAIT UP TO FOUR MINUTES FOR SAFE CPU HEADROOM ====="
 # Low CPU headroom can lag briefly behind a healthy V39 worker.
