@@ -9,6 +9,13 @@ import os
 
 
 def inspect(*, load_1m=None, slots=None, max_load_per_slot=0.80):
+    # Only a CPUQuota=25%, Nice=19, read-only research service opts into
+    # measured admission. All other callers retain the original conservative
+    # <=0.8/core load guard, including offline tests and VM launch preflight.
+    if (os.environ.get("TORN_FREN_V38_IDLE_ADMISSION") == "1"
+            and load_1m is None and slots is None):
+        from research.v38_idle_admission import inspect as idle_inspect
+        return idle_inspect()
     if slots is None:
         slots=len(os.sched_getaffinity(0)) if hasattr(os,"sched_getaffinity") else os.cpu_count()
     if load_1m is None:

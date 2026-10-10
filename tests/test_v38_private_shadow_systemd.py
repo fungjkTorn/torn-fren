@@ -49,6 +49,7 @@ class PrivateShadowUnitTests(unittest.TestCase):
         root=Path(__file__).parents[1]
         source=(root/"deploy/systemd/torn-fren-v38-private-shadow.service").read_text()
         timer=(root/"deploy/systemd/torn-fren-v38-private-shadow.timer").read_text()
+        self.assertIn("Environment=TORN_FREN_V38_IDLE_ADMISSION=1",source)
         self.assertIn("CPUQuota=25%",source)
         self.assertIn("Nice=19",source)
         self.assertIn("MemoryMax=1024M",source)
