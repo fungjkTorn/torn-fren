@@ -18,5 +18,8 @@ NoNewPrivileges=yes
 PrivateTmp=yes
 ProtectHome=yes
 ProtectSystem=strict
-ReadWritePaths=/var/lib/torn-fren
+# Prediction audits persist in the collector SQLite under /opt/torn-fren/data,
+# NOT solely in /var/lib/torn-fren. Keep strict filesystem protection but
+# authorize precisely the durable SQLite DB directory (including WAL/SHM).
+ReadWritePaths=/opt/torn-fren/data /var/lib/torn-fren
 UMask=0077
