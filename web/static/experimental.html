@@ -13,6 +13,21 @@ th{color:#aeb8c6;font-size:.85rem} .good{color:#86e2b8} .warn{color:#ffca87}
 .note{border-left:3px solid #748cbd;padding:.6rem .9rem;background:#222a36}
 @media(max-width:750px){table,thead,tbody,tr,td{display:block}thead{display:none}
 tr{padding:.8rem 0;border-bottom:1px solid #343d4c}td{border:0;padding:.2rem 0}}
+
+.graph-section{margin:1.7rem 0;padding:1.1rem 1.2rem;background:#202630;border:1px solid #343d4c;border-radius:10px}
+.graph-head{display:flex;align-items:center;justify-content:space-between;gap:.8rem;flex-wrap:wrap}
+.graph-head h2{margin:.3rem 0}
+.graph-wrap{height:360px;position:relative;margin-top:1rem}
+.graph-controls{display:flex;gap:.4rem}
+button{font:inherit;cursor:pointer}
+.graph-controls button{background:#303b4c;border:1px solid #4b5b73;color:#e9edf5;border-radius:6px;padding:.4rem .8rem}
+.graph-controls button.active{background:#506ba4}
+.item-view{border:0;background:none;color:#91b4ff;text-align:left;padding:0;text-decoration:underline}
+.graph-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:.8rem;margin-top:1rem}
+.graph-stat{padding:.65rem;background:#181b21;border-radius:6px}
+.graph-stat strong{display:block;font-size:1.2rem;margin-top:.2rem}
+.event-feed{display:flex;flex-wrap:wrap;gap:.6rem;font-size:.83rem;margin-top:1rem}
+.event-feed span{border:1px solid #475165;border-radius:4px;padding:.35rem .55rem}
 </style>
 </head>
 <body>
@@ -26,7 +41,155 @@ Expired, missed, or failed predictions are never presented as actionable.</p>
 <thead><tr><th>Item</th><th>Model</th><th>State</th><th>Departure (your time)</th><th>Arrival (your time)</th><th>Valid until</th></tr></thead>
 <tbody id="rows"></tbody>
 </table>
+
+<section id="graphPanel" class="graph-section" hidden>
+  <div class="graph-head">
+    <h2 id="graphTitle">Stock history</h2>
+    <div class="graph-controls" role="group" aria-label="Observed history timeframe">
+      <button type="button" data-window="1440" class="active">24h</button>
+      <button type="button" data-window="4320">72h</button>
+      <button type="button" data-window="10080">7d</button>
+    </div>
+  </div>
+  <p class="muted">Observed stock quantity and zero-to-positive restocks, with experimental departure/arrival markers.
+    Statistics are derived from visible history, not verified restock cycles. Collection gaps can hide events.</p>
+  <p id="graphStatus" class="muted" role="status">Choose an item.</p>
+  <div class="graph-wrap"><canvas id="stockGraph" aria-label="Observed item stock history and predicted travel times"></canvas></div>
+  <div class="graph-stats" id="graphStats"></div>
+  <div class="event-feed" id="graphEvents"></div>
+</section>
+
 <p class="muted">This page reads precomputed results only, refreshing every 30 seconds. It never runs a forecasting model or schedules travel.</p>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+<script src="/champion_graph.js"></script>
+<script>
+(function() {
+"use strict";
+let selected=null, snapshotRows=[], windowMinutes=1440, graph=null, generation=0, lastGraphFetch=0;
+const panel=document.getElementById("graphPanel"), status=document.getElementById("graphStatus");
+const statBox=document.getElementById("graphStats"), eventsBox=document.getElementById("graphEvents");
+const graphTitle=document.getElementById("graphTitle");
+const stat=(label,value)=>{const el=document.createElement("div");el.className="graph-stat";
+ const caption=document.createElement("span");caption.className="muted";caption.textContent=label;
+ const strong=document.createElement("strong");strong.textContent=value;
+ el.append(caption,strong);return el;};
+const local=(timestamp)=>timestamp===null?"—":new Date(timestamp*1000).toLocaleString();
+const duration=(seconds)=>seconds===null?"—":(seconds/60).toFixed(1)+" min";
+const overlay={
+ id:"v41ChampionTimes",
+ afterDatasetsDraw(ch) {
+  const snap=ch.$snap;
+  if(!snap||!snap.actionable||!ch.scales.x)return;
+  const xScale=ch.scales.x, area=ch.chartArea, ctx=ch.ctx;
+  for(const m of [{t:snap.departure,name:"Depart",color:"#91b4ff"},
+                  {t:snap.arrival,name:"Arrive",color:"#e7b974"}]){
+    if(m.t==null)continue;
+    const x=xScale.getPixelForValue(m.t*1000);
+    if(!Number.isFinite(x)||x<area.left||x>area.right)continue;
+    ctx.save();ctx.strokeStyle=m.color;ctx.fillStyle=m.color;ctx.lineWidth=1.5;
+    ctx.setLineDash([5,4]);ctx.beginPath();ctx.moveTo(x,area.top);ctx.lineTo(x,area.bottom);ctx.stroke();
+    ctx.setLineDash([]);ctx.font="11px system-ui";ctx.fillText(m.name,Math.max(area.left,Math.min(x+4,area.right-40)),area.top+12);ctx.restore();
+  }
+ }
+};
+const getSnapshot=()=>snapshotRows.find(row=>row.item_key===selected)||null;
+async function loadGraph(){
+ if(!selected)return;
+ const seq=++generation;
+ const colon=selected.indexOf(":");
+ if(colon<0)return;
+ status.textContent="Loading observed stock history…";
+ const country=selected.slice(0,colon),item=selected.slice(colon+1);
+ try {
+  const url="/api/history?"+new URLSearchParams({country,item,minutes:String(windowMinutes),legacy_v2:"false"});
+  const response=await fetch(url,{cache:"no-store"});
+  if(!response.ok)throw Error("HTTP "+response.status);
+  const payload=await response.json();
+  if(seq!==generation)return;
+  if(!Array.isArray(payload.rows))throw Error("Invalid stock history");
+  if(typeof Chart==="undefined"||typeof ChampionGraph==="undefined")throw Error("Chart library unavailable");
+  const rows=payload.rows, events=ChampionGraph.extractEvents(rows), stats=ChampionGraph.describe(events);
+  const now=Date.now(), cutoff=now-windowMinutes*60000;
+  const snap=getSnapshot();
+  const forecastLimit=now+12*3600000;
+  const forecastEnd=snap?.actionable ? Number(snap.arrival)*1000 : 0;
+  const xMax=Math.max(now+5*60000,Math.min(forecastLimit,forecastEnd+10*60000));
+  const datasets=[
+    {type:"line",label:"Observed stock",data:ChampionGraph.stockPoints(rows),stepped:"after",
+      borderColor:"#7caff5",backgroundColor:"#7caff5",pointRadius:1.3,tension:0,fill:false},
+    {type:"scatter",label:"Observed restock (zero → positive)",data:ChampionGraph.eventPoints(events,"restock"),
+      borderColor:"#86e2b8",backgroundColor:"#86e2b8",pointRadius:6,pointStyle:"triangle"},
+    {type:"scatter",label:"Observed depletion",data:ChampionGraph.eventPoints(events,"depletion"),
+      borderColor:"#f08f91",backgroundColor:"#f08f91",pointRadius:5},
+    {type:"scatter",label:"Other stock increase",data:ChampionGraph.eventPoints(events,"increase"),
+      borderColor:"#e7b974",backgroundColor:"#e7b974",pointRadius:4}
+  ];
+  if(graph)graph.destroy();
+  graph=new Chart(document.getElementById("stockGraph"),{
+   type:"line",data:{datasets},plugins:[overlay],
+   options:{responsive:true,maintainAspectRatio:false,animation:false,
+    parsing:false,interaction:{intersect:false,mode:"nearest",axis:"x"},
+    scales:{x:{type:"time",min:cutoff,max:xMax,time:{tooltipFormat:"M/d/yyyy, h:mm a"},
+      grid:{color:"#343d4c"},ticks:{color:"#aeb8c6",maxTicksLimit:9}},
+      y:{beginAtZero:true,grid:{color:"#343d4c"},ticks:{color:"#aeb8c6"}}},
+    plugins:{legend:{labels:{color:"#dfe5f3",boxWidth:12}},
+      tooltip:{callbacks:{title:(items)=>items.length?new Date(items[0].parsed.x).toLocaleString():"",
+        label:(ctx)=>ctx.dataset.label+": "+Number(ctx.parsed.y).toLocaleString()+" units"}}}
+   }
+  });
+  graph.$snap=snap;
+  statBox.replaceChildren(
+    stat("Observed restocks",String(stats.restockCount)),
+    stat("Observed depletions",String(stats.depletionCount)),
+    stat("Latest observed restock",local(stats.lastRestock)),
+    stat("Latest observed depletion",local(stats.lastDepletion)),
+    stat("Avg zero → restock",duration(stats.avgZeroToRestockSeconds)),
+    stat("Avg stocked lifetime",duration(stats.avgStockLifetimeSeconds))
+  );
+  eventsBox.replaceChildren();
+  for(const e of events.slice(-8).reverse()){
+    const span=document.createElement("span");
+    span.textContent=(e.type==="restock"?"Restock":e.type==="depletion"?"Depleted":"Stock increase")+
+      " · "+local(e.timestamp)+" · "+e.quantity.toLocaleString()+" units";
+    eventsBox.append(span);
+  }
+  status.textContent=rows.length+" observed points · "+events.length+
+    " stock events · "+(snap?.actionable?"Experimental travel markers displayed if within range":"No currently actionable travel markers");
+  lastGraphFetch=Date.now();
+ }catch(err){
+  if(seq!==generation)return;
+  if(graph){graph.destroy();graph=null;}
+  statBox.replaceChildren();eventsBox.replaceChildren();
+  status.textContent="Stock graph unavailable: "+err.message+". Other site functions remain available.";
+ }
+}
+window.showChampionGraph=function(key){
+ if(!key||!key.includes(":"))return;
+ const changed=selected!==key;
+ selected=key;panel.hidden=false;
+ graphTitle.textContent=key.slice(key.indexOf(":")+1)+" — observed stock history";
+ if(changed||!graph)loadGraph();
+ else {graph.$snap=getSnapshot();graph.update("none");}
+};
+window.refreshChampionGraph=function(rows){
+ snapshotRows=Array.isArray(rows)?rows:[];
+ if(selected&&graph){graph.$snap=getSnapshot();graph.update("none");
+   if(Date.now()-lastGraphFetch>90000)loadGraph();}
+};
+for(const button of document.querySelectorAll("[data-window]")){
+ button.addEventListener("click",()=>{
+  const minutes=Number(button.dataset.window);
+  if(![1440,4320,10080].includes(minutes))return;
+  windowMinutes=minutes;
+  document.querySelectorAll("[data-window]").forEach(b=>b.classList.toggle("active",b===button));
+  loadGraph();
+ });
+}
+})();
+</script>
+
 <script>
 const fields=["item_key","model_config","status","departure","arrival","valid_until"];
 const tbody=document.getElementById("rows"), state=document.getElementById("state");
@@ -42,6 +205,7 @@ function paint(rows){
    if(["departure","arrival","valid_until"].includes(field))v=when(v);
    if(field==="status"){v=item.actionable?"Ready · experimental":v;td.className=item.actionable?"good":"warn";}
    td.textContent=v==null?"—":String(v);
+   if(field==="item_key"){const btn=document.createElement("button");btn.className="item-view";btn.textContent=String(v);btn.onclick=()=>window.showChampionGraph(item.item_key);td.replaceChildren(btn);}
    tr.appendChild(td);
   }
   tbody.appendChild(tr);
@@ -54,6 +218,7 @@ async function refresh(){
   if(!response.ok){state.textContent=response.status===404?"Experimental preview is not enabled.":"Snapshot endpoint unavailable (HTTP "+response.status+").";return;}
   const result=await response.json();
   paint(result.latest);
+  window.refreshChampionGraph(result.latest);
  }catch(_){state.textContent="Unable to load the latest cached predictions. Existing results may be outdated.";tbody.replaceChildren();}
 }
 refresh();setInterval(refresh,30000);
