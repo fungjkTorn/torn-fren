@@ -16,6 +16,7 @@ from research.v38_budgeted_runner import run_tick
 from research.v38_readonly_resource_probe import ALL as PINNED
 from research.v42_xanax_candidate_tick import ALLOWED as XANAX
 from research.v38_budgeted_runner import RED_FOX_KEY
+from research.v57_exception_fingerprint import fingerprint
 
 SOURCE=Path("/opt/torn-fren/data/stock_history.db")
 ROOT=Path("/var/lib/torn-fren-v38")
@@ -26,6 +27,17 @@ MAX_JOBS=19
 WALL_BUDGET=220
 WORKER_SECONDS=30
 HEARTBEAT_MAX_AGE=180
+
+
+
+def stage_error(stage, exc, *, executed_count=0):
+    """Only bounded privacy-safe diagnostics from a failed one-shot probe."""
+    return {"status":f"V63_{stage}_ERROR",
+            "stage":stage,
+            "research_only":True,
+            "collector_written":False,
+            "executed_count":executed_count,
+            **fingerprint(exc)}
 
 
 def exact_roster():
@@ -54,7 +66,10 @@ def smoke(*,source=SOURCE,snapshot=SNAPSHOT,sidecar=SIDECAR,
     if source==snapshot or snapshot==sidecar or sidecar in (source,LIVE_SIDECAR.resolve()):
         raise ValueError("research smoke cannot write collector or active sidecar")
     keys=exact_roster()
-    snapshot_result=snapshotter(source,snapshot)
+    try:
+        snapshot_result=snapshotter(source,snapshot)
+    except Exception as exc:
+        return stage_error("SNAPSHOT",exc)
     if not snapshot_result.get("published") or snapshot_result.get("status")!="PRIVATE_SNAPSHOT_READY":
         return {"status":"V63_SNAPSHOT_NOT_READY","research_only":True,
                 "snapshot":snapshot_result,"executed_count":0}
@@ -62,13 +77,20 @@ def smoke(*,source=SOURCE,snapshot=SNAPSHOT,sidecar=SIDECAR,
         raise RuntimeError("published snapshot missing")
     # This is intentionally a live-clock test: later workers must abstain
     # if the snapshot heartbeat has aged outside the normal 180-second gate.
-    result=infer(stock_db=snapshot,sidecar_db=sidecar,execute=True,
-                 with_xanax=True,with_redfox=True,
-                 approved_keys=keys,active=keys,
-                 max_jobs=MAX_JOBS,worker_seconds=WORKER_SECONDS,
-                 budget_seconds=WALL_BUDGET,max_rows=10000)
+    try:
+        result=infer(stock_db=snapshot,sidecar_db=sidecar,execute=True,
+                     with_xanax=True,with_redfox=True,
+                     approved_keys=keys,active=keys,
+                     max_jobs=MAX_JOBS,worker_seconds=WORKER_SECONDS,
+                     budget_seconds=WALL_BUDGET,max_rows=10000)
+    except Exception as exc:
+        return stage_error("RUNNER",exc)
     rows=result.get("executed",[])
     tested={r["item_key"] for r in rows if r.get("item_key")}
+    try:
+        final_age=source_age(snapshot,clock=clock)
+    except Exception as exc:
+        return stage_error("FINAL_FRESHNESS",exc,executed_count=len(rows))
     return {
         "status": ("V63_FULL_MIRROR_EXECUTED" if result.get("mode")==
                    "EXECUTED_RESEARCH_ONLY" else "V63_FULL_MIRROR_DEFERRED"),
@@ -77,7 +99,7 @@ def smoke(*,source=SOURCE,snapshot=SNAPSHOT,sidecar=SIDECAR,
         "collector_written":False,
         "public_routing_changed":False,
         "snapshot":snapshot_result,
-        "end_heartbeat_age_seconds":source_age(snapshot,clock=clock),
+        "end_heartbeat_age_seconds":final_age,
         "expected_models":len(keys),
         "executed_count":len(rows),
         "missing_model_keys":sorted(set(keys)-tested),
@@ -102,9 +124,15 @@ def main():
     try:
         output=smoke()
     except Exception as exc:
-        output={"status":"V63_SMOKE_ERROR","research_only":True,
-                "error_type":type(exc).__name__}
+        output=stage_error("PREFLIGHT",exc)
     print(json.dumps(output,sort_keys=True))
+    # V63 is a diagnostic, not a long-running service: report an actual
+    # nonzero exit when the one-shot check cannot complete its stage.
+    if output.get("status") in {
+        "V63_PREFLIGHT_ERROR","V63_SNAPSHOT_ERROR",
+        "V63_RUNNER_ERROR","V63_FINAL_FRESHNESS_ERROR",
+    }:
+        raise SystemExit(1)
 
 
 if __name__=="__main__":
