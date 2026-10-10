@@ -157,5 +157,7 @@ jobs:
         run: python -m unittest discover -s tests -p 'test_v63_full_mirror_smoke.py' -v
       - name: V64 safe mirror-stage SQLite diagnostics and fail-closed outcomes
         run: python -m unittest discover -s tests -p 'test_v64_mirror_stage_diagnostics.py' -v
+      - name: V65 scheduled private mirror tick and minimal reversible overlay gates
+        run: python -m unittest discover -s tests -p 'test_v65_private_mirror_shadow_tick.py' -v
       - name: Compile standalone entry points
         run: python -m py_compile research/v38_v18_single_tick.py research/v38_v19_single_tick.py research/v38_readonly_resource_probe.py research/v38_nessie_single_tick.py research/v38_readonly_resource_probe.py research/v38_camel_single_tick.py research/v38_peony_single_tick.py services/plushie_flower_dynamic_planner_v20.py research/v38_budgeted_runner.py research/v38_prediction_store.py research/v38_incremental_observer.py research/v38_feature_cache.py research/v38_red_fox_single_tick.py research/v38_catalog_seed.py research/v38_adaptive_policy.py research/v38_capacity_guard.py research/v38_idle_admission.py research/v38_shadow_canary_preflight.py web/app.py web/catalog_cache_v38.py web/v38_revision_fingerprint.py
