@@ -17,6 +17,7 @@ from web.private_shadow_v29 import champion_shadow
 from web.v38_revision_fingerprint import revision as v38_source_revision
 from web.catalog_cache_v38 import CatalogCache
 from web.history_cache_v39 import HistoryCache
+from web.v41_champion_cache import read_snapshots as read_v41_champions
 import os
 
 app = FastAPI(title="Torn Fren Stock Graph")
@@ -446,6 +447,32 @@ def api_catalog():
     if os.environ.get("TORN_FREN_V38_CATALOG_CACHE") == "1":
         return _V38_CATALOG_CACHE.get(_build_catalog_uncached)
     return _build_catalog_uncached()
+
+
+@app.get("/api/experimental/v41/predictions")
+def api_v41_champion_predictions(country: str | None = None, item: str | None = None):
+    """Precomputed read-only beta, opt-in; no expensive web request forecasting."""
+    if os.environ.get("TORN_FREN_V41_CHAMPION_BETA") != "1":
+        raise HTTPException(status_code=404, detail="Experimental beta disabled")
+    location = os.environ.get("TORN_FREN_V41_SNAPSHOT_DB")
+    if not location:
+        return {"experimental": True, "status": "SIDECAR_NOT_CONFIGURED",
+                "fallback_required": True}
+    if bool(country) != bool(item):
+        raise HTTPException(status_code=400, detail="country and item must be paired")
+    if country and (len(country) > 20 or len(item) > 120):
+        raise HTTPException(status_code=400, detail="invalid item selector")
+    key = f"{country.strip().lower()}:{item.strip()}" if country and item else None
+    latest = read_v41_champions(location, now=int(time.time()), key=key)
+    return {"experimental": True, "prediction_accuracy_verified": False,
+            "source": "PRECOMPUTED_READ_ONLY_SIDECAR", "latest": latest}
+
+
+@app.get("/experimental")
+def champion_experimental_page():
+    if os.environ.get("TORN_FREN_V41_CHAMPION_BETA") != "1":
+        raise HTTPException(status_code=404, detail="Experimental beta disabled")
+    return FileResponse(STATIC_DIR / "experimental.html")
 
 
 @app.get("/api/admin/health")

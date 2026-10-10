@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Torn Fren | Experimental Champion Predictions</title>
+<style>
+:root{color-scheme:dark;font-family:system-ui,-apple-system,Segoe UI,sans-serif}
+body{max-width:1150px;margin:2rem auto;padding:0 1rem;background:#181b21;color:#e9edf5}
+a{color:#91b4ff} .muted{color:#aeb8c6} table{width:100%;border-collapse:collapse;margin-top:1.4rem}
+th,td{padding:.75rem;text-align:left;border-bottom:1px solid #343d4c}
+th{color:#aeb8c6;font-size:.85rem} .good{color:#86e2b8} .warn{color:#ffca87}
+.note{border-left:3px solid #748cbd;padding:.6rem .9rem;background:#222a36}
+@media(max-width:750px){table,thead,tbody,tr,td{display:block}thead{display:none}
+tr{padding:.8rem 0;border-bottom:1px solid #343d4c}td{border:0;padding:.2rem 0}}
+</style>
+</head>
+<body>
+<p><a href="/">← Torn Fren stock graphs</a></p>
+<h1>Experimental champion predictions</h1>
+<p class="note">Research beta. Recommendations target at least 30 units at arrival, with a 10-second grace period.
+<strong>Real-world accuracy has not yet been verified.</strong> These are not guaranteed restocks.
+Expired, missed, or failed predictions are never presented as actionable.</p>
+<p id="state" class="muted" role="status">Loading cached snapshots…</p>
+<table aria-label="Champion predictions">
+<thead><tr><th>Item</th><th>Model</th><th>State</th><th>Departure (your time)</th><th>Arrival (your time)</th><th>Valid until</th></tr></thead>
+<tbody id="rows"></tbody>
+</table>
+<p class="muted">This page reads precomputed results only, refreshing every 30 seconds. It never runs a forecasting model or schedules travel.</p>
+<script>
+const fields=["item_key","model_config","status","departure","arrival","valid_until"];
+const tbody=document.getElementById("rows"), state=document.getElementById("state");
+function when(t){return t==null?"—":new Date(t*1000).toLocaleString();}
+function paint(rows){
+ tbody.replaceChildren();
+ if(!Array.isArray(rows)||rows.length===0){state.textContent="No private champion snapshots are currently available.";return;}
+ for(const item of rows){
+  const tr=document.createElement("tr");
+  for(const field of fields){
+   const td=document.createElement("td");
+   let v=item[field];
+   if(["departure","arrival","valid_until"].includes(field))v=when(v);
+   if(field==="status"){v=item.actionable?"Ready · experimental":v;td.className=item.actionable?"good":"warn";}
+   td.textContent=v==null?"—":String(v);
+   tr.appendChild(td);
+  }
+  tbody.appendChild(tr);
+ }
+ state.textContent="Last refreshed: "+new Date().toLocaleTimeString()+". "+rows.filter(x=>x.actionable).length+" actionable experimental proposals out of "+rows.length+" snapshot rows.";
+}
+async function refresh(){
+ try{
+  const response=await fetch("/api/experimental/v41/predictions",{cache:"no-store"});
+  if(!response.ok){state.textContent=response.status===404?"Experimental preview is not enabled.":"Snapshot endpoint unavailable (HTTP "+response.status+").";return;}
+  const result=await response.json();
+  paint(result.latest);
+ }catch(_){state.textContent="Unable to load the latest cached predictions. Existing results may be outdated.";tbody.replaceChildren();}
+}
+refresh();setInterval(refresh,30000);
+</script>
+</body>
+</html>
