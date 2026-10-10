@@ -6,7 +6,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from research.v60_private_snapshot_probe import snapshot_once
+from research.v60_private_snapshot_probe import snapshot_once, approved_collector_source
 
 T=1791540000
 
@@ -21,6 +21,32 @@ def seed(db,stamp=T-15):
 
 
 class SnapshotTests(unittest.TestCase):
+    def test_canonical_approved_symlink_source_is_accepted(self):
+        # VM's approved /opt path may resolve to another physical filename.
+        # Both sides of the identity check must be resolved, not only input.
+        with tempfile.TemporaryDirectory() as tmp:
+            real=Path(tmp)/"physical"/"stock_history.db"
+            real.parent.mkdir()
+            seed(real)
+            alias=Path(tmp)/"approved"/"stock_history.db"
+            alias.parent.mkdir()
+            alias.symlink_to(real)
+            self.assertTrue(approved_collector_source(alias,approved=alias))
+            self.assertTrue(approved_collector_source(real,approved=alias))
+            other=Path(tmp)/"unapproved"/"stock_history.db"
+            other.parent.mkdir()
+            seed(other)
+            self.assertFalse(approved_collector_source(other,approved=alias))
+
+    def test_missing_or_broken_approved_source_fails_closed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            physical=Path(tmp)/"physical.db"
+            physical.write_bytes(b"placeholder")
+            bad=Path(tmp)/"bad-alias.db"
+            bad.symlink_to(Path(tmp)/"nonexistent.db")
+            with self.assertRaises(FileNotFoundError):
+                approved_collector_source(physical,approved=bad)
+
     def test_consistent_backup_readonly_and_integrity(self):
         with tempfile.TemporaryDirectory() as tmp:
             db=Path(tmp)/"live"/"stock.db"

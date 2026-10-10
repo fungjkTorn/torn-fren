@@ -97,6 +97,16 @@ def snapshot_once(source: str | Path, destination: str | Path,
                 p.unlink()
 
 
+def approved_collector_source(requested: str | Path, *, approved: str | Path =
+                              "/opt/torn-fren/data/stock_history.db") -> bool:
+    """Compare canonical filesystem identities, not an alias against a literal.
+
+    The approved production path can itself be a symbolic link. Resolve both
+    sides strictly; this never authorizes an unrelated database file.
+    """
+    return Path(requested).resolve(strict=True) == Path(approved).resolve(strict=True)
+
+
 def main():
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument("--db", required=True)
@@ -104,7 +114,7 @@ def main():
     args=p.parse_args()
     # CLI restricts writes to private research-owned directory only.
     source=Path(args.db).resolve(strict=True)
-    if source != Path("/opt/torn-fren/data/stock_history.db"):
+    if not approved_collector_source(source):
         raise SystemExit("STOP: source must be collector stock history")
     dst=Path(args.snapshot).resolve(strict=False)
     private=Path("/var/lib/torn-fren-v38").resolve(strict=True)
