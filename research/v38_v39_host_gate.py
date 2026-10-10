@@ -1,9 +1,10 @@
-"""Read-only V39 audit-backlog health gate before private V38 canary.
+"""Read-only V39 audit-worker liveness gate before private V38 canary.
 
-A fresh collector and spare CPU are not enough if durable background
-forecast auditing is deadlocked or repeatedly failing. Protect existing
-shadow outcome evidence; don't enable additional research workers until
-there is proof that the V39 audit worker actually completes real jobs.
+V38 specialist shadow inference never consumes the V39 audit backlog: it
+reads source stock directly. Therefore an old pending V39 target job is an
+observable performance warning, not proof that the independent V38 research
+worker is unsafe. Require real audit-worker progress, then separately require
+fresh source/CPU admission in the V38 launcher and worker.
 """
 from __future__ import annotations
 
@@ -15,7 +16,7 @@ import sqlite3
 import time
 
 MAX_SUCCESS_AGE = 900
-MAX_HIGH_PRIORITY_AGE = 1200
+MAX_HIGH_PRIORITY_AGE = 1200  # warning boundary; never used to block inference
 
 
 def inspect(path, *, now=None):
@@ -29,6 +30,7 @@ def inspect(path, *, now=None):
         "last_completion_age_seconds": None,
         "oldest_high_priority_pending_age_seconds": None,
         "oldest_general_pending_age_seconds": None,
+        "warnings": [],
     }
     try:
         p = Path(path).resolve(strict=True)
@@ -69,13 +71,13 @@ def inspect(path, *, now=None):
         elif (output["last_completion_age_seconds"] is None
               or not 0<=output["last_completion_age_seconds"]<=MAX_SUCCESS_AGE):
             output["reason"]="AUDIT_WORKER_NOT_COMPLETING_RECENTLY"
-        elif (output["oldest_high_priority_pending_age_seconds"] is not None
-              and output["oldest_high_priority_pending_age_seconds"]>
-              MAX_HIGH_PRIORITY_AGE):
-            output["reason"]="URGENT_STOCK_AUDITS_TOO_OLD"
         else:
             output["status"]="AUDIT_QUEUE_PROGRESSING"
             output["reason"]=None
+        if (output["oldest_high_priority_pending_age_seconds"] is not None
+                and output["oldest_high_priority_pending_age_seconds"]>
+                MAX_HIGH_PRIORITY_AGE):
+            output["warnings"].append("URGENT_STOCK_AUDITS_LAGGING")
     except (OSError,sqlite3.Error,ValueError) as exc:
         output["reason"]="AUDIT_QUEUE_UNREADABLE"
         output["error_type"]=type(exc).__name__
