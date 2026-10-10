@@ -33,8 +33,11 @@ class ResolvedExpertCacheTests(unittest.TestCase):
         anchor=NOW-60000
         d={(anchor,0):(1,NOW+1),(anchor,1):(0,NOW-1)}
         s=m.score_experts(d,[anchor],NOW,2,count=2)
-        self.assertEqual(s["expert_index"],1)
-        self.assertEqual(s["resolved_count"],1)
+        # Expert 0's future win cannot contribute; its zero-evidence
+        # Beta(2,2) prior is 0.5 and correctly beats expert 1's 0/1 (0.4).
+        self.assertEqual(s["expert_index"],0)
+        self.assertEqual(s["resolved_count"],0)
+        self.assertEqual(s["posterior_score"],0.5)
 
     def test_gap_revisions_invalidate_private_ledger(self):
         with tempfile.TemporaryDirectory() as folder:
