@@ -117,6 +117,28 @@ class V54OfflineResumeTests(unittest.TestCase):
                 self.assertEqual(conn.execute(
                     "SELECT COUNT(*) FROM v54_history").fetchone()[0],0)
 
+    def test_never_write_to_stock_database_path(self):
+        with tempfile.TemporaryDirectory() as td:
+            db,cache,output,ctx=self.fixtures(td)
+            with self.assertRaisesRegex(ValueError,"paths must differ"):
+                m.run(db,db,output,"lion",NOW,
+                      builder=lambda *a,**k:ctx)
+            with self.assertRaisesRegex(ValueError,"paths must differ"):
+                m.run(db,cache,db,"lion",NOW,
+                      builder=lambda *a,**k:ctx)
+
+    def test_frozen_source_mutation_mid_batch_is_rejected(self):
+        with tempfile.TemporaryDirectory() as td:
+            db,cache,output,ctx=self.fixtures(td)
+            def mutate(context,target,s,cutoff):
+                db.write_bytes(b"changed during run"+b"_"*5100)
+                return None
+            with patch.object(m,"eligible_anchors",return_value=[100000]):
+                with self.assertRaisesRegex(ValueError,"changed during offline replay"):
+                    m.run(db,cache,output,"lion",NOW,last_starts=20,
+                          builder=lambda *a,**k:ctx,processor=mutate)
+            self.assertFalse(output.exists())
+
     def test_no_effect_on_a_stock_history_database(self):
         with tempfile.TemporaryDirectory() as td:
             db,cache,output,ctx=self.fixtures(td)

@@ -120,6 +120,12 @@ def run(db,cache,output,target,cutoff,*,last_starts=240,max_new=12,
     if not 1<=last_starts<=5000 or not 1<=max_new<=50:
         raise ValueError("offline bounded batch limits required")
     db=Path(db).resolve(strict=True)
+    cache_path=Path(cache).resolve(strict=False)
+    output_path=Path(output).resolve(strict=False)
+    if len({db,cache_path,output_path})!=3:
+        raise ValueError("stock source, private cache and export paths must differ")
+    if str(db).startswith(("/opt/torn-fren/","/var/lib/torn-fren/")):
+        raise ValueError("refusing production collector DB for offline replay")
     # A live collector changes underneath this computation and invalidates
     # resolved labels; require a copied, frozen input by snapshot convention.
     if not db.is_file() or db.stat().st_size<4096:
@@ -156,6 +162,8 @@ def run(db,cache,output,target,cutoff,*,last_starts=240,max_new=12,
                 with con:
                     con.execute("INSERT INTO v54_history VALUES(?,?,?)",
                                 (int(s),state,payload))
+            if fingerprint(db)!=ident[3]:
+                raise ValueError("source snapshot changed during offline replay")
             n=write_export_atomic(con,output)
             seen=len(done)+len(batch)
             return {
