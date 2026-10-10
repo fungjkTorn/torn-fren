@@ -28,6 +28,7 @@ def inspect(path, *, now=None):
         "completed_count": 0,
         "last_completion_age_seconds": None,
         "oldest_high_priority_pending_age_seconds": None,
+        "oldest_general_pending_age_seconds": None,
     }
     try:
         p = Path(path).resolve(strict=True)
@@ -39,19 +40,31 @@ def inspect(path, *, now=None):
                 GROUP BY status
             """)}
             output["completed_count"] = int(output["queue"].get("done",0))
+            # A completed item may be requeued as soon as its stock changes.
+            # Retain its real last_finished_at evidence even when status moves
+            # from done -> pending; never use count(done) as completion rate.
             latest = conn.execute("""
                 SELECT MAX(last_finished_at) FROM routine_audit_jobs_v39
-                WHERE status='done'
             """).fetchone()[0]
+            # V39.1 prioritizes the six frozen-canary/legacy Xanax evidence
+            # items at priority >=100; other 236-item audits stay visible
+            # as backlog but don't turn a research readiness check into a
+            # requirement to clear the entire catalog at 35% of one CPU.
             oldest = conn.execute("""
                 SELECT MIN(queued_at) FROM routine_audit_jobs_v39
-                WHERE priority>0 AND status IN ('pending','running')
+                WHERE priority>=100 AND status IN ('pending','running')
+            """).fetchone()[0]
+            general_oldest = conn.execute("""
+                SELECT MIN(queued_at) FROM routine_audit_jobs_v39
+                WHERE priority<100 AND status IN ('pending','running')
             """).fetchone()[0]
         output["last_completion_age_seconds"] = (
             now-int(latest) if latest is not None else None)
         output["oldest_high_priority_pending_age_seconds"] = (
             now-int(oldest) if oldest is not None else None)
-        if output["completed_count"]==0:
+        output["oldest_general_pending_age_seconds"] = (
+            now-int(general_oldest) if general_oldest is not None else None)
+        if latest is None:
             output["reason"]="NO_COMPLETED_AUDITS_YET"
         elif (output["last_completion_age_seconds"] is None
               or not 0<=output["last_completion_age_seconds"]<=MAX_SUCCESS_AGE):
