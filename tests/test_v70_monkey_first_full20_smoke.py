@@ -224,6 +224,9 @@ class Full20SmokeTests(unittest.TestCase):
 
     def test_numeric_revision_probe_explains_cache_newer_than_snapshot(self):
         self.snapshot_once(self.source,self.snapshot)
+        # Other V70 tests use opaque cache fixture bytes because their Monkey
+        # selector is mocked. This particular test needs a real SQLite cache.
+        self.cache.unlink()
         with sqlite3.connect(self.cache) as c:
             c.execute("""CREATE TABLE expert_source_state(
                 item_key TEXT PRIMARY KEY,gap_fingerprint TEXT,
