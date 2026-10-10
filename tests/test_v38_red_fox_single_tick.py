@@ -40,6 +40,16 @@ class RedFoxSingleTickTests(unittest.TestCase):
         self.assertEqual(out["grace_seconds"],10)
         context.con.close.assert_called_once()
 
+    def test_live_builder_uses_heartbeat_attested_asof_without_rw(self):
+        context=SimpleNamespace(grid=[NOW],con=Mock())
+        with patch.object(red,"inspect_live_source",return_value={"status":"FRESH"}):
+            with patch.object(red.ResearchContext,"build",return_value=context) as builder:
+                with patch.object(red,"AnalogPlanner") as planner:
+                    planner.return_value.plan.return_value=(NOW+300,.5,.5)
+                    result=red.predict("unused","uni","Red Fox Plushie",NOW)
+        self.assertEqual(result["status"],"RESEARCH_PROPOSAL_ONLY")
+        builder.assert_called_once_with("unused",asof=NOW,readonly=True)
+
     def test_lagging_joint_context_abstains(self):
         context=SimpleNamespace(grid=[NOW-900],con=Mock())
         with patch.object(red,"inspect_live_source",return_value={"status":"FRESH"}):
@@ -47,6 +57,47 @@ class RedFoxSingleTickTests(unittest.TestCase):
                 self.assertEqual(red.predict("unused","uni","Red Fox Plushie",NOW)["status"],
                                  "CROSS_ITEM_CONTEXT_LAGGING")
 
+
+    def test_asof_context_extends_quiet_stock_without_hindsight(self):
+        import sqlite3,tempfile
+        from pathlib import Path
+        from research.plushie_champions.common import ResearchContext, STEP
+        with tempfile.TemporaryDirectory() as folder:
+            db=Path(folder)/"readonly.db"
+            with sqlite3.connect(db) as con:
+                con.execute("CREATE TABLE stock_history(timestamp INTEGER,country TEXT,item_name TEXT,quantity INTEGER,source TEXT)")
+                con.execute("CREATE TABLE collection_gaps(start_timestamp INTEGER,end_timestamp INTEGER)")
+                con.executemany("INSERT INTO stock_history VALUES(?,?,?,?,?)",[
+                    (NOW-600,"uni","Red Fox Plushie",55,"test"),
+                    (NOW-300,"uni","Red Fox Plushie",45,"test")])
+            asof=ResearchContext.build(db,targets=[("uni","Red Fox Plushie")],
+                                       asof=NOW,readonly=True)
+            try:
+                self.assertEqual(asof.grid[-1],NOW)
+                self.assertEqual(asof.qty[0,-1],45)
+                self.assertEqual(asof.active[0,-1],1)
+            finally:
+                asof.con.close()
+            old=ResearchContext.build(db,targets=[("uni","Red Fox Plushie")])
+            try:
+                self.assertEqual(old.grid[-1],NOW-300)
+            finally:
+                old.con.close()
+
+    def test_asof_rejects_future_stock_in_context(self):
+        import sqlite3,tempfile
+        from pathlib import Path
+        from research.plushie_champions.common import ResearchContext
+        with tempfile.TemporaryDirectory() as folder:
+            db=Path(folder)/"readonly.db"
+            with sqlite3.connect(db) as con:
+                con.execute("CREATE TABLE stock_history(timestamp INTEGER,country TEXT,item_name TEXT,quantity INTEGER,source TEXT)")
+                con.execute("CREATE TABLE collection_gaps(start_timestamp INTEGER,end_timestamp INTEGER)")
+                con.execute("INSERT INTO stock_history VALUES(?,?,?,?,?)",
+                            (NOW+300,"uni","Red Fox Plushie",55,"test"))
+            with self.assertRaises(ValueError):
+                ResearchContext.build(db,targets=[("uni","Red Fox Plushie")],
+                                      asof=NOW,readonly=True)
 
 if __name__=="__main__":
     unittest.main()

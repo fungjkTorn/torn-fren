@@ -27,9 +27,12 @@ def predict(db: str|Path,country: str,item: str,now: int):
     source=inspect_live_source(db,now)
     if source["status"]!="FRESH":
         return {"status":source["status"]}
-    ctx=ResearchContext.build(db)
+    # Collector freshness was independently verified above. Stock history
+    # stores CHANGES, not every heartbeat; extending the held state to the
+    # query tick is causal and avoids false shared-context staleness.
+    q=(now//STEP)*STEP
+    ctx=ResearchContext.build(db,asof=now,readonly=True)
     try:
-        q=(now//STEP)*STEP
         if len(ctx.grid)==0 or q>ctx.grid[-1]:
             return {"status":"CROSS_ITEM_CONTEXT_LAGGING"}
         if now-ctx.grid[-1]>STEP+180:

@@ -25,7 +25,12 @@ PLUSHIES = [
     ('sou','Lion Plushie'),
 ]
 
-def connect(db: str | Path) -> sqlite3.Connection:
+def connect(db: str | Path, readonly: bool = False) -> sqlite3.Connection:
+    if readonly:
+        p = Path(db).resolve(strict=True)
+        con = sqlite3.connect(p.as_uri() + "?mode=ro", uri=True, timeout=15)
+        con.execute("PRAGMA query_only=ON")
+        return con
     return sqlite3.connect(str(Path(db)))
 
 def load_gaps(con):
@@ -99,10 +104,27 @@ class ResearchContext:
     g18: np.ndarray
     active_frac: np.ndarray
     @classmethod
-    def build(cls,db,targets=PLUSHIES):
-        con=connect(db);gs,ge=load_gaps(con);tls={k:Timeline(con,gs,ge,*k) for k in targets}
-        g0=math.ceil(max(x.ts[0] for x in tls.values())/STEP)*STEP;g1=math.floor(min(x.ts[-1] for x in tls.values())/STEP)*STEP
-        grid=np.arange(g0,g1+STEP,STEP,float);A=[];Q=[];AGE=[]
+    def build(cls,db,targets=PLUSHIES,*,asof=None,readonly=False):
+        # Historical replay retains the exact original shared-observation
+        # endpoint. Live workers may extend unchanged last-known stock to an
+        # independently verified collector as-of time, never into the future.
+        con=connect(db,readonly=readonly)
+        try:
+            gs,ge=load_gaps(con)
+            tls={k:Timeline(con,gs,ge,*k) for k in targets}
+            if asof is not None:
+                cutoff=int(asof)
+                if cutoff < max(float(tl.ts[-1]) for tl in tls.values()):
+                    raise ValueError("future stock rows relative to requested as-of")
+            g0=math.ceil(max(x.ts[0] for x in tls.values())/STEP)*STEP
+            if asof is None:
+                g1=math.floor(min(x.ts[-1] for x in tls.values())/STEP)*STEP
+            else:
+                g1=math.floor(cutoff/STEP)*STEP
+            grid=np.arange(g0,g1+STEP,STEP,float);A=[];Q=[];AGE=[]
+        except BaseException:
+            con.close()
+            raise
         for k in targets:
             a,q,ag=tls[k].vals(grid);A.append(a);Q.append(q);AGE.append(ag)
         A,Q,AGE=np.vstack(A),np.vstack(Q),np.vstack(AGE)

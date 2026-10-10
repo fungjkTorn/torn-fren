@@ -60,6 +60,8 @@ jobs:
         run: python -m unittest discover -s tests -p 'test_v38_budgeted_runner.py' -v
       - name: Verify optional V38 beta snapshot API stays disabled by default
         run: python -m unittest discover -s tests -p 'test_v38_experimental_api.py' -v
+      - name: Verify Red Fox live as-of extension and causal history gate
+        run: python -m unittest discover -s tests -p 'test_v38_red_fox_single_tick.py' -v
       - name: Verify Red Fox benchmark-gated source config
         run: python -m unittest discover -s tests -p 'test_v38_red_fox_single_tick.py' -v
       - name: Verify 236-item fallback registration never claims live champions
