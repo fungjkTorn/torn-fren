@@ -6,7 +6,9 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import time
 from types import SimpleNamespace
+from research.v46_fast_template import FastTemplatePlanner
 
 from services.frozen_candidate_worker_v31 import inspect_live_source
 from research.plushie_champions.common import (
@@ -54,7 +56,7 @@ def simulate_one(planner,timeline,start,travel):
     return {"status":"NO_RESOLVED_EXPERT_DECISION",
             "success":None,"resolved_at":None}
 
-def probe(db,target,expert_index,now):
+def probe(db,target,expert_index,now,*,compare_fast=False):
     if target not in TARGETS or not 0<=expert_index<len(EXPERTS):
         raise ValueError("unsupported target or expert")
     country,item,days=TARGETS[target];now=int(now)
@@ -75,10 +77,32 @@ def probe(db,target,expert_index,now):
         ctx=SimpleNamespace(timelines={(country,item):timeline})
         planner=TemplatePlanner(ctx,country,item,
                                 lags=lags,lookback=look,shift_range=shift)
+        t0=time.monotonic()
         outcome=simulate_one(planner.plan,timeline,start,TRAVEL_SECONDS[country])
+        original_seconds=round(time.monotonic()-t0,3)
+        comparison=None
+        if compare_fast:
+            accelerated=FastTemplatePlanner(ctx,country,item,
+                                            lags=lags,lookback=look,
+                                            shift_range=shift)
+            t1=time.monotonic()
+            fast_outcome=simulate_one(accelerated.plan,timeline,start,
+                                     TRAVEL_SECONDS[country])
+            fast_seconds=round(time.monotonic()-t1,3)
+            if fast_outcome!=outcome:
+                return {"status":"SOURCE_PARITY_MISMATCH",
+                        "key":f"{country}:{item}",
+                        "expert_index":expert_index,
+                        "original_decision":outcome,
+                        "accelerated_decision":fast_outcome}
+            comparison={"original_seconds":original_seconds,
+                        "optimized_seconds":fast_seconds,
+                        "same_outcome":True}
     finally:
         con.close()
-    return {"status":outcome["status"],"key":f"{country}:{item}",
+    return {"status":"EXPERT_REPLAY_PARITY_OK" if compare_fast else outcome["status"],
+            "comparison":comparison,
+            "key":f"{country}:{item}",
             "expert_index":expert_index,
             "expert":{"lags":list(lags),"lookback_seconds":look,
                       "shift_seconds":shift},
@@ -95,9 +119,10 @@ def main():
     p.add_argument("--target",choices=tuple(TARGETS),required=True)
     p.add_argument("--expert-index",type=int,default=0)
     p.add_argument("--now",required=True,type=int)
+    p.add_argument("--compare-fast",action="store_true",help="Check identical original and optimized decisions")
     a=p.parse_args()
     try:
-        result=probe(a.db,a.target,a.expert_index,a.now)
+        result=probe(a.db,a.target,a.expert_index,a.now,compare_fast=a.compare_fast)
     except Exception as exc:
         result={"status":"EXPERT_REPLAY_ERROR","error_type":type(exc).__name__}
     print(json.dumps(result,sort_keys=True))
