@@ -59,7 +59,14 @@ class MonkeyIsolatedTests(unittest.TestCase):
         return res,validator
 
     def test_success_only_records_to_separate_canary_sidecar(self):
-        live_original=self.source.read_bytes()
+        # A read-only online backup can legitimately change the main SQLite
+        # file's physical bytes through WAL checkpoint coordination.
+        # Verify the collector's logical data is identical, not file bytes.
+        with sqlite3.connect(f"file:{self.source}?mode=ro",uri=True) as source:
+            live_original=(
+                source.execute("SELECT * FROM stock_history ORDER BY id").fetchall(),
+                source.execute("SELECT * FROM poll_heartbeats").fetchall(),
+            )
         v48_original=self.cache.read_bytes()
         out,validator=self.run_canary()
         self.assertEqual(out["status"],m.SUCCESS)
@@ -75,7 +82,12 @@ class MonkeyIsolatedTests(unittest.TestCase):
         self.assertEqual(row,(
             "arg:Monkey Plushie","RESEARCH_PROPOSAL_ONLY",
             m.FAMILY,m.CONFIG,NOW+1800,NOW+1800+6660,HEARTBEAT))
-        self.assertEqual(self.source.read_bytes(),live_original)
+        with sqlite3.connect(f"file:{self.source}?mode=ro",uri=True) as source:
+            live_after=(
+                source.execute("SELECT * FROM stock_history ORDER BY id").fetchall(),
+                source.execute("SELECT * FROM poll_heartbeats").fetchall(),
+            )
+        self.assertEqual(live_after,live_original)
         self.assertEqual(self.cache.read_bytes(),v48_original)
         self.assertEqual(validator.call_args.args,(self.mirror,self.cache))
 
