@@ -19,14 +19,26 @@ from research.v38_capacity_guard import inspect as capacity_status
 
 ROSTER=Path(__file__).with_name("v38_roster.json")
 
+# V42 requires an explicit opt-in. Default 16-candidate worker routing and
+# all V38 callers stay unchanged; Japan Xanax is NOT a generic candidate.
+V42_XANAX_ROSTER = {
+    "can:Xanax": {"category":"other", "model_family":"v19", "config_name":"dyn8"},
+    "uni:Xanax": {"category":"other", "model_family":"v19", "config_name":"dyn3"},
+}
+V42_XANAX_ROUTES = {
+    key: "research.v42_xanax_candidate_tick" for key in V42_XANAX_ROSTER
+}
 
-def choose(roster, snapshots, *, now, active=(), changed=(), limit=4):
+
+
+def choose(roster, snapshots, *, now, active=(), changed=(), limit=4, routes=None):
     """Fixed source-pinned 16 of 22; never substitute for six missing winners."""
     active,changed=set(active),set(changed)
+    routes = PINNED_WORKERS if routes is None else routes
     due=[]
     pending=[]
     for key,meta in roster.items():
-        if key not in PINNED_WORKERS:
+        if key not in routes:
             pending.append(key)
             continue
         snap=snapshots.get(key) or {}
@@ -46,15 +58,19 @@ def choose(roster, snapshots, *, now, active=(), changed=(), limit=4):
 
 def run_tick(*, stock_db, sidecar_db, execute=False, active=(),
              approved_keys=None, max_rows=10000, max_jobs=4, worker_seconds=20,
-             budget_seconds=85, now=None, runner=subprocess.run,
+             budget_seconds=85, now=None, with_xanax=False, runner=subprocess.run,
              clock=time.monotonic, capacity_probe=capacity_status):
-    if not 1<=max_jobs<=16 or not 1<=worker_seconds<=60:
+    if not 1<=max_jobs<=(18 if with_xanax else 16) or not 1<=worker_seconds<=60:
         raise ValueError("invalid concurrency/resource limits")
     if not worker_seconds<=budget_seconds<=240:
         raise ValueError("invalid total wall budget")
     live_clock = now is None
     now=int(time.time() if live_clock else now)
     roster=json.loads(ROSTER.read_text(encoding="utf-8"))["items"]
+    workers=dict(PINNED_WORKERS)
+    if with_xanax:
+        roster={**roster, **V42_XANAX_ROSTER}
+        workers.update(V42_XANAX_ROUTES)
     # Explicit allowlisting supports a first-five isolation test without
     # accidentally executing every runnable model in the 21-item roster.
     # Unknown keys abort before any collector or research DB access.
@@ -68,7 +84,7 @@ def run_tick(*, stock_db, sidecar_db, execute=False, active=(),
     if not execute:
         snapshots={p["item_key"]:p for p in read(sidecar_db,now) if "item_key" in p}
         return {"mode":"PLAN_ONLY","plan":choose(roster,snapshots,now=now,
-                active=active,limit=max_jobs),"collector_written":False}
+                active=active,limit=max_jobs,routes=workers),"collector_written":False}
     capacity=capacity_probe()
     if not capacity["allowed"]:
         return {"mode":"DEFERRED_CPU_PRESSURE","capacity":capacity,
@@ -88,7 +104,7 @@ def run_tick(*, stock_db, sidecar_db, execute=False, active=(),
                     "delta":delta,"executed":[],"collector_written":False}
         snaps={p["item_key"]:p for p in read(sidecar_db,now) if "item_key" in p}
         plan=choose(roster,snaps,now=now,active=active,
-                    changed=delta["affected_keys"],limit=max_jobs)
+                    changed=delta["affected_keys"],limit=max_jobs,routes=workers)
         start=clock()
         results=[]
         for key in plan["execute"]:
@@ -103,7 +119,7 @@ def run_tick(*, stock_db, sidecar_db, execute=False, active=(),
             # reject newly observed rows as FUTURE_RECORDS_PRESENT.
             # Explicit 'now' remains frozen for deterministic historical tests.
             worker_now=max(now,int(time.time())) if live_clock else now
-            args=[sys.executable,"-m",PINNED_WORKERS[key],"--db",
+            args=[sys.executable,"-m",workers[key],"--db",
                   str(stock_db),"--country",country,"--item",item,
                   "--now",str(worker_now)]
             t0=clock()
@@ -152,6 +168,7 @@ def main():
     p.add_argument("--sidecar",required=True)
     p.add_argument("--execute",action="store_true")
     p.add_argument("--active",action="append",default=[])
+    p.add_argument("--with-xanax",action="store_true",help="Opt into two frozen generic v19 Canada and UK candidates; NOT Japan")
     p.add_argument("--allow-item",action="append",default=None,
                    help="Repeat to limit runs to an explicitly approved subset")
     p.add_argument("--max-rows",type=int,default=10000)
@@ -162,7 +179,8 @@ def main():
     out=run_tick(stock_db=args.db,sidecar_db=args.sidecar,
                  execute=args.execute,active=args.active,max_rows=args.max_rows,
                  max_jobs=args.max_jobs,worker_seconds=args.per_worker,
-                 approved_keys=args.allow_item,budget_seconds=args.budget)
+                 approved_keys=args.allow_item,budget_seconds=args.budget,
+                 with_xanax=args.with_xanax)
     print(json.dumps(out,sort_keys=True,indent=2))
 
 
