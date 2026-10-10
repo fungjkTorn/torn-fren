@@ -14,7 +14,26 @@ FRESHNESS = 180
 VALID_STATUS = "RESEARCH_PROPOSAL_ONLY"
 
 
-def _present(row, now):
+def read_live_poll_heartbeat(path):
+    """Latest verified poll, from the indexed timestamp column. Read-only.
+
+    A missing/unreadable collector never authorizes a departure prediction.
+    """
+    try:
+        p = Path(path).resolve(strict=True)
+        with closing(sqlite3.connect(p.as_uri() + "?mode=ro",
+                                    uri=True, timeout=0.15)) as db:
+            db.execute("PRAGMA query_only=ON")
+            row = db.execute("""SELECT timestamp FROM poll_heartbeats
+                WHERE mode='poll-cycle' AND success=1
+                ORDER BY timestamp DESC LIMIT 1""").fetchone()
+            return int(row[0]) if row and row[0] is not None else None
+    except (OSError, sqlite3.Error, ValueError, TypeError):
+        return None
+
+
+
+def _present(row, now, live_heartbeat):
     d = dict(row)
     computed = int(d["computed_at"])
     as_of = d["stock_as_of"]
@@ -26,8 +45,18 @@ def _present(row, now):
         status = "FUTURE_SNAPSHOT"
     elif now >= expiry:
         status = "EXPIRED_SNAPSHOT"
-    elif as_of is None or int(as_of) > now or now - int(as_of) > FRESHNESS:
-        status = "STALE_SOURCE"
+    elif as_of is None or int(as_of) > computed or computed - int(as_of) > FRESHNESS:
+        # Provenance age is measured at inference, not at page-view time:
+        # five-minute valid snapshots must not become stale after 180 seconds.
+        status = "STALE_AT_INFERENCE"
+    elif live_heartbeat is None:
+        status = "COLLECTOR_UNVERIFIED"
+    elif live_heartbeat > now:
+        status = "FUTURE_COLLECTOR_HEARTBEAT"
+    elif live_heartbeat < int(as_of):
+        status = "COLLECTOR_HEARTBEAT_REGRESSION"
+    elif now - live_heartbeat > FRESHNESS:
+        status = "COLLECTOR_STALE"
     elif status == VALID_STATUS:
         if (int(d["executed"]) != 1 or not isinstance(departure, int)
                 or not isinstance(arrival, int)
@@ -44,6 +73,7 @@ def _present(row, now):
         "model_config": d["model_config"],
         "computed_at": computed,
         "stock_as_of": as_of,
+        "collector_last_verified": live_heartbeat,
         "valid_until": expiry,
         "departure": departure if actionable else None,
         "arrival": arrival if actionable else None,
@@ -56,7 +86,7 @@ def _present(row, now):
     }
 
 
-def read_snapshots(path, *, now, key=None, limit=236):
+def read_snapshots(path, *, now, live_heartbeat=None, key=None, limit=236):
     """Fail closed. All queries are short, read-only and bounded."""
     if not 1 <= limit <= 236:
         raise ValueError("invalid snapshot limit")
@@ -80,6 +110,6 @@ def read_snapshots(path, *, now, key=None, limit=236):
     if key is not None and not rows:
         return {"item_key": key, "status": "NO_MODEL_SNAPSHOT",
                 "actionable": False}
-    return _present(rows[0], int(now)) if key is not None else [
-        _present(row, int(now)) for row in rows
+    return _present(rows[0], int(now), live_heartbeat) if key is not None else [
+        _present(row, int(now), live_heartbeat) for row in rows
     ]

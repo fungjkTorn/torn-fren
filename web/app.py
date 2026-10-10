@@ -17,7 +17,7 @@ from web.private_shadow_v29 import champion_shadow
 from web.v38_revision_fingerprint import revision as v38_source_revision
 from web.catalog_cache_v38 import CatalogCache
 from web.history_cache_v39 import HistoryCache
-from web.v41_champion_cache import read_snapshots as read_v41_champions
+from web.v41_champion_cache import read_snapshots as read_v41_champions, read_live_poll_heartbeat
 import os
 
 app = FastAPI(title="Torn Fren Stock Graph")
@@ -463,7 +463,9 @@ def api_v41_champion_predictions(country: str | None = None, item: str | None = 
     if country and (len(country) > 20 or len(item) > 120):
         raise HTTPException(status_code=400, detail="invalid item selector")
     key = f"{country.strip().lower()}:{item.strip()}" if country and item else None
-    latest = read_v41_champions(location, now=int(time.time()), key=key)
+    now = int(time.time())
+    heartbeat = read_live_poll_heartbeat(DB_PATH)
+    latest = read_v41_champions(location, now=now, live_heartbeat=heartbeat, key=key)
     return {"experimental": True, "prediction_accuracy_verified": False,
             "source": "PRECOMPUTED_READ_ONLY_SIDECAR", "latest": latest}
 
