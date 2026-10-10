@@ -32,7 +32,16 @@ def predict(db: str|Path,country: str,item: str,now: int):
     # stores CHANGES, not every heartbeat; extending the held state to the
     # query tick is causal and avoids false shared-context staleness.
     q=(now//STEP)*STEP
-    ctx=ResearchContext.build(db,asof=now,readonly=True)
+    try:
+        ctx=ResearchContext.build(db,asof=now,readonly=True)
+    except ValueError as exc:
+        # The independently validated source can advance between inspection
+        # and building ten cross-item timelines. Never use later stock as
+        # hindsight for the earlier decision tick: record an explicit
+        # abstention and allow the normal next scheduling cycle to retry.
+        if str(exc)=="future stock rows relative to requested as-of":
+            return {"status":"SOURCE_ADVANCED_DURING_TICK"}
+        raise
     try:
         if len(ctx.grid)==0 or q>ctx.grid[-1]:
             return {"status":"CROSS_ITEM_CONTEXT_LAGGING"}

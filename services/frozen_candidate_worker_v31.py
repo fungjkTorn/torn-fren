@@ -32,8 +32,20 @@ def _install_frozen_readonly_history(history_service, db):
     """Replace legacy history access only inside the isolated child process."""
     path=Path(db).resolve(strict=True)
     def read_only_connect():
-        connection=sqlite3.connect(path.as_uri()+"?mode=ro",uri=True,timeout=30)
-        connection.execute("PRAGMA query_only=ON")
+        # history_service's helpers use "with _connect() as conn:" many
+        # times per forecast. A vanilla sqlite3.Connection commits on __exit__
+        # but DOES NOT close: repeated reads leak DB/WAL file descriptors and
+        # eventually fail with SQLITE_CANTOPEN. Match the collector's existing
+        # deterministic-closing connection factory, without enabling writes.
+        connection=sqlite3.connect(
+            path.as_uri()+"?mode=ro",uri=True,timeout=30,
+            factory=history_service._ClosingConnection,
+        )
+        try:
+            connection.execute("PRAGMA query_only=ON")
+        except BaseException:
+            connection.close()
+            raise
         return connection
     history_service.DB_PATH=path
     history_service._connect=read_only_connect
