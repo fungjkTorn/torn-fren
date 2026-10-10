@@ -121,6 +121,31 @@ class MonkeySelectorReadOnlyTests(unittest.TestCase):
         r=self.probe()
         self.assertEqual(r["status"],"V66_MONKEY_SELECTOR_VALIDATED")
 
+    def test_observed_target_row_after_rounded_slot_is_not_future_data(self):
+        # The checker runs at 5-minute FLOOR(now), whereas the snapshot
+        # legitimately includes collector observations made after that slot.
+        # A later valid row must not block the original bank/parity check.
+        q=(NOW//v66.STEP)*v66.STEP
+        row_ts=NOW-75
+        self.assertGreater(row_ts,q)
+        self.assertLess(row_ts,NOW-10)  # no observations after heartbeat
+        with sqlite3.connect(self.source) as source:
+            source.execute("INSERT INTO stock_history VALUES(3,?,?,?,?,?)",
+                           (row_ts,"arg","Monkey Plushie",45,"observed"))
+        result=self.probe()
+        self.assertEqual(result["status"],"V66_MONKEY_SELECTOR_VALIDATED")
+        self.assertTrue(result["source_parity_one_slot"])
+        self.assertEqual(result["missing_decisions"],0)
+
+    def test_stock_row_after_verified_heartbeat_still_abstains(self):
+        # Do not confuse accepting post-5m-slot observations with allowing
+        # observations beyond the last verified collector heartbeat.
+        with sqlite3.connect(self.source) as source:
+            source.execute("INSERT INTO stock_history VALUES(3,?,?,?,?,?)",
+                           (NOW-5,"arg","Monkey Plushie",45,"unverified"))
+        result=self.probe()
+        self.assertEqual(result["status"],"V66_SOURCE_AFTER_VERIFIED_HEARTBEAT")
+
     def test_future_resolution_refused_as_invalid_evidence(self):
         with sqlite3.connect(self.cache) as c:
             c.execute("""UPDATE expert_resolutions SET resolved_at=?

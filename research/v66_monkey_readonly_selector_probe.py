@@ -13,7 +13,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 from research.plushie_champions.common import (
-    connect, load_gaps, Timeline, TemplatePlanner, STEP, MAX_WAIT,
+    load_gaps, Timeline, TemplatePlanner, STEP, MAX_WAIT, DAY, TRAVEL_SECONDS,
 )
 from research.v45_online_template_probe import EXPERTS, TARGETS
 from research.v46_fast_template import FastTemplatePlanner
@@ -153,8 +153,17 @@ def audit(snapshot,cache,*,clock=time.time,fast_planner=FastTemplatePlanner,
             if int(clock())-int(hb)>MAX_AGE:
                 return safe_result("V66_STALE_BEFORE_PARITY",**base)
             q=(int(clock())//STEP)*STEP
-            if float(timeline.ts[-1])>q:
-                return safe_result("V66_FUTURE_ROWS_RELATIVE_TO_SLOT",**base)
+            # V47's original checkpoint4 plans at the most recent 5-minute
+            # boundary, although the collector can report a NEWER stock row
+            # before the next boundary. The newer row is observed, not an
+            # impermissible future record. Timeline.vals(t) selects rows at
+            # or before t; the bank's historical lag references must also
+            # remain <= q. Validate that contract instead of rejecting valid
+            # post-slot stock observations (V66's false-positive abstention).
+            max_reference_time = (q + MAX_WAIT + TRAVEL_SECONDS[country]
+                                  - min(expert[0])*DAY + expert[2])
+            if max_reference_time>q:
+                return safe_result("V67_UNSAFE_FUTURE_TEMPLATE_REFERENCE",**base)
             ctx=SimpleNamespace(timelines={(country,item):timeline})
             options=dict(lags=expert[0],lookback=expert[1],shift_range=expert[2])
             fast=fast_planner(ctx,country,item,**options).plan(float(q))
