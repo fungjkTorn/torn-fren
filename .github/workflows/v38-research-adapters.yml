@@ -101,5 +101,7 @@ jobs:
         run: python -m py_compile research/japan_xanax/window_regime.py research/japan_xanax/v7_observation_lag.py research/japan_xanax/v8_regime_candidate.py
       - name: Check Red Fox read-only service probe syntax
         run: bash -n deploy/scripts/v43_redfox_safe_probe.sh
+      - name: Check Japan Xanax VM probe is syntactically valid
+        run: bash -n deploy/scripts/v43_japan_safe_probe.sh
       - name: Compile standalone entry points
         run: python -m py_compile research/v38_v18_single_tick.py research/v38_v19_single_tick.py research/v38_readonly_resource_probe.py research/v38_nessie_single_tick.py research/v38_readonly_resource_probe.py research/v38_camel_single_tick.py research/v38_peony_single_tick.py services/plushie_flower_dynamic_planner_v20.py research/v38_budgeted_runner.py research/v38_prediction_store.py research/v38_incremental_observer.py research/v38_feature_cache.py research/v38_red_fox_single_tick.py research/v38_catalog_seed.py research/v38_adaptive_policy.py research/v38_capacity_guard.py research/v38_idle_admission.py research/v38_shadow_canary_preflight.py web/app.py web/catalog_cache_v38.py web/v38_revision_fingerprint.py
