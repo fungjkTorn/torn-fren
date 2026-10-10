@@ -27,7 +27,7 @@ def initialize(con):
     con.commit()
 
 
-def observe(stock_db, sidecar, max_rows=10000):
+def observe(stock_db, sidecar, max_rows=10000, *, fast_bootstrap=False):
     if not 1 <= max_rows <= 50000:
         raise ValueError("batch outside bounds")
     initialize(sidecar)
@@ -50,9 +50,27 @@ def observe(stock_db, sidecar, max_rows=10000):
         last_id=old[0] if old else 0
         reset=maximum<last_id
         if reset: last_id=0
-        rows=src.execute("""SELECT id,timestamp,country,item_name,quantity
-            FROM stock_history WHERE id>? ORDER BY id LIMIT ?""",
-            (last_id,max_rows)).fetchall()
+        # A brand-new private sidecar has no historical feature entries to
+        # invalidate. On a large 153MB stock DB, replaying 10,000 old rows per
+        # 5-minute tick could defer first shadow predictions for hours. Instead
+        # summarize the latest known row per item in one bounded SQL query.
+        # This changes ONLY private sidecar initial state, never collector DB.
+        fresh_compact = bool(fast_bootstrap and old is None and maximum>max_rows)
+        if fresh_compact:
+            rows=src.execute("""
+                SELECT s.id,s.timestamp,s.country,s.item_name,s.quantity
+                FROM stock_history AS s
+                JOIN (
+                    SELECT MAX(id) AS latest_id
+                    FROM stock_history WHERE id<=?
+                    GROUP BY LOWER(country),LOWER(item_name)
+                ) AS latest ON s.id=latest.latest_id
+                ORDER BY s.id
+            """,(maximum,)).fetchall()
+        else:
+            rows=src.execute("""SELECT id,timestamp,country,item_name,quantity
+                FROM stock_history WHERE id>? ORDER BY id LIMIT ?""",
+                (last_id,max_rows)).fetchall()
     affected=set()
     with sidecar:
         if reset:
@@ -73,7 +91,12 @@ def observe(stock_db, sidecar, max_rows=10000):
                 quantity=excluded.quantity
                 WHERE excluded.stock_as_of>=v38_stock_state.stock_as_of""",
                 (key,int(rowid),int(stamp),int(qty)))
-        if rows: last_id=int(rows[-1][0])
+        if fresh_compact:
+            # The grouped source state proves all <=maximum historical
+            # changes are accounted for in the latest per-item snapshot.
+            last_id=int(maximum)
+        elif rows:
+            last_id=int(rows[-1][0])
         if old and (gaps!=old[1] or reset):
             sidecar.execute("DELETE FROM v38_feature_cache")
         elif affected:
@@ -83,7 +106,8 @@ def observe(stock_db, sidecar, max_rows=10000):
             ON CONFLICT(singleton) DO UPDATE SET
             last_id=excluded.last_id,gap_rev=excluded.gap_rev,
             caught_up=excluded.caught_up""",(last_id,gaps,int(last_id>=maximum)))
-    return {"processed":len(rows),"last_id":last_id,
+    return {"processed":len(rows),"fast_bootstrap":fresh_compact,
+            "last_id":last_id,
             "observed_max_id":maximum,"caught_up":last_id>=maximum,
             "gap_revision":gaps,"affected_keys":sorted(affected),"reset":reset,
             "verified_heartbeat":int(observed) if observed is not None else None}
