@@ -44,8 +44,30 @@ export MKL_NUM_THREADS=1
 echo "===== V39 FORECAST AUDITS MUST BE MAKING PROGRESS ====="
 .venv/bin/python -m research.v38_v39_host_gate --db "$DB"
 
-echo "===== FRESH COLLECTOR AND CPU HEADROOM ====="
-.venv/bin/python -m research.v38_shadow_canary_preflight --db "$DB"
+echo "===== WAIT UP TO FOUR MINUTES FOR SAFE CPU HEADROOM ====="
+# Low CPU headroom can lag briefly behind a healthy V39 worker.
+# Wait without changing any service, CPU threshold, or research scheduling.
+# Exit safely if the audit worker stops progressing during this wait.
+READY=0
+for attempt in $(seq 1 13); do
+  echo "CPU admission check $attempt/13"
+  if .venv/bin/python -m research.v38_shadow_canary_preflight --db "$DB"; then
+    READY=1
+    break
+  fi
+  if [ "$attempt" -eq 13 ]; then
+    break
+  fi
+  .venv/bin/python -m research.v38_v39_host_gate --db "$DB" || {
+    echo "STOP: V39 audit backlog failed readiness gate" >&2
+    exit 2
+  }
+  sleep 20
+done
+if [ "$READY" -ne 1 ]; then
+  echo "STOP: collector or CPU never passed the unchanged safe threshold" >&2
+  exit 2
+fi
 
 echo "===== REAL FIVE-MODEL READ-ONLY BENCHMARK ====="
 OUT=$(mktemp /tmp/torn-fren-v38-readonly.XXXXXX)
