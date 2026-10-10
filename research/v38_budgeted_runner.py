@@ -74,7 +74,7 @@ def run_tick(*, stock_db, sidecar_db, execute=False, active=(),
                 "executed":[],"collector_written":False}
     side=open_writer(sidecar_db)
     try:
-        delta=observe(stock_db,side,max_rows=max_rows)
+        delta=observe(stock_db,side,max_rows=max_rows,fast_bootstrap=True)
         if not delta["caught_up"]:
             return {"mode":"SOURCE_BOOTSTRAP","delta":delta,
                     "executed":[],"collector_written":False}
