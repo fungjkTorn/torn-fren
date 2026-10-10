@@ -97,9 +97,29 @@ print("FIVE-MODEL READ-ONLY BENCHMARK ACCEPTED;",
       "proposals",r.get("proposal_count"),"/5")
 PY
 
-echo "===== RECHECK SOURCE, LOAD, AUDIT QUEUE AND PUBLIC WEBSITE ====="
-.venv/bin/python -m research.v38_shadow_canary_preflight --db "$DB"
-.venv/bin/python -m research.v38_v39_host_gate --db "$DB"
+echo "===== WAIT FOR SAFE POST-BENCHMARK HEADROOM (UP TO FOUR MINUTES) ====="
+# The initial CPU check passed before the frozen benchmark. A brief
+# post-benchmark load-average rise must not invalidate a completed probe.
+# Never lower the 1.6 load limit: wait for it to pass again, while
+# checking the worker's actual audit progress and verified stock freshness.
+POST_READY=0
+for attempt in $(seq 1 13); do
+  echo "Post-benchmark CPU admission $attempt/13"
+  .venv/bin/python -m research.v38_v39_host_gate --db "$DB" || {
+    echo "STOP: V39 audit worker stopped making recent progress" >&2
+    exit 2
+  }
+  if .venv/bin/python -m research.v38_shadow_canary_preflight --db "$DB"; then
+    POST_READY=1
+    break
+  fi
+  if [ "$attempt" -eq 13 ]; then break; fi
+  sleep 20
+done
+if [ "$POST_READY" -ne 1 ]; then
+  echo "STOP: post-benchmark source or CPU headroom never met the unchanged safety gate" >&2
+  exit 2
+fi
 curl -fsS --connect-timeout 3 --max-time 15 \
   -o /dev/null http://127.0.0.1:8000/api/catalog
 test "$(git -C /opt/torn-fren rev-parse HEAD)" = "$V39_PROD_SHA"

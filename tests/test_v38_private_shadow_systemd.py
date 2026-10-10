@@ -20,6 +20,16 @@ class PrivateShadowUnitTests(unittest.TestCase):
         self.assertNotIn("sleep 30",source)
         self.assertNotIn("AUDITS_READY",source)
         self.assertIn("VERIFIED V39.1 AUDIT WORKER PROGRESS",source)
+        self.assertEqual(source.count("for attempt in $(seq 1 13)"),2)
+        self.assertIn("Post-benchmark CPU admission $attempt/13",source)
+        self.assertIn("POST_READY=0",source)
+        self.assertIn('if [ "$POST_READY" -ne 1 ]; then',source)
+        self.assertIn("post-benchmark source or CPU headroom never met the unchanged safety gate",source)
+        self.assertLess(source.index("FIVE-MODEL READ-ONLY BENCHMARK ACCEPTED"),
+                        source.index("Post-benchmark CPU admission"))
+        self.assertGreaterEqual(
+            source[source.index("Post-benchmark CPU admission"):].count("research.v38_v39_host_gate"),
+            1)
         self.assertIn("for attempt in $(seq 1 13)",source)
         self.assertIn("sleep 20",source)
         self.assertIn("READY=0",source)

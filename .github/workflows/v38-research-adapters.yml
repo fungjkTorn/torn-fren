@@ -3,12 +3,10 @@ name: V38 expanded live-inference adapters
 on:
   push:
     branches: [research/v38-full-roster-live-prep-20261009]
-  pull_request:
-    paths:
-      - 'research/v38_*'
-      - 'services/private_v18_champion_worker_v35.py'
-      - 'tests/test_v38_*'
-      - '.github/workflows/v38-research-adapters.yml'
+  workflow_dispatch:
+  # Deliberately do not duplicate the identical commit on both push and PR.
+  # The frozen research branch gets one run per pushed commit; manual reruns
+  # remain available from Actions. Avoid redundant failure notifications.
 
 permissions:
   contents: read
