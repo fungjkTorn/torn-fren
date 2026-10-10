@@ -35,7 +35,7 @@ class AuditQueueHostGateTests(unittest.TestCase):
 
     def test_allows_live_pending_with_recently_finished_work(self):
         self.add("uni","Heather","done",0,9500,9950)
-        self.add("can","Wolverine Plushie","pending",10,9750)
+        self.add("can","Wolverine Plushie","pending",100,9750)
         self.add("sou","Lion Plushie","pending",0,1000)
         result=self.read()
         self.assertEqual(result["status"],"AUDIT_QUEUE_PROGRESSING")
@@ -45,7 +45,7 @@ class AuditQueueHostGateTests(unittest.TestCase):
         self.assertTrue(result["read_only"])
 
     def test_only_running_or_pending_never_pass(self):
-        self.add("uni","Heather","running",10,9600)
+        self.add("uni","Heather","running",100,9600)
         self.assertEqual(self.read()["reason"],"NO_COMPLETED_AUDITS_YET")
 
     def test_stale_processing_cannot_pass(self):
@@ -54,8 +54,25 @@ class AuditQueueHostGateTests(unittest.TestCase):
 
     def test_urgent_backlog_deferred_even_with_recent_completion(self):
         self.add("uni","Heather","done",0,9400,9900)
-        self.add("uni","Nessie Plushie","pending",10,8500)
+        self.add("uni","Nessie Plushie","pending",100,8500)
         self.assertEqual(self.read()["reason"],"URGENT_STOCK_AUDITS_TOO_OLD")
+
+    def test_large_old_general_backlog_does_not_block_new_canary(self):
+        self.add("uni","Heather","done",0,9000,9950)
+        self.add("uni","Nessie Plushie","pending",100,9900)
+        for i in range(40):
+            self.add("mex",f"Catalog item {i}","pending",10,1000)
+        result=self.read()
+        self.assertEqual(result["status"],"AUDIT_QUEUE_PROGRESSING")
+        self.assertEqual(result["oldest_high_priority_pending_age_seconds"],100)
+        self.assertEqual(result["oldest_general_pending_age_seconds"],9000)
+
+    def test_requeued_finished_item_still_proves_worker_made_progress(self):
+        self.add("uni","Heather","pending",100,9750,9990)
+        result=self.read()
+        self.assertEqual(result["completed_count"],0)
+        self.assertEqual(result["status"],"AUDIT_QUEUE_PROGRESSING")
+        self.assertEqual(result["last_completion_age_seconds"],10)
 
     def test_missing_and_corrupt_db_fail_without_creating_files(self):
         missing=self.path.parent/"missing.db"
