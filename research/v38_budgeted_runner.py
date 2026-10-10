@@ -172,6 +172,9 @@ def run_tick(*, stock_db, sidecar_db, execute=False, active=(),
                 tag=output.get("error_tag")
                 if isinstance(tag,str) and re.fullmatch(r"[A-Z0-9_]{1,72}",tag):
                     item_result["error_tag"]=tag
+                code=output.get("sqlite_extended_code")
+                if type(code) is int and 1<=code<65536:
+                    item_result["sqlite_extended_code"]=code
                 module=output.get("error_module")
                 if module in (
                     "history_service.py","private_v18_champion_worker_v35.py",

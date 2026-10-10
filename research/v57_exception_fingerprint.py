@@ -82,6 +82,12 @@ def fingerprint(exc):
     else:
         tag="OTHER_"+type(exc).__name__.upper()[:30]
     result={"error_type":type(exc).__name__,"error_tag":tag}
+    # Safe numeric SQLite result code, including extended CANTOPEN causes.
+    # No raw messages, paths, SQL, or file names are exposed.
+    if isinstance(exc,sqlite3.Error):
+        number=getattr(exc,"sqlite_errorcode",None)
+        if type(number) is int and 1<=number<65536:
+            result["sqlite_extended_code"]=number
     # Last known project module frame; no absolute paths or SQL contents.
     frames=traceback.extract_tb(exc.__traceback__) if exc.__traceback__ else []
     for f in reversed(frames):

@@ -147,5 +147,7 @@ jobs:
         run: python -m unittest discover -s tests -p 'test_v57_exception_fingerprint.py' -v
       - name: V58 frozen SQLite read-only FD closure and Red Fox causal race regression
         run: python -m unittest discover -s tests -p 'test_v58_frozen_readonly_fds.py' -v
+      - name: V59 bounded transient SQLite WAL read retry and extended codes
+        run: python -m unittest discover -s tests -p 'test_v59_sqlite_read_retry.py' -v
       - name: Compile standalone entry points
         run: python -m py_compile research/v38_v18_single_tick.py research/v38_v19_single_tick.py research/v38_readonly_resource_probe.py research/v38_nessie_single_tick.py research/v38_readonly_resource_probe.py research/v38_camel_single_tick.py research/v38_peony_single_tick.py services/plushie_flower_dynamic_planner_v20.py research/v38_budgeted_runner.py research/v38_prediction_store.py research/v38_incremental_observer.py research/v38_feature_cache.py research/v38_red_fox_single_tick.py research/v38_catalog_seed.py research/v38_adaptive_policy.py research/v38_capacity_guard.py research/v38_idle_admission.py research/v38_shadow_canary_preflight.py web/app.py web/catalog_cache_v38.py web/v38_revision_fingerprint.py
