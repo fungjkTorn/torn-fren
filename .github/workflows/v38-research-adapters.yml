@@ -179,8 +179,8 @@ jobs:
         run: python -m unittest discover -s tests -p 'test_v74_chamois_isolated_canary.py' -v
       - name: V75 candidate 21-model source-pinned single-snapshot smoke tests
         run: python -m unittest discover -s tests -p 'test_v75_private21_chamois_smoke.py' -v
-      - name: V75 smoke and reversible 21-model deployment script syntax
-        run: bash -n deploy/scripts/v75_private21_smoke.sh deploy/scripts/v75_private21_transition.sh
+      - name: V75 and V77 safe research and beta-source transition scripts
+        run: bash -n deploy/scripts/v75_private21_smoke.sh deploy/scripts/v75_private21_transition.sh deploy/scripts/v77_experimental21_source.sh
       - name: V76 prospective report prevents fictitious exact arrival accuracy
         run: python -m unittest discover -s tests -p 'test_v76_forward_research_report.py' -v
       - name: Compile standalone entry points

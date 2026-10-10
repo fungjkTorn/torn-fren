@@ -65,3 +65,14 @@ These cannot be honestly substituted with unfitted synthetic selectors.
 Japan Xanax: existing research V8 retrospective candidate 13/21 exact
 on historical development snapshot; live target still requires independent
 parity and substantially better prospective accuracy. Keep unreleased for now.
+
+Experimental page after V75 >=3 healthy unattended cycles:
+  bash deploy/scripts/v77_experimental21_source.sh status
+  bash deploy/scripts/v77_experimental21_source.sh enable
+It creates a NEW V77 web-service env override pointing only V41 beta API to
+v75_private_predictions.db; it waits 60s for web readiness and confirms
+21 rows including Chamois and Monkey. V73 remains installed as fallback.
+Rollback website only:
+  bash deploy/scripts/v77_experimental21_source.sh rollback
+This removes V77 and restores the V73 -> V72 database path.
+No production V2 prediction change.
