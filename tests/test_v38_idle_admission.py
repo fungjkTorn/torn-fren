@@ -27,6 +27,23 @@ class IdleAdmissionTests(unittest.TestCase):
         self.assertEqual(result["estimated_idle_cores"],0.64)
         self.assertEqual(result["admission_mode"],"measured_linux_idle_psi")
 
+    def test_high_some_psi_does_not_block_truly_idle_host(self):
+        # Observed V40 VM: 80% idle, load below 1, no full stall or steal.
+        result=assess(sample(1000,500),sample(2000,812),
+                      {"some":62.76,"full":0.0},slots=2,load1=0.924)
+        # This has only 31% idle; the existing busy-host rule should deny.
+        self.assertFalse(result["allowed"])
+        result=assess(sample(1000,500),sample(2000,1300),
+                      {"some":62.76,"full":0.0},slots=2,load1=0.924)
+        self.assertTrue(result["allowed"])
+        self.assertTrue(result["quiet_host_override"])
+
+    def test_high_some_psi_still_blocks_with_high_load_or_full_stall(self):
+        self.assertFalse(assess(sample(1000,500),sample(2000,1300),
+            {"some":70.0,"full":0.0},slots=2,load1=2.0)["allowed"])
+        self.assertFalse(assess(sample(1000,500),sample(2000,1300),
+            {"some":70.0,"full":3.0},slots=2,load1=0.8)["allowed"])
+
     def test_deny_insufficient_true_idle(self):
         result=assess(sample(1000,500),sample(2000,740),
                       {"some":10.0,"full":0.0},slots=2,load1=0.1)

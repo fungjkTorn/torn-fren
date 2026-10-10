@@ -136,6 +136,35 @@ class BudgetedRunnerTests(unittest.TestCase):
         self.assertFalse(self.side.exists())
         self.assertEqual(out["executed"],[])
 
+    def test_live_serial_models_use_current_asof_but_keep_five_minute_due(self):
+        # The collector can append a row after the scheduled 5-minute tick.
+        # Later workers must not be evaluated with an earlier timestamp.
+        from unittest.mock import patch
+        seen=[]
+        def fake(args,**kwargs):
+            observed=int(args[args.index("--now")+1])
+            seen.append(observed)
+            return Mock(returncode=0,stdout=(
+                '{"status":"RESEARCH_PROPOSAL_ONLY",'
+                '"recommended_departure_timestamp":'+str(observed+600)+','
+                '"recommended_arrival_timestamp":'+str(observed+6960)+','
+                '"quantity_threshold":30,"grace_seconds":10,'
+                '"replan_step_seconds":300,"probability_calibrated":false}'))
+        with patch("research.v38_budgeted_runner.time.time",
+                   side_effect=[NOW,NOW+20,NOW+80]):
+            result=run_tick(stock_db=self.stock,sidecar_db=self.side,
+                execute=True,capacity_probe=lambda:{"allowed":True},
+                approved_keys=["uni:Heather","can:Wolverine Plushie"],
+                max_jobs=2,now=None,runner=fake,clock=lambda:0)
+        self.assertEqual(result["mode"],"EXECUTED_RESEARCH_ONLY")
+        self.assertEqual(seen,[NOW+20,NOW+80])
+        self.assertTrue(all(r["status"]=="RESEARCH_PROPOSAL_ONLY"
+                            for r in result["executed"]))
+        with sqlite3.connect(self.side) as db:
+            rows=db.execute("SELECT computed_at,next_due_at FROM latest_predictions").fetchall()
+        self.assertEqual({r[0] for r in rows},{NOW+20,NOW+80})
+        self.assertEqual({r[1] for r in rows},{NOW+300})
+
     def test_resource_limits_and_adapters_are_pinned(self):
         self.assertEqual(len(PINNED_WORKERS),16)
         with self.assertRaises(ValueError):

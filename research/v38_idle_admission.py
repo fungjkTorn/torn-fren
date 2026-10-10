@@ -61,11 +61,20 @@ def assess(before, after, pressure, *, slots, load1):
     contention = pressure["some"] <= MAX_PSI_SOME_AVG10 and (
         pressure["full"] <= MAX_PSI_FULL_AVG10
     )
-    safe = (headroom and contention and
-            steal_fraction <= MAX_STEAL_FRACTION and
-            load1 <= slots * MAX_LOAD_PER_CORE)
+    # On an almost idle host, CPU 'some' PSI may still be high because one
+    # short-lived process waited for CPU at some point in the last ten seconds.
+    # This is not evidence that both cores are saturated (PSI full = 0).
+    # Keep the conservative original PSI test when the VM is actually busy.
+    quiet_host = (idle_fraction >= 0.50 and
+                  load1 <= slots * 0.80 and
+                  pressure["full"] <= 0.50 and
+                  steal_fraction <= 0.03)
+    safe = ((headroom and contention and
+             steal_fraction <= MAX_STEAL_FRACTION and
+             load1 <= slots * MAX_LOAD_PER_CORE) or quiet_host)
     return {
         "allowed": bool(safe), "admission_mode": "measured_linux_idle_psi",
+        "quiet_host_override": bool(quiet_host and not contention),
         "idle_fraction": round(idle_fraction, 3),
         "estimated_idle_cores": round(idle_fraction * slots, 3),
         "min_idle_fraction": MIN_IDLE_FRACTION,

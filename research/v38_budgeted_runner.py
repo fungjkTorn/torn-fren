@@ -52,7 +52,8 @@ def run_tick(*, stock_db, sidecar_db, execute=False, active=(),
         raise ValueError("invalid concurrency/resource limits")
     if not worker_seconds<=budget_seconds<=240:
         raise ValueError("invalid total wall budget")
-    now=int(time.time() if now is None else now)
+    live_clock = now is None
+    now=int(time.time() if live_clock else now)
     roster=json.loads(ROSTER.read_text(encoding="utf-8"))["items"]
     # Explicit allowlisting supports a first-five isolation test without
     # accidentally executing every runnable model in the 21-item roster.
@@ -96,9 +97,15 @@ def run_tick(*, stock_db, sidecar_db, execute=False, active=(),
                 results.append({"item_key":key,"status":"DEFERRED_BUDGET"})
                 continue
             country,item=key.split(":",1)
+            # The poller continues inserting stock rows while 5 independent
+            # models run serially. The first tick timestamp becomes stale;
+            # never feed later models that old --now or they will (correctly)
+            # reject newly observed rows as FUTURE_RECORDS_PRESENT.
+            # Explicit 'now' remains frozen for deterministic historical tests.
+            worker_now=max(now,int(time.time())) if live_clock else now
             args=[sys.executable,"-m",PINNED_WORKERS[key],"--db",
                   str(stock_db),"--country",country,"--item",item,
-                  "--now",str(now)]
+                  "--now",str(worker_now)]
             t0=clock()
             try:
                 p=runner(args,capture_output=True,text=True,check=False,
@@ -122,7 +129,9 @@ def run_tick(*, stock_db, sidecar_db, execute=False, active=(),
                 active=key in active,stock_changed=key in delta["affected_keys"])
             status=record(side,key=key,family=model["model_family"],
                           config=model.get("config_name"),
-                          output=output,now=now,stock_as_of=last,
+                          output=output,now=worker_now,stock_as_of=last,
+                          # Replan cadence is anchored to the 5-minute tick,
+                          # not each serial worker's variable start offset.
                           executed=True,elapsed_ms=elapsed,next_due=now+delay)
             results.append({"item_key":key,"status":status,"elapsed_ms":elapsed})
         return {"mode":"EXECUTED_RESEARCH_ONLY","delta":delta,
