@@ -52,10 +52,28 @@ class AuditQueueHostGateTests(unittest.TestCase):
         self.add("uni","Heather","done",0,9000,9000)
         self.assertEqual(self.read()["reason"],"AUDIT_WORKER_NOT_COMPLETING_RECENTLY")
 
-    def test_urgent_backlog_deferred_even_with_recent_completion(self):
+    def test_urgent_backlog_is_reported_but_does_not_block_independent_shadow(self):
         self.add("uni","Heather","done",0,9400,9900)
         self.add("uni","Nessie Plushie","pending",100,8500)
-        self.assertEqual(self.read()["reason"],"URGENT_STOCK_AUDITS_TOO_OLD")
+        result=self.read()
+        self.assertEqual(result["status"],"AUDIT_QUEUE_PROGRESSING")
+        self.assertIsNone(result["reason"])
+        self.assertEqual(result["oldest_high_priority_pending_age_seconds"],1500)
+        self.assertEqual(result["warnings"],["URGENT_STOCK_AUDITS_LAGGING"])
+
+    def test_real_world_large_old_urgent_backlog_with_recent_liveness(self):
+        # 1 -> 6 done rows in VM logs while 12 queued priority=100 and
+        # 381 others remain pending; graph-only queue is not shadow input.
+        self.add("jap","Xanax","running",100,7000)
+        self.add("uni","Heather","pending",100,7000)
+        self.add("uni","Nessie Plushie","done",0,7500,9940)
+        for i in range(40):
+            self.add("mex",f"Catalog item {i}","pending",10,6900)
+        result=self.read()
+        self.assertEqual(result["status"],"AUDIT_QUEUE_PROGRESSING")
+        self.assertEqual(result["last_completion_age_seconds"],60)
+        self.assertGreater(result["oldest_high_priority_pending_age_seconds"],1200)
+        self.assertIn("URGENT_STOCK_AUDITS_LAGGING",result["warnings"])
 
     def test_large_old_general_backlog_does_not_block_new_canary(self):
         self.add("uni","Heather","done",0,9000,9950)
