@@ -166,14 +166,16 @@ def audit(snapshot,cache,*,clock=time.time,fast_planner=FastTemplatePlanner,
                         selected_research_score_uncalibrated=chosen["posterior_score"],
                         source_parity_one_slot=bool(equal),
                         end_heartbeat_age_seconds=end_age)
-            if end_age>MAX_AGE:
+            if not 0<=end_age<=MAX_AGE:
                 return safe_result("V66_STALE_AFTER_PARITY",**result)
             if not equal:
                 return safe_result("V66_ORIGINAL_PARITY_MISMATCH",**result)
             if fast is None:
                 return safe_result("V66_VALIDATED_NO_RECOMMENDATION",**result)
             departure=int(fast[0])
-            if not q<=departure<=asof+MAX_WAIT:
+            # A research candidate cannot be treated as actionable if
+            # the originally planned slot has already passed.
+            if not int(clock())<=departure<=asof+MAX_WAIT:
                 return safe_result("V66_DEPARTURE_OUT_OF_BOUNDS",**result)
             return safe_result("V66_MONKEY_SELECTOR_VALIDATED",
                 **result,
@@ -188,7 +190,6 @@ def audit(snapshot,cache,*,clock=time.time,fast_planner=FastTemplatePlanner,
 
 def main():
     # Explicit fixed read-only inputs. Do not accept a live collector CLI arg.
-    from research.v60_private_snapshot_probe import approved_collector_source
     try:
         for p in (SNAPSHOT,CACHE):
             if not p.is_file() or p.is_symlink():

@@ -28,6 +28,11 @@ class DifferentPlanner(Planner):
         return q+900,0.7,{"fit":0.9,"maxfit":0.95,"refs":2.0}
 
 
+class AlreadyDepartedPlanner(Planner):
+    def plan(self,q):
+        return q,0.7,{"fit":0.9,"maxfit":0.95,"refs":2.0}
+
+
 class MonkeySelectorReadOnlyTests(unittest.TestCase):
     def setUp(self):
         t=tempfile.TemporaryDirectory()
@@ -130,6 +135,14 @@ class MonkeySelectorReadOnlyTests(unittest.TestCase):
                         fast_planner=Planner,original_planner=DifferentPlanner)
         self.assertEqual(r["status"],"V66_ORIGINAL_PARITY_MISMATCH")
         self.assertFalse(r["source_parity_one_slot"])
+
+    def test_candidate_departure_already_passed_is_not_actionable(self):
+        with patch.object(v66,"eligible_starts",return_value=[ANCHOR]):
+            result=v66.audit(self.source,self.cache,clock=lambda:NOW,
+                 fast_planner=AlreadyDepartedPlanner,
+                 original_planner=AlreadyDepartedPlanner)
+        self.assertEqual(result["status"],"V66_DEPARTURE_OUT_OF_BOUNDS")
+        self.assertTrue(result["source_parity_one_slot"])
 
     def test_missing_no_schedule_is_not_inferred_as_failure(self):
         with sqlite3.connect(self.cache) as c:
