@@ -90,6 +90,12 @@ class TwentyOneResearchTests(unittest.TestCase):
             "snapshot_fresh_after_cycle":True,
             "original_19_proposal_count":19,
             "monkey_proposal_count":1,
+            "monkey_status":"V68_MONKEY_ISOLATED_RECORD_READY",
+            "monkey_validator_status":"V66_MONKEY_SELECTOR_VALIDATED",
+            "monkey_cached_decisions":1176,
+            "monkey_missing_decisions":0,
+            "monkey_source_parity":True,
+            "original_19_executed_count":19,
             "proposal_count":20,
             "original_19_error_count":0,
             "original_19_stale_count":0,
@@ -115,6 +121,12 @@ class TwentyOneResearchTests(unittest.TestCase):
         self.assertEqual(out["chamois_proposals"],1)
         self.assertEqual(out["v72_original_19_proposals"],19)
         self.assertEqual(out["v72_monkey_proposals"],1)
+        self.assertEqual(out["v72_monkey_status"],"V68_MONKEY_ISOLATED_RECORD_READY")
+        self.assertEqual(out["v72_monkey_validator_status"],"V66_MONKEY_SELECTOR_VALIDATED")
+        self.assertEqual(out["v72_monkey_cached_decisions"],1176)
+        self.assertEqual(out["v72_monkey_missing_decisions"],0)
+        self.assertTrue(out["v72_monkey_source_parity"])
+        self.assertEqual(out["v72_original_19_executed"],19)
         self.assertTrue(out["source_fresh_after_cycle"])
         self.assertEqual(self.calls,["snapshot","chamois","baseline"])
         self.assertEqual(len(self.rows()),21)
