@@ -8,6 +8,7 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
+from research.v57_exception_fingerprint import fingerprint
 
 from services.frozen_candidate_worker_v31 import inspect_live_source
 from research.plushie_champions.common import (
@@ -76,7 +77,7 @@ def main():
     a=p.parse_args()
     try: output=predict(a.db,a.country,a.item,a.now)
     except Exception as e:
-        output={"status":"V38_RED_FOX_ERROR","error_type":type(e).__name__}
+        output={"status":"V38_RED_FOX_ERROR",**fingerprint(e)}
     print(json.dumps(output,sort_keys=True))
 
 

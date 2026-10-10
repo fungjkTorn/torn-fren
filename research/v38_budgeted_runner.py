@@ -164,6 +164,27 @@ def run_tick(*, stock_db, sidecar_db, execute=False, active=(),
                 value=output.get("error_type")
                 if isinstance(value,str) and len(value)<=80:
                     item_result["error_type"]=value
+                # Research-only exception fingerprint. Never propagate raw
+                # exception messages, raw SQL, paths or arbitrary model data.
+                # These fields appear in the PRIVATE systemd journal only;
+                # nothing is added to prediction_store or the public API.
+                import re
+                tag=output.get("error_tag")
+                if isinstance(tag,str) and re.fullmatch(r"[A-Z0-9_]{1,72}",tag):
+                    item_result["error_tag"]=tag
+                module=output.get("error_module")
+                if module in (
+                    "history_service.py","private_v18_champion_worker_v35.py",
+                    "frozen_candidate_worker_v31.py","common.py",
+                    "plushie_flower_dynamic_planner_v18.py",
+                    "plushie_flower_dynamic_planner_v19.py",
+                    "plushie_flower_dynamic_planner_v20.py",
+                    "v38_v18_single_tick.py","v38_v19_single_tick.py",
+                    "v38_red_fox_single_tick.py","v38_readonly_retry.py"):
+                    item_result["error_module"]=module
+                    line=output.get("error_line")
+                    if type(line) is int and 0<line<100000:
+                        item_result["error_line"]=line
             results.append(item_result)
         return {"mode":"EXECUTED_RESEARCH_ONLY","delta":delta,
                 "plan":plan,"executed":results,"collector_written":False}

@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
+from research.v57_exception_fingerprint import fingerprint
 
 from services.private_v18_champion_worker_v35 import single_tick as frozen_v18_tick
 
@@ -52,7 +53,7 @@ def main() -> None:
     try:
         response = predict(args.db, args.country, args.item, args.now)
     except Exception as exc:
-        response = {"status": "V38_NATIVE_ERROR", "error_type": type(exc).__name__}
+        response = {"status": "V38_NATIVE_ERROR", **fingerprint(exc)}
     print(json.dumps(response, sort_keys=True))
 
 

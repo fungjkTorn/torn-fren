@@ -8,6 +8,7 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
+from research.v57_exception_fingerprint import fingerprint
 
 from services.frozen_candidate_worker_v31 import (
     inspect_live_source, _install_frozen_readonly_history,
@@ -89,7 +90,7 @@ def main() -> None:
     try:
         result=predict(args.db,args.country,args.item,args.now)
     except Exception as exc:
-        result={"status":"V38_NATIVE_ERROR","error_type":type(exc).__name__}
+        result={"status":"V38_NATIVE_ERROR",**fingerprint(exc)}
     print(json.dumps(result,sort_keys=True))
 
 
