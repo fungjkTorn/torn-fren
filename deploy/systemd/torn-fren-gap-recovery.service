@@ -1,0 +1,23 @@
+[Unit]
+Description=Torn Fren bounded recovery-gap forecast audit worker (V38)
+After=local-fs.target
+ConditionPathExists=/opt/torn-fren/data/stock_history.db
+
+[Service]
+Type=oneshot
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/opt/torn-fren
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/usr/bin/python3 -m research.v38_gap_recovery --once
+# Heavy historic cycle validation must not starve 30-second stock collection.
+Nice=15
+CPUQuota=50%
+MemoryMax=768M
+TimeoutStartSec=180
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectHome=yes
+ProtectSystem=strict
+ReadWritePaths=/opt/torn-fren/data
+UMask=0077

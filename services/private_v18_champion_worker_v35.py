@@ -29,11 +29,16 @@ MIN_QUANTITY=30
 GRACE=10
 
 
-def single_tick(db, country, item, config_name, now):
+def single_tick(db, country, item, config_name, now, *, approved_configs=None):
+    """Evaluate frozen V18; optional explicit allowlist for isolated V38 research only.
+
+    The V35 CLI retains its original two-item default and fails closed.
+    """
     country=country.strip().lower()
     item=item.strip()
     key=f"{country}:{item}"
-    if FROZEN_V18_PILOT.get(key)!=config_name:
+    allowed=FROZEN_V18_PILOT if approved_configs is None else approved_configs
+    if allowed.get(key)!=config_name:
         return {"status":"NOT_APPROVED_FROZEN_V18_PILOT"}
     source=inspect_live_source(db,int(now))
     if source["status"]!="FRESH":

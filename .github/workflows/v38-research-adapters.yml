@@ -1,0 +1,187 @@
+name: V38 expanded live-inference adapters
+
+on:
+  push:
+    branches: [research/v38-full-roster-live-prep-20261009]
+  workflow_dispatch:
+  # Deliberately do not duplicate the identical commit on both push and PR.
+  # The frozen research branch gets one run per pushed commit; manual reruns
+  # remain available from Actions. Avoid redundant failure notifications.
+
+permissions:
+  contents: read
+
+jobs:
+  adapters:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install existing application dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Install standalone plushie-specialist research dependencies
+        run: python -m pip install -r research/plushie_champions/requirements-research.txt
+      - name: Verify Nessie specialist uses exact source-pinned causal template
+        run: python -m unittest discover -s tests -p 'test_v38_nessie_single_tick.py' -v
+      - name: Verify exact Camel 24-template single-tick specialist
+        run: python -m unittest discover -s tests -p 'test_v38_camel_single_tick.py' -v
+      - name: Verify restored original V20 Peony trajectory champion
+        run: python -m unittest discover -s tests -p 'test_v38_peony_single_tick.py' -v
+      - name: Verify new 10-item V18 research worker against original frozen engine
+        run: python -m unittest discover -s tests -p 'test_v38_frozen_v18_rollout.py' -v
+      - name: Verify new 3-item V19 research worker against original frozen engine
+        run: python -m unittest discover -s tests -p 'test_v38_frozen_v19_rollout.py' -v
+      - name: Test 16-model read-only resource benchmark safety
+        run: python -m unittest discover -s tests -p 'test_v38_readonly_resource_probe.py' -v
+      - name: Regression — currently deployed V35 V18 pilot still restricted to 2
+        run: python -m unittest discover -s tests -p 'test_v35_museum_japan_private_pilot.py' -v
+      - name: Regression — currently deployed V36/V37 capture unchanged
+        run: python -m unittest discover -s tests -p 'test_v36_isolated_museum_sampler.py' -v
+      - name: Gate isolated flower-plushie VM probe on recent successful collector heartbeat
+        run: python -m unittest discover -s tests -p 'test_v38_shadow_canary_preflight.py' -v
+      - name: Verify read-only bounded VM resource probe
+        run: python -m unittest discover -s tests -p 'test_v38_resource_probe.py' -v
+      - name: Verify precomputed sidecar causal/freshness and read-only fallback
+        run: python -m unittest discover -s tests -p 'test_v38_prediction_store.py' -v
+      - name: Verify append-only prospective candidate capture
+        run: python -m unittest discover -s tests -p 'test_v38_prediction_store.py' -v
+      - name: Validate guarded 16-item deployment script
+        run: bash -n deploy/scripts/v42_expand_16_shadow.sh
+      - name: Verify incremental observer and causal versioned feature cache
+        run: python -m unittest discover -s tests -p 'test_v38_incremental_observer.py' -v
+      - name: Confirm V39 audit backlog gate fails closed before private launch
+        run: python -m unittest discover -s tests -p 'test_v38_v39_host_gate.py' -v
+      - name: Verify future private five-item capped systemd timer and exact quoted allowlist
+        run: python -m unittest discover -s tests -p 'test_v38_private_shadow_systemd.py' -v
+      - name: Verify opt-in bounded research scheduler
+        run: python -m unittest discover -s tests -p 'test_v38_budgeted_runner.py' -v
+      - name: Verify optional V38 beta snapshot API stays disabled by default
+        run: python -m unittest discover -s tests -p 'test_v38_experimental_api.py' -v
+      - name: Verify Red Fox live as-of extension and causal history gate
+        run: python -m unittest discover -s tests -p 'test_v38_red_fox_single_tick.py' -v
+      - name: Verify Red Fox benchmark-gated source config
+        run: python -m unittest discover -s tests -p 'test_v38_red_fox_single_tick.py' -v
+      - name: Verify 236-item fallback registration never claims live champions
+        run: python -m unittest discover -s tests -p 'test_v38_catalog_seed.py' -v
+      - name: Verify adaptive rare-item and actionable 5min budgets
+        run: python -m unittest discover -s tests -p 'test_v38_adaptive_policy.py' -v
+      - name: Verify stock/gap versioned five-minute website prediction and graph caching
+        run: python -m unittest discover -s tests -p 'test_v38_revision_fingerprint.py' -v
+      - name: Verify opt-in catalog caching, single refresh and stale metadata
+        run: python -m unittest discover -s tests -p 'test_v38_catalog_cache.py' -v
+      - name: Verify read-only CPU idle/pressure admission and fail-closed semantics
+        run: |
+          python -m unittest discover -s tests -p 'test_v38_idle_admission.py' -v
+          python -m unittest discover -s tests -p 'test_v38_private_cpu_release.py' -v
+          bash -n deploy/scripts/upgrade_v38_idle_admission.sh
+      - name: Verify resource guard refuses new jobs at the measured VM load
+        run: python -m unittest discover -s tests -p 'test_v38_capacity_guard.py' -v
+      - name: Guard against production SQLite file descriptor regression
+        run: python -m unittest discover -s tests -p 'test_v37_sqlite_fd_hotfix.py' -v
+      - name: Verify O(1) heartbeat gap reconciliation against original history sweep
+        run: python -m unittest discover -s tests -p 'test_v38_heartbeat_fastpath.py' -v
+      - name: Verify slow recovery never stalls polling or loses evidence
+        run: |
+          python -m unittest discover -s tests -p 'test_v38_gap_recovery.py' -v
+          python -m unittest discover -s tests -p 'test_v38_gap_invalidation_grouping.py' -v
+      - name: Verify frozen Canada and UK Xanax research candidates
+        run: python -m unittest discover -s tests -p 'test_v42_xanax_candidate_tick.py' -v
+      - name: Verify optional 18-model scheduler keeps default 16
+        run: python -m unittest discover -s tests -p 'test_v42_xanax_schedule.py' -v
+      - name: Compile standalone V42 Xanax adapter
+        run: python -m py_compile research/v42_xanax_candidate_tick.py
+      - name: Validate optional two-Xanax admission script
+        run: bash -n deploy/scripts/v42_xanax_addition.sh
+      - name: Test Japan V7 source replay and provisional V8 causal candidate
+        run: python -m unittest discover -s tests -p 'test_v43_japan_xanax_candidate.py' -v
+      - name: Compile frozen Japan V7 and provisional V8 research worker
+        run: python -m py_compile research/japan_xanax/window_regime.py research/japan_xanax/v7_observation_lag.py research/japan_xanax/v8_regime_candidate.py
+      - name: Check Red Fox read-only service probe syntax
+        run: bash -n deploy/scripts/v43_redfox_safe_probe.sh
+      - name: Check Japan Xanax VM probe is syntactically valid
+        run: bash -n deploy/scripts/v43_japan_safe_probe.sh
+      - name: Verify 19th Red Fox opt-in never changes current 18
+        run: python -m unittest discover -s tests -p 'test_v44_redfox_expansion.py' -v
+      - name: Syntax-check guarded Red Fox promotion and rollback
+        run: bash -n deploy/scripts/v44_redfox_expand.sh
+      - name: Smoke-test original Monkey and Chamois replay
+        run: python -m unittest discover -s tests -p 'test_v45_online_template_probe.py' -v
+      - name: Shell-check the 25-percent-CPU protected expert benchmark
+        run: bash -n deploy/scripts/v45_online_expert_probe.sh
+      - name: Original versus vectorized 24-template semantic parity
+        run: python -m unittest discover -s tests -p 'test_v46_fast_template.py' -v
+      - name: Verify protected V46 source-parity benchmark script
+        run: bash -n deploy/scripts/v46_template_parity_probe.sh
+      - name: Verify V47 persistent resolved-only expert selector and cache invalidation
+        run: python -m unittest discover -s tests -p 'test_v47_online_expert_cache.py' -v
+      - name: Verify bounded VM-only source-resolved cache probe
+        run: bash -n deploy/scripts/v47_online_cache_probe.sh
+      - name: Test V48 low-priority unattended cache warmup and rollback preflight
+        run: python -m unittest discover -s tests -p 'test_v48_cache_warmup.py' -v
+      - name: Shell-check guarded V48 optional installer
+        run: bash -n deploy/scripts/v48_cache_warmup.sh
+      - name: Source-pin Lion and Panda expert pair and reject absent classifier weights
+        run: python -m unittest discover -s tests -p 'test_v49_lion_panda_pair_probe.py' -v
+      - name: Syntax-check bounded read-only Lion Panda VM probe
+        run: bash -n deploy/scripts/v49_lion_panda_pair_probe.sh
+      - name: Validate automatic timer-restoring research checkout
+        run: bash -n deploy/scripts/v49_safe_update.sh
+      - name: Validate portable Lion and Panda ML selectors against sklearn
+        run: python -m unittest discover -s tests -p 'test_v50_pair_selector_artifact.py' -v
+      - name: Validate causally resolved offline source-example export
+        run: python -m unittest discover -s tests -p 'test_v50_pair_example_export.py' -v
+      - name: Japan Xanax retrospective V7 V8 causal source-fingerprint parity gate
+        run: python -m unittest discover -s tests -p 'test_v51_japan_parity.py' -v
+      - name: Validate SHA256-pinned research-only pair selector inference
+        run: python -m unittest discover -s tests -p 'test_v52_pair_trained_tick.py' -v
+      - name: Chronological frozen Lion Panda train versus all-row holdout validation
+        run: python -m unittest discover -s tests -p 'test_v53_pair_holdout_audit.py' -v
+      - name: Offline Lion Panda exact-source resume and immutable-snapshot cache safety
+        run: python -m unittest discover -s tests -p 'test_v54_pair_resume_export.py' -v
+      - name: Shell-verify read-only V55 unified VM preflight
+        run: bash -n deploy/scripts/v55_home_research_check.sh
+      - name: Verify private SQLite/Red Fox exception fingerprints remain sanitized and fail-closed
+        run: python -m unittest discover -s tests -p 'test_v57_exception_fingerprint.py' -v
+      - name: V58 frozen SQLite read-only FD closure and Red Fox causal race regression
+        run: python -m unittest discover -s tests -p 'test_v58_frozen_readonly_fds.py' -v
+      - name: V59 bounded transient SQLite WAL read retry and extended codes
+        run: python -m unittest discover -s tests -p 'test_v59_sqlite_read_retry.py' -v
+      - name: V60 opt-in private SQLite DELETE-mode snapshot cannot leak live WAL state
+        run: python -m unittest discover -s tests -p 'test_v60_private_snapshot_probe.py' -v
+      - name: V62 one-off immutable mirror four-original-specialist canary safety
+        run: python -m unittest discover -s tests -p 'test_v62_private_mirror_smoke.py' -v
+      - name: V63 full 19-original-champion private mirror staging and real age safety
+        run: python -m unittest discover -s tests -p 'test_v63_full_mirror_smoke.py' -v
+      - name: V64 safe mirror-stage SQLite diagnostics and fail-closed outcomes
+        run: python -m unittest discover -s tests -p 'test_v64_mirror_stage_diagnostics.py' -v
+      - name: V65 scheduled private mirror tick and minimal reversible overlay gates
+        run: python -m unittest discover -s tests -p 'test_v65_private_mirror_shadow_tick.py' -v
+      - name: V66 read-only completed Monkey expert bank and original planner parity
+        run: python -m unittest discover -s tests -p 'test_v66_monkey_readonly_selector_probe.py' -v
+      - name: V68 isolated Monkey model-20 canary record and fail-closed gates
+        run: python -m unittest discover -s tests -p 'test_v68_monkey_isolated_canary.py' -v
+      - name: V69 full original 19 plus Monkey one-snapshot isolated ledger canary
+        run: python -m unittest discover -s tests -p 'test_v69_full20_isolated_smoke.py' -v
+      - name: V70 Monkey-first 20-model frozen snapshot cache-revision safety
+        run: python -m unittest discover -s tests -p 'test_v70_monkey_first_full20_smoke.py' -v
+      - name: V71 as-issued audit explains expired departure without hiding invalid prediction
+        run: python -m unittest discover -s tests -p 'test_v71_full20_issued_audit.py' -v
+      - name: V72 private 20-model scheduled candidate with original 19 rollback
+        run: python -m unittest discover -s tests -p 'test_v72_private_mirror20_shadow_tick.py' -v
+      - name: Syntax check V72 one-shot smoke and guarded enable and rollback
+        run: bash -n deploy/scripts/v72_private20_smoke.sh deploy/scripts/v72_private20_transition.sh
+      - name: V74 Chamois exact selector source and historical parity
+        run: python -m unittest discover -s tests -p 'test_v74_chamois_selector_parity.py' -v
+      - name: V74 Chamois read-only isolated one-shot tests
+        run: python -m unittest discover -s tests -p 'test_v74_chamois_isolated_canary.py' -v
+      - name: V75 candidate 21-model source-pinned single-snapshot smoke tests
+        run: python -m unittest discover -s tests -p 'test_v75_private21_chamois_smoke.py' -v
+      - name: V75 smoke shell syntax
+        run: bash -n deploy/scripts/v75_private21_smoke.sh
+      - name: V76 prospective report prevents fictitious exact arrival accuracy
+        run: python -m unittest discover -s tests -p 'test_v76_forward_research_report.py' -v
+      - name: Compile standalone entry points
+        run: python -m py_compile research/v38_v18_single_tick.py research/v38_v19_single_tick.py research/v38_readonly_resource_probe.py research/v38_nessie_single_tick.py research/v38_readonly_resource_probe.py research/v38_camel_single_tick.py research/v38_peony_single_tick.py services/plushie_flower_dynamic_planner_v20.py research/v38_budgeted_runner.py research/v38_prediction_store.py research/v38_incremental_observer.py research/v38_feature_cache.py research/v38_red_fox_single_tick.py research/v38_catalog_seed.py research/v38_adaptive_policy.py research/v38_capacity_guard.py research/v38_idle_admission.py research/v38_shadow_canary_preflight.py web/app.py web/catalog_cache_v38.py web/v38_revision_fingerprint.py

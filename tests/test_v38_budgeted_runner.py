@@ -1,0 +1,190 @@
+"""Safety tests for the opt-in V38 serial planner (no VM services)."""
+import sqlite3
+import tempfile
+import unittest
+from pathlib import Path
+from unittest.mock import Mock
+
+from research.v38_budgeted_runner import choose,run_tick,PINNED_WORKERS
+from research.v38_prediction_store import read
+
+NOW=1791540000
+
+
+class BudgetedRunnerTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp=tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.stock=Path(self.tmp.name)/"stock.db"
+        self.side=Path(self.tmp.name)/"side.db"
+        with sqlite3.connect(self.stock) as c:
+            c.execute("""CREATE TABLE stock_history(
+                id INTEGER PRIMARY KEY,timestamp INTEGER,country TEXT,
+                item_name TEXT,quantity INTEGER)""")
+            c.execute("CREATE TABLE collection_gaps(id INTEGER PRIMARY KEY)")
+            c.execute("""CREATE TABLE poll_heartbeats(
+                timestamp INTEGER,mode TEXT,success INTEGER)""")
+            c.execute("INSERT INTO poll_heartbeats VALUES(?,'poll-cycle',1)",(NOW-20,))
+            c.execute("INSERT INTO stock_history VALUES(1,?,?,?,?)",
+                      (NOW-30,"uni","Heather",40))
+            c.execute("INSERT INTO stock_history VALUES(2,?,?,?,?)",
+                      (NOW-30,"can","Wolverine Plushie",40))
+
+    def test_explicit_opt_in_default_never_touches_collector(self):
+        out=run_tick(stock_db="/nonexistent/collector.db",
+                     sidecar_db=self.side,now=NOW)
+        self.assertEqual(out["mode"],"PLAN_ONLY")
+        self.assertFalse(self.side.exists())
+        self.assertFalse(out["collector_written"])
+        self.assertEqual(len(out["plan"]["pending_specialists"]),6)
+
+    def test_six_missing_specialists_never_route_to_wrong_model(self):
+        roster={"jap:Xanax":{},"arg:Monkey Plushie":{},
+                "uni:Heather":{}}
+        selection=choose(roster,{},now=NOW,active=("jap:Xanax","uni:Heather"))
+        self.assertEqual(selection["execute"],["uni:Heather"])
+        self.assertEqual(selection["pending_specialists"],
+                         ["arg:Monkey Plushie","jap:Xanax"])
+
+    def test_capped_bootstrap_and_valid_proposal(self):
+        first=run_tick(stock_db=self.stock,sidecar_db=self.side,
+                       execute=True,capacity_probe=lambda:{"allowed":True},max_rows=1,now=NOW)
+        self.assertEqual(first["mode"],"SOURCE_BOOTSTRAP")
+        self.assertEqual(first["executed"],[])
+        def fake(args,**kwargs):
+            self.assertIn("research.v38_v18_single_tick",args)
+            self.assertLessEqual(kwargs["timeout"],20)
+            return Mock(returncode=0,stdout=(
+                '{"status":"RESEARCH_PROPOSAL_ONLY",'
+                '"recommended_departure_timestamp":'+str(NOW+600)+','
+                '"recommended_arrival_timestamp":'+str(NOW+6960)+','
+                '"quantity_threshold":30,"grace_seconds":10,'
+                '"replan_step_seconds":300,"probability_calibrated":false}'))
+        out=run_tick(stock_db=self.stock,sidecar_db=self.side,execute=True,capacity_probe=lambda:{"allowed":True},
+                     max_rows=10,max_jobs=1,active=["uni:Heather"],
+                     now=NOW,runner=fake,clock=lambda:0)
+        self.assertEqual(out["mode"],"EXECUTED_RESEARCH_ONLY")
+        self.assertEqual(out["executed"][0]["item_key"],"uni:Heather")
+        self.assertEqual(out["executed"][0]["status"],"RESEARCH_PROPOSAL_ONLY")
+        self.assertFalse(read(self.side,NOW,"uni:Heather")["fallback_required"])
+
+    def test_quiet_stock_can_still_have_fresh_collector_observation(self):
+        # An item unchanged for days is still fresh if a real poll succeeded.
+        with sqlite3.connect(self.stock) as db:
+            db.execute("UPDATE stock_history SET timestamp=?",(NOW-86400,))
+        def fake(args,**kwargs):
+            return Mock(returncode=0,stdout=(
+                '{"status":"RESEARCH_PROPOSAL_ONLY",'
+                '"recommended_departure_timestamp":'+str(NOW+600)+','
+                '"recommended_arrival_timestamp":'+str(NOW+6960)+','
+                '"quantity_threshold":30,"grace_seconds":10,'
+                '"replan_step_seconds":300,"probability_calibrated":false}'))
+        result=run_tick(stock_db=self.stock,sidecar_db=self.side,
+                execute=True,capacity_probe=lambda:{"allowed":True},
+                active=["uni:Heather"],max_jobs=1,now=NOW,
+                runner=fake,clock=lambda:0.)
+        self.assertEqual(result["executed"][0]["status"],
+                         "RESEARCH_PROPOSAL_ONLY")
+        self.assertEqual(read(self.side,NOW,"uni:Heather")["stock_as_of"],NOW-20)
+
+    def test_stale_heartbeat_refuses_to_execute_even_when_stock_changes(self):
+        with sqlite3.connect(self.stock) as db:
+            db.execute("UPDATE poll_heartbeats SET timestamp=?",(NOW-500,))
+        never=Mock()
+        result=run_tick(stock_db=self.stock,sidecar_db=self.side,
+                        execute=True,capacity_probe=lambda:{"allowed":True},
+                        now=NOW,runner=never)
+        self.assertEqual(result["mode"],"COLLECTOR_STALE_OR_NO_HEARTBEAT")
+        self.assertEqual(result["executed"],[])
+        never.assert_not_called()
+
+    def test_invalid_subprocess_remains_abstention(self):
+        out=run_tick(stock_db=self.stock,sidecar_db=self.side,execute=True,capacity_probe=lambda:{"allowed":True},
+                     max_jobs=1,active=["uni:Heather"],now=NOW,
+                     runner=lambda *a,**k: Mock(returncode=5,stdout=""),
+                     clock=lambda:0)
+        self.assertEqual(out["executed"][0]["status"],"WORKER_ERROR")
+        self.assertTrue(read(self.side,NOW,"uni:Heather")["fallback_required"])
+
+    def test_private_error_type_logged_not_raw_message(self):
+        fake=Mock(returncode=0,stdout=(
+            '{"status":"V38_NATIVE_ERROR","error_type":"OperationalError",'
+            '"raw_message":"must never be logged"}'))
+        out=run_tick(stock_db=self.stock,sidecar_db=self.side,
+            execute=True,capacity_probe=lambda:{"allowed":True},
+            max_jobs=1,active=["uni:Heather"],now=NOW,
+            runner=lambda *a,**k:fake,clock=lambda:0)
+        self.assertEqual(out["executed"][0]["error_type"],"OperationalError")
+        self.assertNotIn("raw_message",str(out["executed"]))
+
+    def test_first_five_allowlist_never_runs_unapproved_candidates(self):
+        from research.v38_readonly_resource_probe import PROBES
+        seen=[]
+        def simulated(args,**kwargs):
+            seen.append(args)
+            return Mock(returncode=0,stdout='{"status":"NO_RECOMMENDATION"}')
+        result=run_tick(stock_db=self.stock,sidecar_db=self.side,
+            execute=True,capacity_probe=lambda:{"allowed":True},
+            approved_keys=PROBES,active=["uni:Heather"],
+            max_jobs=5,budget_seconds=120,now=NOW,
+            runner=simulated,clock=lambda:0.)
+        self.assertEqual(result["mode"],"EXECUTED_RESEARCH_ONLY")
+        self.assertLessEqual(len(result["executed"]),5)
+        self.assertEqual(
+            {x["item_key"] for x in result["executed"]},
+            set(PROBES))
+        with self.assertRaises(ValueError):
+            run_tick(stock_db=self.stock,sidecar_db=self.side,
+                approved_keys=["uni:Unsupported Plushie"],now=NOW)
+        self.assertFalse(any("Xanax" in str(args) for args in seen))
+
+    def test_cpu_pressure_defers_before_creating_sidecar(self):
+        out=run_tick(stock_db=self.stock,sidecar_db=self.side,execute=True,
+                     now=NOW,capacity_probe=lambda:{
+                         "allowed":False,"one_minute_load":4.5,
+                         "cpu_slots":1,"normalized_load":4.5})
+        self.assertEqual(out["mode"],"DEFERRED_CPU_PRESSURE")
+        self.assertFalse(self.side.exists())
+        self.assertEqual(out["executed"],[])
+
+    def test_live_serial_models_use_current_asof_but_keep_five_minute_due(self):
+        # The collector can append a row after the scheduled 5-minute tick.
+        # Later workers must not be evaluated with an earlier timestamp.
+        from unittest.mock import patch
+        seen=[]
+        def fake(args,**kwargs):
+            observed=int(args[args.index("--now")+1])
+            seen.append(observed)
+            return Mock(returncode=0,stdout=(
+                '{"status":"RESEARCH_PROPOSAL_ONLY",'
+                '"recommended_departure_timestamp":'+str(observed+600)+','
+                '"recommended_arrival_timestamp":'+str(observed+6960)+','
+                '"quantity_threshold":30,"grace_seconds":10,'
+                '"replan_step_seconds":300,"probability_calibrated":false}'))
+        with patch("research.v38_budgeted_runner.time.time",
+                   side_effect=[NOW,NOW+20,NOW+80]):
+            result=run_tick(stock_db=self.stock,sidecar_db=self.side,
+                execute=True,capacity_probe=lambda:{"allowed":True},
+                approved_keys=["uni:Heather","can:Wolverine Plushie"],
+                max_jobs=2,now=None,runner=fake,clock=lambda:0)
+        self.assertEqual(result["mode"],"EXECUTED_RESEARCH_ONLY")
+        self.assertEqual(seen,[NOW+20,NOW+80])
+        self.assertTrue(all(r["status"]=="RESEARCH_PROPOSAL_ONLY"
+                            for r in result["executed"]))
+        with sqlite3.connect(self.side) as db:
+            rows=db.execute("SELECT computed_at,next_due_at FROM latest_predictions").fetchall()
+        self.assertEqual({r[0] for r in rows},{NOW+20,NOW+80})
+        self.assertEqual({r[1] for r in rows},{NOW+300})
+
+    def test_resource_limits_and_adapters_are_pinned(self):
+        self.assertEqual(len(PINNED_WORKERS),16)
+        with self.assertRaises(ValueError):
+            run_tick(stock_db=self.stock,sidecar_db=self.side,execute=True,capacity_probe=lambda:{"allowed":True},
+                     max_jobs=17)
+        with self.assertRaises(ValueError):
+            run_tick(stock_db=self.stock,sidecar_db=self.side,execute=True,capacity_probe=lambda:{"allowed":True},
+                     worker_seconds=50,budget_seconds=20)
+
+
+if __name__=="__main__":
+    unittest.main()

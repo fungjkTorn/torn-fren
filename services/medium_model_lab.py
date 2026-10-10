@@ -3,7 +3,7 @@ import sqlite3
 import statistics
 from dataclasses import dataclass
 
-from services.history_service import DB_PATH
+from services.history_service import DB_PATH, _ClosingConnection
 from services.cycle_feature_lab import build_cycle_feature_rows, _percentile, _tertile_prediction
 
 
@@ -308,7 +308,7 @@ def analyze_advanced_item(country, item_name, min_train=15):
 
 
 def list_tracked_items(min_rows=20):
-    with sqlite3.connect(DB_PATH) as conn:
+    with sqlite3.connect(DB_PATH, factory=_ClosingConnection) as conn:
         return conn.execute(
             """
             SELECT country, item_name, COUNT(*)

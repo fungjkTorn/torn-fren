@@ -414,34 +414,44 @@ def invalidate_pending_forecasts_crossing_gap(
             (gap_start,),
         ).fetchall()
 
-    invalidated = 0
-    preserved = 0
+    # A single restock item can have many P1/P2/P3 pending runs. Evaluate
+    # expensive full-history item continuity only ONCE per item per gap.
+    grouped = {}
     for run_id, country, item_name in runs:
+        key = (str(country).lower(), str(item_name).lower())
+        grouped.setdefault(key, []).append(int(run_id))
+
+    updates = []
+    for (country, item_name), run_ids in grouped.items():
         continuity = _interval_gaps_preserve_item_cycle(
             country, item_name, gap_start, gap_end
         )
         if continuity["valid"]:
-            preserved += 1
             continue
+        explanation = (
+            f"invalidated: {reason} ({gap_start} -> {gap_end}); "
+            f"{continuity['reason']}"
+        )
+        updates.extend((explanation, now, run_id) for run_id in run_ids)
 
+    invalidated = 0
+    # Use a single short write transaction, not one new SQLite transaction
+    # per run. Heavy continuity queries above do not hold writer locks.
+    if updates:
         with _connect() as conn:
-            cursor = conn.execute(
-                """
-                UPDATE forecast_audit_points
-                SET status = 'invalidated',
-                    ground_truth_valid = 0,
-                    validation_reason = ?,
-                    resolved_at = ?
-                WHERE status = 'pending' AND run_id = ?
-                """,
-                (
-                    f"invalidated: {reason} ({gap_start} -> {gap_end}); "
-                    f"{continuity['reason']}",
-                    now,
-                    int(run_id),
-                ),
-            )
-            invalidated += int(cursor.rowcount or 0)
+            for explanation, resolved_at, run_id in updates:
+                cursor = conn.execute(
+                    """
+                    UPDATE forecast_audit_points
+                    SET status = 'invalidated',
+                        ground_truth_valid = 0,
+                        validation_reason = ?,
+                        resolved_at = ?
+                    WHERE status = 'pending' AND run_id = ?
+                    """,
+                    (explanation, resolved_at, run_id),
+                )
+                invalidated += int(cursor.rowcount or 0)
 
     return invalidated
 
