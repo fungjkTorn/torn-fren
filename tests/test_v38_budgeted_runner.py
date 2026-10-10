@@ -106,6 +106,17 @@ class BudgetedRunnerTests(unittest.TestCase):
         self.assertEqual(out["executed"][0]["status"],"WORKER_ERROR")
         self.assertTrue(read(self.side,NOW,"uni:Heather")["fallback_required"])
 
+    def test_private_error_type_logged_not_raw_message(self):
+        fake=Mock(returncode=0,stdout=(
+            '{"status":"V38_NATIVE_ERROR","error_type":"OperationalError",'
+            '"raw_message":"must never be logged"}'))
+        out=run_tick(stock_db=self.stock,sidecar_db=self.side,
+            execute=True,capacity_probe=lambda:{"allowed":True},
+            max_jobs=1,active=["uni:Heather"],now=NOW,
+            runner=lambda *a,**k:fake,clock=lambda:0)
+        self.assertEqual(out["executed"][0]["error_type"],"OperationalError")
+        self.assertNotIn("raw_message",str(out["executed"]))
+
     def test_first_five_allowlist_never_runs_unapproved_candidates(self):
         from research.v38_readonly_resource_probe import PROBES
         seen=[]

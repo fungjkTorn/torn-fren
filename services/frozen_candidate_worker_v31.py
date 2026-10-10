@@ -17,6 +17,7 @@ import argparse
 import json
 import sqlite3
 from pathlib import Path
+from research.v38_readonly_retry import read_with_retry
 
 # Standalone canary helper: do not import research-only V24 replay from main.
 # The existing V24 replay module is not part of the public V2 website path.
@@ -47,27 +48,29 @@ VALID_COUNTRIES={"mex","cay","can","haw","uni","arg","swi","jap","chi","uae","so
 
 def inspect_live_source(db: str | Path, now: int, freshness=LIVE_FRESHNESS_SECONDS) -> dict:
     db=Path(db).resolve(strict=True)
-    with sqlite3.connect(db.as_uri()+"?mode=ro",uri=True) as con:
-        # Source is a living collector DB, not an offline lookback onto the future.
-        maximum=con.execute("SELECT MAX(timestamp) FROM stock_history").fetchone()[0]
-        if maximum is None:
-            return {"status":"NO_OBSERVATIONS"}
-        if int(maximum)>now:
-            return {"status":"FUTURE_RECORDS_PRESENT","latest_observation":int(maximum)}
-        hb=con.execute("""SELECT MAX(timestamp) FROM poll_heartbeats
-                           WHERE mode='poll-cycle' AND success=1""").fetchone()[0]
-        if hb is None or hb>now or now-hb>freshness:
-            return {"status":"COLLECTOR_STALE_OR_NO_HEARTBEAT",
-                    "last_successful_heartbeat":int(hb) if hb is not None else None}
-        # Inclusive boundaries: recovery timestamp itself is not a valid cycle label.
-        gaps=con.execute("""SELECT start_timestamp,end_timestamp FROM collection_gaps
-                            WHERE start_timestamp <= ? AND
-                            COALESCE(end_timestamp,9223372036854775807)>=? LIMIT 1""",
-                         (int(now),int(hb))).fetchone()
-        if gaps is not None:
-            return {"status":"COLLECTION_GAP_CROSSES_RECENT_POLL"}
-    return {"status":"FRESH","last_successful_heartbeat":int(hb),
-            "latest_observation":int(maximum)}
+    def read_source_once():
+        with sqlite3.connect(db.as_uri()+"?mode=ro",uri=True) as con:
+            # Source is a living collector DB, not an offline lookback onto the future.
+            maximum=con.execute("SELECT MAX(timestamp) FROM stock_history").fetchone()[0]
+            if maximum is None:
+                return {"status":"NO_OBSERVATIONS"}
+            if int(maximum)>now:
+                return {"status":"FUTURE_RECORDS_PRESENT","latest_observation":int(maximum)}
+            hb=con.execute("""SELECT MAX(timestamp) FROM poll_heartbeats
+                               WHERE mode='poll-cycle' AND success=1""").fetchone()[0]
+            if hb is None or hb>now or now-hb>freshness:
+                return {"status":"COLLECTOR_STALE_OR_NO_HEARTBEAT",
+                        "last_successful_heartbeat":int(hb) if hb is not None else None}
+            # Inclusive boundaries: recovery timestamp itself is not a valid cycle label.
+            gaps=con.execute("""SELECT start_timestamp,end_timestamp FROM collection_gaps
+                                WHERE start_timestamp <= ? AND
+                                COALESCE(end_timestamp,9223372036854775807)>=? LIMIT 1""",
+                             (int(now),int(hb))).fetchone()
+            if gaps is not None:
+                return {"status":"COLLECTION_GAP_CROSSES_RECENT_POLL"}
+        return {"status":"FRESH","last_successful_heartbeat":int(hb),
+                "latest_observation":int(maximum)}
+    return read_with_retry(read_source_once)
 
 
 def frozen_single_tick(

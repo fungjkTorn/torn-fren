@@ -6,6 +6,7 @@ Rowid changes and collection gap revisions invalidate dependent features.
 from __future__ import annotations
 import sqlite3
 from pathlib import Path
+from research.v38_readonly_retry import read_with_retry
 
 
 def initialize(con):
@@ -32,49 +33,54 @@ def observe(stock_db, sidecar, max_rows=10000, *, fast_bootstrap=False):
         raise ValueError("batch outside bounds")
     initialize(sidecar)
     p = Path(stock_db).resolve(strict=True)
-    with sqlite3.connect(p.as_uri()+"?mode=ro",uri=True,timeout=2) as src:
-        src.execute("PRAGMA query_only=ON")
-        maximum=src.execute("SELECT COALESCE(MAX(id),0) FROM stock_history").fetchone()[0]
-        gaps=src.execute("SELECT COALESCE(MAX(id),0) FROM collection_gaps").fetchone()[0]
-        # Stock rows are change-only: a quiet item may be perfectly fresh for
-        # hours. Its most recent changed-row timestamp is NOT its last observed
-        # timestamp. Successful collector heartbeats prove the live read state.
-        try:
-            observed=src.execute("""
-                SELECT MAX(timestamp) FROM poll_heartbeats
-                WHERE mode='poll-cycle' AND success=1
-            """).fetchone()[0]
-        except sqlite3.OperationalError:
-            observed=None
-        old=sidecar.execute("SELECT last_id,gap_rev FROM v38_source_cursor WHERE singleton=1").fetchone()
-        last_id=old[0] if old else 0
-        reset=maximum<last_id
-        if reset: last_id=0
-        # A brand-new private sidecar has no historical feature entries to
-        # invalidate. On a large 153MB stock DB, replaying 10,000 old rows per
-        # 5-minute tick could defer first shadow predictions for hours. Instead
-        # summarize the latest known row per item in one bounded SQL query.
-        # This changes ONLY private sidecar initial state, never collector DB.
-        # Small explicit max_rows values are diagnostic chunk limits. Never
-        # bypass a deliberately tiny row budget during unit tests/probes.
-        fresh_compact = bool(
-            fast_bootstrap and max_rows>=1000 and old is None and maximum>max_rows
-        )
-        if fresh_compact:
-            rows=src.execute("""
-                SELECT s.id,s.timestamp,s.country,s.item_name,s.quantity
-                FROM stock_history AS s
-                JOIN (
-                    SELECT MAX(id) AS latest_id
-                    FROM stock_history WHERE id<=?
-                    GROUP BY LOWER(country),LOWER(item_name)
-                ) AS latest ON s.id=latest.latest_id
-                ORDER BY s.id
-            """,(maximum,)).fetchall()
-        else:
-            rows=src.execute("""SELECT id,timestamp,country,item_name,quantity
-                FROM stock_history WHERE id>? ORDER BY id LIMIT ?""",
-                (last_id,max_rows)).fetchall()
+    def read_source_once():
+        with sqlite3.connect(p.as_uri()+"?mode=ro",uri=True,timeout=2) as src:
+            src.execute("PRAGMA query_only=ON")
+            maximum=src.execute("SELECT COALESCE(MAX(id),0) FROM stock_history").fetchone()[0]
+            gaps=src.execute("SELECT COALESCE(MAX(id),0) FROM collection_gaps").fetchone()[0]
+            # Stock rows are change-only: a quiet item may be perfectly fresh for
+            # hours. Its most recent changed-row timestamp is NOT its last observed
+            # timestamp. Successful collector heartbeats prove the live read state.
+            try:
+                observed=src.execute("""
+                    SELECT MAX(timestamp) FROM poll_heartbeats
+                    WHERE mode='poll-cycle' AND success=1
+                """).fetchone()[0]
+            except sqlite3.OperationalError:
+                observed=None
+            old=sidecar.execute("SELECT last_id,gap_rev FROM v38_source_cursor WHERE singleton=1").fetchone()
+            last_id=old[0] if old else 0
+            reset=maximum<last_id
+            if reset: last_id=0
+            # A brand-new private sidecar has no historical feature entries to
+            # invalidate. On a large 153MB stock DB, replaying 10,000 old rows per
+            # 5-minute tick could defer first shadow predictions for hours. Instead
+            # summarize the latest known row per item in one bounded SQL query.
+            # This changes ONLY private sidecar initial state, never collector DB.
+            # Small explicit max_rows values are diagnostic chunk limits. Never
+            # bypass a deliberately tiny row budget during unit tests/probes.
+            fresh_compact = bool(
+                fast_bootstrap and max_rows>=1000 and old is None and maximum>max_rows
+            )
+            if fresh_compact:
+                rows=src.execute("""
+                    SELECT s.id,s.timestamp,s.country,s.item_name,s.quantity
+                    FROM stock_history AS s
+                    JOIN (
+                        SELECT MAX(id) AS latest_id
+                        FROM stock_history WHERE id<=?
+                        GROUP BY LOWER(country),LOWER(item_name)
+                    ) AS latest ON s.id=latest.latest_id
+                    ORDER BY s.id
+                """,(maximum,)).fetchall()
+            else:
+                rows=src.execute("""SELECT id,timestamp,country,item_name,quantity
+                    FROM stock_history WHERE id>? ORDER BY id LIMIT ?""",
+                    (last_id,max_rows)).fetchall()
+        return maximum,gaps,observed,old,last_id,reset,fresh_compact,rows
+
+    (maximum,gaps,observed,old,last_id,reset,
+     fresh_compact,rows)=read_with_retry(read_source_once)
     affected=set()
     with sidecar:
         if reset:

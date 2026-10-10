@@ -133,7 +133,13 @@ def run_tick(*, stock_db, sidecar_db, execute=False, active=(),
                           # Replan cadence is anchored to the 5-minute tick,
                           # not each serial worker's variable start offset.
                           executed=True,elapsed_ms=elapsed,next_due=now+delay)
-            results.append({"item_key":key,"status":status,"elapsed_ms":elapsed})
+            item_result={"item_key":key,"status":status,"elapsed_ms":elapsed}
+            # Private journal identifiers only: never log raw paths or errors.
+            if status!="RESEARCH_PROPOSAL_ONLY":
+                value=output.get("error_type")
+                if isinstance(value,str) and len(value)<=80:
+                    item_result["error_type"]=value
+            results.append(item_result)
         return {"mode":"EXECUTED_RESEARCH_ONLY","delta":delta,
                 "plan":plan,"executed":results,"collector_written":False}
     finally:
