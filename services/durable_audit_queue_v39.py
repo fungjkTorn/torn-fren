@@ -11,6 +11,27 @@ import json
 import time
 from services import history_service as hs
 
+# Private canary & existing Japan evidence take scheduling precedence over
+# background catalog audits. These are NOT separate models in production.
+# Source-of-truth item spellings match the frozen V38 read-only roster.
+CANARY_KEYS = frozenset({
+    ("uni", "heather"),
+    ("can", "wolverine plushie"),
+    ("arg", "ceibo flower"),
+    ("jap", "cherry blossom"),
+    ("uni", "nessie plushie"),
+    ("jap", "xanax"),
+})
+CANARY_PRIORITY = 100
+STOCK_PRIORITY = 10
+
+
+def _priority(country, item_name, requested):
+    if (str(country).strip().lower(), str(item_name).strip().lower()) in CANARY_KEYS:
+        return max(CANARY_PRIORITY, int(requested))
+    return int(requested)
+
+
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS routine_audit_jobs_v39 (
     country TEXT NOT NULL,
@@ -44,12 +65,13 @@ def ensure_schema(conn):
     """)
 
 
-def enqueue(conn, country, item_name, now=None, *, priority=10):
+def enqueue(conn, country, item_name, now=None, *, priority=STOCK_PRIORITY):
     now=int(time.time() if now is None else now)
     country=str(country).lower().strip()
     item_name=str(item_name).strip()
     if not country or not item_name:
         raise ValueError("country and item are required")
+    priority = _priority(country,item_name,priority)
     # The caller's existing stock-row transaction commits this UPSERT
     # atomically with the observation that caused the audit.
     conn.execute("""
@@ -58,12 +80,37 @@ def enqueue(conn, country, item_name, now=None, *, priority=10):
         lease_until)
       VALUES(?,?,?,1,?,'pending',0,0)
       ON CONFLICT(country,item_name) DO UPDATE SET
-        queued_at=excluded.queued_at,
+        -- Preserve the oldest enqueue time while the same work is pending.
+        -- A newly arrived event must not make a waiting item appear newer
+        -- than thousands of other items. Completed jobs start a new wait.
+        queued_at=CASE WHEN routine_audit_jobs_v39.status='done'
+            THEN excluded.queued_at ELSE MIN(routine_audit_jobs_v39.queued_at,excluded.queued_at) END,
         generation=routine_audit_jobs_v39.generation+1,
         priority=MAX(routine_audit_jobs_v39.priority,excluded.priority),
         status='pending',next_due_at=0,lease_until=0,
         last_error=NULL
-    """,(country,item_name,now,int(priority)))
+    """,(country,item_name,now,priority))
+
+
+def promote_canary_pending(now=None):
+    """Elevate already queued canary stock changes without resetting timestamps.
+
+    Safe on an active V39 queue: no rows deleted, no generation changes,
+    no new synthetic audit predictions, and no production model invocation.
+    """
+    hs.init_db()
+    with hs._connect() as con:
+        count=0
+        for country,item in sorted(CANARY_KEYS):
+            result=con.execute("""
+              UPDATE routine_audit_jobs_v39
+              SET priority=?
+              WHERE country=? AND LOWER(item_name)=?
+                AND status IN ('pending','running')
+                AND priority<?
+            """,(CANARY_PRIORITY,country,item,CANARY_PRIORITY))
+            count+=result.rowcount
+    return count
 
 
 def claim(now=None, *, lease_seconds=360):
@@ -76,7 +123,9 @@ def claim(now=None, *, lease_seconds=360):
           FROM routine_audit_jobs_v39
           WHERE (status='pending' AND next_due_at<=?)
              OR (status='running' AND lease_until<=?)
-          ORDER BY priority DESC,queued_at DESC
+          -- Strict priority bands, FIFO within each band. Never let a
+          -- stream of new changes indefinitely starve older waiting jobs.
+          ORDER BY priority DESC,queued_at ASC,country ASC,item_name ASC
           LIMIT 1
         """,(now,now)).fetchone()
         if row is None:
@@ -206,6 +255,7 @@ def drain(*,max_jobs=4,max_seconds=40,now_fn=time.time,
         return {"status":"DEFERRED_RECOVERY_OR_STALE_COLLECTOR",
                 "recovery":recovery,"collector":collector}
     seeded=bootstrap()
+    promoted=promote_canary_pending()
     started=time.monotonic()
     results=[]
     while len(results)<max_jobs and time.monotonic()-started<max_seconds:
@@ -224,7 +274,7 @@ def drain(*,max_jobs=4,max_seconds=40,now_fn=time.time,
                             "status":"RETRY_SCHEDULED" if updated else "SUPERSEDED",
                             "error_type":type(exc).__name__})
     return {"status":"BATCH_COMPLETED","bootstrap_candidates":seeded,
-            "results":results,"queue":status()}
+            "promoted_canary_jobs":promoted,"results":results,"queue":status()}
 
 
 def main():
