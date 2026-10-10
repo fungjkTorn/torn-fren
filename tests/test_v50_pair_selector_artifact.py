@@ -1,5 +1,6 @@
 """V50 tests: no future labels, sklearn JSON decision parity, safe artifact."""
 import json
+import importlib.util
 import tempfile
 import unittest
 from pathlib import Path
@@ -7,6 +8,9 @@ from pathlib import Path
 import numpy as np
 
 from research import v50_pair_selector_artifact as m
+
+
+SKLEARN_AVAILABLE = importlib.util.find_spec("sklearn") is not None
 
 
 class V50ArtifactTests(unittest.TestCase):
@@ -28,6 +32,7 @@ class V50ArtifactTests(unittest.TestCase):
         self.assertEqual(m.FEATURES["panda"][-5:],
                          ("g2_g6","g6_g18raw","rL_g18raw","prob_gap","rob_gap"))
 
+    @unittest.skipUnless(SKLEARN_AVAILABLE, "offline classifier training requires optional scikit-learn")
     def test_logistic_matches_real_sklearn_across_training_samples(self):
         data=self.rows("lion")
         trained=m.train(data,"lion",1801000000)
@@ -40,6 +45,7 @@ class V50ArtifactTests(unittest.TestCase):
             v=np.where(np.isfinite(vec),vec,med)
             self.assertIn(m.choose_from_vector(trained,v),(0,1))
 
+    @unittest.skipUnless(SKLEARN_AVAILABLE, "offline classifier training requires optional scikit-learn")
     def test_forest_portable_inference_matches_real_sklearn(self):
         data=self.rows("panda",80)
         trained=m.train(data,"panda",1801000000)
@@ -101,6 +107,7 @@ class V50ArtifactTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,"two classes"):
             m.train(collapsed,"lion",1801000000)
 
+    @unittest.skipUnless(SKLEARN_AVAILABLE, "offline classifier training requires optional scikit-learn")
     def test_cannot_use_artifact_as_live_approval(self):
         a=m.train(self.rows("lion"),"lion",1801000000)
         a["approved_for_live"]=True

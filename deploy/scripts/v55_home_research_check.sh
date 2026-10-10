@@ -34,6 +34,12 @@ systemctl show torn-fren-v38-private-shadow.service -p ExecStart --no-pager |
   }
 
 echo "=== V50–V54 TESTS ==="
+if "$PY" -c "import sklearn" >/dev/null 2>&1; then
+  echo "scikit-learn available: running complete offline-training + VM-compatible research tests"
+else
+  echo "scikit-learn not installed: five offline-only model-fitting tests will report SKIPPED"
+  echo "This is expected for the VM; GitHub CI separately runs the complete training tests."
+fi
 PYTHONPATH="$ROOT" "$PY" -m unittest discover -s tests -p 'test_v5*.py' -q
 
 echo "=== LATEST PRIVATE RESEARCH API (NO WRITES) ==="

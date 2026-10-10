@@ -1,5 +1,6 @@
 """V53 chronological holdout prevents training-label leaks and selection bias."""
 import json
+import importlib.util
 import tempfile
 import unittest
 from pathlib import Path
@@ -7,6 +8,8 @@ from unittest.mock import patch
 
 from research import v53_pair_holdout_audit as m
 from research.v50_pair_selector_artifact import FEATURES
+
+SKLEARN_AVAILABLE = importlib.util.find_spec("sklearn") is not None
 
 BASE=1800000000
 STEP=1800
@@ -88,6 +91,7 @@ class V53HoldoutTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError,"duplicate"):
                 m.read_examples(path,"lion")
 
+    @unittest.skipUnless(SKLEARN_AVAILABLE, "offline classifier training requires optional scikit-learn")
     def test_audit_fits_only_resolved_before_cutoff(self):
         with tempfile.TemporaryDirectory() as tmp:
             path=Path(tmp)/"examples.jsonl"
@@ -121,6 +125,7 @@ class V53HoldoutTests(unittest.TestCase):
                         evaluation_until=BASE+80*STEP,
                         embargo_seconds=STEP,min_holdout=20)
 
+    @unittest.skipUnless(SKLEARN_AVAILABLE, "offline classifier training requires optional scikit-learn")
     def test_panda_offline_holdout_and_inference(self):
         with tempfile.TemporaryDirectory() as tmp:
             path=Path(tmp)/"panda.jsonl"
