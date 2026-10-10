@@ -1,0 +1,40 @@
+name: V39.1 audit backlog fairness hotfix
+
+on:
+  push:
+    branches: [release/v39-priority-fairness-20261009]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fifo-and-v39-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      matrix:
+        python-version: ['3.12','3.13']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install existing project import prerequisites
+        run: python -m pip install 'requests>=2.31,<3' 'fastapi>=0.100,<1' 'python-dotenv>=1,<2'
+      - name: Ensure high-priority V38 models cannot starve and old DB audit writer survives
+        run: python -m unittest discover -s tests -p 'test_v39_durable_routine_audits.py' -v
+      - name: Preserve V39 website caches and historical rolling graphs
+        run: |
+          python -m unittest discover -s tests -p 'test_v38_catalog_cache.py' -v
+          python -m unittest discover -s tests -p 'test_v38_revision_fingerprint.py' -v
+          python -m unittest discover -s tests -p 'test_v39_graph_history_cache.py' -v
+          python -m unittest discover -s tests -p 'test_v39_web_endpoint_cache_gate.py' -v
+      - name: Preserve critical V37 collector and gap-recovery guards
+        run: |
+          python -m unittest discover -s tests -p 'test_v37_sqlite_fd_hotfix.py' -v
+          python -m unittest discover -s tests -p 'test_v38_gap_recovery.py' -v
+          python -m unittest discover -s tests -p 'test_v38_heartbeat_fastpath.py' -v
+          python -m unittest discover -s tests -p 'test_v38_gap_invalidation_grouping.py' -v
+      - name: Compile audited modules
+        run: python -m py_compile services/durable_audit_queue_v39.py services/history_service.py poller.py web/app.py
