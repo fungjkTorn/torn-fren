@@ -287,6 +287,7 @@ def api_history(
     country: str = Query(..., min_length=3, max_length=3),
     item: str = Query(..., min_length=1),
     minutes: int = Query(1440, ge=1, le=10080),
+    legacy_v2: bool = False,
 ):
     country = country.lower().strip()
     item = item.strip()
@@ -295,6 +296,11 @@ def api_history(
         raise HTTPException(status_code=400, detail="Item name is required.")
 
     hours = minutes / 60
+    # Stock graph + profitability continue to work in V40 lightweight mode.
+    # Full V2 and historical cycle scoring are explicitly requested as a
+    # limited backup rather than scheduled every 30 seconds per open browser.
+    light_graph_enabled = os.environ.get("TORN_FREN_V40_LIGHT_GRAPH") == "1"
+    light_request = light_graph_enabled and not legacy_v2
     latest_item_state = get_latest_item_snapshot(country, item) or {}
     research_cache = os.environ.get("TORN_FREN_V38_REVISION_CACHE") == "1"
     source_status, revision_token = ("DISABLED", None)
@@ -309,13 +315,17 @@ def api_history(
             get_item_history_since,now=now_ts)
     else:
         rows = get_item_history_since(country, item, hours)
-    if research_cache and source_status != "FRESH":
+    if light_request:
+        # Intentionally do not enqueue either historical-cycle analysis or
+        # V2 profile recomputation. Returned raw graph points are unchanged.
+        base_analysis, analysis_warming = None, False
+    elif research_cache and source_status != "FRESH":
         base_analysis, analysis_warming = None, True
     else:
         base_analysis, analysis_warming = _get_analysis_nonblocking(
             country, item,revision=revision_token)
     analysis = _analysis_for_window(base_analysis, minutes) if base_analysis else {
-        "current_stock": rows[-1]["quantity"] if rows else None,
+        "current_stock": latest_item_state.get("quantity", rows[-1]["quantity"] if rows else None),
         "current_cost": latest_item_state.get("cost"),
         "current_cost_timestamp": latest_item_state.get("timestamp"),
         "current_cost_source": latest_item_state.get("source"),
@@ -325,6 +335,8 @@ def api_history(
         "analysis_warming": True,
     }
     analysis["analysis_warming"] = bool(analysis_warming)
+    analysis["legacy_v2_backup_available"] = light_graph_enabled
+    analysis["light_graph_mode"] = bool(light_request)
     # Price is a cheap latest-state lookup and should appear immediately even
     # while historical stats / Prediction v2 are warming in the background.
     analysis["current_cost"] = latest_item_state.get("cost")
@@ -341,7 +353,14 @@ def api_history(
     # issue cannot take the graph down.  The old prediction is retained as
     # baseline_prediction for diagnostics.
     try:
-        if research_cache and source_status != "FRESH":
+        if light_request:
+            prediction_v2 = {
+                "status":"backup_available","display_prediction":None,
+                "predictions":[],
+                "note":"V2 is paused to save CPU. Use Legacy V2 backup to request it temporarily."
+            }
+            prediction_stale = True
+        elif research_cache and source_status != "FRESH":
             prediction_v2 = {
                 "status":source_status, "display_prediction":None,"predictions":[],
                 "note":"Verified stock source unavailable; no live departure forecast."
@@ -374,7 +393,10 @@ def api_history(
             # current Prediction v2 result while the expensive profile warms.
             analysis["prediction"] = None
 
-        analysis["forecast_history"] = get_recent_active_forecasts(
+        # The historical audit DB is preserved and keeps receiving updates
+        # from the independent V39 worker. Don't query/render archived V2
+        # overlays on every lightweight stock-only chart request.
+        analysis["forecast_history"] = [] if light_request else get_recent_active_forecasts(
             country,
             item,
             since_timestamp=int(time.time()) - minutes * 60,

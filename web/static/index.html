@@ -661,6 +661,7 @@
 
       <div class="right-controls">
         <span class="live-state" id="liveState">Loading…</span>
+        <button id="legacyV2Button" type="button" hidden title="Temporarily enable the CPU-heavy legacy predictor">V2 backup: Off</button>
         <button id="refreshButton" type="button">↻ Refresh</button>
         <button id="insights-toggle" type="button" aria-expanded="false">Stats & prediction</button>
         <button id="latestButton" type="button">Jump to latest</button>
@@ -783,6 +784,7 @@
     const countrySelect = document.getElementById("countrySelect");
     const itemSelect = document.getElementById("itemSelect");
     const refreshButton = document.getElementById("refreshButton");
+    const legacyV2Button = document.getElementById("legacyV2Button");
     const liveStateEl = document.getElementById("liveState");
 
     const PI_PILOT_FLIGHT_MINUTES = {
@@ -814,6 +816,7 @@
     let currentAnalysis = null;
     let catalog = { countries: [] };
     let autoRefreshTimer = null;
+    let legacyV2UntilMs = 0; // Explicitly requested legacy backup times out after 10 minutes
     let loadingData = false;
     let loadGeneration = 0;
     let previousActivePrediction = null;
@@ -1385,12 +1388,19 @@
       } else {
         const waitingClean = v2.status === "waiting_for_clean_anchor";
         const warming = v2.status === "warming";
-        estimateEl.textContent = warming
-          ? "Calculating prediction…"
-          : waitingClean
-            ? "Waiting for clean live anchor"
-            : "No active restock target";
-        windowEl.textContent = warming ? "Stock history is ready; Prediction v2 is warming in the background." : "—";
+        const backup = v2.status === "backup_available";
+        estimateEl.textContent = backup
+          ? "V2 paused to save CPU"
+          : warming
+            ? "Calculating prediction…"
+            : waitingClean
+              ? "Waiting for clean live anchor"
+              : "No active restock target";
+        windowEl.textContent = backup
+          ? "Click V2 backup to run the older predictor for 10 minutes."
+          : warming
+            ? "Stock history is ready; Prediction v2 is warming in the background."
+            : "—";
       }
 
       const fallbackArrival = prediction.arrival_offset_source === "mid-stock fallback";
@@ -1694,7 +1704,8 @@
       if (!keepView) statusEl.textContent = "Loading...";
 
       try {
-        const url = `/api/history?country=${encodeURIComponent(requestedCountry)}&item=${encodeURIComponent(requestedItem)}&minutes=${requestedFetchMinutes}`;
+        const useLegacyV2 = legacyV2UntilMs > Date.now();
+        const url = `/api/history?country=${encodeURIComponent(requestedCountry)}&item=${encodeURIComponent(requestedItem)}&minutes=${requestedFetchMinutes}${useLegacyV2 ? "&legacy_v2=true" : ""}`;
         const response = await fetch(url, { cache: "no-store" });
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
@@ -1702,6 +1713,13 @@
         if (requestId !== loadGeneration || requestedSelectionKey !== selectionKey()) return;
         cachedRows = data.rows || [];
         cachedAnalysis = data.analysis || null;
+        const hasBackup = Boolean(data.analysis?.legacy_v2_backup_available);
+        legacyV2Button.hidden = !hasBackup;
+        if (hasBackup) {
+          const active = legacyV2UntilMs > Date.now();
+          legacyV2Button.classList.toggle("active", active);
+          legacyV2Button.textContent = active ? "V2 backup: On (10m max)" : "V2 backup: Off";
+        }
         cachedFetchMinutes = requestedFetchMinutes;
         cachedSelectionKey = requestedSelectionKey;
         previousActivePrediction = oldPrediction;
@@ -1877,6 +1895,16 @@
 
 
     refreshButton.addEventListener("click", () => {
+      loadData(currentMinutes, { keepView: true });
+    });
+
+    legacyV2Button.addEventListener("click", () => {
+      // A bounded, explicit backup session: never silently re-enable
+      // heavy V2 requests after browser reload or 10 minutes.
+      legacyV2UntilMs = legacyV2UntilMs > Date.now() ? 0 : Date.now() + 10 * 60 * 1000;
+      legacyV2Button.classList.toggle("active", legacyV2UntilMs > Date.now());
+      legacyV2Button.textContent = legacyV2UntilMs > Date.now()
+        ? "V2 backup: On (10m max)" : "V2 backup: Off";
       loadData(currentMinutes, { keepView: true });
     });
 

@@ -1,0 +1,40 @@
+name: V40 lightweight graph / legacy V2 opt-in backup
+
+on:
+  push:
+    branches: [release/v40-light-graph-20261009]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.12','3.13']
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - run: python -m pip install -r requirements.txt
+      - name: V40 no-heavy-compute API and manual 10-minute backup
+        run: python -m unittest discover -s tests -p 'test_v40_light_graph.py' -v
+      - name: Original V39 revision and catalog caching remain backward compatible
+        run: |
+          python -m unittest discover -s tests -p 'test_v39_web_endpoint_cache_gate.py' -v
+          python -m unittest discover -s tests -p 'test_v38_revision_fingerprint.py' -v
+          python -m unittest discover -s tests -p 'test_v38_catalog_cache.py' -v
+          python -m unittest discover -s tests -p 'test_v39_graph_history_cache.py' -v
+      - name: V39 audit queue & V37 collector safety
+        run: |
+          python -m unittest discover -s tests -p 'test_v39_durable_routine_audits.py' -v
+          python -m unittest discover -s tests -p 'test_v37_sqlite_fd_hotfix.py' -v
+      - name: Static shell, Python compile and no hidden web/bot restart
+        run: |
+          bash -n deploy/scripts/deploy_v40_light_graph.sh
+          bash -n deploy/scripts/rollback_v40_light_graph.sh
+          python -m py_compile web/app.py
