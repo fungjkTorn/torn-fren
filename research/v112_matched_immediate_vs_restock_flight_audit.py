@@ -85,9 +85,33 @@ def paired_summary(episodes):
         result["joint"][(model_strict,now_strict)]+=1
         result["weak_joint"][(model_weak,now_weak)]+=1
 
-    model=result["model"];now=result["depart_now"]
-    delta_low=(model["HIT"]-(now["HIT"]+now["UNKNOWN"]))/n if n else None
-    delta_high=((model["HIT"]+model["UNKNOWN"])-now["HIT"])/n if n else None
+    # Account for paired counterfactual identity: if model departure and
+    # depart-now departure are the SAME timestamp, their true arrival stock
+    # outcome must be identical even when both observations are censored.
+    # Do not widen unknown-outcome sensitivity bounds for identical flights.
+    possible_low=possible_high=0
+    for rec in episodes:
+        model_ev=rec["model_evidence"]
+        now_ev=rec["now_evidence"]
+        departure=rec["departure"]
+        if departure is not None and departure==rec["issue"]:
+            if (model_ev is not None
+                and model_ev["strict_bracket_proxy"]!=now_ev["strict_bracket_proxy"]):
+                raise AssertionError("same departure scored with different stock evidence")
+            continue
+        def possible(v):
+            if v is True:return (1,1)
+            if v is False or v=="NO_DEPARTURE":return (0,0)
+            return (0,1)
+        if model_ev is None:
+            lo_m,hi_m=0,0
+        else:
+            lo_m,hi_m=possible(model_ev["strict_bracket_proxy"])
+        lo_n,hi_n=possible(now_ev["strict_bracket_proxy"])
+        possible_low+=lo_m-hi_n
+        possible_high+=hi_m-lo_n
+    delta_low=possible_low/n if n else None
+    delta_high=possible_high/n if n else None
     certain_better=result["joint"][("HIT","MISS")]
     certain_worse=(result["joint"][("MISS","HIT")]
                    +result["joint"][("NO_DEPARTURE","HIT")])
@@ -127,7 +151,7 @@ def paired_summary(episodes):
         "possible_delta_success_per_anchor_bounds":{
             "lower":round(delta_low,4) if delta_low is not None else None,
             "upper":round(delta_high,4) if delta_high is not None else None,
-            "meaning":"deterministic unknown-outcome sensitivity bounds; NOT statistical CI"
+            "meaning":"paired identical-flight-aware unknown-outcome bounds; NOT statistical CI"
         },
         "model_wait_minutes":{
             "mean":round(statistics.mean(waits),2) if waits else None,
