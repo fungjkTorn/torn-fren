@@ -127,10 +127,10 @@ class CommitmentReconfirmationTests(unittest.TestCase):
                     valid_until INTEGER,actual_player_departure INTEGER
                 )""")
                 samples=[
-                    candidate(T0+300,T0+3600),
-                    candidate(T0+600,T0+3600),
-                    candidate(T0+900,T0+3600),
-                    candidate(T0+3600-220,T0+3600+1800)
+                    candidate(T0+300,T0+1800),
+                    candidate(T0+600,T0+1800),
+                    candidate(T0+900,T0+1800),
+                    candidate(T0+1800-220,T0+1800+1800)
                 ]
                 con.executemany("""INSERT INTO v42_candidate_decisions(
                     item_key,computed_at,model_family,model_config,
