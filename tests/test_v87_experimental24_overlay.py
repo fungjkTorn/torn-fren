@@ -41,7 +41,7 @@ class OverlayTests(unittest.TestCase):
                 (key, variant, issued, issued//300*300, issued-source_lag,
                  issued+300, status, "a", dep if status=="FORWARD_CANDIDATE_ONLY" else None,
                  dep+travel if status=="FORWARD_CANDIDATE_ONLY" else None,
-                 "pinned-by-source", 30, 10, 0))
+                 m.PINS[key], 30, 10, 0))
 
     def japan_add(self, *, status="FORWARD_CANDIDATE_ONLY",
                   dep=NOW+1500, issued=NOW-25, hb_lag=25):
@@ -120,6 +120,15 @@ class OverlayTests(unittest.TestCase):
         out = self.merge()
         self.assertIsNone(out["latest"][21]["departure"])
         self.assertEqual(out["latest"][21]["status"], "RESEARCH_PREVIEW_STALE")
+
+    def test_wrong_pair_artifact_rejected(self):
+        self.pair_add("chi:Panda Plushie")
+        with sqlite3.connect(self.pair) as con:
+            con.execute("UPDATE pair_issued_decisions SET artifact_sha256=?",
+                        ("wrong-artifact",))
+        row = self.merge()["latest"][21]
+        self.assertEqual(row["status"], "RESEARCH_PREVIEW_INVALID")
+        self.assertIsNone(row["departure"])
 
     def test_japan_invalid_nonfresh_fails_closed(self):
         self.japan_add(hb_lag=200)
