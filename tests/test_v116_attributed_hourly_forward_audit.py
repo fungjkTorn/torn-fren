@@ -134,8 +134,6 @@ class FirstHourlyFamilyTests(unittest.TestCase):
     def test_invalid_targets_and_cap_fail_closed(self):
         with sqlite3.connect(self.ledger) as conn:
             conn.row_factory=sqlite3.Row
-            with self.assertRaisesRegex(ValueError,"more than 1200 target arrivals"):
-                pass
             # A deliberately lower limit cannot silently drop a valid item.
             with self.assertRaisesRegex(ValueError,"more than 1200"):
                 m.select_candidates(
