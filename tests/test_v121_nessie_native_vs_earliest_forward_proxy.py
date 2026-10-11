@@ -18,8 +18,11 @@ N=m.ITEM_KEY
 
 
 class FixtureModel:
+    def __init__(self,origin):
+        self.origin=origin
+
     def plan(self,q):
-        return q+600,.98
+        return max(q,self.origin+600),.98
 
 
 class ScoreCurveReplay(unittest.TestCase):
@@ -31,7 +34,7 @@ class ScoreCurveReplay(unittest.TestCase):
             }
         start=T0+3600
         dep,ticks,queries=m.choose_all(
-            start,FixtureModel(),curve_fn=curve)
+            start,FixtureModel(start),curve_fn=curve)
         self.assertEqual(dep["champion"],start+600)
         self.assertEqual(dep["nearpeak_0.15"],start)
         self.assertEqual(dep["floor_0.55"],start)
