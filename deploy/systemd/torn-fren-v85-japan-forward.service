@@ -1,0 +1,27 @@
+[Unit]
+Description=Torn V85 Japan Xanax independent private forward capture (never public)
+After=local-fs.target
+ConditionPathExists=/opt/torn-fren/data/stock_history.db
+ConditionPathIsDirectory=/home/ubuntu/torn-fren-private-models
+
+[Service]
+Type=oneshot
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/home/ubuntu/torn-fren-v38-probe
+ExecStart=/home/ubuntu/torn-fren-v38-probe/.venv/bin/python -m research.v84_japan_forward_canary
+Environment=PYTHONDONTWRITEBYTECODE=1
+Environment=OMP_NUM_THREADS=1
+Environment=OPENBLAS_NUM_THREADS=1
+Environment=MKL_NUM_THREADS=1
+CPUQuota=15%
+MemoryMax=640M
+TimeoutStartSec=55s
+TimeoutStopSec=10s
+Nice=15
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+NoNewPrivileges=yes
+PrivateTmp=yes
+UMask=0077
+Restart=no
