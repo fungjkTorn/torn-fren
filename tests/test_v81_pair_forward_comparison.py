@@ -121,6 +121,26 @@ class ForwardPairTests(unittest.TestCase):
         self.assertEqual(result["status"], "V81_SOURCE_CHANGED_OR_STALE")
         self.assertFalse(self.ledger.exists())
 
+    def test_expired_planning_grid_rejected_before_recording(self):
+        # A :04-based grid decision finishing after :05 is not a fresh
+        # five-minute-slot proposal, even if snapshot checks were otherwise OK.
+        moments = iter([NOW, NOW + 260])
+        with (patch.object(m, "load_pinned_artifact",
+                           side_effect=lambda *_a: {"train_asof": NOW - 86400}),
+              patch.object(m, "original_features", return_value={"test": 1}),
+              patch.object(m, "choose_from_features", return_value=0)):
+            result = m.tick(
+                source=self.source, artifact_dir=self.artifacts,
+                ledger=self.ledger, clock=lambda: next(moments),
+                inspector=self.inspect,
+                context_builder=lambda *_a, **_kw: Context(),
+                planner_cls=FakePlanner, busy_check=lambda: False,
+                snapshotter=lambda _a, _b: {
+                    "status": "PRIVATE_SNAPSHOT_READY", "published": True})
+        self.assertEqual(result["status"], "V81_PLANNING_SLOT_EXPIRED")
+        self.assertEqual(result["records_written"], 0)
+        self.assertFalse(self.ledger.exists())
+
     def test_v75_busy_deferred(self):
         result = m.tick(source=self.source, artifact_dir=self.artifacts,
                         ledger=self.ledger, busy_check=lambda: True)
