@@ -125,6 +125,7 @@ def evidence_only_after_selection(conn,*,country,item,asof,departures,
                                   scorer=observation):
     """No proxy read before ALL policies have selected departures."""
     result={}
+    arrival_cache={}
     for label,dep in departures.items():
         if dep is None:
             result[label]={
@@ -136,7 +137,10 @@ def evidence_only_after_selection(conn,*,country,item,asof,departures,
             if arrival+EVALUATION_MATURITY_SECONDS>asof:
                 status,hit="PENDING_ARRIVAL",None
             else:
-                status,hit,_=scorer(conn,country,item,arrival,asof)
+                if arrival not in arrival_cache:
+                    status,hit,_=scorer(conn,country,item,arrival,asof)
+                    arrival_cache[arrival]=(status,hit)
+                status,hit=arrival_cache[arrival]
             result[label]={
                 "departure":int(dep),
                 "arrival":arrival,
