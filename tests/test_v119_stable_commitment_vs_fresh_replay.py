@@ -177,8 +177,9 @@ class CommitmentTests(unittest.TestCase):
             self.assertTrue(report["comparison_no_future_stock_used_for_choice"])
             real=m.audit
             def fixture(**opts):
+                opts["now"]=T0+30000
                 return real(ledger=ledger,stock=stock,
-                            scorer=score,now=T0+30000,**opts)
+                            scorer=score,**opts)
             with (patch.object(m,"audit",side_effect=fixture),
                   patch.object(m,"approved_collector_source",return_value=True)):
                 for as_json in (False,True):
