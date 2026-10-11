@@ -44,13 +44,17 @@ SCHEMA = """CREATE TABLE IF NOT EXISTS japan_forward_decisions (
 
 
 def research_workers_busy():
-    return any(subprocess.run(
-        ["systemctl", "is-active", "--quiet", name],
-        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False,
-    ).returncode == 0 for name in (
-        "torn-fren-v38-private-shadow.service",
-        "torn-fren-v82-pair-forward.service",
-    ))
+    # Type=oneshot workers stay in ActiveState=activating while Python runs;
+    # "systemctl is-active --quiet" does NOT reliably detect that state.
+    for name in ("torn-fren-v38-private-shadow.service",
+                 "torn-fren-v82-pair-forward.service"):
+        probe = subprocess.run(
+            ["systemctl", "show", name, "--property=ActiveState", "--value"],
+            capture_output=True, text=True, check=False,
+        )
+        if probe.returncode != 0 or probe.stdout.strip() not in ("inactive", "failed"):
+            return True
+    return False
 
 
 def file_stamp(path):
