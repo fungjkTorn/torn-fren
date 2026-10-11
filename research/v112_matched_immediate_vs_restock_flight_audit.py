@@ -70,26 +70,27 @@ def paired_summary(episodes):
     for rec in episodes:
         for label,key in (("model","model_evidence"),("depart_now","now_evidence")):
             ev=rec[key]
-            s=state(None if ev is None else ev["strict_bracket_proxy"])
-            w=state(None if ev is None else ev["last_known_proxy"])
+            s=("NO_DEPARTURE" if ev is None and label=="model"
+               else state(None if ev is None else ev["strict_bracket_proxy"]))
+            w=("NO_DEPARTURE" if ev is None and label=="model"
+               else state(None if ev is None else ev["last_known_proxy"]))
             result[label][s]+=1
             result["weak_"+label][w]+=1
-        result["joint"][(
-            state(rec["model_evidence"]["strict_bracket_proxy"]
-                  if rec["model_evidence"] else None),
-            state(rec["now_evidence"]["strict_bracket_proxy"]
-                  if rec["now_evidence"] else None))]+=1
-        result["weak_joint"][(
-            state(rec["model_evidence"]["last_known_proxy"]
-                  if rec["model_evidence"] else None),
-            state(rec["now_evidence"]["last_known_proxy"]
-                  if rec["now_evidence"] else None))]+=1
+        model_strict=("NO_DEPARTURE" if rec["model_evidence"] is None
+                      else state(rec["model_evidence"]["strict_bracket_proxy"]))
+        model_weak=("NO_DEPARTURE" if rec["model_evidence"] is None
+                    else state(rec["model_evidence"]["last_known_proxy"]))
+        now_strict=state(rec["now_evidence"]["strict_bracket_proxy"])
+        now_weak=state(rec["now_evidence"]["last_known_proxy"])
+        result["joint"][(model_strict,now_strict)]+=1
+        result["weak_joint"][(model_weak,now_weak)]+=1
 
     model=result["model"];now=result["depart_now"]
     delta_low=(model["HIT"]-(now["HIT"]+now["UNKNOWN"]))/n if n else None
     delta_high=((model["HIT"]+model["UNKNOWN"])-now["HIT"])/n if n else None
     certain_better=result["joint"][("HIT","MISS")]
-    certain_worse=result["joint"][("MISS","HIT")]
+    certain_worse=(result["joint"][("MISS","HIT")]
+                   +result["joint"][("NO_DEPARTURE","HIT")])
     both_known=sum(count for (a,b),count in result["joint"].items()
                    if a!="UNKNOWN" and b!="UNKNOWN")
     def summarize(label):
@@ -98,6 +99,7 @@ def paired_summary(episodes):
             "evidence_hits":c["HIT"],
             "evidence_misses":c["MISS"],
             "uncertain":c["UNKNOWN"],
+            "not_departed":c["NO_DEPARTURE"],
             "scorable":c["HIT"]+c["MISS"],
             "evidence_fraction_of_all_anchors":round(c["HIT"]/n,4) if n else None,
         }
