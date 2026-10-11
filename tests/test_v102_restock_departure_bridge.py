@@ -56,11 +56,12 @@ class RestockDepartureTests(unittest.TestCase):
         self.assertEqual(p["earliest_conservative_departure"],NOW)
 
     def test_stock_window_ends_exclusively_no_arrival_at_depletion(self):
-        p=derive_departure_windows(window(expected_start=NOW+FLIGHT,
-                          expected_end=NOW+FLIGHT,
-                          late_start=NOW+FLIGHT,early_end=NOW+FLIGHT),
-                          now=NOW)
-        self.fail("Impossible stock interval should have been rejected")
+        with self.assertRaises(ValueError):
+            derive_departure_windows(window(
+                expected_start=NOW+FLIGHT,
+                expected_end=NOW+FLIGHT,
+                late_start=NOW+FLIGHT,
+                early_end=NOW+FLIGHT),now=NOW)
 
 
 class AvailabilityCurveTests(unittest.TestCase):
