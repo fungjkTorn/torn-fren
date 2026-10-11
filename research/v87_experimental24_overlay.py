@@ -201,3 +201,31 @@ def merge_response(payload, *, now=None, pair_db=PAIR, japan_db=JAPAN):
         "timestamps are not gameplay instructions or calibrated probabilities."
     )
     return result
+
+def overlay_response(payload, *, key=None, now=None, pair_db=PAIR, japan_db=JAPAN):
+    """Opt-in HTTP response adapter; preserve original results if base drifts.
+
+    Pair-filtered legacy queries remain unchanged. An exact request for one of
+    the new preview items returns one non-actionable preview record.
+    """
+    if not isinstance(payload, dict) or not isinstance(payload.get("latest"), list):
+        raise ValueError("invalid experimental API response")
+    if key is not None:
+        if key not in ADDED:
+            return payload
+        rows = [r for r in previews(now=now, pair_db=pair_db,
+                                    japan_db=japan_db) if r["item_key"] == key]
+        result = dict(payload)
+        result.update(latest=rows, experimental=True,
+                      prediction_accuracy_verified=False,
+                      preview_only_item_keys=[key],
+                      preview_warning="Unvalidated research model; not a gameplay instruction.")
+        return result
+    try:
+        return merge_response(payload, now=now, pair_db=pair_db, japan_db=japan_db)
+    except ValueError:
+        # A partial, corrupted or changing V75 baseline must not cause a
+        # production 500 or replace any of the original visible records.
+        result = dict(payload)
+        result["preview_overlay_status"] = "BASE_ROSTER_NOT_21"
+        return result
