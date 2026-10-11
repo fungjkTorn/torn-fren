@@ -10,6 +10,7 @@ on:
       - 'tests/test_v86_japan_forward_report.py'
       - 'research/v87_experimental24_overlay.py'
       - 'tests/test_v87_experimental24_overlay.py'
+      - 'deploy/scripts/v87_web24_preview.sh'
       - 'deploy/scripts/v85_japan_forward_timer.sh'
       - 'deploy/systemd/torn-fren-v85-japan-forward.service'
       - 'deploy/systemd/torn-fren-v85-japan-forward.timer'
@@ -38,4 +39,4 @@ jobs:
       - name: Verify Japan implementation compiles
         run: python -m py_compile research/v84_japan_forward_canary.py research/v86_japan_forward_report.py research/v87_experimental24_overlay.py
       - name: Validate guarded opt-in service installer syntax
-        run: bash -n deploy/scripts/v85_japan_forward_timer.sh
+        run: bash -n deploy/scripts/v85_japan_forward_timer.sh deploy/scripts/v87_web24_preview.sh
