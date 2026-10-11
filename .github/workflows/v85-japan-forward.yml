@@ -24,6 +24,8 @@ on:
       - 'tests/test_v97_experimental_dashboard_state.py'
       - 'research/v98_ready_vs_watch_forward_audit.py'
       - 'tests/test_v98_ready_vs_watch_forward_audit.py'
+      - 'research/v99_issued_stock_vs_forecast_audit.py'
+      - 'tests/test_v99_issued_stock_vs_forecast_audit.py'
       - 'deploy/scripts/v87_web24_preview.sh'
       - 'deploy/scripts/v85_japan_forward_timer.sh'
       - 'deploy/systemd/torn-fren-v85-japan-forward.service'
@@ -66,7 +68,9 @@ jobs:
         run: python -m unittest discover -s tests -p 'test_v97_experimental_dashboard_state.py' -v
       - name: Verify V98 complete forward issue cohort, ready/watches kept separate
         run: python -m unittest discover -s tests -p 'test_v98_ready_vs_watch_forward_audit.py' -v
+      - name: Verify V99 pre-issuance stocked-vs-forecast causality
+        run: python -m unittest discover -s tests -p 'test_v99_issued_stock_vs_forecast_audit.py' -v
       - name: Verify Japan implementation compiles
-        run: python -m py_compile research/v84_japan_forward_canary.py research/v86_japan_forward_report.py research/v87_experimental24_overlay.py research/v88_poll_state_forward_report.py research/v89_pending_horizon_diagnostic.py research/v91_travel_decision_contract.py research/v93_arrival_observation_policy.py research/v97_experimental_dashboard_state.py research/v98_ready_vs_watch_forward_audit.py
+        run: python -m py_compile research/v84_japan_forward_canary.py research/v86_japan_forward_report.py research/v87_experimental24_overlay.py research/v88_poll_state_forward_report.py research/v89_pending_horizon_diagnostic.py research/v91_travel_decision_contract.py research/v93_arrival_observation_policy.py research/v97_experimental_dashboard_state.py research/v98_ready_vs_watch_forward_audit.py research/v99_issued_stock_vs_forecast_audit.py
       - name: Validate guarded opt-in service installer syntax
         run: bash -n deploy/scripts/v85_japan_forward_timer.sh deploy/scripts/v87_web24_preview.sh
