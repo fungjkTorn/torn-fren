@@ -1,5 +1,13 @@
 """V112 identical-issue direct-flight benchmark and uncertain-outcome bounds."""
 import unittest
+import contextlib
+import io
+import json
+import sqlite3
+import sys
+import tempfile
+from pathlib import Path
+from unittest.mock import patch
 
 from research import v112_matched_immediate_vs_restock_flight_audit as m
 from research.v107_explicit_restock_cycle_baseline import StockObservation
@@ -134,6 +142,60 @@ class MatchedArrivalEvidenceTests(unittest.TestCase):
         self.assertEqual(out["depart_now"]["evidence_hits"]
                          +out["depart_now"]["evidence_misses"]
                          +out["depart_now"]["uncertain"],4)
+
+
+    def test_cli_report_completes_with_sqlite_fixture_in_json_and_text_modes(self):
+        # V112 previously finished its calculations and crashed at the
+        # final report due to an undefined stopwatch variable. Exercise
+        # main() all the way through formatting, not only audit_item().
+        obs=stock_cycles()
+        with tempfile.TemporaryDirectory() as temporary:
+            path=Path(temporary)/"raw_fixture.sqlite"
+            db=sqlite3.connect(path)
+            try:
+                db.execute("""CREATE TABLE stock_history (
+                    id INTEGER PRIMARY KEY,
+                    timestamp INTEGER NOT NULL,
+                    country TEXT NOT NULL,
+                    item_name TEXT NOT NULL,
+                    quantity INTEGER NOT NULL,
+                    source TEXT NOT NULL
+                )""")
+                db.execute("""CREATE TABLE collection_gaps (
+                    start_timestamp INTEGER, end_timestamp INTEGER
+                )""")
+                db.executemany(
+                    """INSERT INTO stock_history
+                       (timestamp,country,item_name,quantity,source)
+                       VALUES (?,?,?,?,?)""",
+                    [(r.epoch,"uni","Nessie Plushie",r.quantity,r.source)
+                     for r in obs])
+                db.commit()
+            finally:
+                db.close()
+
+            with patch.object(m,"SOURCE",str(path)), \\
+                 patch.object(m,"approved_collector_source",return_value=True):
+                for is_json in (True,False):
+                    argv=["v112","--target","nessie","--events","2"]
+                    if is_json:argv.append("--json")
+                    capture=io.StringIO()
+                    with patch.object(sys,"argv",argv), \\
+                         contextlib.redirect_stdout(capture):
+                        m.main()
+                    output=capture.getvalue()
+                    if is_json:
+                        result=json.loads(output)
+                        self.assertEqual(result["status"],
+                          "V112_MATCHED_DEPART_NOW_VS_MULTI_CYCLE_FLIGHT_EVIDENCE")
+                        self.assertTrue(result["read_only"])
+                        self.assertEqual(result["items"]["nessie"]["anchors"],2)
+                        self.assertGreaterEqual(result["duration_seconds"],0)
+                    else:
+                        self.assertIn(
+                            "V112 MATCHED DEPART NOW VS MULTI-RESTOCK FLIGHT",
+                            output)
+                        self.assertIn("elapsed seconds:",output)
 
 
 if __name__=="__main__":
