@@ -107,14 +107,14 @@ class JapanV84Tests(unittest.TestCase):
     def test_activating_oneshot_worker_is_busy(self):
         with patch.object(m.subprocess, "run",
                           return_value=SimpleNamespace(
-                              returncode=0, stdout="activating\\n")) as run:
+                              returncode=0, stdout="activating\n")) as run:
             self.assertTrue(m.research_workers_busy())
             self.assertEqual(run.call_count, 1)
 
     def test_inactive_oneshot_workers_allow_private_canary(self):
         with patch.object(m.subprocess, "run",
                           return_value=SimpleNamespace(
-                              returncode=0, stdout="inactive\\n")) as run:
+                              returncode=0, stdout="inactive\n")) as run:
             self.assertFalse(m.research_workers_busy())
             self.assertEqual(run.call_count, 2)
 
