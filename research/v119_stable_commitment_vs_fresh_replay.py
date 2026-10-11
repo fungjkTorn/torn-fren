@@ -161,6 +161,12 @@ def summarize(records,label):
             counts["scheduled_arrival_pending"]+=1
         if outcome["proxy_status"]=="NO_TRIP":
             counts["no_trip"]+=1
+    # JSON fields must not disappear just because the count is zero.
+    for field in (
+        "scheduled","proxy_hit","proxy_miss","proxy_unknown_or_no_trip",
+        "scheduled_arrival_pending","no_trip"
+    ):
+        counts.setdefault(field,0)
     n=counts["start_cohort"]
     return {**dict(sorted(counts.items())),
             "coverage_of_all_starts":round(counts["scheduled"]/n,4) if n else None,
@@ -196,6 +202,11 @@ def paired(records,a,b):
              "a_only" if x["proxy_hit"] else
              "b_only" if y["proxy_hit"] else "both_miss")
         c[tag]+=1
+    for field in (
+        "paired_scorable","both_hit","both_miss","a_only","b_only",
+        "same_departure","one_or_both_unknown","no_trip_in_pair"
+    ):
+        c.setdefault(field,0)
     n=c["paired_scorable"]
     return {**dict(sorted(c.items())),
             "scorable_a_success_fraction":(
