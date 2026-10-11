@@ -29,7 +29,9 @@ fi
 test -z "$(git status --porcelain)" || { echo "STOP: research checkout dirty"; exit 1; }
 test -f "$src_service" && test -f "$src_timer" || { echo "STOP: V85 unit files missing"; exit 1; }
 systemctl is-active --quiet torn-fren-v38-private-shadow.timer || { echo "STOP: V75 timer inactive"; exit 1; }
-systemctl is-active --quiet torn-fren-v82-pair-forward.timer || { echo "STOP: V82 timer inactive"; exit 1; }
+# During a guarded research-code checkout, V82's enabled timer is
+# intentionally paused. Require that it remains enabled, not actively firing.
+systemctl is-enabled --quiet torn-fren-v82-pair-forward.timer || { echo "STOP: V82 timer not enabled"; exit 1; }
 test -d /home/ubuntu/torn-fren-private-models || { echo "STOP: missing private research directory"; exit 1; }
 test -f /opt/torn-fren/data/stock_history.db || { echo "STOP: collector missing"; exit 1; }
 echo "===== V84 UNIT TESTS ====="
