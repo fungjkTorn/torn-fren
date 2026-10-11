@@ -1,6 +1,6 @@
 """V81 private, as-issued Lion/Panda A/B/selector comparison.
 
-Uses one read-only V75 stock snapshot, with causal feature context shared
+Creates one independent source-consistent snapshot, with causal context shared
 between both items. Never modifies V75, public services or gameplay.
 """
 from __future__ import annotations
@@ -18,9 +18,11 @@ from research.plushie_champions.common import (
 from research.v49_lion_panda_pair_probe import TARGETS, original_features
 from research.v50_pair_selector_artifact import choose_from_features
 from research.v52_pair_trained_tick import load_pinned_artifact
+from research.v65_private_mirror_shadow_tick import snapshot_with_retry
 from services.frozen_candidate_worker_v31 import inspect_live_source
 
-SOURCE = Path("/var/lib/torn-fren-v38/v75_stock_snapshot.db")
+COLLECTOR = Path("/opt/torn-fren/data/stock_history.db")
+SOURCE = Path("/var/lib/torn-fren-v38/v81_stock_snapshot.db")
 ARTIFACT_DIR = Path("/home/ubuntu/torn-fren-private-models")
 SIDECAR = ARTIFACT_DIR / "v81_pair_forward.db"
 PINS = {
@@ -92,18 +94,17 @@ def store_decisions(ledger, records):
 def tick(*, source=SOURCE, artifact_dir=ARTIFACT_DIR, ledger=SIDECAR,
          clock=time.time, inspector=inspect_live_source,
          context_builder=ResearchContext.build, planner_cls=AnalogPlanner,
-         busy_check=v75_busy):
+         busy_check=v75_busy, snapshotter=snapshot_with_retry):
     source = Path(source)
     artifact_dir = Path(artifact_dir)
     ledger = Path(ledger)
-    if source.is_symlink() or not source.is_file():
-        raise ValueError("snapshot is not a regular research file")
+    if source.is_symlink():
+        raise ValueError("unsafe research snapshot symlink")
     if ledger.resolve(strict=False) == source.resolve(strict=True):
         raise ValueError("ledger cannot overwrite snapshot")
     if busy_check():
         return {"status": "V81_DEFERRED_V75_BUSY", "records_written": 0}
 
-    start = int(clock())
     models = {}
     for target, digest in PINS.items():
         path = artifact_dir / f"{target}_selector_artifact.json"
@@ -111,6 +112,13 @@ def tick(*, source=SOURCE, artifact_dir=ARTIFACT_DIR, ledger=SIDECAR,
             raise ValueError("artifact cannot be a symlink")
         models[target] = load_pinned_artifact(path, digest, target)
 
+    snap = snapshotter(COLLECTOR, source)
+    if snap.get("status") != "PRIVATE_SNAPSHOT_READY" or not snap.get("published"):
+        return {"status": "V81_SNAPSHOT_NOT_READY",
+                "snapshot_status": snap.get("status"), "records_written": 0}
+    if source.is_symlink() or not source.is_file():
+        raise ValueError("research snapshot not regular")
+    start = int(clock())
     before = inspector(source, start)
     if before.get("status") != "FRESH":
         return {"status": "V81_SOURCE_NOT_FRESH", "source_status": before.get("status"),
