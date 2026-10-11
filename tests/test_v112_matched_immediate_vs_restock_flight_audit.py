@@ -174,14 +174,14 @@ class MatchedArrivalEvidenceTests(unittest.TestCase):
             finally:
                 db.close()
 
-            with patch.object(m,"SOURCE",str(path)), \\
-                 patch.object(m,"approved_collector_source",return_value=True):
+            with (patch.object(m,"SOURCE",str(path)),
+                  patch.object(m,"approved_collector_source",return_value=True)):
                 for is_json in (True,False):
                     argv=["v112","--target","nessie","--events","2"]
                     if is_json:argv.append("--json")
                     capture=io.StringIO()
-                    with patch.object(sys,"argv",argv), \\
-                         contextlib.redirect_stdout(capture):
+                    with (patch.object(sys,"argv",argv),
+                          contextlib.redirect_stdout(capture)):
                         m.main()
                     output=capture.getvalue()
                     if is_json:
