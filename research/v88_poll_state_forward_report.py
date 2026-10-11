@@ -34,7 +34,9 @@ from research.v60_private_snapshot_probe import approved_collector_source
 GRACE = 10
 THRESHOLD = 30
 MAX_BRACKET_SECONDS = 180
-MAX_STATE_AGE_SECONDS = 7 * 86400
+MAX_STATE_AGE_SECONDS = 24 * 3600
+# A heartbeat certifies our fetch/save, not the country-specific provider age.
+# Treat very old delta states as unknown rather than recycling week-old stock.
 PENDING_BUFFER = 180
 
 
@@ -92,7 +94,11 @@ def observation(conn, country, item, arrival, asof):
         if row is None:
             return "NO_STOCK_STATE",None,metadata
         if poll_time-int(row[0]) > MAX_STATE_AGE_SECONDS:
-            return "STOCK_STATE_OLDER_THAN_7D",None,metadata
+            return "STOCK_STATE_OLDER_THAN_24H",None,metadata
+        # A change-only stock row from a different upstream provider cannot
+        # be assumed to describe the same current observation stream.
+        if row[2] != pre[1]:
+            return "STOCK_STATE_PROVIDER_MISMATCH",None,metadata
         states.append((int(row[1]),int(row[0])))
     metadata["pre_quantity"], metadata["post_quantity"] = states[0][0],states[1][0]
     metadata["pre_state_age_s"] = before-states[0][1]
