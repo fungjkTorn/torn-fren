@@ -208,9 +208,13 @@ def overlay_response(payload, *, key=None, now=None, pair_db=PAIR, japan_db=JAPA
     Pair-filtered legacy queries remain unchanged. An exact request for one of
     the new preview items returns one non-actionable preview record.
     """
-    if not isinstance(payload, dict) or not isinstance(payload.get("latest"), list):
+    if not isinstance(payload, dict):
         raise ValueError("invalid experimental API response")
     if key is not None:
+        # The legacy endpoint returns a different shape for filtered lookups
+        # (a single record or None rather than the full 21-row list).
+        # Preserve old filtered requests byte-for-byte; construct a preview
+        # list only for the three new item keys.
         if key not in ADDED:
             return payload
         rows = [r for r in previews(now=now, pair_db=pair_db,
@@ -220,6 +224,10 @@ def overlay_response(payload, *, key=None, now=None, pair_db=PAIR, japan_db=JAPA
                       prediction_accuracy_verified=False,
                       preview_only_item_keys=[key],
                       preview_warning="Unvalidated research model; not a gameplay instruction.")
+        return result
+    if not isinstance(payload.get("latest"), list):
+        result = dict(payload)
+        result["preview_overlay_status"] = "BASE_ROSTER_SHAPE_UNEXPECTED"
         return result
     try:
         return merge_response(payload, now=now, pair_db=pair_db, japan_db=japan_db)
