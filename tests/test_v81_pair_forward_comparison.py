@@ -54,7 +54,9 @@ class ForwardPairTests(unittest.TestCase):
                           ledger=self.ledger, clock=lambda: NOW,
                           inspector=self.inspect,
                           context_builder=lambda *_a, **_kw: Context(),
-                          planner_cls=FakePlanner, busy_check=lambda: False)
+                          planner_cls=FakePlanner, busy_check=lambda: False,
+                          snapshotter=lambda _a, _b: {
+                              'status': 'PRIVATE_SNAPSHOT_READY', 'published': True})
 
     def test_six_variants_persist_and_idempotent(self):
         result = self.tick()
@@ -93,7 +95,9 @@ class ForwardPairTests(unittest.TestCase):
                 ledger=self.ledger, clock=lambda: next(moments),
                 inspector=self.inspect,
                 context_builder=lambda *_a, **_kw: Context(),
-                planner_cls=FakePlanner, busy_check=lambda: False)
+                planner_cls=FakePlanner, busy_check=lambda: False,
+                          snapshotter=lambda _a, _b: {
+                              'status': 'PRIVATE_SNAPSHOT_READY', 'published': True})
         self.assertEqual(result["status"], "V81_SOURCE_CHANGED_OR_STALE")
         self.assertFalse(self.ledger.exists())
 
@@ -114,7 +118,9 @@ class ForwardPairTests(unittest.TestCase):
             result = m.tick(source=self.source, artifact_dir=self.artifacts,
                 ledger=self.ledger, clock=lambda: NOW, inspector=self.inspect,
                 context_builder=lambda *_a, **_kw: Context(),
-                planner_cls=Past, busy_check=lambda: False)
+                planner_cls=Past, busy_check=lambda: False,
+                snapshotter=lambda _a, _b: {
+                    'status': 'PRIVATE_SNAPSHOT_READY', 'published': True})
         self.assertEqual(result["status"], "V81_PRIVATE_PAIR_RECORDED")
         with sqlite3.connect(self.ledger) as con:
             rows = con.execute(
