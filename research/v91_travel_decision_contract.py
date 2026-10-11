@@ -258,9 +258,12 @@ def evaluate_views(candidates: Iterable[Opportunity], *, now: int,
         (c for c in accepted if _wait(c,now)<=quick_seconds),
         key=lambda c:_earliest_sort(c,now)))
     nexts=one_per_item(sorted(accepted,key=lambda c:_earliest_sort(c,now)))
-    # Stock margin needed before "best" means more than an unsupported hunch.
+    # Either a recorded arrival-stock floor or genuinely calibrated evidence
+    # can justify comparative ranking. Do not invent a floor when only a
+    # probability is supported, or vice versa.
     quality_qualified=[c for c in accepted
-                       if c.projected_stock_floor is not None]
+                       if (c.projected_stock_floor is not None or
+                           c.calibrated_success_probability is not None)]
     best=one_per_item(sorted(quality_qualified,
                             key=lambda c:_quality_sort(c,now)))
     return {
@@ -274,10 +277,10 @@ def evaluate_views(candidates: Iterable[Opportunity], *, now: int,
         "next_opportunity":[pack(c) for c in nexts],
         "best_chance":[pack(c) for c in best],
         "best_chance_warning":(
-            "Stock-margin proxy ranking only; not a calibrated hit rate"
+            "Mixed or uncalibrated estimates; do not interpret this ranking as a hit probability"
             if best and any(c.calibrated_success_probability is None for c in best)
-            else ("Calibrated sample sizes vary; not guaranteed game availability"
-                  if best else "No supplied stock-floor estimates; cannot rank best chance")),
+            else ("Calibrated samples vary; not guaranteed game availability"
+                  if best else "No stock-floor or calibrated success evidence; cannot rank best chance")),
         "alternative_generation_complete":False,
         "note":"Each supplied candidate is an as-issued proposal, not an executed flight. Existing specialists usually expose one option. No gameplay commands or probability estimates are generated.",
     }
