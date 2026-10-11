@@ -128,7 +128,9 @@ class MatchedArrivalEvidenceTests(unittest.TestCase):
             predictor=abstain)
         self.assertEqual(out["forecasted_departures"],0)
         self.assertEqual(out["anchors"],4)
-        self.assertEqual(out["model"]["uncertain"],4)
+        self.assertEqual(out["model"]["uncertain"],0)
+        self.assertEqual(out["model"]["not_departed"],4)
+        self.assertEqual(out["possible_delta_success_per_anchor_bounds"]["upper"],0.0)
         self.assertEqual(out["depart_now"]["evidence_hits"]
                          +out["depart_now"]["evidence_misses"]
                          +out["depart_now"]["uncertain"],4)
