@@ -17,6 +17,8 @@ on:
       - 'research/v91_travel_decision_contract.py'
       - 'tests/test_v91_travel_decision_contract.py'
       - 'tests/test_v92_stress_decision_engine.py'
+      - 'research/v93_arrival_observation_policy.py'
+      - 'tests/test_v93_arrival_observation_policy.py'
       - 'deploy/scripts/v87_web24_preview.sh'
       - 'deploy/scripts/v85_japan_forward_timer.sh'
       - 'deploy/systemd/torn-fren-v85-japan-forward.service'
@@ -51,7 +53,9 @@ jobs:
         run: python -m unittest discover -s tests -p 'test_v91_travel_decision_contract.py' -v
       - name: Stress test V92 11k-option research selection
         run: python -m unittest discover -s tests -p 'test_v92_stress_decision_engine.py' -v
+      - name: Verify V93 rate-limited country-fresh arrival observation design
+        run: python -m unittest discover -s tests -p 'test_v93_arrival_observation_policy.py' -v
       - name: Verify Japan implementation compiles
-        run: python -m py_compile research/v84_japan_forward_canary.py research/v86_japan_forward_report.py research/v87_experimental24_overlay.py research/v88_poll_state_forward_report.py research/v89_pending_horizon_diagnostic.py research/v91_travel_decision_contract.py
+        run: python -m py_compile research/v84_japan_forward_canary.py research/v86_japan_forward_report.py research/v87_experimental24_overlay.py research/v88_poll_state_forward_report.py research/v89_pending_horizon_diagnostic.py research/v91_travel_decision_contract.py research/v93_arrival_observation_policy.py
       - name: Validate guarded opt-in service installer syntax
         run: bash -n deploy/scripts/v85_japan_forward_timer.sh deploy/scripts/v87_web24_preview.sh
