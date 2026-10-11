@@ -3,6 +3,8 @@ import sqlite3
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import patch
 
 from research import v84_japan_forward_canary as m
 
@@ -101,6 +103,20 @@ class JapanV84Tests(unittest.TestCase):
         r = self.go()
         self.assertEqual(r["status"], "V84_PLANNING_SLOT_EXPIRED")
         self.assertFalse(self.ledger.exists())
+
+    def test_activating_oneshot_worker_is_busy(self):
+        with patch.object(m.subprocess, "run",
+                          return_value=SimpleNamespace(
+                              returncode=0, stdout="activating\\n")) as run:
+            self.assertTrue(m.research_workers_busy())
+            self.assertEqual(run.call_count, 1)
+
+    def test_inactive_oneshot_workers_allow_private_canary(self):
+        with patch.object(m.subprocess, "run",
+                          return_value=SimpleNamespace(
+                              returncode=0, stdout="inactive\\n")) as run:
+            self.assertFalse(m.research_workers_busy())
+            self.assertEqual(run.call_count, 2)
 
     def test_sidecar_cannot_equal_source(self):
         with self.assertRaises(ValueError):
