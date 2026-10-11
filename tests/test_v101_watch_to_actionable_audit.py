@@ -86,7 +86,7 @@ class WatchConversionTests(unittest.TestCase):
                 insert(sample("can:Crocus",DEP-660,DEP-600))
                 insert(sample("cay:Banana Orchid",ISSUED,NOW+600))
                 insert(sample("arg:Ceibo Flower",ISSUED,DEP))
-                insert(sample("arg:Ceibo Flower",DEP-180,DEP+1800))
+                insert(sample("arg:Ceibo Flower",DEP-180,None,"NO_RECOMMENDATION"))
                 con.commit()
             r=m.audit(sidecar=path,asof=NOW,days=1)
             p=r["overall"]
