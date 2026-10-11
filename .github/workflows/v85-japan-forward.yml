@@ -34,6 +34,8 @@ on:
       - 'tests/test_v102_restock_departure_bridge.py'
       - 'research/v103_champion_score_curves.py'
       - 'tests/test_v103_champion_score_curves.py'
+      - 'research/v104_real_champion_earliest_replay.py'
+      - 'tests/test_v104_real_champion_earliest_replay.py'
       - 'deploy/scripts/v87_web24_preview.sh'
       - 'deploy/scripts/v85_japan_forward_timer.sh'
       - 'deploy/systemd/torn-fren-v85-japan-forward.service'
@@ -86,7 +88,9 @@ jobs:
         run: python -m unittest discover -s tests -p 'test_v102_restock_departure_bridge.py' -v
       - name: V103 actual champion model score-curve parity and earliest candidate selection
         run: python -m unittest discover -s tests -p 'test_v103_champion_score_curves.py' -v
+      - name: V104 no-lookahead earliest vs champion historical query comparators
+        run: python -m unittest discover -s tests -p 'test_v104_real_champion_earliest_replay.py' -v
       - name: Verify Japan implementation compiles
-        run: python -m py_compile research/v84_japan_forward_canary.py research/v86_japan_forward_report.py research/v87_experimental24_overlay.py research/v88_poll_state_forward_report.py research/v89_pending_horizon_diagnostic.py research/v91_travel_decision_contract.py research/v93_arrival_observation_policy.py research/v97_experimental_dashboard_state.py research/v98_ready_vs_watch_forward_audit.py research/v99_issued_stock_vs_forecast_audit.py research/v100_future_watch_reconfirmation_audit.py research/v101_watch_to_actionable_audit.py research/v102_restock_departure_bridge.py research/v103_champion_score_curves.py
+        run: python -m py_compile research/v84_japan_forward_canary.py research/v86_japan_forward_report.py research/v87_experimental24_overlay.py research/v88_poll_state_forward_report.py research/v89_pending_horizon_diagnostic.py research/v91_travel_decision_contract.py research/v93_arrival_observation_policy.py research/v97_experimental_dashboard_state.py research/v98_ready_vs_watch_forward_audit.py research/v99_issued_stock_vs_forecast_audit.py research/v100_future_watch_reconfirmation_audit.py research/v101_watch_to_actionable_audit.py research/v102_restock_departure_bridge.py research/v103_champion_score_curves.py research/v104_real_champion_earliest_replay.py
       - name: Validate guarded opt-in service installer syntax
         run: bash -n deploy/scripts/v85_japan_forward_timer.sh deploy/scripts/v87_web24_preview.sh
