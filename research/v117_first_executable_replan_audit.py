@@ -99,11 +99,13 @@ def first_actionable_tick(initial,timeline,times,*,now):
             rejected["INVALID_OR_ABSTAINED"]+=1
             continue
         dep=int(row["departure"])
-        if dep>int(row["valid_until"]):
-            rejected["EXPIRED_BEFORE_DEPARTURE"]+=1
-            continue
+        # Non-executable watches expire on their original 5m snapshot;
+        # call them watches, not a failed attempt to depart.
         if dep-issued>STEP:
             rejected["FUTURE_WATCH_NOT_YET_EXECUTABLE"]+=1
+            continue
+        if dep>int(row["valid_until"]):
+            rejected["EXPIRED_BEFORE_DEPARTURE"]+=1
             continue
         if dep>deadline:
             rejected["DEPARTURE_AFTER_8H_WAIT_BUDGET"]+=1
