@@ -108,6 +108,29 @@ class OverlayTests(unittest.TestCase):
         self.assertEqual(row["status"], "RESEARCH_PREVIEW_EXPERT_ABSTAINED")
         self.assertIsNone(row["departure"])
 
+    def test_selected_preview_returns_only_requested_item(self):
+        self.japan_add()
+        source = {**self.original, "latest": []}
+        out = m.overlay_response(source, key="jap:Xanax", now=NOW,
+                                 pair_db=self.pair, japan_db=self.japan)
+        self.assertEqual(len(out["latest"]), 1)
+        self.assertEqual(out["latest"][0]["item_key"], "jap:Xanax")
+        self.assertFalse(out["latest"][0]["actionable"])
+        self.assertFalse(out["latest"][0]["prediction_accuracy_verified"])
+
+    def test_legacy_filtered_response_remains_unchanged(self):
+        original = {**self.original, "latest": [self.original["latest"][3]]}
+        result = m.overlay_response(original, key="arg:Monkey Plushie", now=NOW,
+                                    pair_db=self.pair, japan_db=self.japan)
+        self.assertEqual(result, original)
+
+    def test_base_roster_drift_preserves_original_response(self):
+        original = {**self.original, "latest": self.original["latest"][:20]}
+        result = m.overlay_response(original, now=NOW,
+                                    pair_db=self.pair, japan_db=self.japan)
+        self.assertEqual(result["latest"], original["latest"])
+        self.assertEqual(result["preview_overlay_status"], "BASE_ROSTER_NOT_21")
+
     def test_reject_non_21_or_colliding_roster(self):
         for rows in ([], [{"item_key":"x"}]*21,
                      [{"item_key":"jap:Xanax"}]+self.original["latest"][1:]):
