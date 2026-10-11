@@ -24,7 +24,7 @@ import json
 import sqlite3
 import time
 from collections import Counter,defaultdict
-from contextlib import closing
+from contextlib import closing,nullcontext
 from pathlib import Path
 
 from research.v76_forward_research_report import V75,SOURCE,ro,eligible,select_unique
@@ -101,7 +101,7 @@ def audit(*,sidecar=V75,source=SOURCE,days=1,asof=None,
     per_item=defaultdict(Counter)
     wait_hist=defaultdict(Counter)
     stock_cross=defaultdict(Counter)
-    with closing(ro(source)) if with_stock_proxy else closing(None) as stock:
+    with (closing(ro(source)) if with_stock_proxy else nullcontext(None)) as stock:
         for row in events:
             key=row["item_key"]
             issued=int(row["computed_at"])
