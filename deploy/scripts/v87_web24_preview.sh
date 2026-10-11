@@ -152,6 +152,46 @@ elif [[ -e "$BACKUP" && ! -d "$BACKUP" ]]; then
 fi
 echo "===== VERIFYING EXISTING 21 ====="
 probe 21
+echo "===== OFFLINE CHECK AGAINST LIVE FILTERED RESPONSE SHAPES ====="
+python3 - "$STAGED" <<'PY'
+import importlib.util
+import json
+import sys
+import time
+from urllib.parse import urlencode
+from urllib.request import urlopen
+
+spec = importlib.util.spec_from_file_location("v87_staged_preflight", sys.argv[1])
+module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(module)
+root = "http://127.0.0.1:8000/api/experimental/v41/predictions"
+def get(country=None, item=None):
+    url = root if country is None else root + "?" + urlencode(
+        {"country": country, "item": item})
+    with urlopen(url, timeout=8) as response:
+        return json.load(response)
+now = int(time.time())
+base = get()
+combined = module.overlay_response(base, now=now)
+records = combined["latest"]
+assert len(records) == 24 and len({r["item_key"] for r in records}) == 24
+assert records[:21] == base["latest"], "baseline 21 modified"
+for country, item in (("chi", "Panda Plushie"),
+                      ("sou", "Lion Plushie"), ("jap", "Xanax")):
+    key = f"{country}:{item}"
+    filtered_base = get(country, item)
+    wrapped = module.overlay_response(filtered_base, key=key, now=now)
+    assert isinstance(wrapped["latest"], list)
+    assert [r["item_key"] for r in wrapped["latest"]] == [key]
+    assert wrapped["latest"][0]["actionable"] is False
+    assert wrapped["latest"][0]["prediction_accuracy_verified"] is False
+legacy = get("arg", "Monkey Plushie")
+assert module.overlay_response(legacy, key="arg:Monkey Plushie", now=now) == legacy
+print(json.dumps({"offline_merged_rows":len(records), "filtered_preview_count":3,
+                  "legacy_filtered_unchanged":True,
+                  "new_statuses":{r["item_key"]:r["status"] for r in records[21:]}},
+                 sort_keys=True))
+PY
 echo "===== BUILDING AND COMPILING EXACT-SOURCE PATCH ====="
 mkdir -p "$BACKUP"
 chmod 700 "$BACKUP"
