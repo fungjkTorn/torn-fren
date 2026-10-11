@@ -25,6 +25,8 @@ META = {"chi:Panda Plushie": "PAIR_SELECTOR_UNVALIDATED",
         "sou:Lion Plushie": "PAIR_SELECTOR_UNVALIDATED",
         "jap:Xanax": "JAPAN_V8_REGIME_UNVALIDATED"}
 MAX_SOURCE_LAG = 180
+PINS = {"chi:Panda Plushie": "84037c778301fa5a3825007dd439abec7c971ec05b176efae3bffe99fc827280",
+        "sou:Lion Plushie": "a8a5e7d989c701fa75975dd9b8d73c128e5fd895298443c2cfd6bb3d72e824bd"}
 
 
 def _read_one(path, sql, args):
@@ -73,7 +75,7 @@ def _pair(key, now, db):
     row = _base(key, now)
     latest = _read_one(db, """SELECT item_key,variant,issued_at,planned_at,
                          stock_as_of,valid_until,status,selected_expert,
-                         departure,arrival,min_quantity,grace_seconds,
+                         departure,arrival,artifact_sha256,min_quantity,grace_seconds,
                          actual_player_departure
                          FROM pair_issued_decisions
                          WHERE item_key=? AND variant=?
@@ -103,6 +105,7 @@ def _pair(key, now, db):
         return row
     dep, arr = latest.get("departure"), latest.get("arrival")
     if (latest.get("item_key") != key or latest.get("variant") != SELECTED_VARIANT
+            or latest.get("artifact_sha256") != PINS[key]
             or latest.get("min_quantity") != 30
             or latest.get("grace_seconds") != GRACE
             or latest.get("actual_player_departure") != 0
