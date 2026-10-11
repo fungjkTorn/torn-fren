@@ -105,7 +105,7 @@ class HeartbeatArrivalEvidenceTests(unittest.TestCase):
             return {"strict_bracket_proxy":None,
                     "last_known_proxy":None,"reason":"NO_POLL_BRACKET"}
         observations=[
-            StockObservation(x[0],x[4],x[5])
+            StockObservation(x[0],x[3],x[4])
             for x in long_stock_rows()]
         from research.v113_phase_offset_departure_comparison import analyze_item
         r=analyze_item(
