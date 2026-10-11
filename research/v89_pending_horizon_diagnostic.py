@@ -196,9 +196,44 @@ def main():
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument("--days",type=int,default=1)
     p.add_argument("--row-limit",type=int,default=MAX_CANDIDATE_ROWS)
+    p.add_argument("--table",action="store_true",
+                   help="compact readable result, avoids massive JSON dump")
     args=p.parse_args()
-    print(json.dumps(analyze(days=args.days,row_limit=args.row_limit),
-                     sort_keys=True))
+    out=analyze(days=args.days,row_limit=args.row_limit)
+    if not args.table:
+        print(json.dumps(out,sort_keys=True))
+        return
+    print("===== V89 LAST %d DAY(S): ISSUE-TIME HORIZON / PENDING AUDIT =====" %
+          args.days)
+    for k in ("raw_rows","raw_valid_candidate_rows",
+              "invalid_or_abstained_rows","exact_item_and_arrival_duplicate_rows",
+              "unique_item_arrival_targets","pending_equivalent_to_v76",
+              "matured_equivalent_to_v76"):
+        print(f"{k}: {out[k]}")
+    print("===== WHAT PENDING REALLY MEANS =====")
+    for k,v in sorted(out["stage_counts"].items()):
+        print(f"{k}: {v}")
+    print("===== ORIGINAL ISSUE -> DEPARTURE WAIT DISTRIBUTION =====")
+    for k,v in out["wait_to_depart_all_targets"].items():
+        print(f"{k}: {v}")
+    print("Summary:",json.dumps(out["wait_to_depart_summary"],sort_keys=True))
+    print("===== FORECAST CHANGES ON CONSECUTIVE ISSUES =====")
+    for k,v in out["forecast_revision_pair_counts"].items():
+        print(f"{k}: {v}")
+    print("===== PER-ITEM BREAKDOWN =====")
+    print(f'{"ITEM":30} {"TARGETS":>7} {"WAITING":>7} {"FLIGHT":>7} '
+          f'{"BUFFER":>7} {"MATURE":>7} {">1H WAIT":>8}')
+    for key,rec in sorted(out["per_item"].items()):
+        print(f'{key:30} {rec["targets"]:7} '
+              f'{rec.get("WAITING_FOR_DEPARTURE",0):7} '
+              f'{rec.get("HYPOTHETICALLY_IN_FLIGHT",0):7} '
+              f'{rec.get("AWAITING_POST_ARRIVAL_BUFFER",0):7} '
+              f'{rec.get("MATURED_FOR_OUTCOME_AUDIT",0):7} '
+              f'{out["targets_with_wait_over_1_hour_per_item"].get(key,0):8}')
+    print("===== NOT INDEPENDENT RESTOCKS =====")
+    print("15m-nearby target groups (heuristic only):",
+          out["nearby_15min_target_groups_heuristic_total"])
+    print("No stock was scored. No live services or data changed.")
 
 
 if __name__=="__main__":
