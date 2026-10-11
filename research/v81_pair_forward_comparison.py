@@ -154,6 +154,13 @@ def tick(*, source=SOURCE, artifact_dir=ARTIFACT_DIR, ledger=SIDECAR,
         context.con.close()
 
     issued = int(clock())
+    # The calendar tick may arrive late or inference may overrun the next
+    # five-minute decision slot. Never mislabel an expired grid decision as
+    # an actionable, as-issued forward comparison.
+    if not 0 <= issued - planned < STEP:
+        return {"status": "V81_PLANNING_SLOT_EXPIRED",
+                "planning_age_seconds": issued - planned,
+                "records_written": 0}
     after = inspector(source, issued)
     if (file_stamp(source) != stamp or after.get("status") != "FRESH" or
             after.get("last_successful_heartbeat") != source_as_of or
@@ -181,7 +188,10 @@ def tick(*, source=SOURCE, artifact_dir=ARTIFACT_DIR, ledger=SIDECAR,
     store_decisions(ledger, records)
     return {"status": "V81_PRIVATE_PAIR_RECORDED", "records_written": len(records),
             "issued_at": issued, "stock_as_of": source_as_of,
-            "planning_timestamp": planned, "research_only": True,
+            "planning_timestamp": planned,
+            "planning_age_seconds": issued - planned,
+            "snapshot_age_seconds": issued - source_as_of,
+            "research_only": True,
             "published_to_website": False, "gameplay_automated": False,
             "comparisons": summary}
 
