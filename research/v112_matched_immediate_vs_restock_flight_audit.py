@@ -238,7 +238,7 @@ def main():
         "historical_holdout_previously_inspected":True,
         "genuine_player_flights_verified":False,
         "country_provider_freshness_verified":False,
-        "duration_seconds":round(time.monotonic()-begin,2),
+        "duration_seconds":round(time.monotonic()-beginning,2),
         "items":items,
     }
     if a.json:
