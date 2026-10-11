@@ -116,8 +116,15 @@ def report(ledger, stock, *, now=None, days=7, limit=CAP):
             tally[code] += 1
             by_model[model][code] += 1
     def totals(v):
+        # Counter omits untouched keys when serialized to JSON. Keep a stable
+        # reporting contract: zero evidence must be 0, never a missing field.
+        fixed = ("issued_rows", "abstentions", "invalid_candidates",
+                 "valid_candidates", "unique_arrivals",
+                 "duplicate_arrival_targets", "pending",
+                 "proxy_success", "proxy_miss")
         denom = v["proxy_success"] + v["proxy_miss"]
-        return {**dict(sorted(v.items())),
+        return {**{key: int(v[key]) for key in fixed},
+                **dict(sorted(v.items())),
                 "proxy_scorable": denom,
                 "proxy_success_fraction": round(v["proxy_success"] / denom, 4)
                    if denom else None}
