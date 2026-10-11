@@ -32,7 +32,7 @@ class V91DecisionViewsTests(unittest.TestCase):
         self.assertEqual(report["best_chance"][0]["model_id"],"late")
         self.assertEqual(report["best_chance"][0]["stock_reserve_above_30"],1870)
         self.assertIsNone(report["best_chance"][0]["calibrated_success_probability"])
-        self.assertIn("Stock-margin proxy",report["best_chance_warning"])
+        self.assertIn("uncalibrated",report["best_chance_warning"])
 
     def test_quick_view_does_not_silently_expand_to_eight_hours(self):
         c=example(wait=21600,stock=2000)
@@ -56,6 +56,15 @@ class V91DecisionViewsTests(unittest.TestCase):
         second=m.evaluate_views([with_prov],now=NOW)["leave_now"][0]
         self.assertEqual(first["exposure"],"PROVISIONAL_NEAR_TERM")
         self.assertEqual(second["exposure"],"QUALIFIED_DEPARTURE_WINDOW")
+
+    def test_calibrated_success_without_stock_floor_is_rankable(self):
+        candidate=example(stock=None,wait=250,model="validated",
+                          level="validated",p=.85,n=60)
+        ranked=m.evaluate_views([candidate],now=NOW)
+        self.assertEqual(len(ranked["best_chance"]),1)
+        self.assertEqual(ranked["best_chance"][0]["model_id"],"validated")
+        self.assertIsNone(ranked["best_chance"][0]["stock_reserve_above_30"])
+        self.assertEqual(ranked["best_chance"][0]["calibrated_success_probability"],.85)
 
     def test_does_not_fake_stock_reserve_or_best_rank(self):
         c=example(wait=40,stock=None)
