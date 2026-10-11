@@ -19,7 +19,6 @@ from research.v34_prospective_ops_audit import arrival_truth
 from research.v76_forward_research_report import strict_samples
 from research.v81_pair_forward_comparison import SIDECAR, VARIANTS
 from research.plushie_champions.common import TRAVEL_SECONDS
-from services.frozen_candidate_worker_v31 import inspect_live_source
 from research.v60_private_snapshot_probe import approved_collector_source
 
 COLLECTOR = Path("/opt/torn-fren/data/stock_history.db")
@@ -32,8 +31,11 @@ QTY = 30
 
 
 def readonly(db):
-    p = Path(db).resolve(strict=True)
-    if p.is_symlink() or not p.is_file():
+    raw = Path(db)
+    if raw.is_symlink():
+        raise ValueError("symlink research input rejected")
+    p = raw.resolve(strict=True)
+    if not p.is_file():
         raise ValueError("not regular research input")
     con = sqlite3.connect(p.as_uri() + "?mode=ro", uri=True, timeout=15)
     con.row_factory = sqlite3.Row
