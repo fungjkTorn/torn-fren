@@ -95,7 +95,13 @@ def transition_episodes(observations,gaps=()):
 
 
 def actual_forecast_boundary(prediction,phase):
-    if prediction["status"]!="FORECAST_AVAILABLE":
+    # Event-time skill must NOT be selected by player flight feasibility.
+    # V107 may forecast a boundary even when no outbound flight can reach
+    # any proposed stocked window. Evaluate that boundary regardless.
+    if prediction["status"] not in (
+        "FORECAST_AVAILABLE",
+        "ABSTAIN_NO_FLIGHT_CAN_REACH_PREDICTED_WINDOW",
+    ):
         return None
     windows=prediction["windows"]
     if not windows:
