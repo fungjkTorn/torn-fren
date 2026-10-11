@@ -118,6 +118,19 @@ class V91DecisionViewsTests(unittest.TestCase):
         self.assertEqual([c["item_key"] for c in r["next_opportunity"]],
                          ["jap:Xanax"])
 
+    def test_source_currently_stale_even_when_issuance_was_valid(self):
+        source=example(issued=NOW-170,source=NOW-200)
+        self.assertEqual(m.validity(source,NOW),"STALE_COLLECTOR_NOW")
+        provider=example(provider=NOW-181)
+        self.assertEqual(m.validity(provider,NOW),"STALE_PROVIDER_UPDATE")
+
+    def test_invalid_category_fails_closed_without_throwing(self):
+        bad=example()
+        bad=replace(bad,category="unspecified-unknown")
+        r=m.evaluate_views([bad],now=NOW)
+        self.assertEqual(r["valid_candidate_count"],0)
+        self.assertEqual(r["excluded_by_reason"]["INVALID_CATEGORY"],1)
+
     def test_one_per_item_while_showing_multiple_different_items(self):
         a=example(wait=20,model="a")
         b=example(wait=40,model="b")
