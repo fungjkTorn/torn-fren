@@ -1,0 +1,37 @@
+name: V85 Japan isolated forward research
+on:
+  push:
+    branches: [research/v38-full-roster-live-prep-20261009]
+    paths:
+      - '.github/workflows/v85-japan-forward.yml'
+      - 'research/v84_japan_forward_canary.py'
+      - 'research/v86_japan_forward_report.py'
+      - 'tests/test_v84_japan_forward_canary.py'
+      - 'tests/test_v86_japan_forward_report.py'
+      - 'deploy/scripts/v85_japan_forward_timer.sh'
+      - 'deploy/systemd/torn-fren-v85-japan-forward.service'
+      - 'deploy/systemd/torn-fren-v85-japan-forward.timer'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  forward-isolation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install existing and research dependencies
+        run: python -m pip install -r requirements.txt -r research/plushie_champions/requirements-research.txt
+      - name: Verify Japan V84 live inference safety tests
+        run: python -m unittest discover -s tests -p 'test_v84_japan_forward_canary.py' -v
+      - name: Verify Japan V86 report count and proxy accuracy safety
+        run: python -m unittest discover -s tests -p 'test_v86_japan_forward_report.py' -v
+      - name: Verify Japan implementation compiles
+        run: python -m py_compile research/v84_japan_forward_canary.py research/v86_japan_forward_report.py
+      - name: Validate guarded opt-in service installer syntax
+        run: bash -n deploy/scripts/v85_japan_forward_timer.sh
