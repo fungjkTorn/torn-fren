@@ -87,8 +87,14 @@ def validity(candidate: Opportunity, now: int):
     """Return one reason, or None if an as-issued candidate is still displayable."""
     if not isinstance(candidate, Opportunity):
         return "INVALID_CONTRACT"
+    if (not isinstance(candidate.item_key, str)
+        or len(candidate.item_key)>160
+        or not isinstance(candidate.model_id, str)
+        or not 1<=len(candidate.model_id)<=128):
+        return "INVALID_ITEM"
     country, sep, item = candidate.item_key.partition(":")
-    if not sep or not item or country not in TRAVEL_SECONDS or not candidate.model_id:
+    if (not sep or not item or item!=item.strip()
+        or country not in TRAVEL_SECONDS):
         return "INVALID_ITEM"
     if candidate.status not in FORECAST_STATUSES:
         return "INVALID_STATUS"
