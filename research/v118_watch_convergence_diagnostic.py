@@ -122,11 +122,19 @@ def diagnose_start(original,rows,times,*,asof):
         for a,b in zip(stream,stream[1:])
     ]
     large_gaps=[x for x in gaps if x>2*STEP]
-    drifts=[
-        b[1]-a[1]
+    adjacent=[
+        (b[0]-a[0],b[1]-a[1])
         for a,b in zip(proposals,proposals[1:])
         if 0<b[0]-a[0]<=2*STEP
     ]
+    drifts=[shift for _,shift in adjacent]
+    # A rolling target can move forward EXACTLY five minutes on each
+    # five-minute issue tick. Counting only shift >STEP misses that failure.
+    rolling_pairs=sum(
+        shift>0 and abs(shift-issued_gap)<=60
+        for issued_gap,shift in adjacent
+    )
+    truly_stationary_pairs=sum(abs(shift)<=60 for _,shift in adjacent)
     future_only=sum(x>STEP for x in leads)
     recheck=target_recheck(original,rows,times,asof)
     completed=asof>=begin+MAX_WAIT
@@ -157,6 +165,8 @@ def diagnose_start(original,rows,times,*,asof):
         "future_departure_shifted_later_pairs":sum(x>STEP for x in drifts),
         "future_departure_shifted_earlier_pairs":sum(x<-STEP for x in drifts),
         "future_departure_roughly_stable_pairs":sum(abs(x)<=STEP for x in drifts),
+        "future_target_moves_one_for_one_with_tick_pairs":rolling_pairs,
+        "future_target_stationary_within_one_minute_pairs":truly_stationary_pairs,
         "median_departure_shift_seconds":(
             int(statistics.median(drifts)) if drifts else None),
         "original_departure_recheck":recheck,
@@ -199,6 +209,10 @@ def audit(*,ledger=V75,now=None,hours=24,
             c["drift_later_pairs"]+=row["future_departure_shifted_later_pairs"]
             c["drift_earlier_pairs"]+=row["future_departure_shifted_earlier_pairs"]
             c["stable_pairs"]+=row["future_departure_roughly_stable_pairs"]
+            c["rolling_one_for_one_pairs"]+=row[
+                "future_target_moves_one_for_one_with_tick_pairs"]
+            c["true_stationary_pairs"]+=row[
+                "future_target_stationary_within_one_minute_pairs"]
             c["departure_drift_adjacent_pairs"]+=(
                 row["valid_adjacent_departure_drift_pairs"])
             c["recheck_"+row["original_departure_recheck"]["status"]]+=1
