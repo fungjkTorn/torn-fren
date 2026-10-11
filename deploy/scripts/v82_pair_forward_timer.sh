@@ -25,7 +25,7 @@ if [[ "$ACTION" == "status" ]]; then
 fi
 if [[ "$ACTION" == "upgrade" ]]; then
   echo "===== V82 GUARDED SERVICE-TIMEOUT UPGRADE ====="
-  systemctl is-active --quiet "$TIMER" || { echo "STOP: V82 timer not active"; exit 1; }
+  systemctl is-enabled --quiet "$TIMER" || { echo "STOP: V82 timer is not enabled"; exit 1; }
   [[ "$(git status --porcelain)" == "" ]] || { echo "STOP: dirty research checkout"; exit 1; }
   sudo test -f "$DST_S" && sudo test -f "$DST_T" || { echo "STOP: V82 installed unit absent"; exit 1; }
   sudo cmp -s "$SRC_T" "$DST_T" || { echo "STOP: timer differs from audited source"; exit 1; }
