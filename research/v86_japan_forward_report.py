@@ -15,7 +15,7 @@ from pathlib import Path
 
 from research.v34_prospective_ops_audit import arrival_truth
 from research.v76_forward_research_report import strict_samples
-from research.v84_japan_forward_canary import LEDGER, COLLECTOR
+from research.v84_japan_forward_canary import LEDGER, COLLECTOR, MAX_INFERENCE_AGE
 from research.v60_private_snapshot_probe import approved_collector_source
 
 DAY = 86400
@@ -43,7 +43,7 @@ def valid(row):
             "slot", "queried_at", "issued_at", "source_heartbeat",
             "departure", "arrival"))
         and row["slot"] == row["queried_at"] // STEP * STEP
-        and 0 <= row["issued_at"] - row["slot"] < STEP
+        and 0 <= row["issued_at"] - row["queried_at"] <= MAX_INFERENCE_AGE
         and 0 <= row["issued_at"] - row["source_heartbeat"] <= 180
         and row["queried_at"] <= row["issued_at"]
         and row["issued_at"] <= row["departure"]
