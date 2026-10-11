@@ -15,7 +15,7 @@ from research.v107_explicit_restock_cycle_baseline import StockObservation
 T0=1700000000
 
 
-def cycles(n=160,low=900,high=1800):
+def cycles(n=600,low=900,high=1800):
     t=T0
     obs=[StockObservation(t,0,"yata")]
     for _ in range(n):
