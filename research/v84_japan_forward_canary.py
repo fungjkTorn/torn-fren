@@ -23,6 +23,7 @@ COLLECTOR = Path("/opt/torn-fren/data/stock_history.db")
 SNAPSHOT = Path("/var/lib/torn-fren-v38/v84_japan_stock_snapshot.db")
 LEDGER = Path("/home/ubuntu/torn-fren-private-models/v84_japan_forward.db")
 STEP = 300
+MAX_INFERENCE_AGE = 60  # Japan estimates against the query second, not a grid anchor.
 HORIZON = 28800
 TRAVEL = 8940
 SCHEMA = """CREATE TABLE IF NOT EXISTS japan_forward_decisions (
@@ -140,8 +141,11 @@ def tick(*, collector=COLLECTOR, snapshot=SNAPSHOT, ledger=LEDGER,
     result = predictor(str(snapshot), "jap", "Xanax", queried)
     issued = int(clock())
     slot = queried // STEP * STEP
-    if not 0 <= issued - slot < STEP:
-        return {"status": "V84_PLANNING_SLOT_EXPIRED", "records_written": 0}
+    # Unlike analog grid planners, Japan V8 plans as of the exact query
+    # second. A quick inference crossing :05 is still as-issued evidence.
+    # Reject genuinely slow inference (>60s); never silently accept stale work.
+    if not 0 <= issued - queried <= MAX_INFERENCE_AGE:
+        return {"status": "V84_INFERENCE_TOO_LATE", "records_written": 0}
     after = inspector(snapshot, issued)
     if (file_stamp(snapshot) != stamp or after.get("status") != "FRESH" or
         after.get("last_successful_heartbeat") != heartbeat or
@@ -165,6 +169,8 @@ def tick(*, collector=COLLECTOR, snapshot=SNAPSHOT, ledger=LEDGER,
             "records_written": 1, "issued_at": issued,
             "source_heartbeat_age_seconds": issued - heartbeat,
             "planning_age_seconds": issued - slot,
+            "inference_age_seconds": issued - queried,
+            "crossed_grid_boundary": issued // STEP != queried // STEP,
             "research_only": True, "published_to_website": False,
             "gameplay_automated": False,
             "recommended_departure_timestamp": departure,
