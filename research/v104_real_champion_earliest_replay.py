@@ -32,8 +32,10 @@ from research.plushie_champions.common import (
     AnalogPlanner,TemplatePlanner,ResearchContext,PLUSHIES,valid_starts,
     TRAVEL_SECONDS,GRACE,MAX_WAIT
 )
-from research.plushie_champions.rf_localgrid import WINNING_CONFIG as FOX_CONFIG
-from research.plushie_champions.recent_phase_select import WINNING_CONFIG as NESS_CONFIG
+FOX_CONFIG={"k":18,"global_regime_weight":0.5}
+NESS_CONFIG={"lags":(1,),"lookback_h":2,"shift_h":1,"minfit":0.5}
+# Match the pinned, documented champion research configurations. Tests guard
+# against accidental drift from the six-source reproducibility bundle.
 from research.v60_private_snapshot_probe import approved_collector_source
 from research.v103_champion_score_curves import (
     score_curve,earliest_from_curve,analog_champion_from_curve,
