@@ -16,7 +16,7 @@ Environment=OPENBLAS_NUM_THREADS=1
 Environment=MKL_NUM_THREADS=1
 CPUQuota=15%
 MemoryMax=640M
-TimeoutStartSec=55s
+TimeoutStartSec=20s
 TimeoutStopSec=10s
 Nice=15
 IOSchedulingClass=best-effort
