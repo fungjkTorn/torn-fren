@@ -100,6 +100,13 @@ class V100Tests(unittest.TestCase):
         # Optional stock was disabled and nonexistent source must not be opened.
         self.assertEqual(result["stock_proxy_by_reconfirmation_status"],{})
 
+    def test_recommended_departure_90_seconds_earlier_is_past(self):
+        original=fake(START,D)
+        update=fake(D-120,D-90)
+        label,diff=m.late_state(original,[original,update],[START,D-120],NOW)
+        self.assertEqual(label,"RECHECK_DEPARTURE_ALREADY_PASSED")
+        self.assertEqual(diff,-90)
+
     def test_missing_private_ledger_does_not_create_it(self):
         with tempfile.TemporaryDirectory() as tmp:
             missing=Path(tmp)/"missing.db"
