@@ -82,6 +82,14 @@ class JapanV86ReportTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             m.report(self.ledger, self.ledger, now=NOW+100)
 
+    def test_empty_ledger_has_explicit_zero_counts(self):
+        result = m.report(self.ledger, self.stock, now=NOW + 500)
+        self.assertEqual(result["totals"]["unique_arrivals"], 0)
+        self.assertEqual(result["totals"]["issued_rows"], 0)
+        self.assertEqual(result["totals"]["abstentions"], 0)
+        self.assertEqual(result["totals"]["proxy_scorable"], 0)
+        self.assertIsNone(result["totals"]["proxy_success_fraction"])
+
     def test_invalid_window_rejected(self):
         with self.assertRaises(ValueError):
             m.report(self.ledger, self.stock, days=0)
