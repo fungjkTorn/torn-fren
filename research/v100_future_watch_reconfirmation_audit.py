@@ -100,7 +100,7 @@ def audit(*,sidecar=V75,source=SOURCE,days=1,asof=None,
     outcomes=Counter()
     per_item=defaultdict(Counter)
     wait_hist=defaultdict(Counter)
-    stock_cross=defaultdict(Counter)
+    stock_cross=Counter()
     with (closing(ro(source)) if with_stock_proxy else nullcontext(None)) as stock:
         for row in events:
             key=row["item_key"]
