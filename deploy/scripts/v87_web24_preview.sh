@@ -53,7 +53,15 @@ else:
         assert [r["item_key"] for r in filtered["latest"]] == [f"{country}:{item}"]
     legacy = get("/api/experimental/v41/predictions?" +
                  urlencode({"country":"arg", "item":"Monkey Plushie"}))
-    assert [r["item_key"] for r in legacy["latest"]] == ["arg:Monkey Plushie"]
+    # The pre-existing V41 filtered API may return a single dict rather than
+    # an array. Verify its original contract instead of asserting list only.
+    legacy_value = legacy.get("latest")
+    if isinstance(legacy_value, list):
+        assert [r["item_key"] for r in legacy_value] == ["arg:Monkey Plushie"]
+    elif isinstance(legacy_value, dict):
+        assert legacy_value.get("item_key") == "arg:Monkey Plushie"
+    else:
+        raise AssertionError("legacy filtered API returned unexpected shape")
 from urllib.request import urlopen
 for endpoint in ("/experimental", "/api/catalog"):
     with urlopen(base + endpoint, timeout=8) as r:
@@ -74,7 +82,18 @@ rollback_files() {
   sudo rm -f "$MODULE" "$DROPIN"
   sudo systemctl daemon-reload
   sudo systemctl restart "$SERVICE"
-  echo "V87 files reverted; old web service restarted."
+  echo "V87 files reverted; waiting for original web service to return."
+  local restored=0
+  for attempt in $(seq 1 30); do
+    if systemctl is-active --quiet "$SERVICE" &&
+       curl -fsS --max-time 4 "$BASE/api/experimental/v41/predictions" >/dev/null 2>&1; then
+      restored=1; break
+    fi
+    sleep 2
+  done
+  [[ "$restored" == 1 ]] || { echo "STOP: rollback service not healthy within 60s"; return 1; }
+  probe 21
+  echo "Original 21-item website verified after rollback."
 }
 
 if [[ "$action" == "status" ]]; then
@@ -104,7 +123,6 @@ if [[ "$action" == "rollback" ]]; then
     exit 1
   }
   rollback_files
-  probe 21
   echo "===== V87 REVERTED TO ORIGINAL 21 ====="
   exit 0
 fi
@@ -119,13 +137,27 @@ for timer in torn-fren-v38-private-shadow.timer torn-fren-v82-pair-forward.timer
 done
 [[ -f "$APP" && ! -L "$APP" ]] || { echo "STOP: unexpected web app"; exit 1; }
 [[ ! -e "$DROPIN" && ! -e "$MODULE" ]] || { echo "STOP: V87 already present; use status"; exit 1; }
-[[ ! -e "$ORIGINAL" ]] || { echo "STOP: prior V87 backup exists; inspect before new install"; exit 1; }
+# A failed prior V87 deployment intentionally keeps its baseline backup.
+# Reuse only after byte-for-byte verification against today's deployed app.
+if [[ -e "$ORIGINAL" || -L "$ORIGINAL" ]]; then
+  [[ -f "$ORIGINAL" && ! -L "$ORIGINAL" ]] || {
+    echo "STOP: prior backup is not a regular file"; exit 1;
+  }
+  sudo cmp -s "$ORIGINAL" "$APP" || {
+    echo "STOP: deployed app differs from prior baseline; inspect before retry"; exit 1;
+  }
+  echo "Verified original 21-item app matches preserved prior backup."
+elif [[ -e "$BACKUP" && ! -d "$BACKUP" ]]; then
+  echo "STOP: invalid rollback directory"; exit 1
+fi
 echo "===== VERIFYING EXISTING 21 ====="
 probe 21
 echo "===== BUILDING AND COMPILING EXACT-SOURCE PATCH ====="
 mkdir -p "$BACKUP"
 chmod 700 "$BACKUP"
-sudo cp -p "$APP" "$ORIGINAL"
+if [[ ! -f "$ORIGINAL" ]]; then
+  sudo cp -p "$APP" "$ORIGINAL"
+fi
 python3 - "$APP" "$BACKUP/modified_app.py" <<'PY'
 import ast
 from pathlib import Path
@@ -153,8 +185,7 @@ RESTORE=0
 recover() {
   if [[ "$RESTORE" == 1 ]]; then
     echo "WEB VERIFICATION FAILED: restoring original endpoint."
-    rollback_files || true
-    probe 21 || true
+    rollback_files || echo "STOP: automatic rollback verification failed; investigate web health"
   fi
 }
 trap recover EXIT
