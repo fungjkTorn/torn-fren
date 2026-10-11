@@ -14,6 +14,8 @@ on:
       - 'tests/test_v88_poll_state_forward_report.py'
       - 'research/v89_pending_horizon_diagnostic.py'
       - 'tests/test_v89_pending_horizon_diagnostic.py'
+      - 'research/v91_travel_decision_contract.py'
+      - 'tests/test_v91_travel_decision_contract.py'
       - 'deploy/scripts/v87_web24_preview.sh'
       - 'deploy/scripts/v85_japan_forward_timer.sh'
       - 'deploy/systemd/torn-fren-v85-japan-forward.service'
@@ -44,7 +46,9 @@ jobs:
         run: python -m unittest discover -s tests -p 'test_v88_poll_state_forward_report.py' -v
       - name: Verify V89 pending classification and recommendation stability audit
         run: python -m unittest discover -s tests -p 'test_v89_pending_horizon_diagnostic.py' -v
+      - name: Verify V91 item-aware decision policy contract
+        run: python -m unittest discover -s tests -p 'test_v91_travel_decision_contract.py' -v
       - name: Verify Japan implementation compiles
-        run: python -m py_compile research/v84_japan_forward_canary.py research/v86_japan_forward_report.py research/v87_experimental24_overlay.py research/v88_poll_state_forward_report.py research/v89_pending_horizon_diagnostic.py
+        run: python -m py_compile research/v84_japan_forward_canary.py research/v86_japan_forward_report.py research/v87_experimental24_overlay.py research/v88_poll_state_forward_report.py research/v89_pending_horizon_diagnostic.py research/v91_travel_decision_contract.py
       - name: Validate guarded opt-in service installer syntax
         run: bash -n deploy/scripts/v85_japan_forward_timer.sh deploy/scripts/v87_web24_preview.sh
