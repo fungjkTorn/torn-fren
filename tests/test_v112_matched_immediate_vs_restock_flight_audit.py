@@ -60,7 +60,7 @@ class MatchedArrivalEvidenceTests(unittest.TestCase):
         self.assertEqual(out["paired_known_comparisons"],1)
         self.assertEqual(out["possible_delta_success_per_anchor_bounds"],
             {"lower":0.0,"upper":0.6667,
-             "meaning":"deterministic unknown-outcome sensitivity bounds; NOT statistical CI"})
+             "meaning":"paired identical-flight-aware unknown-outcome bounds; NOT statistical CI"})
 
     def test_model_can_lose_against_immediate_on_same_start(self):
         rec=[fake_record(T0,False,True)]
@@ -77,6 +77,32 @@ class MatchedArrivalEvidenceTests(unittest.TestCase):
         self.assertEqual(out["certain_model_worse_now_better"],0)
         self.assertEqual(out["possible_delta_success_per_anchor_bounds"]["lower"],0)
         self.assertEqual(out["possible_delta_success_per_anchor_bounds"]["upper"],0)
+
+    def test_same_departure_unknown_evidence_has_zero_paired_difference(self):
+        rec=[{
+            "issue":T0,
+            "departure":T0,
+            "model_evidence":evidence(None),
+            "now_evidence":evidence(None),
+        }]
+        out=m.paired_summary(rec)
+        self.assertEqual(
+            out["possible_delta_success_per_anchor_bounds"]["lower"],0)
+        self.assertEqual(
+            out["possible_delta_success_per_anchor_bounds"]["upper"],0)
+        self.assertEqual(out["joint_strict_evidence"],{
+            "UNKNOWN_vs_UNKNOWN":1,
+        })
+
+    def test_inconsistent_same_time_stock_proxies_fail_closed(self):
+        rec=[{
+            "issue":T0,
+            "departure":T0,
+            "model_evidence":evidence(True),
+            "now_evidence":evidence(False),
+        }]
+        with self.assertRaisesRegex(AssertionError,"same departure"):
+            m.paired_summary(rec)
 
     def test_no_anchor_is_not_100_percent(self):
         out=m.paired_summary([])
