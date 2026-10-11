@@ -125,7 +125,7 @@ probe 21
 echo "===== BUILDING AND COMPILING EXACT-SOURCE PATCH ====="
 mkdir -p "$BACKUP"
 chmod 700 "$BACKUP"
-cp -p "$APP" "$ORIGINAL"
+sudo cp -p "$APP" "$ORIGINAL"
 python3 - "$APP" "$BACKUP/modified_app.py" <<'PY'
 import ast
 from pathlib import Path
@@ -160,7 +160,7 @@ recover() {
 trap recover EXIT
 RESTORE=1
 sudo install -m 0644 "$STAGED" "$MODULE"
-sudo cp -p "$BACKUP/modified_app.py" "$APP"
+sudo cp "$BACKUP/modified_app.py" "$APP"
 sha256sum "$APP" | awk '{print $1}' > "$AFTER_HASH"
 printf '[Service]\nEnvironment=TORN_FREN_V87_EXPERIMENTAL24_PREVIEW=1\n' |
   sudo tee "$DROPIN" >/dev/null
