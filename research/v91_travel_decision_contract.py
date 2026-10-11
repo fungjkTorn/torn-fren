@@ -94,7 +94,10 @@ def validity(candidate: Opportunity, now: int):
         return "INVALID_STATUS"
     if candidate.evidence_tier not in EVIDENCE_TIERS:
         return "INVALID_EVIDENCE_TIER"
-    if candidate.resolved_category() not in CATEGORIES:
+    try:
+        if candidate.resolved_category() not in CATEGORIES:
+            return "INVALID_CATEGORY"
+    except (ValueError, TypeError):
         return "INVALID_CATEGORY"
     times=(candidate.issued_at,candidate.stock_as_of,candidate.valid_until,
            candidate.depart_at,candidate.arrive_at,now)
@@ -106,6 +109,8 @@ def validity(candidate: Opportunity, now: int):
         return "FUTURE_OR_INCONSISTENT_EVIDENCE"
     if candidate.issued_at-candidate.stock_as_of>MAX_SOURCE_AGE:
         return "STALE_COLLECTOR_AT_ISSUE"
+    if now-candidate.stock_as_of>MAX_SOURCE_AGE:
+        return "STALE_COLLECTOR_NOW"
     if candidate.valid_until<=now:
         return "EXPIRED_SNAPSHOT"
     if candidate.valid_until-candidate.issued_at>900:
@@ -118,7 +123,7 @@ def validity(candidate: Opportunity, now: int):
         u=candidate.provider_update_as_of
         if type(u) is not int or u>candidate.stock_as_of:
             return "BAD_PROVIDER_UPDATE_TIMESTAMP"
-        if candidate.stock_as_of-u>MAX_SOURCE_AGE:
+        if candidate.stock_as_of-u>MAX_SOURCE_AGE or now-u>MAX_SOURCE_AGE:
             return "STALE_PROVIDER_UPDATE"
     if (candidate.projected_stock_floor is not None and
         (type(candidate.projected_stock_floor) is not int or
@@ -207,9 +212,9 @@ def evaluate_views(candidates: Iterable[Opportunity], *, now: int,
         if not isinstance(c,Opportunity):
             exclusions["INVALID_CONTRACT"]+=1
             continue
-        if category is not None and c.resolved_category()!=category:
-            continue
         reason=validity(c,now)
+        if reason is None and category is not None and c.resolved_category()!=category:
+            continue
         if reason is None:
             accepted.append(c)
         else:
