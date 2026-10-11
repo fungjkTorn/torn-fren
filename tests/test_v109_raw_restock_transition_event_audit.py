@@ -88,6 +88,19 @@ class TransitionLevelTests(unittest.TestCase):
         self.assertEqual(rejected["SHORT_TRANSITION_BOUNCE"],1)
         self.assertEqual(len(events),1)
 
+    def test_restocks_scored_even_when_flight_cannot_reach_first_window(self):
+        prediction={
+            "status":"ABSTAIN_NO_FLIGHT_CAN_REACH_PREDICTED_WINDOW",
+            "windows":[{
+                "expected_stocked_start":START+600,
+                "expected_drop_below_30":START+900,
+            }],
+        }
+        self.assertEqual(
+            m.actual_forecast_boundary(prediction,"DEPLETED"),START+600)
+        self.assertEqual(
+            m.actual_forecast_boundary(prediction,"STOCKED"),START+900)
+
     def test_empty_history_has_no_claimed_skill(self):
         out=m.evaluate_events([],[],item_key="uni:Nessie Plushie")
         self.assertEqual(out["state"],"NO_OBSERVATIONS")
