@@ -58,6 +58,26 @@ class ForwardPairTests(unittest.TestCase):
                           snapshotter=lambda _a, _b: {
                               'status': 'PRIVATE_SNAPSHOT_READY', 'published': True})
 
+    def test_first_run_creates_missing_snapshot_before_resolution(self):
+        missing = self.source.parent / "v81_new_snapshot.db"
+        self.assertFalse(missing.exists())
+        def publish(_collector, dest):
+            Path(dest).write_bytes(b"fresh independent snapshot")
+            return {"status": "PRIVATE_SNAPSHOT_READY", "published": True}
+        with (patch.object(m, "load_pinned_artifact",
+                           side_effect=lambda *_a: {"train_asof": NOW - 86400}),
+              patch.object(m, "original_features", return_value={"test": 1}),
+              patch.object(m, "choose_from_features", return_value=0)):
+            result = m.tick(source=missing, artifact_dir=self.artifacts,
+                            ledger=self.ledger, clock=lambda: NOW,
+                            inspector=self.inspect,
+                            context_builder=lambda *_a, **_kw: Context(),
+                            planner_cls=FakePlanner,
+                            busy_check=lambda: False, snapshotter=publish)
+        self.assertTrue(missing.is_file())
+        self.assertEqual(result["status"], "V81_PRIVATE_PAIR_RECORDED")
+        self.assertEqual(result["records_written"], 6)
+
     def test_six_variants_persist_and_idempotent(self):
         result = self.tick()
         self.assertEqual(result["status"], "V81_PRIVATE_PAIR_RECORDED")
