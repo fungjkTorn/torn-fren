@@ -49,7 +49,8 @@ MAX_EPISODES=25
 
 def earliest_risk_budget(q,curve,*,loss_budget,
                          absolute_floor=ABSOLUTE_FLOOR,
-                         min_points=CONTIGUOUS_POINTS):
+                         min_points=CONTIGUOUS_POINTS,
+                         previous_departure=None):
     """Earliest supported future arrival, within gap of model's own peak.
 
     Analog models additionally require nearby robustness to remain within
@@ -81,14 +82,27 @@ def earliest_risk_budget(q,curve,*,loss_budget,
               and (robust_min is None or robust[idx]>=robust_min))
         if okay:
             qualifying.append(idx)
+    # Mark every grid point within a contiguous well-supported forecast
+    # window. If an existing absolute departure is still supported in the
+    # NEW as-of score curve, retain it rather than chasing a shifting peak.
+    supported=set()
     for i in qualifying:
         if all((i+j<len(delays)
                 and int(delays[i+j])-int(delays[i])==j*STEP
                 and score[i+j]>=threshold
                 and (robust_min is None or robust[i+j]>=robust_min))
                for j in range(min_points)):
-            return (int(q)+int(delays[i]),float(score[i]))
-    return None
+            for j in range(min_points):
+                supported.add(i+j)
+    if not supported:
+        return None
+    if previous_departure is not None:
+        if int(previous_departure)>=int(q):
+            for idx in sorted(supported):
+                if int(q)+int(delays[idx])==int(previous_departure):
+                    return (int(previous_departure),float(score[idx]))
+    i=min(supported)
+    return (int(q)+int(delays[i]),float(score[i]))
 
 
 def simulate_one(start,planner,curve_for,labels):
@@ -111,9 +125,16 @@ def simulate_one(start,planner,curve_for,labels):
                 p=earliest_from_curve(q,curve,floor=.55)
             else:
                 delta=float(label.removeprefix("nearpeak_"))
-                p=earliest_risk_budget(q,curve,loss_budget=delta)
+                p=earliest_risk_budget(
+                    q,curve,loss_budget=delta,
+                    previous_departure=(
+                        schedules[label][0] if schedules[label] else None))
             if p and q<=p[0]<=limit:
                 schedules[label]=p
+            elif label!="floor_0.55":
+                # Never execute a stale near-peak flight if the current
+                # model has withdrawn its availability support.
+                schedules[label]=None
         for label in outstanding:
             s=schedules[label]
             if s is not None and s[0]<=q+STEP:
