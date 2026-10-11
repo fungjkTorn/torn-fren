@@ -117,6 +117,21 @@ class HeartbeatStateTests(unittest.TestCase):
         self.assertEqual(report["proxy_scorable"],0)
         self.assertEqual(report["outcomes"]["PROVIDER_SWITCH"],1)
 
+    def test_old_delta_record_fails_closed_despite_fresh_global_heartbeat(self):
+        with sqlite3.connect(self.stockdb) as c:
+            self.stock(c,ARR-2*86400,100)
+        report=self.run_report()
+        self.assertEqual(report["proxy_scorable"],0)
+        self.assertEqual(report["outcomes"]["STOCK_STATE_OLDER_THAN_24H"],1)
+
+    def test_provider_mismatch_not_used_as_stock_truth(self):
+        with sqlite3.connect(self.stockdb) as c:
+            self.stock(c,ISSUED-50,100)
+            c.execute("UPDATE stock_history SET source='prometheus'")
+        report=self.run_report()
+        self.assertEqual(report["proxy_scorable"],0)
+        self.assertEqual(report["outcomes"]["STOCK_STATE_PROVIDER_MISMATCH"],1)
+
     def test_future_arrival_is_pending(self):
         with sqlite3.connect(self.stockdb) as c:
             self.stock(c,ISSUED-50,100)
