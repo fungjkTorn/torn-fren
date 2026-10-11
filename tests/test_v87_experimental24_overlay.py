@@ -124,6 +124,38 @@ class OverlayTests(unittest.TestCase):
                                     pair_db=self.pair, japan_db=self.japan)
         self.assertEqual(result, original)
 
+    def test_unknown_filtered_baseline_none_becomes_one_preview(self):
+        # The deployed V41 reader returns a non-list value for an unknown
+        # filtered item; V87 previously raised and caused a public HTTP 500.
+        self.japan_add()
+        payload = {**self.original, "latest": None}
+        out = m.overlay_response(payload, key="jap:Xanax", now=NOW,
+                                 pair_db=self.pair, japan_db=self.japan)
+        self.assertEqual([r["item_key"] for r in out["latest"]],
+                         ["jap:Xanax"])
+        self.assertFalse(out["latest"][0]["actionable"])
+
+    def test_filtered_original_single_dict_is_unchanged(self):
+        single = {"item_key":"arg:Monkey Plushie", "status":"ORIGINAL"}
+        payload = {**self.original, "latest": single}
+        out = m.overlay_response(payload, key="arg:Monkey Plushie",
+                                 now=NOW, pair_db=self.pair, japan_db=self.japan)
+        self.assertEqual(out, payload)
+
+    def test_filtered_original_none_is_unchanged(self):
+        payload = {**self.original, "latest": None}
+        out = m.overlay_response(payload, key="arg:Monkey Plushie",
+                                 now=NOW, pair_db=self.pair, japan_db=self.japan)
+        self.assertEqual(out, payload)
+
+    def test_unfiltered_unexpected_shape_fails_open_without_500(self):
+        payload = {**self.original, "latest": None}
+        out = m.overlay_response(payload, now=NOW,
+                                 pair_db=self.pair, japan_db=self.japan)
+        self.assertEqual(out["preview_overlay_status"],
+                         "BASE_ROSTER_SHAPE_UNEXPECTED")
+        self.assertIsNone(out["latest"])
+
     def test_base_roster_drift_preserves_original_response(self):
         original = {**self.original, "latest": self.original["latest"][:20]}
         result = m.overlay_response(original, now=NOW,
