@@ -131,6 +131,22 @@ class V91DecisionViewsTests(unittest.TestCase):
         self.assertEqual(r["valid_candidate_count"],0)
         self.assertEqual(r["excluded_by_reason"]["INVALID_CATEGORY"],1)
 
+    def test_malformed_model_inputs_fail_closed_instead_of_throwing(self):
+        from dataclasses import replace
+        sample=example(wait=25,stock=45)
+        attempts=[
+            replace(sample,item_key=None),
+            replace(sample,item_key=21),
+            replace(sample,item_key="mex:"),
+            replace(sample,item_key="mex:One Plushie" + "Z"*200),
+            replace(sample,model_id=9),
+            replace(sample,model_id=""),
+            replace(sample,model_id="a"*130),
+        ]
+        results=m.evaluate_views(attempts,now=NOW)
+        self.assertEqual(results["valid_candidate_count"],0)
+        self.assertEqual(results["excluded_by_reason"]["INVALID_ITEM"],len(attempts))
+
     def test_one_per_item_while_showing_multiple_different_items(self):
         a=example(wait=20,model="a")
         b=example(wait=40,model="b")
