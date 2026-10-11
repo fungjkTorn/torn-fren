@@ -98,11 +98,24 @@ class JapanV84Tests(unittest.TestCase):
         self.assertEqual(r["status"], "V84_SOURCE_NOT_FRESH")
         self.assertFalse(self.ledger.exists())
 
-    def test_expired_slot_rejected_even_with_valid_snapshot(self):
+    def test_slow_inference_rejected_even_with_valid_snapshot(self):
         self.moments = iter([NOW, NOW + 300])
         r = self.go()
-        self.assertEqual(r["status"], "V84_PLANNING_SLOT_EXPIRED")
+        self.assertEqual(r["status"], "V84_INFERENCE_TOO_LATE")
         self.assertFalse(self.ledger.exists())
+
+    def test_fast_inference_across_grid_boundary_is_valid(self):
+        query = NOW + 280
+        self.moments = iter([query, query + 20])
+        r = self.go(inspector=lambda _p, _t: {
+            "status": "FRESH", "last_successful_heartbeat": query - 20})
+        self.assertEqual(r["status"], "V84_JAPAN_RESEARCH_RECORDED")
+        self.assertEqual(r["model_status"], "FORWARD_CANDIDATE_ONLY")
+        self.assertTrue(r["crossed_grid_boundary"])
+        self.assertEqual(r["inference_age_seconds"], 20)
+        with sqlite3.connect(self.ledger) as con:
+            self.assertEqual(con.execute(
+                "SELECT COUNT(*) FROM japan_forward_decisions").fetchone()[0], 1)
 
     def test_activating_oneshot_worker_is_busy(self):
         with patch.object(m.subprocess, "run",
