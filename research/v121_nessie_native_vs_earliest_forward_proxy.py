@@ -82,8 +82,10 @@ def _past_only_template(planner,q):
     As-of q, a reference to the previous day shifted by +/-1h is
     strictly older than q, even for arrival horizon MAX_WAIT+travel.
     """
-    latest_reference=q+TRAVEL_SECONDS["uni"]+MAX_WAIT
-    -DAY + NESS_CONFIG["shift_h"]*3600
+    latest_reference = (
+        q + TRAVEL_SECONDS["uni"] + MAX_WAIT
+        - DAY + NESS_CONFIG["shift_h"] * 3600
+    )
     return latest_reference<q
 
 
@@ -252,6 +254,17 @@ def audit(*,ledger=V75,stock=SOURCE,now=None,hours=24,
         cohort=first_per_item_hour(candidates)
         if len(cohort)>max_starts:
             raise ValueError("too many first-per-hour starts for replay")
+        # We cannot simulate a 5-minute update that had not yet occurred
+        # by frozen asof. Evaluate ONLY starts with a complete 8h decision
+        # horizon and 106m arrival/maturity window. Everything else is
+        # reported as pending, not counted as zero-hit abstentions.
+        complete=[
+            row for row in cohort
+            if int(row["computed_at"]) + MAX_WAIT
+               + TRAVEL_SECONDS["uni"]
+               + EVALUATION_MATURITY_SECONDS <= asof
+        ]
+        pending=len(cohort)-len(complete)
     with closing(ro(stock)) as source:
         # Source chronology is full history for scoring; only past
         # reference dates enter actual TemplatePlanner.plan/score_curve.
@@ -267,7 +280,7 @@ def audit(*,ledger=V75,stock=SOURCE,now=None,hours=24,
         try:
             out=[]
             count_queries=0
-            for initial in cohort:
+            for initial in complete:
                 start=int(initial["computed_at"])
                 if model is None:
                     first_history=int(ctx.timelines[PILOTS["nessie"]].ts[0])
@@ -301,7 +314,9 @@ def audit(*,ledger=V75,stock=SOURCE,now=None,hours=24,
         "target_item_key":ITEM_KEY,
         "cutoff_epoch":asof,
         "issued_window_hours":hours,
-        "frozen_v75_hourly_start_cohort":len(out),
+        "frozen_v75_hourly_start_cohort":len(cohort),
+        "complete_eight_hour_replay_starts":len(out),
+        "starts_pending_complete_eight_hour_horizon":pending,
         "original_v75_model_family_counts":dict(Counter(
             r["frozen_v75_family"] for r in out)),
         "raw_v75_rows":raw,
@@ -352,6 +367,8 @@ def main():
     print("===== V121 NESSIE NATIVE MIDPOINT VS EARLIEST-NEARPEAK SELECTOR =====")
     print("Research reconstruction from historical asof; NOT frozen V75 alternatives")
     print("cohort:",result["frozen_v75_hourly_start_cohort"],
+          "matured:",result["complete_eight_hour_replay_starts"],
+          "pending_horizon:",result["starts_pending_complete_eight_hour_horizon"],
           "curve queries:",result["total_unique_model_score_queries"],
           "valid initial V75 arrivals:",result["valid_unique_v75_arrival_targets"])
     for name,data in result["policy_outcomes"].items():
