@@ -61,10 +61,11 @@ def late_state(original, item_rows, issue_times, asof):
         return "RECHECK_ABSTAINED_OR_INVALID",None
     new_dep=int(row["departure"])
     difference=new_dep-dep
+    if new_dep<dep:
+        return "RECHECK_DEPARTURE_ALREADY_PASSED",difference
     if difference==0:
         return "EXACT_DEPARTURE_RECONFIRMED",difference
-    if (abs(difference)<=NEAR_DEPARTURE_TOLERANCE and
-        new_dep>=new_issue):
+    if difference<=NEAR_DEPARTURE_TOLERANCE:
         return "NEARBY_DEPARTURE_RECONFIRMED",difference
     return "DIFFERENT_DEPARTURE_AT_RECHECK",difference
 
@@ -129,6 +130,7 @@ def audit(*,sidecar=V75,source=SOURCE,days=1,asof=None,
         return {"n":n,"exact":c["EXACT_DEPARTURE_RECONFIRMED"],
                 "nearby":c["NEARBY_DEPARTURE_RECONFIRMED"],
                 "shifted":c["DIFFERENT_DEPARTURE_AT_RECHECK"],
+                "earlier_passed":c["RECHECK_DEPARTURE_ALREADY_PASSED"],
                 "abstained":c["RECHECK_ABSTAINED_OR_INVALID"],
                 "no_recent":c["NO_RECENT_RECHECK"]+c["NO_LATER_RECHECK"],
                 "unreached":c["TARGET_DEPARTURE_NOT_REACHED"]}
@@ -177,12 +179,12 @@ def pretty(r):
     print("===== RECONFIRMATION BY ORIGINAL WAIT =====")
     for name,c in r["issue_wait_bucket_outcomes"].items():
         print(f'{name}: total={c["n"]} exact={c["exact"]} nearby={c["nearby"]} '
-              f'shifted={c["shifted"]} abstained={c["abstained"]} '
+              f'shifted={c["shifted"]} earlier_passed={c["earlier_passed"]} abstained={c["abstained"]} '
               f'no_recent={c["no_recent"]} unreached={c["unreached"]}')
     print("===== BY ITEM =====")
     for key,c in r["per_item"].items():
         print(f'{key:30} n={c["n"]:4} exact={c["exact"]:4} nearby={c["nearby"]:4} '
-              f'shifted={c["shifted"]:4} abstained={c["abstained"]:4} '
+              f'shifted={c["shifted"]:4} earlier_passed={c["earlier_passed"]:4} abstained={c["abstained"]:4} '
               f'no_recent={c["no_recent"]:4} unreached={c["unreached"]:4}')
     if r["optional_stock_proxy"]:
         print("===== PROXY STOCK OUTCOMES BY RECONFIRMATION =====")
