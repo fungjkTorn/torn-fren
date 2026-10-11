@@ -43,7 +43,7 @@ class V91DecisionViewsTests(unittest.TestCase):
 
     def test_research_only_never_called_ready_even_with_stock_bound(self):
         v=m.evaluate_views([example(wait=0,stock=800,
-                        provider=NOW-20)],now=NOW)
+                        provider=NOW-25)],now=NOW)
         a=v["leave_now"][0]
         self.assertEqual(a["exposure"],"PROVISIONAL_NEAR_TERM")
         self.assertFalse(a["accuracy_verified"])
