@@ -107,6 +107,34 @@ class V100Tests(unittest.TestCase):
         self.assertEqual(label,"RECHECK_DEPARTURE_ALREADY_PASSED")
         self.assertEqual(diff,-90)
 
+    def test_with_stock_proxy_option_counts_tuple_status_correctly(self):
+        from unittest.mock import patch
+        with tempfile.TemporaryDirectory() as tmp:
+            sidecar=Path(tmp)/"sidecar.db"
+            stock=Path(tmp)/"collector.db"
+            with open_writer(sidecar) as db:
+                for issued in (START,D-120):
+                    db.execute(
+                        """INSERT INTO v42_candidate_decisions(
+                         item_key,computed_at,model_family,model_config,
+                         stock_as_of,status,departure,arrival,
+                         valid_until,actual_player_departure)
+                         VALUES(?,?,'fixture','fixture',?,
+                         'RESEARCH_PROPOSAL_ONLY',?,?,?,0)""",
+                         ("mex:Jaguar Plushie",issued,issued-10,
+                          D,D+TRAVEL_SECONDS["mex"],issued+300))
+                db.commit()
+            sqlite3.connect(stock).close()
+            with patch.object(m,"observation",
+                              return_value=("POLL_STATE_PROXY_SUCCESS",True,{})):
+                out=m.audit(sidecar=sidecar,source=stock,asof=NOW,
+                            with_stock_proxy=True)
+            self.assertEqual(
+                out["stock_proxy_by_reconfirmation_status"][
+                    "EXACT_DEPARTURE_RECONFIRMED"]["HIT"],1)
+            self.assertTrue(out["optional_stock_proxy"])
+            self.assertFalse(out["collector_written"])
+
     def test_missing_private_ledger_does_not_create_it(self):
         with tempfile.TemporaryDirectory() as tmp:
             missing=Path(tmp)/"missing.db"
