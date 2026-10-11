@@ -114,7 +114,7 @@ def _quantile(xs,f):
     return round(vals[index],2)
 
 
-def evaluate_events(obs,episodes,*,item_key,max_episodes=MAX_EPISODES):
+def evaluate_events(obs,episodes,*,item_key,gaps=(),max_episodes=MAX_EPISODES):
     """Chronological last-quarter phase forecasts. No outcome-derived tuning."""
     if not 1<=max_episodes<=MAX_EPISODES:
         raise ValueError("event safety cap invalid")
@@ -138,7 +138,8 @@ def evaluate_events(obs,episodes,*,item_key,max_episodes=MAX_EPISODES):
         # The FORECAST is run with its own exact as-of and sees only prior
         # event history; observation timestamps after issue are not input.
         past=[r for r in obs if r.epoch<=issue]
-        prediction=next_windows(item_key,past,asof=issue)
+        prediction=next_windows(
+            item_key,past,asof=issue,collection_gaps=gaps)
         phase=ep["phase"]
         c=kinds[phase]
         c["observed_completed_events"]+=1
@@ -239,7 +240,7 @@ def main():
             obs,gaps=read_collector_item(conn,country,item)
             episodes,excluded=transition_episodes(obs,gaps)
             result[target]=evaluate_events(
-                obs,episodes,item_key=f"{country}:{item}",
+                obs,episodes,item_key=f"{country}:{item}",gaps=gaps,
                 max_episodes=args.events)
             result[target]["raw_stock_change_rows"]=len(obs)
             result[target]["completed_provider_continuous_phases"]=len(episodes)
