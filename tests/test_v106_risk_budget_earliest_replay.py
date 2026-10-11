@@ -89,9 +89,14 @@ class RiskBudgetTests(unittest.TestCase):
 
     def test_peaky_curve_can_protect_champion_choice(self):
         def curve(p,q):
+            delays=np.array([0,300,600,900])
+            scores=np.array([
+                .99 if q+int(d)==START+600 else
+                .98 if q+int(d)==START+900 else .2
+                for d in delays])
             return {
-                "delay_seconds":np.array([0,300,600,900]),
-                "availability_score":np.array([.2,.3,.99,.98]),
+                "delay_seconds":delays,
+                "availability_score":scores,
             }
         result=m.evaluate(
             [START],tl=SyntheticTimeline(q=400),
@@ -101,15 +106,50 @@ class RiskBudgetTests(unittest.TestCase):
 
     def test_explicit_fixed_floor_baseline_remains_available(self):
         def curve(p,q):
+            delays=np.array([0,300,600,900])
+            scores=np.array([
+                .99 if q+int(d)==START+600 else
+                .98 if q+int(d)==START+900 else
+                .66 if q+int(d)==START+300 else .65
+                for d in delays])
             return {
-                "delay_seconds":np.array([0,300,600,900]),
-                "availability_score":np.array([.65,.66,.99,.98]),
+                "delay_seconds":delays,
+                "availability_score":scores,
             }
         result=m.evaluate(
             [START],tl=SyntheticTimeline(),planner=Planner(),
             travel=TRAVEL,curve_generator=curve)
         self.assertEqual(result["stats"]["floor_0.55"]["mean_wait_minutes"],0)
         self.assertEqual(result["stats"]["nearpeak_0.03"]["mean_wait_minutes"],10)
+
+    def test_rolling_goalpost_does_not_create_false_late_departs(self):
+        # If the curve always says "wait 10 more minutes", a real user
+        # never receives a reliably supported fixed departure.
+        def curve(p,q):
+            return {
+                "delay_seconds":np.array([0,300,600,900]),
+                "availability_score":np.array([.2,.3,.99,.98]),
+            }
+        out=m.evaluate([START],tl=SyntheticTimeline(),
+                       planner=Planner(),travel=TRAVEL,
+                       curve_generator=curve)
+        self.assertEqual(out["stats"]["nearpeak_0.03"]["departures"],0)
+        self.assertEqual(out["stats"]["champion"]["departures"],1)
+        self.assertEqual(out["stats"]["floor_0.55"]["departures"],1)
+
+    def test_previous_absolute_departure_requires_current_model_support(self):
+        curve={
+            "delay_seconds":np.array([0,300,600,900]),
+            "availability_score":np.array([.2,.99,.98,.2]),
+        }
+        retained=m.earliest_risk_budget(
+            START+300,curve,loss_budget=.03,
+            previous_departure=START+600)
+        self.assertEqual(retained[0],START+600)
+        withdrawn=m.earliest_risk_budget(
+            START+300,curve,loss_budget=.03,
+            previous_departure=START+300)
+        self.assertEqual(withdrawn[0],START+600)
 
     def test_no_historical_starts_does_not_fabricate_precision(self):
         def curve(p,q):return None
