@@ -47,8 +47,14 @@ def classify_prediction(row, *, now, soon_seconds=DEFAULT_SOON_SECONDS):
     def pack(status,why):
         return {**base,"display_state":status,"display_explanation":why}
     if preview:
-        # A researcher may view the forecast window, but cannot treat the
-        # unvalidated V82/V85 private forward pilot as verified game advice.
+        # The forecaster's issued target may be displayed as *information*
+        # without converting it to actionable gameplay departure guidance.
+        if (type(valid) is int and valid>now
+            and type(source) is int and 0<=now-source<=MAX_STOCK_AGE_SECONDS
+            and type(departure) is int and departure>=now
+            and type(arrival) is int and arrival>departure):
+            base.update(departure_time=departure,arrival_time=arrival,
+                        leave_in_seconds=departure-now)
         return pack(STATUS_PREVIEW,"Forward-study preview only; no certified accuracy or gameplay departure guidance.")
     if state in {"DEPARTURE_PASSED","RESEARCH_PREVIEW_DEPARTURE_PASSED"}:
         return pack(STATUS_PASSED,"Previously recommended departure is already in the past.")
