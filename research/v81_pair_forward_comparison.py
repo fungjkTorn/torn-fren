@@ -100,7 +100,8 @@ def tick(*, source=SOURCE, artifact_dir=ARTIFACT_DIR, ledger=SIDECAR,
     ledger = Path(ledger)
     if source.is_symlink():
         raise ValueError("unsafe research snapshot symlink")
-    if ledger.resolve(strict=False) == source.resolve(strict=True):
+    # The first scheduled run intentionally has no snapshot yet.
+    if ledger.resolve(strict=False) == source.resolve(strict=False):
         raise ValueError("ledger cannot overwrite snapshot")
     if busy_check():
         return {"status": "V81_DEFERRED_V75_BUSY", "records_written": 0}
