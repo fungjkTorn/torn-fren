@@ -5,9 +5,10 @@ set -euo pipefail
 export SYSTEMD_PAGER=cat
 
 ACTION="${1:-status}"
-# On PowerShell -> SSH streams the last argument may retain a CR.
-# Strip only a trailing carriage return; preserve all other user input.
-ACTION="${ACTION%
+case "$ACTION" in
+  status|smoke|enable|disable) ;;
+  *) echo "Use status|smoke|enable|disable"; exit 2 ;;
+esac
 [[ "$(id -un)" == "ubuntu" ]] || { echo "STOP: run as ubuntu"; exit 1; }
 
 SERVICE=torn-fren-v127-earliest-shadow.service
