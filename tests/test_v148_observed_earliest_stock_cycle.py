@@ -97,7 +97,7 @@ class FirstReachableStockWindowsTests(unittest.TestCase):
         self.assertEqual(r["status"],"CURRENT_STATE_ONSET_NOT_VERIFIABLE")
 
     def test_short_stocked_duration_with_large_late_restock_band_is_not_safe(self):
-        obs,t=trace(n=5,high=120,low=7200)
+        obs,t=trace(n=5,high=300,low=7200)
         p=provider_continuous_phases(obs,asof=t)
         # Deliberately widen empirical depleted duration spread while
         # preserving all past events and disallowing invented guarantees.
