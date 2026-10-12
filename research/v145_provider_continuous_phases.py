@@ -97,6 +97,50 @@ def provider_continuous_phases(observations, *, asof, gaps=()):
     }
 
 
+
+def observed_cycle_evidence_tier(phases, *, required_for_monte_carlo=5):
+    """Any genuinely completed observed phase counts as historical evidence.
+
+    Unlike the V128 >=5+5 Monte Carlo eligibility rule, a single bounded
+    stocked interval is not thrown away as 'no history.' Sparse periods
+    are valid research evidence, but do NOT authorize a high-confidence
+    departure recommendation or fabricated inferred missing periods.
+    """
+    if (not isinstance(phases,dict) or
+        type(required_for_monte_carlo) is not int
+        or required_for_monte_carlo < 2):
+        raise ValueError("invalid evidence tier arguments")
+    highs=phases.get("stocked_durations")
+    lows=phases.get("depleted_durations")
+    if (not isinstance(highs,list) or not isinstance(lows,list)
+        or any(type(x) is not int or x <= 0 for x in highs+lows)):
+        raise ValueError("invalid completed phase durations")
+    high_n=len(highs)
+    low_n=len(lows)
+    if high_n >= required_for_monte_carlo and low_n >= required_for_monte_carlo:
+        tier="V128_MONTE_CARLO_SAMPLE_ELIGIBLE"
+    elif high_n > 0 and low_n > 0:
+        tier="BOUNDED_HISTORY_SPARSE_PROVISIONAL"
+    elif high_n > 0 or low_n > 0:
+        tier="ONE_PHASE_KIND_OBSERVED_NO_CLOSED_FULL_CYCLE"
+    else:
+        tier="NO_COMPLETED_BOUNDED_INTERVALS"
+    return {
+        "tier":tier,
+        "observed_bounded_stocked_intervals":high_n,
+        "observed_bounded_depleted_intervals":low_n,
+        "min_samples_per_phase_for_existing_v128_curve":required_for_monte_carlo,
+        "history_exists":high_n > 0 or low_n > 0,
+        "supports_valid_completed_stocked_lifetime":high_n > 0,
+        "supports_valid_completed_depleted_wait":low_n > 0,
+        "sufficient_for_existing_v128_monte_carlo": (
+            tier=="V128_MONTE_CARLO_SAMPLE_ELIGIBLE"
+        ),
+        "arrival_recommendation_accuracy_established":False,
+        "permission_to_publish_as_certified_departure":False,
+    }
+
+
 def compare_phase_eligibility(observations, *, asof, gaps=()):
     """One-clock-tick comparison, NOT an accuracy or deployment result."""
     from research.v128_full24_earliest_shadow import fast_phases
