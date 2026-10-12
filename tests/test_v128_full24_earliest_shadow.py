@@ -146,7 +146,7 @@ class Full24ShadowTests(unittest.TestCase):
             now=collector_fixture(src,m.exact_roster())
             before=digest(src)
             result=m.observe(source=src,sidecar=dst,issued=now,
-                             canonical=False)
+                             clock=lambda:now,canonical=False)
             self.assertEqual(result["status"],"V128_PREVIEW_24_NO_WRITES")
             self.assertEqual(result["roster_count"],24)
             self.assertEqual(set(result["predictions"]),set(m.exact_roster()))
@@ -168,10 +168,10 @@ class Full24ShadowTests(unittest.TestCase):
             now=collector_fixture(src,m.exact_roster())
             digest_before=digest(src)
             a=m.observe(source=src,sidecar=dst,issued=now,
-                        canonical=False,record=True)
+                        clock=lambda:now,canonical=False,record=True)
             self.assertEqual(a["status"],"V128_RECORDED_24_PRIVATE")
             m.observe(source=src,sidecar=dst,issued=now,
-                      canonical=False,record=True)
+                      clock=lambda:now,canonical=False,record=True)
             with sqlite3.connect(dst) as conn:
                 self.assertEqual(conn.execute(
                     "SELECT COUNT(*) FROM v128_ticks").fetchone()[0],1)
@@ -188,7 +188,7 @@ class Full24ShadowTests(unittest.TestCase):
             dst=Path(t)/"shadow.db"
             now=collector_fixture(src,m.exact_roster())
             out=m.observe(source=src,sidecar=dst,issued=now+900,
-                          canonical=False)
+                          clock=lambda:now+900,canonical=False)
             self.assertEqual(out["roster_count"],24)
             self.assertEqual(
                 out["decision_status_counts"]["ABSTAIN_GLOBAL_HEARTBEAT_STALE"],
@@ -201,7 +201,7 @@ class Full24ShadowTests(unittest.TestCase):
             dst=Path(t)/"shadow.db"
             now=collector_fixture(src,m.exact_roster())
             out=m.observe(source=src,sidecar=dst,issued=now,
-                          canonical=False,budget_seconds=-1)
+                          clock=lambda:now,canonical=False,budget_seconds=-1)
             self.assertEqual(
                 out["decision_status_counts"]["ABSTAIN_RESOURCE_BUDGET"],24)
 
