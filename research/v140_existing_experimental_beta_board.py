@@ -89,6 +89,30 @@ def _v128_record(row, *, now):
         "RESEARCH_NEAR_TERM_NOT_CERTIFIED",
         "RESEARCH_FUTURE_WATCH_RECHECK_REQUIRED",
     }
+    message = row.get("message")
+    if issue is None or issue > now:
+        state = "FUTURE_ISSUANCE_REJECTED" if issue else "INVALID_RESEARCH_ISSUE_TIME"
+        message = "Research issue time is invalid; no departure guidance."
+        supported = False
+    elif now >= valid:
+        state = "RESEARCH_SNAPSHOT_EXPIRED"
+        message = "Research snapshot expired; obtain a fresh near-departure recheck."
+        supported = False
+    elif supported:
+        if departure is None or arrival is None or arrival <= departure:
+            state = "NO_QUALIFYING_RESEARCH_DEPARTURE"
+            message = "Research departure/arrival timestamps are invalid."
+            supported = False
+        elif departure < now:
+            state = "PROPOSED_DEPARTURE_ALREADY_PASSED"
+            message = "Proposed departure passed; a new forecast is required."
+            supported = False
+        else:
+            state = ("RESEARCH_NEAR_TERM_NOT_CERTIFIED" if departure - now <= NEAR_SECONDS
+                     else "RESEARCH_FUTURE_WATCH_RECHECK_REQUIRED")
+            message = ("Near-term research candidate; landing stock is not certified."
+                       if departure - now <= NEAR_SECONDS else
+                       "Future research WATCH; recheck with a fresh forecast near departure.")
     if not (supported and valid is not None and now < valid
             and departure is not None and departure >= now
             and arrival is not None and arrival > departure
@@ -101,7 +125,7 @@ def _v128_record(row, *, now):
         "issued_epoch": issue,
         "valid_until_epoch": valid,
         "refresh_due_in_seconds": _remaining(valid, now),
-        "display_explanation": row.get("message"),
+        "display_explanation": message,
         "verified_departure": False,
         "estimated_stock_at_arrival": None,
         "score_is_calibrated_probability": False,

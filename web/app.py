@@ -331,6 +331,11 @@ def api_history(
     # Prediction v2 is isolated from the base history analysis so a model-side
     # issue cannot take the graph down.  The old prediction is retained as
     # baseline_prediction for diagnostics.
+    analysis["baseline_prediction"] = analysis.get("prediction")
+    analysis["prediction"] = None
+    analysis["prediction_v2_stale"] = True
+    # Response validation time, NOT a new model issue or country-feed timestamp.
+    analysis["prediction_v2_checked_at"] = int(time.time())
     try:
         if research_cache and source_status != "FRESH":
             prediction_v2 = {
@@ -343,7 +348,6 @@ def api_history(
                 country,item,revision=revision_token)
         else:
             prediction_v2, prediction_stale = _get_prediction_nonblocking(country,item)
-        analysis["baseline_prediction"] = analysis.get("prediction")
         analysis["prediction_v2"] = prediction_v2
         analysis["prediction_v2_stale"] = bool(prediction_stale)
 
