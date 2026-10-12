@@ -72,8 +72,7 @@ state that the current site has 24 active models until probed.
 
 ## Beta quality gates (not yet satisfied)
 
-[ ] Verify live /experimental page, fields and exact HTML code WITHOUT
-    clobbering deployed files.
+[ ] Run prepared V142 read-only audit for live /experimental fields and\n    exact HTML code fingerprint WITHOUT clobbering deployed files.
 [ ] Verify exact existing API roster: 21/24, no duplicates, appropriate
     specialist per item, fresh valid_until and actual status labels.
 [ ] VM V139 combined frozen outcomes: original V2 next-restock &
@@ -81,8 +80,8 @@ state that the current site has 24 active models until probed.
 [ ] VM V128 scheduled timer health and repeated full 24-item saved issues.
 [ ] Integrate V140 into existing experimental UI through reversible opt-in,
     keeping V2 graph untouched. Do not mount automatically.
-[ ] Integrate V141's NO_WINDOW semantics into server+browser together,
-    with regression tests and rollout gate. Do not patch graph yet.
+[x] Prepare NO_WINDOW semantics in BOTH research branch server+browser,
+    with JS/Python parity regression tests.\n[ ] Inspect current VM graph source, reconcile drift and apply this change\n    only behind reviewed reversible canary. NOT deployed yet.
 [ ] Verify model-specific error metrics per item, especially weak and
     abstaining items; require honest minimum evidence bar for calling beta.
 [ ] Browser QA: desktop/mobile, 24 rows, long item names, filters,
