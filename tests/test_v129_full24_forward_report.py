@@ -142,7 +142,7 @@ class Full24ForwardReportTests(unittest.TestCase):
             self.assertEqual(out["raw_five_minute_issue_rows"],6)
             self.assertEqual(out["first_item_UTC_hourly_cohorts"],3)
             self.assertEqual(
-                out["per_item"][k1]["recheck_RECONFIRMED_FRESH_NEAR_DEPARTURE"],
+                out["per_item"][k1]["recheck_status_counts"]["RECONFIRMED_FRESH_NEAR_DEPARTURE"],
                 1)
             self.assertEqual(out["per_item"][k1]["abstained_hours"],1)
             self.assertEqual(out["per_item"][k2]["matched_pair"]["both_miss"],1)
