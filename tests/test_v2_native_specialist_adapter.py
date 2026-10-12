@@ -67,6 +67,15 @@ class NativeArrivalPlanAdapterTests(unittest.TestCase):
                 self.assertEqual(row["arrival"]-row["departure"],
                                  TRAVEL_SECONDS[item.split(":")[0]])
 
+    def test_live_lowercase_v19_alias_for_xanax_is_canonicalized(self):
+        for item, config in (("can:Xanax","dyn8"),("uni:Xanax","dyn3")):
+            with self.subTest(item=item):
+                row=preview_record(item,plan(item),family="v19",config=config,
+                    issued_at=ISSUE,stock_as_of=ISSUE-10)
+                self.assertEqual(row["model_family"],"V19")
+                self.assertEqual(row["model_config"],config)
+                self.assertFalse(row["prediction_accuracy_verified"])
+
     def test_blank_output_is_explicit_abstention(self):
         row=preview_record("can:Crocus",None,family="V18",config="dyn5",
                            issued_at=ISSUE,stock_as_of=ISSUE-10)
