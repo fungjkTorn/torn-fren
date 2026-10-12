@@ -72,6 +72,8 @@ def event_diagnostic(observations, *, asof, earliest, gaps=()):
     replenished_30 = 0
     depleted_30 = 0
     ambiguous_replenish = 0
+    positive_quantity_jumps_same_source = 0
+    positive_jumps_while_above_30 = 0
     provider_switches = 0
     gap_crossings = 0
     # We retain the immediately preceding observation to classify a
@@ -99,6 +101,10 @@ def event_diagnostic(observations, *, asof, earliest, gaps=()):
             provider_switches += int(provider_changed)
             gap_crossings += int(gap)
             fresh = not provider_changed and not gap
+            if fresh and q > old_q:
+                positive_quantity_jumps_same_source += 1
+                if old_q >= 30:
+                    positive_jumps_while_above_30 += 1
             if old_q == 0 and q > 0:
                 zero_to_positive += int(fresh)
             if old_q < 30 and q >= 30:
@@ -119,6 +125,8 @@ def event_diagnostic(observations, *, asof, earliest, gaps=()):
         "observed_clean_crossings_to_30":replenished_30,
         "observed_clean_zero_to_positive":zero_to_positive,
         "observed_clean_drops_below_30":depleted_30,
+        "observed_positive_quantity_jumps_same_source":positive_quantity_jumps_same_source,
+        "positive_jumps_without_dropping_below_30":positive_jumps_while_above_30,
         "ambiguous_crossings_to_30_source_or_gap":ambiguous_replenish,
         "provider_switch_count":provider_switches,
         "collector_gap_crossings":gap_crossings,
@@ -126,6 +134,7 @@ def event_diagnostic(observations, *, asof, earliest, gaps=()):
             clean_30_epochs[-1] if clean_30_epochs else None),
         "median_between_clean_30_crossings_seconds":cadence,
         "cadence_is_based_on_three_or_more_events":cadence is not None,
+        "positive_quantity_jump_is_not_certified_restock":True,
         "no_stored_change_means_no_game_restock":False,
         "country_source_freshness_verified":False,
     }
