@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# V146 research-only offline same-issue V128/V145 audit (not a deployment).
+# V146 research-only offline same-issue V128/V145/V148 audit (not a deployment).
 # Uses the same private research Python stage that the successful V139 audit
 # already verified; only NEW v145/v146 source files are staged there.
 # Never writes live collector, V128 sidecar, V75, website or timers.
@@ -8,7 +8,7 @@ set -euo pipefail
 WORK=/home/ubuntu/torn-fren-v38-probe
 STAGE=/home/ubuntu/torn-fren-private-models/v128_stage/pinned/research
 VENV="$WORK/.venv/bin/python"
-PIN=945a570d65eccdd5df19fca67e53ca98ba70fe78
+PIN=4f7b472a6e3734c19fd27a5710e548f6a9de6713
 LIVE=/opt/torn-fren/data/stock_history.db
 V128=/var/lib/torn-fren-v38/v128_earliest24_shadow.db
 
@@ -26,7 +26,7 @@ test ! -L "$STAGE" || { echo "STOP: stage is symlink"; exit 1; }
 cd "$WORK"
 git fetch -q origin research/v38-full-roster-live-prep-20261009 2>/dev/null
 git cat-file -e "${PIN}^{commit}"
-for module in v145_provider_continuous_phases v146_v145_same_issue_replay; do
+for module in v145_provider_continuous_phases v148_observed_earliest_stock_cycle v146_v145_same_issue_replay; do
   test ! -L "$STAGE/$module.py" || { echo "STOP: staged module symlink"; exit 1; }
   git show "${PIN}:research/${module}.py" > "$STAGE/$module.py"
   "$VENV" -m py_compile "$STAGE/$module.py"
