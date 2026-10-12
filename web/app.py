@@ -146,13 +146,11 @@ def _latest_safe_leave_timestamp(prediction):
         float(depletion) - depletion_buffer
         if depletion is not None else None
     )
+    # The end of a restock prediction interval is not the end of the stocked
+    # interval. A nonexistent/negative arrival window is NOT an executable
+    # departure and must not collapse to a fabricated single instant.
     if latest_arrival is None or latest_arrival <= earliest_arrival:
-        latest_arrival = (
-            late_restock_bound or calibrated_arrival or estimate
-        )
-    if latest_arrival is None:
         return None
-    latest_arrival = max(float(latest_arrival), float(earliest_arrival))
     return latest_arrival - float(travel)
 
 
