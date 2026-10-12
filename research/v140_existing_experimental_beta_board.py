@@ -39,7 +39,17 @@ def _legacy_record(row, *, now):
             "No existing experimental model row; do not substitute V128.",
             "verified_departure": False,
         }
-    status = classify_prediction(row, now=now)
+    issued = _safe_epoch(row.get("computed_at"))
+    if issued is None or issued > now:
+        return {**_legacy_record(None, now=now),
+                "present": True, "model_status": "INVALID_INCUMBENT_ISSUE_TIME",
+                "display_state": "INVALID_INCUMBENT_DATA"}
+    try:
+        status = classify_prediction(row, now=now)
+    except (ValueError, TypeError, KeyError):
+        return {**_legacy_record(None, now=now),
+                "present": True, "model_status": "INVALID_INCUMBENT_RECORD",
+                "display_state": "INVALID_INCUMBENT_DATA"}
     deadline = _safe_epoch(status["snapshot_valid_until"])
     return {
         "present": True,
@@ -60,7 +70,7 @@ def _legacy_record(row, *, now):
 
 def _v128_record(row, *, now):
     """V128 candidate always remains a separately labeled research estimate."""
-    if row is None:
+    if row is None or not isinstance(row, dict):
         return {
             "present": False, "model_family": "V128",
             "display_state": "NO_COMPLETE_V128_BATCH",
@@ -137,6 +147,13 @@ def build_board(legacy, panel, *, now, roster_keys):
         and panel.get("roster_size") == ROSTER_SIZE
         and isinstance(panel.get("items"), dict)
         and set(panel["items"]) == set(keys)
+        and _safe_epoch(panel.get("selected_issued_epoch")) is not None
+        and all(
+            isinstance(v, dict)
+            and v.get("item_key") == k
+            and v.get("forecast_issued_epoch") == panel["selected_issued_epoch"]
+            for k, v in panel["items"].items()
+        )
     )
     v128_rows = panel["items"] if panel_ok else {}
 
