@@ -375,6 +375,29 @@ def api_history(
             since_timestamp=int(time.time()) - minutes * 60,
             limit=16,
         )
+
+        # Optional, READ-ONLY shared candidate contract for the future two-view
+        # beta. Disabled by default. The V2 computation time is frozen by the
+        # model, NOT replaced with the timestamp of this HTTP request.
+        if os.environ.get("TORN_FREN_V2_BETA_TIMELINE") == "1":
+            try:
+                from research.v2_beta_departure_bridge import build_item_timeline
+                analysis["beta_item_timeline"] = build_item_timeline(
+                    f"{country}:{item}", prediction_v2,
+                    now=int(time.time()),
+                    issued_at=(
+                        prediction_v2.get("forecast_model_computed_at")
+                        if isinstance(prediction_v2, dict) else None
+                    ),
+                    stock_as_of=analysis.get("collector_last_success_timestamp"),
+                    forecast_stale=bool(prediction_stale),
+                )
+            except (ValueError, TypeError, KeyError) as bridge_error:
+                analysis["beta_item_timeline"] = {
+                    "status": "BETA_PREVIEW_UNAVAILABLE",
+                    "reason": type(bridge_error).__name__,
+                    "first_reachable": None,
+                }
     except Exception as exc:
         analysis["prediction_v2_error"] = str(exc)
 
