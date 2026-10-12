@@ -141,6 +141,23 @@ class FirstReachableDepartureTests(unittest.TestCase):
         r2=run([p,p])
         self.assertEqual(r2["status"],"INVALID_V2_CYCLE_IDENTITIES")
 
+    def test_other_item_specialist_cannot_be_attached_to_crocus(self):
+        mismatch=incumbent()
+        mismatch["item_key"]="can:Wolverine Plushie"
+        r=run([cycle(1)],incumbent=mismatch)
+        self.assertEqual(r["incumbent_specialist"]["status"],
+                         "SPECIALIST_ITEM_IDENTITY_MISMATCH")
+        self.assertIsNone(r["incumbent_specialist"]["departure_epoch"])
+
+    def test_out_of_order_restock_chain_rejected(self):
+        bad=[cycle(1,restock=6000,upper=6200,target=6300,
+                   depleted=7200),
+             cycle(2,restock=3000,upper=3250,target=3300,
+                   depleted=4200)]
+        r=run(bad)
+        self.assertEqual(r["status"],"INVALID_OR_UNSORTED_RESTOCK_CHAIN")
+        self.assertIsNone(r["first_reachable"])
+
     def test_absent_forecast_does_not_invent_restocks(self):
         r=run([])
         self.assertEqual(r["status"],"NO_V2_CYCLES")
