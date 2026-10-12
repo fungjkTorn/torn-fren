@@ -45,10 +45,25 @@ If the output finishes with an error, capture the error. Do not run extra
 `systemctl` or alter pinned research stage manually. V139 itself pins audit
 modules at commit `142f10363037b31fc299183c7cfb0734cf7df50c`.
 
-### 3. Give assistant evidence
+### 3. Read-only check of the ALREADY-EXISTING experimental website
 
-Upload `torn-fren-v139-audit.txt` from the Windows Desktop or paste the
-text; include timer/health output. Do not post API keys, tokens or contents
+This is important: the existing VM `/experimental` page and V41 API
+were added directly to the deployed web app, and GitHub's research checkout
+does not include their exact live source. Inspect before modifying anything:
+
+```powershell
+& ssh -i $key $remote 'cd /home/ubuntu/torn-fren-v38-probe && git show 4e4295c47a8a147c7f56f931080cf617f73692a1:deploy/scripts/v142_inspect_existing_experimental.sh | bash' 2>&1 | Tee-Object -FilePath (Join-Path $HOME "Desktop\torn-fren-v142-site-probe.txt")
+```
+
+This prints only current endpoint health, 24 roster/model/status/validity
+summary, page fingerprints, and installed V87 preview flag. It never
+prints HTTP response bodies, secrets, or player API keys. No restarting
+the web service, no git checkout, no new endpoint.
+
+### 4. Give assistant evidence
+
+Upload `torn-fren-v139-audit.txt` and `torn-fren-v142-site-probe.txt`
+from the Windows Desktop or paste the text; include timer/health output. Do not post API keys, tokens or contents
 from any secrets files.
 
 ## How to read the evidence
