@@ -81,6 +81,53 @@ class FirstReachableDepartureTests(unittest.TestCase):
         self.assertEqual(r["first_reachable"]["earliest_departure_epoch"],NOW+4140)
         self.assertEqual(r["first_reachable"]["arrival_epoch"],NOW+10500)
 
+    def test_short_restock_cadence_flags_unreasonably_long_modeled_wait(self):
+        # A 30-minute observed restock cadence is incompatible with an
+        # unexplained 2-hour gap between projected cycles. Preserve the
+        # first reachable modeled cycle, but label the long wait untrusted.
+        p1=cycle(1,restock=500,upper=600,target=650,
+                 depleted=750,lifetime=300)
+        p2=cycle(2,restock=10000,upper=10300,target=10400,
+                 depleted=11500,lifetime=1100)
+        r=build_item_timeline("can:Crocus",{"predictions":[p1,p2]},
+                              now=NOW,issued_at=NOW-20,stock_as_of=NOW-30,
+                              observed_median_restock_cadence_seconds=1800)
+        self.assertEqual(r["first_reachable"]["prediction_number"],2)
+        self.assertEqual(r["first_reachable"]["status"],
+                         "LONG_WAIT_VERIFY_NEARER_RESTOCKS")
+        self.assertIn("MODELED_RESTOCK_GAP_EXCEEDS_OBSERVED_CADENCE",
+                      r["cadence_alerts"])
+        self.assertIn("LONG_WAIT_MULTIPLE_OBSERVED_RESTOCK_PERIODS",
+                      r["cadence_alerts"])
+        self.assertFalse(r["stock_at_arrival_at_least_30_verified"])
+
+    def test_reasonable_wait_under_cadence_is_not_suppressed(self):
+        p=cycle(1)
+        r=build_item_timeline("can:Crocus",{"predictions":[p]},
+                              now=NOW,issued_at=NOW-20,stock_as_of=NOW-30,
+                              observed_median_restock_cadence_seconds=1800)
+        self.assertEqual(r["first_reachable"]["earliest_departure_epoch"],
+                         NOW+1680)
+        self.assertEqual(r["cadence_alerts"],[])
+        self.assertEqual(r["first_reachable"]["status"],
+                         "FUTURE_WATCH_RECONFIRM_REQUIRED")
+
+    def test_no_unsupported_assumption_if_cadence_unknown(self):
+        p1=cycle(1,restock=500,upper=600,target=650,
+                 depleted=750,lifetime=300)
+        p2=cycle(2,restock=10000,upper=10300,target=10400,
+                 depleted=11500,lifetime=1100)
+        r=run([p1,p2])
+        self.assertEqual(r["cadence_alerts"],[])
+        self.assertEqual(r["first_reachable"]["status"],
+                         "FUTURE_WATCH_RECONFIRM_REQUIRED")
+
+    def test_fake_or_unrealistic_cadence_is_rejected(self):
+        with self.assertRaises(ValueError):
+            build_item_timeline("can:Crocus",{"predictions":[cycle(1)]},
+                                now=NOW,issued_at=NOW-20,stock_as_of=NOW-30,
+                                observed_median_restock_cadence_seconds=0)
+
     def test_expired_issuance_not_rescued_by_fresh_http_response(self):
         r=run([cycle(1)],issue=NOW-301,source=NOW-330)
         self.assertEqual(r["status"],"MODEL_ISSUE_EXPIRED")
