@@ -1,5 +1,7 @@
 # Home VM command queue — 12 October 2026
 
+> **COMPLETED 2026-10-12:** User executed timer health check (V128 and V38 timers active, one V128 collector SQLite open failure recovered), V142 source/route probe (both pages HTTP 200, 24 expected V41 API rows, no duplicates), and V139 pinned combined arrival audit (finished, exit 0). These commands are retained below as historical reference. **Do not ask user to rerun them.** See `docs/vm_observed_dual_view_probe_20261012.md` and `docs/v139_real_vm_accuracy_findings_20261012.md` for observed results. Next blocker: safe read-only capture/reconciliation of live deployed app.py and experimental.html source. No production updates authorized.
+
 The user is currently away from their PC. Do not instruct them to run anything
 until they say they are home. Keep these exact instructions accessible on the
 research branch for continuation and in-chat copy/paste.
