@@ -37,3 +37,7 @@ User provided full current deployed source copies to this chat. Verified app.py 
 2. For items with newly complete phases, rerun the same Monte Carlo policy and calculate matched observed >=30-at-arrival proxy, abstention rate, time-to-leave, long-wait reasonableness, and forecast jitter. Do not drop unresolved arrival observations.
 3. Treat Japan Xanax's separate 92 score-gate abstentions separately from its 152 unknown-onset abstentions; likewise assess Peony/Edelweiss/UK Xanax history sufficiency only after phase extraction improvement.
 4. Merge into the existing actual deployed experimental/V2 source only after source diff, tests, rollback and approval; no live changes now.
+
+## Second eligibility rule corrected in research
+
+The user confirmed that one genuinely observed start/end counts as valid historical data. Therefore V145 also exports `observed_cycle_evidence_tier()`. It counts ANY clean bounded stocked interval as evidence, and distinguishes a sparse partial/full cycle from the existing V128 requirement of 5 completed HIGH plus 5 completed LOW durations before invoking Monte Carlo. A sparse record must not be labeled **NO_HISTORY**; it is explicitly provisional and not proof of a safe flight. The original V128 scorer threshold remains unchanged in production. Additional regression tests passed in GitHub CI.
