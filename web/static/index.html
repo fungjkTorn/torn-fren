@@ -1159,35 +1159,36 @@
 
       for (const candidate of predictions) {
         const window = departureWindowForPrediction(candidate, flightSeconds);
-        if (!window) continue;
+        if (!window) {
+          candidate.usable_for_departure = false;
+          continue;
+        }
         candidate.usable_for_departure = nowSeconds <= window.latestLeave;
         if (!next && candidate.usable_for_departure) next = candidate;
       }
 
       const current = analysis.prediction;
-      const changed = Boolean(
-        next?.estimate_timestamp &&
-        (
-          !current?.estimate_timestamp ||
-          next.prediction_number !== current.prediction_number ||
-          next.estimate_timestamp !== current.estimate_timestamp
-        )
-      );
+      const changed = next
+        ? (!current?.estimate_timestamp ||
+           next.prediction_number !== current.prediction_number ||
+           next.estimate_timestamp !== current.estimate_timestamp)
+        : Boolean(current?.estimate_timestamp);
 
       if (!changed) return false;
 
       previousActivePrediction = current ? { ...current } : null;
       analysis.prediction_v2.display_prediction = next;
-      analysis.prediction_v2.active_prediction_number = next.prediction_number;
-      analysis.prediction_v2.cycles_before_active_target =
-        Math.max(0, (next.prediction_number || 1) - 1);
-      analysis.prediction = {
+      analysis.prediction_v2.active_prediction_number =
+        next?.prediction_number ?? null;
+      analysis.prediction_v2.cycles_before_active_target = next
+        ? Math.max(0, (next.prediction_number || 1) - 1) : null;
+      analysis.prediction = next ? {
         ...next,
         confidence: next.travel_reliability,
         sample_count: v2.model_evidence_tier,
         excluded_sample_count: null,
         note: v2.note,
-      };
+      } : null;
 
       // Redraw all target-dependent UI immediately; no model rebuild/network
       // request is needed just because the clock crossed a departure deadline.
