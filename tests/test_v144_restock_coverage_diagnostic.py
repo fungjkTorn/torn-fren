@@ -35,6 +35,15 @@ class PureTransitionsTests(unittest.TestCase):
         self.assertTrue(out["cadence_is_based_on_three_or_more_events"])
         self.assertFalse(out["country_source_freshness_verified"])
 
+    def test_positive_increase_without_crossing_30_is_not_silent(self):
+        rows=[(NOW-4000,60,"yata"),(NOW-2500,120,"yata"),
+              (NOW-2000,65,"yata"),(NOW-1000,115,"yata")]
+        out=m.event_diagnostic(rows,asof=NOW,earliest=NOW-m.DAY)
+        self.assertEqual(out["observed_clean_crossings_to_30"],0)
+        self.assertEqual(out["observed_positive_quantity_jumps_same_source"],2)
+        self.assertEqual(out["positive_jumps_without_dropping_below_30"],2)
+        self.assertTrue(out["positive_quantity_jump_is_not_certified_restock"])
+
     def test_switch_or_gap_does_not_certify_a_restock(self):
         rows=[
             (NOW-3600,0,"yata"),(NOW-3400,99,"prometheus"),
