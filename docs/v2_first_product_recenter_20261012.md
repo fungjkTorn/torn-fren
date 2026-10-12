@@ -7,15 +7,22 @@ the intended product. Extensive item-specific champion research and V75–V139
 prediction experiments were meant to **fix Prediction V2's accuracy issues**,
 not replace its user experience with a standalone probabilistic departure tool.
 
-**North star:** show, for any foreign item, a trustworthy next restock forecast,
+**North star:** retain both the existing `/experimental` multi-item board and the original `/` V2 graph as first-class product views. Show, for any foreign item, a trustworthy next restock forecast,
 stocked availability/lifetime window, and actionable earliest reasonable
 departure/arrival window adjusted for the country's flight time. Present a
 clear LIVE/TOO EARLY/GOOD TO LEAVE/LATE/WATCH distinction with uncertainty and
-live revision behavior. The existing history graph remains the visual anchor.
+live revision behavior. The existing history graph remains the single-item analytical view, while `/experimental` remains the multi-item opportunity board. Both are retained.
 
 The travel assistant is a second consumer of the same predictions: use stock,
 flight duration, return trip, travel timings and economics to plan several
 trips in a day without silently initiating gameplay actions.
+
+## Two existing user-facing views
+
+- **Experimental board**: `/experimental` and `/api/experimental/v41/predictions`, historically 21 champion rows plus optional three-item V87 preview. Lists item, existing champion, proposed departure, arrival, expiry/recompute deadline, and future WATCH states. The VM-deployed page source must be audited before patching, because this endpoint is missing from the research checkout's `web/app.py`.
+- **V2 graph**: `/` plus `/api/history`. Single-item stock history, restock forecast bands, estimated stocked interval, country flight duration, actionable departure-window visualization, and projected P1/P2+.
+
+New research integration code `research/v140_existing_experimental_beta_board.py` preserves both predictions separately. The feasibility guard `research/v141_v2_feasible_departure_window.py` is intended to fix collapsed impossible V2 windows. Neither is mounted on the public site.
 
 ## Retain from original V2
 
