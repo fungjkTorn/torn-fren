@@ -65,7 +65,7 @@ class V127PrivateRecorderSafety(unittest.TestCase):
         start=shell.index('ACTION="${1:-status}"')
         end=shell.index('[[ "$(id -un)"',start)
         snippet=shell[start:end]
-        for value in ("status", "status\\r", "smoke", "enable", "disable"):
+        for value in ("status", "status\r", "smoke", "enable", "disable"):
             outcome=subprocess.run(
                 ["bash","-c",snippet,"v127-parse",value],
                 capture_output=True,text=True)
