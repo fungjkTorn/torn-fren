@@ -7,6 +7,7 @@ from research.v128_full24_earliest_shadow import (
 )
 from research.v145_provider_continuous_phases import (
     provider_continuous_phases,compare_phase_eligibility,
+    observed_cycle_evidence_tier,
 )
 
 T = 1791800000
@@ -51,6 +52,31 @@ class ProviderContinuityTests(unittest.TestCase):
         self.assertEqual(improved["phase_onset"],T+400)
         self.assertEqual(improved["diagnostics"]["benign_provider_switches_preserved"],2)
         self.assertEqual(improved["diagnostics"]["clean_observed_threshold_crossings"],2)
+
+    def test_single_observed_bounded_period_is_valid_history_not_no_data(self):
+        # A completed high period is real evidence even without V128's
+        # arbitrary 5+5 minimum; we do not pretend it validates a flight.
+        trace=rows((0,0,"yata"),(100,80,"yata"),
+                   (150,80,"prometheus"),(200,80,"yata"),
+                   (300,0,"yata"))
+        observed=provider_continuous_phases(trace,asof=T+300)
+        tier=observed_cycle_evidence_tier(observed)
+        self.assertEqual(tier["tier"],
+                         "ONE_PHASE_KIND_OBSERVED_NO_CLOSED_FULL_CYCLE")
+        self.assertTrue(tier["history_exists"])
+        self.assertTrue(tier["supports_valid_completed_stocked_lifetime"])
+        self.assertFalse(tier["sufficient_for_existing_v128_monte_carlo"])
+        self.assertFalse(tier["permission_to_publish_as_certified_departure"])
+
+    def test_sparse_both_phase_types_count_as_bounded_history(self):
+        trace=rows((0,0,"yata"),(100,80,"yata"),
+                   (200,0,"yata"),(300,80,"yata"))
+        tier=observed_cycle_evidence_tier(
+            provider_continuous_phases(trace,asof=T+300))
+        self.assertEqual(tier["tier"],"BOUNDED_HISTORY_SPARSE_PROVISIONAL")
+        self.assertEqual(tier["observed_bounded_stocked_intervals"],1)
+        self.assertEqual(tier["observed_bounded_depleted_intervals"],1)
+        self.assertFalse(tier["arrival_recommendation_accuracy_established"])
 
     def test_no_provider_switch_parity_with_v128(self):
         trace=rows((0,0,"yata"),(100,80,"yata"),
