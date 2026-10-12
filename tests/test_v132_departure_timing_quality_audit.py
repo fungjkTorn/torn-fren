@@ -91,9 +91,7 @@ class TimingQualityTests(unittest.TestCase):
             rows=[
                 issued(base,departure_delay=1200),
                 issued(base+300,departure_delay=2700),
-                issued(base,k2 and departure_delay if False else
-                       None,key=k2) if False else issued(base,
-                       departure_delay=None,key=k2),
+                issued(base,departure_delay=None,key=k2),
             ]
             with sqlite3.connect(ledger) as db:
                 db.execute("""CREATE TABLE v128_issued(
