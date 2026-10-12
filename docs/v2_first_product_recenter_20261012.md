@@ -54,6 +54,26 @@ This is not equivalent to V128:
   itself a restock/depletion forecast. Do not substitute it into the graph
   as a fabricated next-restock timestamp.
 
+## Specific V2 product gaps confirmed by source inspection
+
+- During an active-stock phase, `_build_live_prediction_v2_impl` forecasts a
+  *future* P1 next cycle and sets `current_stock_estimated_reachable` from a
+  time-to-estimated-depletion comparison. That path does not guarantee or
+  explicitly model **>=30 remaining at ETA**; a source showing nonzero stock is
+  not equivalent to >=30 stock at landing. Treat current-stock leave-now as a
+  separate threshold-aware candidate, alongside future restock candidates.
+- The browser's arrival-window fallback can collapse to a point when estimated
+  depletion is earlier than the conservative restock/arrival lower bound. The
+  UI must distinguish `NO_FEASIBLE_STOCKED_INTERVAL` from a genuinely useful
+  departure range rather than displaying a misleading zero-width
+  GOOD TO LEAVE moment.
+- Mid-stock-lifetime arrival-offset fallbacks are explicitly labeled as
+  uncalibrated in the V2 code. The UI needs a stronger evidence distinction
+  before representing them as safe departures.
+
+These are candidate product fixes for research/specification and regressions;
+they are not authorization to mutate public V2 code or deploy new models.
+
 ## Problems to solve in V2 rather than starting a new tournament
 
 1. Next-restock forecast error: wrong depletion anchor, provider discontinuity,
