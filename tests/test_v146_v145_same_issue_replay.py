@@ -94,6 +94,33 @@ class SameIssueReplayTests(unittest.TestCase):
             self.assertEqual(src.read_bytes(),earlier_bytes[0])
             self.assertEqual(side.read_bytes(),earlier_bytes[1])
 
+    def test_explicit_restock_candidate_compares_on_exact_same_issue(self):
+        with tempfile.TemporaryDirectory() as temp:
+            src,side,issued=make_db(temp)
+            recovered={
+                "status":"PROVISIONAL_FIRST_REACHABLE_STOCK_WINDOW",
+                "first_reachable":{
+                    "cycle_number":7,
+                    "earliest_departure_epoch":issued+300,
+                    "arrival_epoch":issued+300+
+                                    original.TRAVEL_SECONDS["uni"],
+                    "provisional":True,
+                },
+            }
+            with patch.object(m,"first_reachable_stock_cycles",
+                              return_value=recovered), (
+                 patch.object(m,"_pair_score",return_value="HIT")
+            ):
+                result=m.replay(collector=src,sidecar=side,
+                                now=issued+12000,max_model_evals=10)
+            row=result["items"][ITEM]
+            self.assertEqual(row["explicit_proposals"],1)
+            self.assertEqual(row["matched_explicit_vs_now"],1)
+            self.assertEqual(row["explicit_departure_median_wait_seconds"],300)
+            self.assertEqual(row["explicit_only_vs_now"],0)
+            self.assertEqual(row["now_only_vs_explicit"],0)
+            self.assertFalse(result["source_provider_freshness_certified"])
+
     def test_a_mutated_historical_snapshot_is_not_claimed_matched(self):
         with tempfile.TemporaryDirectory() as temp:
             src,side,issued=make_db(temp)
