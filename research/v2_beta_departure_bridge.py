@@ -13,7 +13,6 @@ by the model issue, not just the time a cached HTTP response was returned.
 from __future__ import annotations
 
 from collections import Counter
-from copy import deepcopy
 from urllib.parse import urlencode
 
 from research.plushie_champions.common import TRAVEL_SECONDS
@@ -69,6 +68,8 @@ def _baseline(*, item_key, country, item, now, issued, stock_as_of):
         "departure_advice_is_provisional": True,
         "incumbent_specialist": None,
         "specialist_does_not_replace_v2_restock": True,
+        "observed_median_restock_cadence_seconds": None,
+        "cadence_alerts": [],
     }
 
 
@@ -130,7 +131,8 @@ def _specialist_view(row, *, item_key, now, flight):
 
 def build_item_timeline(item_key, v2, *, now, issued_at, stock_as_of,
                         incumbent=None, valid_until=None,
-                        forecast_stale=False):
+                        forecast_stale=False,
+                        observed_median_restock_cadence_seconds=None):
     """Read-only first reachable V2 cycle and optional specialist comparison.
 
     True model issuance must be supplied explicitly. It must NOT be minted
@@ -145,6 +147,10 @@ def build_item_timeline(item_key, v2, *, now, issued_at, stock_as_of,
     source = _epoch(stock_as_of)
     out = _baseline(item_key=item_key, country=country, item=item,
                     now=now, issued=issued, stock_as_of=source)
+    cadence = observed_median_restock_cadence_seconds
+    if cadence is not None and (type(cadence) is not int or not 60 <= cadence <= 86400):
+        raise ValueError("invalid observed restock cadence")
+    out["observed_median_restock_cadence_seconds"] = cadence
     out["incumbent_specialist"] = _specialist_view(
         incumbent, item_key=item_key, now=now, flight=flight)
     if not isinstance(v2, dict) or forecast_stale:
@@ -253,6 +259,32 @@ def build_item_timeline(item_key, v2, *, now, issued_at, stock_as_of,
         x["earliest_departure_epoch"], x["prediction_number"]))
     out["cycle_candidates"] = candidates
     out["first_reachable"] = candidates[0] if candidates else None
+
+    # A user should not be told to wait hours when a reliable item re-stocks
+    # every ~30m without acknowledging missing or skipped opportunities.
+    # The optional cadence must be OBSERVED from completed past transitions,
+    # not invented from an inaccurate long-horizon V2 projection.
+    if cadence is not None:
+        warnings = []
+        long_limit = max(900, 2 * cadence)
+        for earlier, later in zip(restocks, restocks[1:]):
+            if later - earlier > long_limit:
+                warnings.append("MODELED_RESTOCK_GAP_EXCEEDS_OBSERVED_CADENCE")
+                break
+        if candidates:
+            lead = candidates[0]["leave_in_seconds"]
+            if lead > long_limit:
+                warnings.append("LONG_WAIT_MULTIPLE_OBSERVED_RESTOCK_PERIODS")
+                candidates[0]["wait_reason"] = (
+                    "Earliest within the explicitly modeled feasible cycles; "
+                    "other nearer restocks may be missing from V2."
+                )
+                # Keep the first MODELED opportunity visible, but do not
+                # turn it into urgent/verified flight advice.
+                candidates[0]["status"] = "LONG_WAIT_VERIFY_NEARER_RESTOCKS"
+            elif lead > cadence and skipped:
+                warnings.append("EARLIER_MODELED_WINDOW_UNREACHABLE")
+        out["cadence_alerts"] = warnings
     out["status"] = (
         "V2_FIRST_REACHABLE_PROVISIONAL" if candidates
         else "NO_REACHABLE_V2_WINDOW")
