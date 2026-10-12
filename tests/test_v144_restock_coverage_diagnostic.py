@@ -12,6 +12,9 @@ NOW=1791800000
 
 
 class PureTransitionsTests(unittest.TestCase):
+    def test_pinned_vm_diagnostic_roster_equals_exact_model_roster(self):
+        self.assertEqual(m.KEYS,set(exact_roster()))
+
     def test_clean_replenishments_visible_despite_other_model_abstention(self):
         # Several genuine observed high/low transitions are different from
         # V128 being eligible to issue an arrival estimate today.
