@@ -107,7 +107,7 @@ def _old_record_matches_asof(issued, old, observed):
         "NO_ITEM_STOCK_HISTORY",
     ):
         return False
-    return (len(observed["stocked_durations"])>=0)
+    return True
 
 
 def _pair_score(db, country, item, arrival, now):
@@ -131,6 +131,7 @@ def _score_counts(counter, label):
 def _aggregate(rows):
     counters=Counter()
     out={}
+    wait_seconds=defaultdict(list)
     for r in rows:
         c=r["comparison"]
         counters.update([c])
@@ -142,6 +143,10 @@ def _aggregate(rows):
         item=out[key]
         item["issued_hourly_samples"]+=1
         item[c]+=1
+        if r.get("original_source_status"):
+            item["original_source:"+r["original_source_status"]]+=1
+        if r.get("new_status"):
+            item["new_decision:"+r["new_status"]]+=1
         if r["recovered"]:
             item["recovered"]+=1
         if r["old_departure"] is not None:
@@ -153,6 +158,9 @@ def _aggregate(rows):
                 r["old_outcome"].startswith("UNKNOWN_"))
         if r["new_departure"] is not None:
             item["new_proposals"]+=1
+            if type(r.get("issued_epoch")) is int:
+                wait_seconds[key].append(
+                    r["new_departure"]-r["issued_epoch"])
             _score_counts(item,r["new_outcome"])
             if r["new_outcome"] in ("HIT","MISS") and (
                 r["leave_now_outcome"] in ("HIT","MISS")
@@ -186,6 +194,14 @@ def _aggregate(rows):
                   "recovered","long_wait_needs_explanation","HIT","MISS",
                   "PENDING","scorable","unknown_or_no_proposal"):
             v[k]+=0
+    for key, v in out.items():
+        waits=wait_seconds[key]
+        v["new_departure_mean_wait_seconds"]=(
+            round(statistics.mean(waits),1) if waits else None
+        )
+        v["new_departure_median_wait_seconds"]=(
+            round(statistics.median(waits),1) if waits else None
+        )
     return dict(counters),{k:dict(v) for k,v in sorted(out.items())}
 
 
