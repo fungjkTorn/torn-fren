@@ -1130,11 +1130,13 @@
       const depletionBuffer = lifetime
         ? Math.max(60, Math.min(300, Math.round(lifetime * 0.10)))
         : 60;
-      let latestArrival = depletion ? depletion - depletionBuffer : null;
-      if (!latestArrival || latestArrival <= earliestArrival) {
-        latestArrival = prediction.window_end_timestamp || calibratedArrival || estimate;
+      // The restock-window end is NOT an upper bound on available stock.
+      // If the predicted stocked interval closes before our conservative
+      // arrival, there is no feasible flight; never invent zero-width GO.
+      const latestArrival = depletion ? depletion - depletionBuffer : null;
+      if (!Number.isFinite(latestArrival) || latestArrival <= earliestArrival) {
+        return null;
       }
-      if (!latestArrival || latestArrival < earliestArrival) latestArrival = earliestArrival;
 
       return {
         earliestArrival,
