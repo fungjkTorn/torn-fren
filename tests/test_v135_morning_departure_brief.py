@@ -74,7 +74,7 @@ class MorningEvidenceBriefTests(unittest.TestCase):
             "original_graph_restock_cycle_hit_not_verified_30_stock_at_arrival"])
         text=m.short_summary(result)
         self.assertIn("ORIGINAL GRAPH V2",text)
-        self.assertIn("OLD V75",text)
+        self.assertIn("OLDER V75",text)
         self.assertIn("V128",text)
         self.assertIn("uni:Nessie Plushie",text)
         self.assertIn('"v128_future_watches": 1',text)
