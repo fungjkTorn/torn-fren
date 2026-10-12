@@ -1,0 +1,12 @@
+[Unit]
+Description=Optional five-minute isolated 24-item earliest-arrival research-only recorder
+
+[Timer]
+OnCalendar=*-*-* *:04/5:00
+AccuracySec=10s
+RandomizedDelaySec=0
+Persistent=false
+Unit=torn-fren-v128-full24-shadow.service
+
+[Install]
+WantedBy=timers.target
