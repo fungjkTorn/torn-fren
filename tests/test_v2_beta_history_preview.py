@@ -93,10 +93,11 @@ class BetaHistoryEndpointTests(unittest.TestCase):
         self.assertEqual(response["rows"][0]["quantity"],200)
 
     def test_model_compute_timestamp_exists_even_when_audit_disabled(self):
-        with patch.object(v2,"_build_live_prediction_v2_impl",
-                          return_value={"status":"no_forecast","predictions":[]}), (
-             patch.object(v2.time,"time",return_value=N)
-        ):
+        with ExitStack() as stack:
+            stack.enter_context(patch.object(
+                v2,"_build_live_prediction_v2_impl",
+                return_value={"status":"no_forecast","predictions":[]}))
+            stack.enter_context(patch.object(v2.time,"time",return_value=N))
             result=v2.build_live_prediction_v2("can","Crocus",record_audit=False)
         self.assertEqual(result["forecast_model_computed_at"],N)
         self.assertEqual(result["predictions"],[])
