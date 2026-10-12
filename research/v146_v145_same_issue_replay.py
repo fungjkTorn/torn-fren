@@ -21,6 +21,7 @@ from __future__ import annotations
 import argparse
 import bisect
 import json
+import math
 import sqlite3
 import statistics
 import time
@@ -143,6 +144,13 @@ def _aggregate(rows):
         item[c]+=1
         if r["recovered"]:
             item["recovered"]+=1
+        if r["old_departure"] is not None:
+            item["original_proposals"]+=1
+            item["old_proxy_hit"]+=int(r["old_outcome"]=="HIT")
+            item["old_proxy_miss"]+=int(r["old_outcome"]=="MISS")
+            item["old_proxy_pending"]+=int(r["old_outcome"]=="PENDING")
+            item["old_proxy_unknown"]+=int(
+                r["old_outcome"].startswith("UNKNOWN_"))
         if r["new_departure"] is not None:
             item["new_proposals"]+=1
             _score_counts(item,r["new_outcome"])
@@ -157,12 +165,23 @@ def _aggregate(rows):
                                      r["leave_now_outcome"]=="MISS")
                 item["now_only"]+=int(r["new_outcome"]=="MISS" and
                                      r["leave_now_outcome"]=="HIT")
+        if r["old_departure"] is not None and r["new_departure"] is not None and (
+            r["old_outcome"] in ("HIT","MISS") and
+            r["new_outcome"] in ("HIT","MISS")):
+            item["matched_new_vs_old"]+=1
+            item["new_only_vs_old"]+=int(
+                r["new_outcome"]=="HIT" and r["old_outcome"]=="MISS")
+            item["old_only_vs_new"]+=int(
+                r["old_outcome"]=="HIT" and r["new_outcome"]=="MISS")
         if r["long_wait_vs_cadence"]:
             item["long_wait_needs_explanation"]+=1
     for v in out.values():
         # Convert Counter into plain JSON-friendly dict, including zero
         # denominators for sparse items; never hide absent model proposals.
-        for k in ("new_proposals","matched_new_vs_now","new_only",
+        for k in ("original_proposals","old_proxy_hit","old_proxy_miss",
+                  "old_proxy_pending","old_proxy_unknown",
+                  "matched_new_vs_old","new_only_vs_old","old_only_vs_new",
+                  "new_proposals","matched_new_vs_now","new_only",
                   "now_only","new_hits_in_matched","now_hits_in_matched",
                   "recovered","long_wait_needs_explanation","HIT","MISS",
                   "PENDING","scorable","unknown_or_no_proposal"):
@@ -201,8 +220,10 @@ def replay(*,collector=COLLECTOR, sidecar=SIDECAR, now=None,
             issues_by_item[entry["item_key"]].append(entry)
         results=[]
         total_model_evals=0
+        per_item_budget=math.ceil(max_model_evals/len(roster))
         for key in sorted(roster):
             country,item=key.split(":",1)
+            item_model_evals=0
             item_issues=issues_by_item[key]
             if not item_issues:
                 continue
@@ -218,6 +239,7 @@ def replay(*,collector=COLLECTOR, sidecar=SIDECAR, now=None,
                 results.extend({
                     "item_key":key,"comparison":"SOURCE_HISTORY_LIMIT",
                     "recovered":False,"new_departure":None,
+                    "old_departure":None,"old_outcome":"NOT_PROPOSED",
                     "new_outcome":"NOT_PROPOSED",
                     "leave_now_outcome":"NOT_PROPOSED",
                     "long_wait_vs_cadence":False,
@@ -252,6 +274,9 @@ def replay(*,collector=COLLECTOR, sidecar=SIDECAR, now=None,
                     "new_completed_low":len(new["depleted_durations"]),
                     "history_evidence_tier":observed_cycle_evidence_tier(new)["tier"],
                     "recovered":False,
+                    "old_departure":baseline.get("earliest_departure"),
+                    "old_arrival":baseline.get("earliest_arrival"),
+                    "old_outcome":"NOT_PROPOSED",
                     "new_departure":None, "new_arrival":None,
                     "new_outcome":"NOT_PROPOSED",
                     "leave_now_outcome":"NOT_PROPOSED",
@@ -265,6 +290,9 @@ def replay(*,collector=COLLECTOR, sidecar=SIDECAR, now=None,
                     record["comparison"]="ISSUED_SOURCE_SNAPSHOT_MISMATCH"
                     results.append(record)
                     continue
+                if type(record["old_arrival"]) is int:
+                    record["old_outcome"]=_pair_score(
+                        stock,country,item,record["old_arrival"],current)
                 old_eligible=(
                     old["phase_onset"] is not None and
                     min(len(old["stocked_durations"]),
@@ -281,11 +309,12 @@ def replay(*,collector=COLLECTOR, sidecar=SIDECAR, now=None,
                     results.append(record)
                     continue
                 record["recovered"]=not old_eligible
-                if total_model_evals>=max_model_evals:
+                if total_model_evals>=max_model_evals or item_model_evals>=per_item_budget:
                     record["comparison"]="NEW_ELIGIBLE_BUT_RESOURCE_LIMIT"
                     results.append(record)
                     continue
                 total_model_evals+=1
+                item_model_evals+=1
                 curve=empirical_arrival_scores(new,key,asof=issued)
                 choice=earliest_credible_for_country(curve,key)
                 record["comparison"]=(
@@ -322,6 +351,7 @@ def replay(*,collector=COLLECTOR, sidecar=SIDECAR, now=None,
         "hourly_issued_cohorts":len(results),
         "monte_carlo_replayed":total_model_evals,
         "replay_cap":max_model_evals,
+        "per_item_budget":per_item_budget,
         "summary":agg,
         "items":by_item,
         "no_writes":True,
