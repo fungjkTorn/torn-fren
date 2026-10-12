@@ -44,6 +44,41 @@ class OriginalV2DepartureParityTests(unittest.TestCase):
         self.assertTrue(new["predictions"][1]["usable_for_departure"])
         self.assertIs(frozen["display_prediction"],p1)
 
+    def test_server_no_usable_cycle_removes_stale_active_target(self):
+        p1=prediction(target_depletion_timestamp=NOW+8000)
+        result=_roll_prediction_to_now(
+            dict(predictions=[p1],display_prediction=p1),now=NOW)
+        self.assertIsNone(result["active_prediction_number"])
+        self.assertIsNone(result["display_prediction"])
+        self.assertFalse(result["predictions"][0]["usable_for_departure"])
+
+    @unittest.skipUnless(shutil.which("node"),"Node unavailable on this runner")
+    def test_browser_roll_clears_impossible_target(self):
+        source=HTML.read_text()
+        start=source.index("    function departureWindowForPrediction(prediction, flightSeconds) {")
+        end=source.index("    function updateFlightTicker()",start)
+        helpers=source[start:end]
+        impossible=prediction(target_depletion_timestamp=NOW+8000)
+        script=("let country='can',PI_PILOT_FLIGHT_MINUTES={can:27},chart=null;"+
+                "let previousActivePrediction=null;"+
+                "function updateInsights(){};"+
+                "Date.now=()=>"+str(NOW)+"*1000;"+
+                "let currentAnalysis={prediction:"+json.dumps(impossible)+
+                ",prediction_v2:{predictions:["+json.dumps(impossible)+
+                "],model_evidence_tier:'research'}};"+
+                helpers+
+                "const moved=rollPredictionTargetClientSide();"+
+                "console.log(JSON.stringify({moved,active:"+
+                "currentAnalysis.prediction_v2.active_prediction_number,"+
+                "prediction:currentAnalysis.prediction,"+
+                "usable:currentAnalysis.prediction_v2.predictions[0].usable_for_departure}));")
+        r=subprocess.run(["node","-e",script],capture_output=True,text=True,
+                         timeout=8)
+        self.assertEqual(r.returncode,0,r.stderr)
+        output=json.loads(r.stdout)
+        self.assertEqual(output,{"moved":True,"active":None,
+                                 "prediction":None,"usable":False})
+
     @unittest.skipUnless(shutil.which("node"),"Node unavailable on this runner")
     def test_browser_and_python_same_window_rejection_and_latest_leave(self):
         source=HTML.read_text()
