@@ -1,0 +1,12 @@
+[Unit]
+Description=Optional five-minute V127 UK first-credible research-only recording
+
+[Timer]
+OnCalendar=*-*-* *:02/5:00
+AccuracySec=10s
+RandomizedDelaySec=0
+Persistent=false
+Unit=torn-fren-v127-earliest-shadow.service
+
+[Install]
+WantedBy=timers.target
