@@ -5,6 +5,8 @@ set -euo pipefail
 export SYSTEMD_PAGER=cat
 
 ACTION="${1:-status}"
+# Windows PowerShell to SSH can append a carriage return to the final arg.
+ACTION="$(printf '%s' "$ACTION" | tr -d '\015')"
 case "$ACTION" in
   status|smoke|enable|disable) ;;
   *) echo "Use status|smoke|enable|disable"; exit 2 ;;
