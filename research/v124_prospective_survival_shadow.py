@@ -206,6 +206,8 @@ def preflight(*,source=SOURCE,sidecar=SIDECAR,
               enforce_canonical=True):
     src=Path(source).resolve(strict=True)
     root=ROOT if enforce_canonical else Path(sidecar).parent
+    if not root.is_dir():
+        raise ValueError("approved private research directory unavailable")
     root=root.resolve(strict=True)
     dst=Path(sidecar)
     if (src==dst.resolve(strict=False)
