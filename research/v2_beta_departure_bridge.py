@@ -72,7 +72,7 @@ def _baseline(*, item_key, country, item, now, issued, stock_as_of):
     }
 
 
-def _specialist_view(row, *, now, flight):
+def _specialist_view(row, *, item_key, now, flight):
     """Only translate an ACTUAL as-issued existing /experimental row.
 
     This forecasts arrival availability rather than V2's next restock
@@ -83,6 +83,13 @@ def _specialist_view(row, *, now, flight):
     if not isinstance(row, dict):
         return {
             "status": "INVALID_INCUMBENT_ROW", "model_family": None,
+            "departure_epoch": None, "arrival_epoch": None,
+            "verified_stock_at_arrival": False,
+        }
+    if row.get("item_key") != item_key:
+        return {
+            "status": "SPECIALIST_ITEM_IDENTITY_MISMATCH",
+            "model_family": row.get("model_family"),
             "departure_epoch": None, "arrival_epoch": None,
             "verified_stock_at_arrival": False,
         }
@@ -139,7 +146,7 @@ def build_item_timeline(item_key, v2, *, now, issued_at, stock_as_of,
     out = _baseline(item_key=item_key, country=country, item=item,
                     now=now, issued=issued, stock_as_of=source)
     out["incumbent_specialist"] = _specialist_view(
-        incumbent, now=now, flight=flight)
+        incumbent, item_key=item_key, now=now, flight=flight)
     if not isinstance(v2, dict) or forecast_stale:
         out["status"] = "V2_WARMING_OR_STALE"
         return out
@@ -178,6 +185,11 @@ def build_item_timeline(item_key, v2, *, now, issued_at, stock_as_of,
         return out
     if any(p.get("travel_seconds") not in (None, flight) for p in chain):
         out["status"] = "TRAVEL_TIME_MISMATCH"
+        return out
+    restocks = [_epoch(p.get("estimate_timestamp")) for p in chain]
+    if (any(t is None for t in restocks)
+        or any(a >= b for a, b in zip(restocks, restocks[1:]))):
+        out["status"] = "INVALID_OR_UNSORTED_RESTOCK_CHAIN"
         return out
 
     skipped = Counter()
