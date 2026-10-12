@@ -61,8 +61,13 @@ def preview_record(item_key, plan, *, family, config, issued_at,
     specialist; NEVER computes forecasts from future observations.
     """
     models=registered_models(roster_path)
+    # Live V41 uses lower-case "v19" for Canadian and UK Xanax, while
+    # the pinned research roster names their algorithm V19. This is only
+    # a capitalization alias, never permission to change the model/config.
+    canonical_family = family.upper() if isinstance(family,str) and (
+        family.casefold() in ("v18","v19","v20")) else family
     if (item_key not in models or
-        models[item_key] != (family,config)):
+        models[item_key] != (canonical_family,config)):
         raise ValueError("wrong or unsupported pinned specialist")
     country,item = item_key.split(":",1)
     travel = TRAVEL_SECONDS[country]
@@ -72,7 +77,7 @@ def preview_record(item_key, plan, *, family, config, issued_at,
         raise ValueError("missing or stale issuance evidence")
     if plan is None:
         return {
-            "item_key": item_key, "model_family":family,
+            "item_key": item_key, "model_family":canonical_family,
             "model_config":config,"status":"RESEARCH_PREVIEW_ABSTAINED",
             "computed_at":issued_at,"stock_as_of":stock_as_of,
             "valid_until":issued_at+STEP_SECONDS,"departure":None,
@@ -101,7 +106,7 @@ def preview_record(item_key, plan, *, family, config, issued_at,
         or not math.isfinite(support) or support <= 0):
         raise ValueError("invalid model support")
     return {
-        "item_key":item_key, "model_family":family,
+        "item_key":item_key, "model_family":canonical_family,
         "model_config":config,
         "status":"RESEARCH_PREVIEW_UNVALIDATED",
         "computed_at":issued_at, "stock_as_of":stock_as_of,
