@@ -13,7 +13,7 @@ LIVE=/opt/torn-fren/data/stock_history.db
 V128=/var/lib/torn-fren-v38/v128_earliest24_shadow.db
 
 for target in "$WORK/.git" "$STAGE/v128_full24_earliest_shadow.py" \
-              "$STAGE/v88_poll_state_forward_report.py" "$VENV" \
+              "$VENV" \
               "$LIVE" "$V128"; do
   test -e "$target" || { echo "STOP missing input: $target"; exit 1; }
 done
