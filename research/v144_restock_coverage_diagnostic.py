@@ -21,9 +21,25 @@ from collections import Counter, defaultdict
 from contextlib import closing
 from pathlib import Path
 
-from research.v128_full24_earliest_shadow import (
-    COLLECTOR, SIDECAR, exact_roster,
-)
+# Keep the operator standalone: it can run directly from pinned git show
+# with system python even when the VM research checkout is older than HEAD.
+# Keep exactly identical to V128's exact_roster() in unit tests.
+COLLECTOR = Path("/opt/torn-fren/data/stock_history.db")
+SIDECAR = Path("/var/lib/torn-fren-v38/v128_earliest24_shadow.db")
+KEYS = frozenset({
+    "arg:Ceibo Flower", "arg:Monkey Plushie",
+    "can:Crocus", "can:Wolverine Plushie", "can:Xanax",
+    "cay:Banana Orchid", "cay:Stingray Plushie",
+    "chi:Panda Plushie", "chi:Peony",
+    "haw:Orchid", "jap:Cherry Blossom", "jap:Xanax",
+    "mex:Dahlia", "mex:Jaguar Plushie",
+    "sou:African Violet", "sou:Lion Plushie",
+    "swi:Chamois Plushie", "swi:Edelweiss",
+    "uae:Camel Plushie", "uae:Tribulus Omanense",
+    "uni:Heather", "uni:Nessie Plushie", "uni:Red Fox Plushie",
+    "uni:Xanax",
+})
+assert len(KEYS) == 24
 
 DAY = 86400
 MAX_ROWS_PER_ITEM = 10000
@@ -52,7 +68,6 @@ def event_diagnostic(observations, *, asof, earliest, gaps=()):
     AMBIGUOUS, not as a certified within-source restock. A source state still
     above 30 may never cross the threshold even if quantity replenishes.
     """
-    clean = []
     zero_to_positive = 0
     replenished_30 = 0
     depleted_30 = 0
@@ -150,7 +165,7 @@ def diagnose(*,collector=COLLECTOR, sidecar=SIDECAR, now=None, days=1):
     if type(epoch) is not int or epoch<=DAY:
         raise ValueError("invalid asof timestamp")
     beginning=epoch-DAY
-    keys=exact_roster()
+    keys=KEYS
     if Path(collector).resolve(strict=True)==Path(sidecar).resolve(strict=True):
         raise ValueError("collector and sidecar must be different")
     with closing(readonly(collector)) as db, closing(readonly(sidecar)) as v128:
