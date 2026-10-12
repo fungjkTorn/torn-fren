@@ -28,7 +28,7 @@ def candidate(k, issue=N-20, dep=N+1200):
 
 def panel(rows=None):
     return dict(status="V133_SAFE_RESEARCH_24_ITEM_DEPARTURE_PANEL_DATA",
-                roster_size=24,
+                roster_size=24,selected_issued_epoch=N-20,
                 items=rows if rows is not None else {k:candidate(k) for k in KEYS})
 
 def build(old_rows=None, p=None):
@@ -67,6 +67,7 @@ class BridgeTests(unittest.TestCase):
         self.assertEqual(b["existing_experimental_model"]["refresh_due_in_seconds"],280)
     def test_v128_stale_and_incomplete_hidden(self):
         stale=panel({k:candidate(k,issue=N-301) for k in KEYS})
+        stale["selected_issued_epoch"]=N-301
         result=build([old(k) for k in KEYS],stale)
         self.assertTrue(all(x["v128_research_challenger"]["departure_epoch"] is None for x in result["rows"]))
         broken=panel()
@@ -92,6 +93,12 @@ class BridgeTests(unittest.TestCase):
     def test_bad_roster(self):
         with self.assertRaises(ValueError):
             m.build_board({},panel(),now=N,roster_keys=KEYS[:-1]+(KEYS[0],))
+    def test_mixed_issuance_rejected_for_whole_batch(self):
+        p=panel()
+        p["items"][KEYS[0]]["forecast_issued_epoch"]=N-100
+        r=build([old(k) for k in KEYS],p)
+        self.assertFalse(r["v128_complete_24"])
+        self.assertTrue(all(x["v128_research_challenger"]["departure_epoch"] is None for x in r["rows"]))
     def test_missing_v128_preserves_incumbent(self):
         r=build([old(k) for k in KEYS],{})
         self.assertTrue(r["legacy_complete_24"])
