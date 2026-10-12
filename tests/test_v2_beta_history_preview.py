@@ -87,7 +87,9 @@ class BetaHistoryEndpointTests(unittest.TestCase):
         self.assertEqual(beta["status"],"ISSUANCE_OR_SOURCE_UNKNOWN")
 
     def test_malformed_history_model_does_not_break_stock_graph(self):
-        response=api(enabled=True,result={"predictions":[{"bad":"data"}]})
+        response=api(enabled=True,result={
+            "forecast_model_computed_at":N-10,
+            "predictions":[{"bad":"data"}]})
         beta=response["analysis"]["beta_item_timeline"]
         self.assertEqual(beta["status"],"INVALID_V2_CYCLE_IDENTITIES")
         self.assertEqual(response["rows"][0]["quantity"],200)
