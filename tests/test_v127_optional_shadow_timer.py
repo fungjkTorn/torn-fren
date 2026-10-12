@@ -58,6 +58,25 @@ class V127PrivateRecorderSafety(unittest.TestCase):
         if cal.returncode==0:
             self.assertIn("Normalized form",cal.stdout)
 
+    def test_windows_carriage_return_status_is_read_only_dispatch(self):
+        shell=INSTALL.read_text()
+        # Test only the parser preamble: never execute the installer or
+        # any enable/disable command in CI.
+        start=shell.index('ACTION="${1:-status}"')
+        end=shell.index('[[ "$(id -un)"',start)
+        snippet=shell[start:end]
+        for value in ("status", "status\\r", "smoke", "enable", "disable"):
+            outcome=subprocess.run(
+                ["bash","-c",snippet,"v127-parse",value],
+                capture_output=True,text=True)
+            self.assertEqual(outcome.returncode,0,
+                             (value,outcome.stderr,outcome.stdout))
+        for value in ("invalid","status-mistyped","enable-extra"):
+            outcome=subprocess.run(
+                ["bash","-c",snippet,"v127-parse",value],
+                capture_output=True,text=True)
+            self.assertEqual(outcome.returncode,2,value)
+
     def test_launcher_does_not_load_checkout_champion_as_last_module(self):
         text=LAUNCH.read_text()
         self.assertIn("v127_stage/pinned/research",text)
