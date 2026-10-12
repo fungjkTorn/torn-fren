@@ -105,6 +105,38 @@ wrappers may rely on common historical context/planner code for actual
 inference; inspect that service wiring rather than declaring they lack all
 inference implementations.
 
+## New optional direct connection into the EXISTING V2 API (research only)
+
+The research-branch `services/prediction_v2_live.py` now stamps
+`forecast_model_computed_at` exactly when its actual model computation
+completes. This timestamp survives result caching and is **not** refreshed
+by each successful web request. It is distinct from archival audit timing
+and from `prediction_v2_checked_at`, which reflects only response checks.
+
+The existing `web/app.py` `/api/history` optionally provides
+`analysis.beta_item_timeline` when environment variable
+`TORN_FREN_V2_BETA_TIMELINE=1`. The default is OFF; without the flag
+the API response keeps its original shape. The preview reuses the
+already-calculated `prediction_v2`, collector heartbeat and frozen model
+issue stamp; **it does not compute a second expensive prediction**.
+No HTTP route or external API calls are introduced.
+
+The field contains the provisional reachable P1/P2+ candidate, all other
+usable projected cycles, the unchanged first-restock forecast,
+refresh deadline, and explicit lack of certified >=30 stock at landing.
+If forecast issuance is missing or stale, it returns a reason and no
+suggested departure. No existing deployed experimental page is modified.
+
+`tests/test_v2_beta_history_preview.py` verifies OFF by default, first
+reachable P2 with P1 missed, model issue time not renewed by HTTP refresh,
+freshness withdrawal, malformed data fail-closed and that the base stock
+history still renders.
+
+**This is a research branch candidate, not installed on VM**. Before
+enabling on the deployed website, reconcile the actual VM source and test a
+reversible staged canary. This option alone does not finish integrating
+the original deployed `/experimental` source.
+
 ## Integration steps remaining
 
 1. **Do not deploy yet.** Obtain original deployed `/experimental`
