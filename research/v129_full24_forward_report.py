@@ -141,8 +141,24 @@ def one_item_summary(items):
             elif base:pairs["now_only_hit"]+=1
             else:pairs["both_miss"]+=1
     n=c["first_issue_UTC_item_hours"]
-    result=dict(c)
-    result["matched_pair"]=dict(pairs)
+    result={key:c[key] for key in (
+        "first_issue_UTC_item_hours","abstained_hours",
+        "proposed_departure_hours","model_proxy_success",
+        "model_proxy_miss","model_proxy_unknown","model_pending",
+        "now_proxy_success","now_proxy_miss","now_proxy_unknown",
+    )}
+    result["recheck_status_counts"]={
+        key.removeprefix("recheck_"):n for key,n in sorted(c.items())
+        if key.startswith("recheck_")
+    }
+    result["unknown_status_counts"]={
+        key.removeprefix("model_unknown_"):n for key,n in sorted(c.items())
+        if key.startswith("model_unknown_")
+    }
+    result["matched_pair"]={key:pairs[key] for key in (
+        "both_scorable","both_hit","model_only_hit",
+        "now_only_hit","both_miss"
+    )}
     result["matched_known_net_win"]=(
         pairs["model_only_hit"]-pairs["now_only_hit"])
     result["mean_wait_minutes"]=(
