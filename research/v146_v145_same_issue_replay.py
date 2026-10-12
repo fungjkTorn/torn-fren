@@ -37,6 +37,7 @@ from research.v128_full24_earliest_shadow import (
 from research.v145_provider_continuous_phases import (
     provider_continuous_phases, observed_cycle_evidence_tier,
 )
+from research.v148_observed_earliest_stock_cycle import first_reachable_stock_cycles
 from research.v88_poll_state_forward_report import observation
 
 DAY=86400
@@ -132,6 +133,7 @@ def _aggregate(rows):
     counters=Counter()
     out={}
     wait_seconds=defaultdict(list)
+    explicit_wait_seconds=defaultdict(list)
     for r in rows:
         c=r["comparison"]
         counters.update([c])
@@ -149,6 +151,25 @@ def _aggregate(rows):
             item["new_decision:"+r["new_status"]]+=1
         if r["recovered"]:
             item["recovered"]+=1
+        if r.get("explicit_status"):
+            item["explicit_status:"+r["explicit_status"]]+=1
+        if r.get("explicit_departure") is not None:
+            item["explicit_proposals"]+=1
+            explicit_wait_seconds[key].append(
+                r["explicit_departure"]-r["issued_epoch"])
+            outcome=r.get("explicit_outcome")
+            item["explicit_proxy_hit"]+=int(outcome=="HIT")
+            item["explicit_proxy_miss"]+=int(outcome=="MISS")
+            item["explicit_proxy_pending"]+=int(outcome=="PENDING")
+            item["explicit_proxy_unknown"]+=int(
+                isinstance(outcome,str) and outcome.startswith("UNKNOWN_"))
+            if (outcome in ("HIT","MISS") and
+                r.get("leave_now_outcome") in ("HIT","MISS")):
+                item["matched_explicit_vs_now"]+=1
+                item["explicit_only_vs_now"]+=int(
+                    outcome=="HIT" and r["leave_now_outcome"]=="MISS")
+                item["now_only_vs_explicit"]+=int(
+                    outcome=="MISS" and r["leave_now_outcome"]=="HIT")
         if r["old_departure"] is not None:
             item["original_proposals"]+=1
             item["old_proxy_hit"]+=int(r["old_outcome"]=="HIT")
@@ -186,7 +207,11 @@ def _aggregate(rows):
     for v in out.values():
         # Convert Counter into plain JSON-friendly dict, including zero
         # denominators for sparse items; never hide absent model proposals.
-        for k in ("original_proposals","old_proxy_hit","old_proxy_miss",
+        for k in ("explicit_proposals","explicit_proxy_hit",
+                  "explicit_proxy_miss","explicit_proxy_pending",
+                  "explicit_proxy_unknown","matched_explicit_vs_now",
+                  "explicit_only_vs_now","now_only_vs_explicit",
+                  "original_proposals","old_proxy_hit","old_proxy_miss",
                   "old_proxy_pending","old_proxy_unknown",
                   "matched_new_vs_old","new_only_vs_old","old_only_vs_new",
                   "new_proposals","matched_new_vs_now","new_only",
@@ -201,6 +226,11 @@ def _aggregate(rows):
         )
         v["new_departure_median_wait_seconds"]=(
             round(statistics.median(waits),1) if waits else None
+        )
+        explicit_waits=explicit_wait_seconds[key]
+        v["explicit_departure_median_wait_seconds"]=(
+            round(statistics.median(explicit_waits),1)
+            if explicit_waits else None
         )
     return dict(counters),{k:dict(v) for k,v in sorted(out.items())}
 
@@ -256,6 +286,8 @@ def replay(*,collector=COLLECTOR, sidecar=SIDECAR, now=None,
                     "item_key":key,"comparison":"SOURCE_HISTORY_LIMIT",
                     "recovered":False,"new_departure":None,
                     "old_departure":None,"old_outcome":"NOT_PROPOSED",
+                    "explicit_departure":None,"explicit_status":None,
+                    "explicit_outcome":"NOT_PROPOSED",
                     "new_outcome":"NOT_PROPOSED",
                     "leave_now_outcome":"NOT_PROPOSED",
                     "long_wait_vs_cadence":False,
@@ -293,6 +325,8 @@ def replay(*,collector=COLLECTOR, sidecar=SIDECAR, now=None,
                     "old_departure":baseline.get("earliest_departure"),
                     "old_arrival":baseline.get("earliest_arrival"),
                     "old_outcome":"NOT_PROPOSED",
+                    "explicit_departure":None,"explicit_status":None,
+                    "explicit_outcome":"NOT_PROPOSED",
                     "new_departure":None, "new_arrival":None,
                     "new_outcome":"NOT_PROPOSED",
                     "leave_now_outcome":"NOT_PROPOSED",
@@ -309,6 +343,23 @@ def replay(*,collector=COLLECTOR, sidecar=SIDECAR, now=None,
                 if type(record["old_arrival"]) is int:
                     record["old_outcome"]=_pair_score(
                         stock,country,item,record["old_arrival"],current)
+                # Independent explicit-restock/depletion baseline from
+                # observed V145 periods, including sparse bounded history.
+                # It forecasts next stock P1..P16, not V128's arrival score.
+                explicit=first_reachable_stock_cycles(key,new,asof=issued)
+                record["explicit_status"]=explicit["status"]
+                proposed=explicit["first_reachable"]
+                if proposed is not None:
+                    record["explicit_departure"]=proposed[
+                        "earliest_departure_epoch"]
+                    record["explicit_arrival"]=proposed["arrival_epoch"]
+                    record["explicit_cycle_number"]=proposed["cycle_number"]
+                    record["explicit_outcome"]=_pair_score(
+                        stock,country,item,record["explicit_arrival"],current)
+                    # Compare all three against the same leave-now timestamp.
+                    record["leave_now_outcome"]=_pair_score(
+                        stock,country,item,
+                        issued+baseline["travel_seconds"],current)
                 old_eligible=(
                     old["phase_onset"] is not None and
                     min(len(old["stocked_durations"]),
@@ -352,9 +403,10 @@ def replay(*,collector=COLLECTOR, sidecar=SIDECAR, now=None,
                             wait>max(900,2*cadence))
                     record["new_outcome"]=_pair_score(
                         stock,country,item,choice["arrival"],current)
-                    record["leave_now_outcome"]=_pair_score(
-                        stock,country,item,
-                        issued+baseline["travel_seconds"],current)
+                    if record["leave_now_outcome"]=="NOT_PROPOSED":
+                        record["leave_now_outcome"]=_pair_score(
+                            stock,country,item,
+                            issued+baseline["travel_seconds"],current)
                 results.append(record)
     agg,by_item=_aggregate(results)
     total=sum(x["issued_hourly_samples"] for x in by_item.values())
