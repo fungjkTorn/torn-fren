@@ -152,6 +152,15 @@ function node(type,txt,cls){const x=document.createElement(type);x.textContent=t
  if(cls)x.className=cls;return x;}
 function add(parent,type,txt,cls){const x=node(type,txt,cls);parent.append(x);return x;}
 const currentTime=()=>Math.floor(Date.now()/1000);
+// A current global heartbeat does not verify this item's last stock report.
+// Ten minutes is a transparent UI caution threshold, NOT a trained cutoff.
+const ITEM_REPORT_CAUTION_SECONDS=600;
+function itemReportAge(row,now){return Number.isInteger(row.source_last_epoch)?
+ Math.max(0,now-row.source_last_epoch):null;}
+function reportNeedsRecheck(row,now){
+ const age=itemReportAge(row,now);
+ return age===null||age>ITEM_REPORT_CAUTION_SECONDS;
+}
 function fresh(){return !!latest&&latest.healthy && currentTime()-latest.issued_epoch<=660;}
 function variants(row){return Object.entries(row.models);}
 function future(row,now){return variants(row).filter(([name,m])=>
@@ -172,13 +181,18 @@ function diagnose(row,now){
  const first=futureModels[0][1],other=futureModels.length>1?futureModels[1][1]:null;
  const disagree=!!other&&Math.abs(other.departure-first.departure)>300;
  const agreement=!!other&&!disagree;
- const label=disagree?"MODELS DISAGREE":agreement?"MODELS AGREE":"ONE MODEL ONLY";
- const lead=disagree?"TIMES CONFLICT · RECHECK":
+ const oldStock=reportNeedsRecheck(row,now);
+ const label=oldStock?"OLD STOCK REPORT":disagree?"MODELS DISAGREE":
+   agreement?"MODELS AGREE":"ONE MODEL ONLY";
+ const lead=oldStock?"VERIFY STOCK FIRST":disagree?"TIMES CONFLICT · RECHECK":
    first.departure<=now+30?"DUE NOW":"LEAVE AT "+clock(first.departure);
- const why=disagree?"Two models suggest different times. Recheck before acting.":
+ const age=itemReportAge(row,now);
+ const why=oldStock?"Last stock report "+(age===null?"has unknown age":elapsed(age)+" ago")+
+    ". Global heartbeat does not confirm this item's stock. Recheck before any travel.":
+   disagree?"Two models suggest different times. Recheck before acting.":
    agreement?"Models agree within five minutes. Still unvalidated.":
    "Only one model offers this departure. Recheck before acting.";
- return {first,lead,label,why,disagree,agreement,
+ return {first,lead,label,why,disagree:disagree||oldStock,agreement:agreement&&!oldStock,
    eta:first.arrival,when:first.departure,
    alternate:disagree?other.departure:null};
 }
@@ -296,8 +310,16 @@ function renderCheck(data){
  const mismatch=valid.length===2&&Math.abs(valid[0].departure_epoch-valid[1].departure_epoch)>300;
  const two=valid.length===2&&!mismatch;
  const exp=age>30 || !valid.length;
+ const stockReportAge=Number.isInteger(data.source_last_epoch)?
+    data.issued_epoch-data.source_last_epoch:null;
+ const stockOld=stockReportAge===null||stockReportAge<0||
+    stockReportAge>ITEM_REPORT_CAUTION_SECONDS;
  let state,caption;
- if(age>30){state="RECHECK — RESULT EXPIRED";caption="Calculation is over 30 seconds old. Run another check.";}
+ if(stockOld){state="VERIFY STOCK REPORT";
+   caption="The last item-specific stock observation is "+
+      (stockReportAge===null?"of unknown age":elapsed(stockReportAge)+" old")+
+      ". An active global collector does not verify this item's stock. Treat the modeled departure as unconfirmed.";}
+ else if(age>30){state="RECHECK — RESULT EXPIRED";caption="Calculation is over 30 seconds old. Run another check.";}
  else if(!valid.length){state="NO SUPPORTED DEPARTURE";caption="Neither model currently supports an eligible flight.";}
  else if(mismatch){state="MODELS DISAGREE";caption="Both models produced different times; no single recommended departure.";}
  else if(valid[0].departure_epoch<=currentTime()+30){
@@ -315,8 +337,9 @@ function renderCheck(data){
      " · target ≥30 on arrival","meta");
    if(mismatch)add(output,"p","Other model departure "+clock(valid[1].departure_epoch),"meta");
  }else if(exp)add(output,"p","Wait for a fresher result.","meta");
- add(output,"div","Stock last observed "+(data.source_last_quantity??"unknown")+
-   " · source heartbeat "+elapsed(data.source_heartbeat_age_seconds)+
+ add(output,"div","Last reported stock "+(data.source_last_quantity??"unknown")+
+   " · item report age "+(stockReportAge===null?"unknown":elapsed(stockReportAge))+
+   " · global collector heartbeat "+elapsed(data.source_heartbeat_age_seconds)+
    " old when checked.","meta");
  const technical=add(output,"details","","");
  add(technical,"summary","Show research scenario support (not accuracy)");
