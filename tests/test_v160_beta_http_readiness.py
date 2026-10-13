@@ -7,6 +7,7 @@ import unittest
 from http.server import BaseHTTPRequestHandler,ThreadingHTTPServer
 from pathlib import Path
 from urllib.error import URLError
+from urllib.request import urlopen
 
 ROOT=Path(__file__).resolve().parents[1]
 PROBE=ROOT/"deploy/scripts/v160_beta_http_readiness.py"
@@ -54,20 +55,26 @@ class Fixtures:
 
 class BetaReadinessTests(unittest.TestCase):
     def test_actual_http_retry_survives_server_startup_delay(self):
+        # A socket bound but not yet served may simply block the first
+        # request until ready. Explicitly inject the connection-refused
+        # window so the regression deterministically verifies retry.
         with ThreadingHTTPServer(("127.0.0.1",0),Fixtures().handler()) as server:
-            def serve_later():
-                time.sleep(0.2)
-                server.serve_forever(poll_interval=.02)
-            task=threading.Thread(target=serve_later,daemon=True)
+            task=threading.Thread(target=server.serve_forever,daemon=True)
             task.start()
+            calls=[0]
+            def transient_bind(url,**kwargs):
+                calls[0]+=1
+                if calls[0]<=2:
+                    raise URLError("Connection refused during service restart")
+                return urlopen(url,**kwargs)
             try:
                 report=health.readiness(port=server.server_port,
                                         expected="new",deadline_seconds=3,
-                                        interval=.05)
+                                        interval=.05,open_fn=transient_bind)
                 self.assertEqual(report["records"],24)
                 self.assertTrue(report["source_healthy"])
                 self.assertEqual(report["mode"],"new")
-                self.assertGreater(report["attempts"],1)
+                self.assertGreaterEqual(report["attempts"],3)
             finally:
                 server.shutdown()
                 task.join(timeout=2)
