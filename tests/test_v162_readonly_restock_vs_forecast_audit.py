@@ -37,7 +37,7 @@ class RestockAuditTests(unittest.TestCase):
             (130,0,"prometheus",3),(200,100,"prometheus",4),
             (220,0,"prometheus",5),(240,100,"prometheus",6)]
         out=audit_module.restock_edges(
-            rows,window_start=100,gaps=[(190,205)])
+            rows,window_start=100,gaps=[(190,195)])
         self.assertEqual(out["ambiguous_cross_provider_threshold_changes"],1)
         self.assertEqual(out["known_gap_edges"],1)
         self.assertEqual(out["observed_threshold_restocks"],1)
