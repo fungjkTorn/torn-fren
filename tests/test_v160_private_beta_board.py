@@ -9,6 +9,7 @@ import unittest
 from contextlib import closing
 from http.server import ThreadingHTTPServer
 from pathlib import Path
+from unittest.mock import patch
 from urllib.error import HTTPError
 from urllib.request import urlopen
 
@@ -159,6 +160,15 @@ class PrivateBetaBoardTests(unittest.TestCase):
                     self.assertFalse(data["healthy"])
                     self.assertNotIn("payload_json",json.dumps(data))
                     self.assertNotIn("api_key",json.dumps(data))
+                    # Also assert a genuinely fresh issue gets HTTP 200
+                    # and presents the forecast candidates, without writes.
+                    with patch.object(board.time,"time",return_value=ISSUED+45):
+                        with urlopen(base+"/api/live",timeout=3) as good:
+                            self.assertEqual(good.status,200)
+                            ready=json.load(good)
+                            self.assertTrue(ready["healthy"])
+                            self.assertEqual(sum(r["available"]
+                                for r in ready["items"]),24)
                 finally:
                     server.shutdown()
                     thread.join(timeout=3)
