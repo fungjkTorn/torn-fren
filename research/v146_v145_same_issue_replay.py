@@ -167,6 +167,10 @@ def _aggregate(rows):
             item["stable_status:"+r["stable_status"]]+=1
         if r.get("next_restock_status"):
             item["restock:"+r["next_restock_status"]]+=1
+        if r.get("recent_restock_status"):
+            item["recency_status:"+r["recent_restock_status"]]+=1
+        for name,status in r.get("recent_variant_statuses",{}).items():
+            item["recency_status:"+name+":"+status]+=1
         errors=r.get("recent_restocks_abs_errors_seconds",{})
         for name,error in errors.items():
             if type(error) is not int or error<0:
@@ -513,6 +517,9 @@ def replay(*,collector=COLLECTOR, sidecar=SIDECAR, now=None,
                     "adjacent_supported_bin_count")
                 recent=recent_restock_forecasts(
                     key,new,asof=issued)
+                record["recent_restock_status"]=recent["status"]
+                record["recent_variant_statuses"]={
+                    name:spec["status"] for name,spec in recent["forecasts"].items()}
                 if outcome_phases is not None:
                     time_to_restock=stable.get(
                         "first_next_restock_onset_median_seconds")
