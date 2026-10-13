@@ -45,6 +45,7 @@ from research.v153_recent_completed_restock_baseline import recent_restock_forec
 from research.v156_item_cycle_profile_router import (
     item_cycle_profile, route_issued_prediction,
 )
+from research.v157_prequential_stock_survival_router import prequential_item_route
 from research.v88_poll_state_forward_report import observation
 
 DAY=86400
@@ -168,6 +169,40 @@ def _aggregate(rows):
         if r.get("routing_predeclared"):
             item["route_original:"+r["routing_predeclared"]]+=1
             item["route_reason:"+r["routing_reason"]]+=1
+        if r.get("prequential_selection"):
+            item["prequential_reason:"+r["prequential_reason"]]+=1
+            item["prequential_chose:"+r["prequential_selection"]]+=1
+            if r.get("prequential_heldout_episodes"):
+                item["prequential_scored_issue_hours"]+=1
+        if r.get("prequential_departure") is not None:
+            item["prequential_proposals"]+=1
+            item["prequential_paired_selected"]+=int(
+                r["prequential_actual"]=="paired_complete")
+            item["prequential_independent_selected"]+=int(
+                r["prequential_actual"]=="independent")
+            outcome=r.get("prequential_outcome")
+            item["prequential_proxy_hit"]+=int(outcome=="HIT")
+            item["prequential_proxy_miss"]+=int(outcome=="MISS")
+            item["prequential_proxy_pending"]+=int(outcome=="PENDING")
+            item["prequential_proxy_unknown"]+=int(
+                isinstance(outcome,str) and outcome.startswith("UNKNOWN_"))
+            if (outcome in ("HIT","MISS") and
+                r.get("stable_outcome") in ("HIT","MISS")):
+                if (r["prequential_departure"]==r["stable_departure"] and
+                    outcome!=r["stable_outcome"]):
+                    raise AssertionError("prequential same departure proxy contradiction")
+                item["prequential_vs_independent_matched"]+=1
+                item["prequential_only_vs_independent"]+=int(
+                    outcome=="HIT" and r["stable_outcome"]=="MISS")
+                item["independent_only_vs_prequential"]+=int(
+                    outcome=="MISS" and r["stable_outcome"]=="HIT")
+            if (outcome in ("HIT","MISS") and
+                r.get("leave_now_outcome") in ("HIT","MISS")):
+                item["prequential_vs_now_matched"]+=1
+                item["prequential_only_vs_now"]+=int(
+                    outcome=="HIT" and r["leave_now_outcome"]=="MISS")
+                item["now_only_vs_prequential"]+=int(
+                    outcome=="MISS" and r["leave_now_outcome"]=="HIT")
         if r.get("routed_departure") is not None:
             item["routed_proposals"]+=1
             if r["routing_actual"]=="paired_complete":
@@ -432,7 +467,16 @@ def _aggregate(rows):
     for v in out.values():
         # Convert Counter into plain JSON-friendly dict, including zero
         # denominators for sparse items; never hide absent model proposals.
-        for k in ("routed_proposals","routed_selected_paired",
+        for k in ("prequential_proposals","prequential_paired_selected",
+                  "prequential_independent_selected","prequential_scored_issue_hours",
+                  "prequential_proxy_hit","prequential_proxy_miss",
+                  "prequential_proxy_pending","prequential_proxy_unknown",
+                  "prequential_vs_independent_matched",
+                  "prequential_only_vs_independent",
+                  "independent_only_vs_prequential",
+                  "prequential_vs_now_matched","prequential_only_vs_now",
+                  "now_only_vs_prequential",
+                  "routed_proposals","routed_selected_paired",
                   "routed_selected_independent",
                   "routed_proxy_hit","routed_proxy_miss","routed_proxy_pending",
                   "routed_proxy_unknown","routed_vs_independent_matched",
@@ -580,6 +624,11 @@ def replay(*,collector=COLLECTOR, sidecar=SIDECAR, now=None,
                     "routing_predeclared":None,
                     "routing_reason":None,"routing_actual":None,
                     "routed_departure":None,"routed_outcome":"NOT_PROPOSED",
+                    "prequential_selection":None,"prequential_reason":None,
+                    "prequential_heldout_episodes":0,
+                    "prequential_actual":None,
+                    "prequential_departure":None,
+                    "prequential_outcome":"NOT_PROPOSED",
                     "paired_departure":None,"paired_status":None,
                     "paired_outcome":"NOT_PROPOSED",
                     "paired_next_restock_abs_error_seconds":None,
@@ -656,6 +705,11 @@ def replay(*,collector=COLLECTOR, sidecar=SIDECAR, now=None,
                     "routing_predeclared":None,
                     "routing_reason":None,"routing_actual":None,
                     "routed_departure":None,"routed_outcome":"NOT_PROPOSED",
+                    "prequential_selection":None,"prequential_reason":None,
+                    "prequential_heldout_episodes":0,
+                    "prequential_actual":None,
+                    "prequential_departure":None,
+                    "prequential_outcome":"NOT_PROPOSED",
                     "paired_departure":None,"paired_status":None,
                     "paired_outcome":"NOT_PROPOSED",
                     "paired_next_restock_abs_error_seconds":None,
@@ -704,6 +758,30 @@ def replay(*,collector=COLLECTOR, sidecar=SIDECAR, now=None,
                     key,new,asof=issued,scenarios=64,
                     cycle_sampling="paired_complete")
                 profile=item_cycle_profile(key,new,asof=issued)
+                heldout=prequential_item_route(key,new,asof=issued)
+                frozen_prequential_profile={
+                    "item_key":key,"issued_epoch":issued,
+                    "predeclared_research_route":heldout["selected_sampling"],
+                }
+                selected_prequential=route_issued_prediction(
+                    frozen_prequential_profile,
+                    {"item_key":key,"issued_epoch":issued,
+                     "cycle_sampling":"independent",
+                     "first_reachable":stable["first_reachable"]},
+                    {"item_key":key,"issued_epoch":issued,
+                     "cycle_sampling":"paired_complete",
+                     "first_reachable":paired["first_reachable"]})
+                record["prequential_selection"]=heldout["selected_sampling"]
+                record["prequential_reason"]=heldout["reason"]
+                record["prequential_heldout_episodes"]=heldout[
+                    "heldout_episodes"]
+                record["prequential_actual"]=selected_prequential["actual_model_used"]
+                if selected_prequential["departure_epoch"] is not None:
+                    record["prequential_departure"]=selected_prequential[
+                        "departure_epoch"]
+                    record["prequential_outcome"]=_pair_score(
+                        stock,country,item,
+                        selected_prequential["arrival_epoch"],current)
                 chosen=route_issued_prediction(
                     profile,
                     {"item_key":key,"issued_epoch":issued,
@@ -805,6 +883,11 @@ def replay(*,collector=COLLECTOR, sidecar=SIDECAR, now=None,
                         stock,country,item,
                         issued+baseline["travel_seconds"],current)
                 if (record["routed_departure"] is not None and
+                    record["leave_now_outcome"]=="NOT_PROPOSED"):
+                    record["leave_now_outcome"]=_pair_score(
+                        stock,country,item,
+                        issued+baseline["travel_seconds"],current)
+                if (record["prequential_departure"] is not None and
                     record["leave_now_outcome"]=="NOT_PROPOSED"):
                     record["leave_now_outcome"]=_pair_score(
                         stock,country,item,
