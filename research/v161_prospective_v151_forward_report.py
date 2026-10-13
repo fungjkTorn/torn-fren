@@ -194,6 +194,16 @@ def score(*, ledger=DESTINATION, collector=COLLECTOR,
                 round(sum(waits[item]["paired_complete"])/len(waits[item]["paired_complete"]),2)
                 if waits[item]["paired_complete"] else None),
         }
+    for key in (
+        "issued_item_hours","paired_matched_independent",
+        "paired_only_hit","independent_only_hit",
+        "independent_hit","independent_miss","independent_unknown",
+        "paired_complete_hit","paired_complete_miss",
+        "paired_complete_unknown","leave_now_hit","leave_now_miss",
+        "leave_now_unknown","independent_future_unreconfirmed",
+        "paired_complete_future_unreconfirmed",
+    ):
+        allcounts.setdefault(key,0)
     return {
         "status":"V161_TRUE_PROSPECTIVE_V151_24_ITEM_SHADOW_REPORT",
         "policy_id":POLICY,"report_asof_epoch":asof,
