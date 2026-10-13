@@ -92,6 +92,16 @@ def compact(result):
     next_count=total("next_restock_scored")
     next_abs_total=total("next_restock_abs_error_total_seconds")
     next_mae=f"{next_abs_total/next_count/60:.1f} min" if next_count else "not scorable"
+    paired_n=total("paired_restock_scored")
+    paired_mae=(
+        f"{total('paired_restock_abs_sum_seconds')/paired_n/60:.1f}m"
+        if paired_n else "N/A")
+    paired_timing_matched=total("paired_restock_mature_comparisons")
+    paired_better=total("paired_restock_better")
+    paired_worse=total("paired_restock_worse")
+    paired_ties=total("paired_restock_tie")
+    if paired_better+paired_worse+paired_ties!=paired_timing_matched:
+        raise ValueError("unbalanced paired first-restock comparison")
     recency_summary={}
     for name in ("recent_3","recent_5","recent_10","all_bounded"):
         prefix="recent_"+name
@@ -141,7 +151,9 @@ def compact(result):
         f"({total('paired_only_vs_independent')} paired-only vs "
         f"{total('independent_only_vs_paired')} independent-only); "
         f"vs NOW {total('paired_vs_leave_now_matched')} pairs net "
-        f"{total('paired_only_vs_leave_now')-total('leave_now_only_vs_paired'):+d}",
+        f"{total('paired_only_vs_leave_now')-total('leave_now_only_vs_paired'):+d}; "
+        f"paired restock MAE {paired_mae} (n={paired_n}), "
+        f"timing head-to-head {paired_better} better/{paired_worse} worse/{paired_ties} ties",
         f"  V151 next completed-restock forecast: {next_count} matched fully bounded starts, "
         f"MAE {next_mae}, within 1/5/15 min "
         f"{total('next_restock_within_1m')}/{total('next_restock_within_5m')}/"
