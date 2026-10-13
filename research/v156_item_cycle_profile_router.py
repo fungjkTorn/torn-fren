@@ -174,6 +174,18 @@ def route_issued_prediction(profile, independent, paired):
         else:
             fallback=True
     decision=chosen.get("first_reachable")
+    if decision is not None:
+        depart=decision.get("departure_epoch")
+        arrive=decision.get("arrival_epoch")
+        if (type(depart) is not int or type(arrive) is not int or
+            depart<issue or arrive<depart):
+            raise ValueError("invalid departure or arrival chronology")
+        delay=depart-issue
+        if ("wait_seconds" in decision and
+            decision["wait_seconds"]!=delay):
+            raise ValueError("departure wait does not reconcile")
+    else:
+        delay=None
     return {
         "item_key":item,"issued_epoch":issue,
         "profile_route":choice,
@@ -183,8 +195,7 @@ def route_issued_prediction(profile, independent, paired):
             decision["departure_epoch"] if decision else None),
         "arrival_epoch":(
             decision["arrival_epoch"] if decision else None),
-        "wait_seconds":(
-            decision["wait_seconds"] if decision else None),
+        "wait_seconds":delay,
         "predeclared_asof_research_only":True,
         "outcome_optimized_posthoc":False,
         "recommendation_production_ready":False,
