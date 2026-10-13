@@ -10,7 +10,7 @@ ROSTER=/home/ubuntu/torn-fren-private-models/v160_stage/pinned/research/v38_rost
 LEDGER=/var/lib/torn-fren-v38/v160_v151_prospective24.db
 BRANCH=research/v38-full-roster-live-prep-20261009
 # CI-verified file revision; upgrade never uses moving origin HEAD for code.
-PIN=54d090d215618d742e8adbe5a6dd6ccd2052eae3
+PIN=b98d1e92166dcfc1e0c0fd0d2043e16c18e337e5
 
 systemctl is-active --quiet "$UNIT" || { echo "STOP: private beta service is not active"; exit 1; }
 systemctl is-enabled --quiet "$UNIT" || { echo "STOP: private beta service is not enabled"; exit 1; }
