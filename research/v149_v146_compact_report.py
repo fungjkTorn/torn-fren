@@ -49,6 +49,7 @@ def compact(result):
     total_v151 = total("stable_proposals")
     total_fine60 = total("fine60_proposals")
     total_paired = total("paired_proposals")
+    total_routed = total("routed_proposals")
     h145, m145, pn145, unk145 = (
         total("HIT"),total("MISS"),total("PENDING"),
         sum(total(key) for key in (
@@ -66,7 +67,12 @@ def compact(result):
     h_pair,m_pair,p_pair,u_pair=(
         total("paired_proxy_hit"),total("paired_proxy_miss"),
         total("paired_proxy_pending"),total("paired_proxy_unknown"))
-    if (h_pair+m_pair+p_pair+u_pair != total_paired or
+    rh,rm,rp,ru=(
+        total("routed_proxy_hit"),total("routed_proxy_miss"),
+        total("routed_proxy_pending"),total("routed_proxy_unknown"))
+    if (rh+rm+rp+ru != total_routed or
+        total("routed_selected_paired")+total("routed_selected_independent") != total_routed or
+        h_pair+m_pair+p_pair+u_pair != total_paired or
         h60+m60+p60+u60 != total_fine60 or
         h151+m151+pending151+u151 != total_v151 or
         h148+m148+pending148+u148 != total_v148 or
@@ -74,6 +80,7 @@ def compact(result):
         total_v148>source["cohorts"] or total_v151>source["cohorts"]
         or total_fine60>source["cohorts"]
         or total_paired>source["cohorts"]
+        or total_routed>source["cohorts"]
         or total_v128>source["cohorts"]
         or total_v145>source["mc_actual_evaluations"]):
         raise ValueError("model outcome denominators do not reconcile")
@@ -154,6 +161,16 @@ def compact(result):
         f"{total('paired_only_vs_leave_now')-total('leave_now_only_vs_paired'):+d}; "
         f"paired restock MAE {paired_mae} (n={paired_n}), "
         f"timing head-to-head {paired_better} better/{paired_worse} worse/{paired_ties} ties",
+        f"  V156 per-item AS-ISSUED routing: {total_routed} proposals, "
+        f"{total('routed_selected_paired')} paired vs "
+        f"{total('routed_selected_independent')} independent; mature "
+        f"{_rate(rh,rm)}; matched vs independent "
+        f"{total('routed_vs_independent_matched')} cases net "
+        f"{total('routed_only_vs_independent')-total('independent_only_vs_routed'):+d} "
+        f"({total('routed_only_vs_independent')} routed-only/"
+        f"{total('independent_only_vs_routed')} independent-only); "
+        f"vs NOW {total('routed_vs_leave_now_matched')} pairs net "
+        f"{total('routed_only_vs_now')-total('now_only_vs_routed'):+d}",
         f"  V151 next completed-restock forecast: {next_count} matched fully bounded starts, "
         f"MAE {next_mae}, within 1/5/15 min "
         f"{total('next_restock_within_1m')}/{total('next_restock_within_5m')}/"
@@ -168,7 +185,7 @@ def compact(result):
         f"{_num(items['jap:Xanax'],'stable_peak_under_60pct_scenario_gate')} peak support below .60; "
         f"{_num(items['jap:Xanax'],'stable_single_supported_bin_only')} one-bin-only",
         "=== ITEM | old | recovered | V148 proposed/H/M/net | "
-        "V151 proposed/H/M/net | vs V148 | 1min net | paired proposals/net | restock MAE base/recent5 | wait min ===",
+        "V151 proposed/H/M/net | vs V148 | paired proposals/net | V156 paired picks/net | stock/low min | wait min ===",
     ]
     focus=["jap:Xanax","chi:Peony","swi:Edelweiss","uni:Xanax"]
     ordered=sorted(items,key=lambda k:(0 if k in focus else 1,focus.index(k) if k in focus else k))
@@ -179,6 +196,12 @@ def compact(result):
             not isinstance(wait,(int,float)) or wait<0):
             raise ValueError("invalid wait value")
         next_abs_mean=it.get('next_restock_mean_abs_error_seconds')
+        high_n=_num(it,"profile_high_seconds_n")
+        low_n=_num(it,"profile_low_seconds_n")
+        stock_mean=(_num(it,"profile_high_seconds_sum")/high_n/60
+                    if high_n else None)
+        low_mean=(_num(it,"profile_low_seconds_sum")/low_n/60
+                  if low_n else None)
         recent5_n=_num(it,"recent_recent_5_scored")
         recent5_avg=(
             _num(it,"recent_recent_5_abs_total_seconds")/recent5_n/60
@@ -195,11 +218,12 @@ def compact(result):
             f"{_num(it,'stable_proxy_miss'):>2}/"
             f"{_num(it,'stable_only_vs_now')-_num(it,'now_only_vs_stable'):+3} "
             f"{_num(it,'stable_only_vs_explicit')-_num(it,'explicit_only_vs_stable'):+3} "
-            f"{_num(it,'fine60_only_vs_coarse')-_num(it,'coarse_only_vs_fine60'):+3} "
             f"{_num(it,'paired_proposals'):>2}/"
             f"{_num(it,'paired_only_vs_independent')-_num(it,'independent_only_vs_paired'):+3} "
-            f"{'N/A' if next_abs_mean is None else f'{next_abs_mean/60:.1f}'}"
-            f"/{'N/A' if recent5_avg is None else format(recent5_avg,'.1f')} "
+            f"{_num(it,'routed_selected_paired'):>2}/"
+            f"{_num(it,'routed_only_vs_independent')-_num(it,'independent_only_vs_routed'):+3} "
+            f"{'N/A' if stock_mean is None else format(stock_mean,'.1f')}/"
+            f"{'N/A' if low_mean is None else format(low_mean,'.1f')} "
             f"{'N/A' if wait is None else f'{wait/60:.1f}'}"
         )
     lines.extend([
