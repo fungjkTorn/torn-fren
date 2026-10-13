@@ -25,7 +25,7 @@ $key = "C:\Users\fungb\Desktop\.ssh\torn-fren.key"
 $remote = "ubuntu@150.136.108.146"
 if (-not (Test-Path -LiteralPath $key)) { throw "SSH key missing: $key" }
 $branch = "research/v38-full-roster-live-prep-20261009"
-$pin = "275a1cf6c3c1e7557f2002f8be64f0f8ace75f1a"
+$pin = "af455fe114545021fe87afdc225d5384c86e8160"
 $operator = "deploy/scripts/v160_forward24_operator.sh"
 $prefix = "cd /home/ubuntu/torn-fren-v38-probe && git fetch -q origin $branch"
 $command = $prefix + " && git show " + $pin + ":" + $operator + " | bash -s -- smoke"
