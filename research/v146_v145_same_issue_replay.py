@@ -46,6 +46,7 @@ from research.v156_item_cycle_profile_router import (
     item_cycle_profile, route_issued_prediction,
 )
 from research.v157_prequential_stock_survival_router import prequential_item_route
+from research.v158_flight_horizon_router import flight_horizon_item_route
 from research.v88_poll_state_forward_report import observation
 
 DAY=86400
@@ -169,6 +170,40 @@ def _aggregate(rows):
         if r.get("routing_predeclared"):
             item["route_original:"+r["routing_predeclared"]]+=1
             item["route_reason:"+r["routing_reason"]]+=1
+        if r.get("flight_horizon_selection"):
+            item["flight_horizon_reason:"+r["flight_horizon_reason"]]+=1
+            item["flight_horizon_chose:"+r["flight_horizon_selection"]]+=1
+            item["flight_horizon_valid_origins"]+=r.get(
+                "flight_horizon_valid_origins",0)
+        if r.get("flight_horizon_departure") is not None:
+            item["flight_horizon_proposals"]+=1
+            item["flight_horizon_selected_paired"]+=int(
+                r["flight_horizon_actual"]=="paired_complete")
+            item["flight_horizon_selected_independent"]+=int(
+                r["flight_horizon_actual"]=="independent")
+            outcome=r.get("flight_horizon_outcome")
+            item["flight_horizon_proxy_hit"]+=int(outcome=="HIT")
+            item["flight_horizon_proxy_miss"]+=int(outcome=="MISS")
+            item["flight_horizon_proxy_pending"]+=int(outcome=="PENDING")
+            item["flight_horizon_proxy_unknown"]+=int(
+                isinstance(outcome,str) and outcome.startswith("UNKNOWN_"))
+            if outcome in ("HIT","MISS") and (
+                r.get("stable_outcome") in ("HIT","MISS")):
+                if (r["flight_horizon_departure"]==r["stable_departure"] and
+                    outcome!=r["stable_outcome"]):
+                    raise AssertionError("flight router same-departure outcome mismatch")
+                item["flight_horizon_vs_independent_matched"]+=1
+                item["flight_horizon_only_vs_independent"]+=int(
+                    outcome=="HIT" and r["stable_outcome"]=="MISS")
+                item["independent_only_vs_flight_horizon"]+=int(
+                    outcome=="MISS" and r["stable_outcome"]=="HIT")
+            if outcome in ("HIT","MISS") and (
+                r.get("leave_now_outcome") in ("HIT","MISS")):
+                item["flight_horizon_vs_now_matched"]+=1
+                item["flight_horizon_only_vs_now"]+=int(
+                    outcome=="HIT" and r["leave_now_outcome"]=="MISS")
+                item["now_only_vs_flight_horizon"]+=int(
+                    outcome=="MISS" and r["leave_now_outcome"]=="HIT")
         if r.get("prequential_selection"):
             item["prequential_reason:"+r["prequential_reason"]]+=1
             item["prequential_chose:"+r["prequential_selection"]]+=1
@@ -467,7 +502,17 @@ def _aggregate(rows):
     for v in out.values():
         # Convert Counter into plain JSON-friendly dict, including zero
         # denominators for sparse items; never hide absent model proposals.
-        for k in ("prequential_proposals","prequential_paired_selected",
+        for k in ("flight_horizon_proposals","flight_horizon_selected_paired",
+                  "flight_horizon_selected_independent",
+                  "flight_horizon_proxy_hit","flight_horizon_proxy_miss",
+                  "flight_horizon_proxy_pending","flight_horizon_proxy_unknown",
+                  "flight_horizon_vs_independent_matched",
+                  "flight_horizon_only_vs_independent",
+                  "independent_only_vs_flight_horizon",
+                  "flight_horizon_vs_now_matched",
+                  "flight_horizon_only_vs_now","now_only_vs_flight_horizon",
+                  "flight_horizon_valid_origins",
+                  "prequential_proposals","prequential_paired_selected",
                   "prequential_independent_selected","prequential_scored_issue_hours",
                   "prequential_proxy_hit","prequential_proxy_miss",
                   "prequential_proxy_pending","prequential_proxy_unknown",
@@ -629,6 +674,12 @@ def replay(*,collector=COLLECTOR, sidecar=SIDECAR, now=None,
                     "prequential_actual":None,
                     "prequential_departure":None,
                     "prequential_outcome":"NOT_PROPOSED",
+                    "flight_horizon_selection":None,
+                    "flight_horizon_reason":None,
+                    "flight_horizon_valid_origins":0,
+                    "flight_horizon_actual":None,
+                    "flight_horizon_departure":None,
+                    "flight_horizon_outcome":"NOT_PROPOSED",
                     "paired_departure":None,"paired_status":None,
                     "paired_outcome":"NOT_PROPOSED",
                     "paired_next_restock_abs_error_seconds":None,
@@ -710,6 +761,12 @@ def replay(*,collector=COLLECTOR, sidecar=SIDECAR, now=None,
                     "prequential_actual":None,
                     "prequential_departure":None,
                     "prequential_outcome":"NOT_PROPOSED",
+                    "flight_horizon_selection":None,
+                    "flight_horizon_reason":None,
+                    "flight_horizon_valid_origins":0,
+                    "flight_horizon_actual":None,
+                    "flight_horizon_departure":None,
+                    "flight_horizon_outcome":"NOT_PROPOSED",
                     "paired_departure":None,"paired_status":None,
                     "paired_outcome":"NOT_PROPOSED",
                     "paired_next_restock_abs_error_seconds":None,
@@ -759,6 +816,29 @@ def replay(*,collector=COLLECTOR, sidecar=SIDECAR, now=None,
                     cycle_sampling="paired_complete")
                 profile=item_cycle_profile(key,new,asof=issued)
                 heldout=prequential_item_route(key,new,asof=issued)
+                flight_cv=flight_horizon_item_route(key,new,asof=issued)
+                frozen_flight_profile={
+                    "item_key":key,"issued_epoch":issued,
+                    "predeclared_research_route":flight_cv["selected_sampling"],
+                }
+                chosen_flight=route_issued_prediction(
+                    frozen_flight_profile,
+                    {"item_key":key,"issued_epoch":issued,
+                     "cycle_sampling":"independent",
+                     "first_reachable":stable["first_reachable"]},
+                    {"item_key":key,"issued_epoch":issued,
+                     "cycle_sampling":"paired_complete",
+                     "first_reachable":paired["first_reachable"]})
+                record["flight_horizon_selection"]=flight_cv["selected_sampling"]
+                record["flight_horizon_reason"]=flight_cv["reason"]
+                record["flight_horizon_valid_origins"]=flight_cv[
+                    "validation_origin_count"]
+                record["flight_horizon_actual"]=chosen_flight["actual_model_used"]
+                if chosen_flight["departure_epoch"] is not None:
+                    record["flight_horizon_departure"]=chosen_flight[
+                        "departure_epoch"]
+                    record["flight_horizon_outcome"]=_pair_score(
+                        stock,country,item,chosen_flight["arrival_epoch"],current)
                 frozen_prequential_profile={
                     "item_key":key,"issued_epoch":issued,
                     "predeclared_research_route":heldout["selected_sampling"],
@@ -888,6 +968,11 @@ def replay(*,collector=COLLECTOR, sidecar=SIDECAR, now=None,
                         stock,country,item,
                         issued+baseline["travel_seconds"],current)
                 if (record["prequential_departure"] is not None and
+                    record["leave_now_outcome"]=="NOT_PROPOSED"):
+                    record["leave_now_outcome"]=_pair_score(
+                        stock,country,item,
+                        issued+baseline["travel_seconds"],current)
+                if (record["flight_horizon_departure"] is not None and
                     record["leave_now_outcome"]=="NOT_PROPOSED"):
                     record["leave_now_outcome"]=_pair_score(
                         stock,country,item,
