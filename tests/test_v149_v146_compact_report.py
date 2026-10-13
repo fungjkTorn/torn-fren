@@ -62,7 +62,6 @@ class CompactEvidenceTests(unittest.TestCase):
         self.assertIn("net +",output)
         self.assertIn("jap:Xanax",output)
         self.assertIn("uni:Xanax",output)
-        self.assertIn("PROSPECTIVE",output) if False else None
         self.assertIn("not independent trips",output)
 
     def test_json_sample_must_balance_outcomes(self):
