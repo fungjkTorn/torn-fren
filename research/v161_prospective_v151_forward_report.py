@@ -253,7 +253,27 @@ def score(*, ledger=DESTINATION, collector=COLLECTOR,
     for item in sorted(roster):
         c=per_item[item]
         allcounts.update(c)
+        meta=roster[item]
         summary[item]={
+            # These fields describe the incumbent roster metadata, NOT a
+            # verified V75 prediction, promotion, or deployed website model.
+            "incumbent_model_family":meta.get("incumbent_model_family"),
+            "incumbent_model_config":meta.get("incumbent_model_config"),
+            "incumbent_source_verified":bool(
+                meta.get("incumbent_source_verified",False)),
+            "incumbent_preview_only":bool(
+                meta.get("incumbent_preview_only",False)),
+            "forward_evidence_status":(
+                "NO_GENUINE_V160_ISSUES" if not c["issued_item_hours"]
+                else "MATURE_POLL_PROXY_COMPARISONS_ONLY"
+                if c["paired_matched_independent"]
+                else "NO_MATURE_MATCHED_MODEL_COMPARISONS"),
+            "incumbent_forward_evidence_status":(
+                "NEAR_ISSUED_V75_PROXY_COMPARISONS_ONLY"
+                if c["independent_matched_v75"] or
+                   c["paired_complete_matched_v75"]
+                else "NO_MATCHED_REAL_V75_FORECAST"),
+            "model_promotion_authorized":False,
             **{key:c[key] for key in (
                 "issued_item_hours","leave_now_hit","leave_now_miss",
                 "leave_now_pending","leave_now_unknown","independent_proposals",
