@@ -265,20 +265,47 @@ def snapshot(ledger=LEDGER, roster=ROSTER, *, now=None):
             if frac is not None and (
                 type(frac) not in (float,int) or not 0<=frac<=1):
                 raise ValueError("invalid scenario fraction")
-            # A stale recommendation is never given a departure timestamp.
+            # The previous viewer erased any NOW forecast after 30 seconds,
+            # then mislabeled a genuine V151 candidate as 'No departure'.
+            # Retain its *as-issued* evidence separately, NEVER turn an
+            # expired issue-time forecast into a new actionable prediction.
+            if dep is None:
+                signal="NO_MODEL_CANDIDATE"
+            elif not healthy:
+                signal="STALE_RESEARCH_ISSUE"
+            elif dep>=now-30:
+                signal="DUE_NOW" if dep<=now+30 else "FUTURE_WATCH"
+            elif dep<=issued+30 and now<issued+300:
+                signal="RECENT_ISSUED_NOW_RECHECK"
+            else:
+                signal="DEPARTURE_PASSED"
+            actionable_window=signal in ("DUE_NOW","FUTURE_WATCH")
             public[name]={
-                "departure":dep if healthy and dep is not None and dep>=now-30 else None,
-                "arrival":arr if healthy and dep is not None and dep>=now-30 else None,
-                "fraction":float(frac) if healthy and dep is not None and dep>=now-30 and frac is not None else None,
+                "departure":dep if actionable_window else None,
+                "arrival":arr if actionable_window else None,
+                "fraction":float(frac) if actionable_window and frac is not None else None,
                 "status":m.get("status") if isinstance(m.get("status"),str) else "UNKNOWN",
+                "signal":signal,
+                "issued_departure":dep,
+                "issued_arrival":arr,
+                "issued_fraction":float(frac) if frac is not None else None,
+                "issued_now":dep is not None and dep<=issued+30,
             }
         qty=data.get("source_last_qty")
         items.append({
             "item_key":key,"country_name":COUNTRIES[country],"item":item,
             "flight_seconds":FLIGHTS[country],
             "source_quantity":qty if _int(qty) and qty>=0 else None,
+            "source_last_epoch":data.get("source_last_epoch")
+                if _int(data.get("source_last_epoch")) else None,
+            "source_provider":data.get("source_last_provider")
+                if data.get("source_last_provider") in ("yata","prometheus") else None,
+            "phase":data.get("phase") if data.get("phase") in ("HIGH","LOW") else None,
             "models":public,
             "available":any(v["departure"] is not None for v in public.values()),
+            "recent_now_signal":any(
+                v["signal"]=="RECENT_ISSUED_NOW_RECHECK"
+                for v in public.values()),
         })
     return {
         "status":"V160_PRIVATE_LIVE_RESEARCH_BETA",
