@@ -43,7 +43,7 @@ class PrivateV160OperatorTests(unittest.TestCase):
         for name in ('"--preview"','"--record"','"--report"',
                      "unpinned shadow module",
                      "capture.capture_once(record=a.record)",
-                     "report.score(days=7)"):
+                     "report.score(days=2)"):
             self.assertIn(name,script)
         self.assertNotIn("web.app",script)
 
