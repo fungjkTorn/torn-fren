@@ -305,6 +305,9 @@ function renderCheck(data){
    .sort((a,b)=>a.departure_epoch-b.departure_epoch);
  const mismatch=valid.length===2&&Math.abs(valid[0].departure_epoch-valid[1].departure_epoch)>300;
  const two=valid.length===2&&!mismatch;
+ const timeline=data.restock_timeline;
+ const hasRestockOutlook=timeline&&Array.isArray(timeline.restock_events)
+   &&timeline.restock_events.length>0;
  const exp=age>30 || !valid.length;
  const lastChangeAge=Number.isInteger(data.source_last_epoch)?
     data.issued_epoch-data.source_last_epoch:null;
@@ -313,6 +316,10 @@ function renderCheck(data){
    state="STOCK HISTORY UNKNOWN";
    caption="No usable stock state timestamp for this item; treat any modeled departure as unconfirmed.";
  }else if(age>30){state="RECHECK — RESULT EXPIRED";caption="Calculation is over 30 seconds old. Run another check.";}
+ else if(!valid.length && hasRestockOutlook){
+   state="RESTOCKS FORECAST · ARRIVAL NOT VALIDATED";
+   caption="The event model predicts replenishments, but neither V151 model supports a >=30-stock arrival. View all events below; do not treat the event estimate as a safe-to-fly signal.";
+ }
  else if(!valid.length){state="NO SUPPORTED DEPARTURE";caption="Neither model currently supports an eligible flight.";}
  else if(mismatch){state="MODELS DISAGREE";caption="Both models produced different times; no single recommended departure.";}
  else if(valid[0].departure_epoch<=currentTime()+30){
@@ -334,7 +341,6 @@ function renderCheck(data){
    " · last quantity change "+(lastChangeAge===null?"unknown":elapsed(lastChangeAge))+
    " ago · global collector heartbeat "+elapsed(data.source_heartbeat_age_seconds)+
    " old when checked. Unchanged quantities are not stale merely because time passed.","meta");
- const timeline=data.restock_timeline;
  const section=add(output,"div","","");
  section.className="sep";
  add(output,"h3","Predicted restocks — next 8 hours");
