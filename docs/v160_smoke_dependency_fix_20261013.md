@@ -41,3 +41,20 @@ Write-Host "V160 smoke exit code: $LASTEXITCODE"
 Expected if the environment permits completion: `V160_PRIVATE_PREVIEW_NO_WRITES`, roster 24, `sidecar_written:false`, `collector_written:false`, then `SMOKE PASS; V160 timer is NOT enabled or installed`. Model forecasts may abstain based on actual source state, and this is not a mature forecast accuracy measurement. A smoke can fail for other VM-specific reasons; report its exact output rather than assume success.
 
 **Do NOT run `record` or `enable` without user approval**. Next phase after a passing smoke and explicit approval: enable only isolated five-minute V160 prospective ledger, observe repeated batches, and score mature V161 outcomes by item versus leave-now and genuine near-issued incumbent V75 candidates. No production or deployed UI changes.
+
+
+## Corrected VM smoke PASSED — verified user output (Oct 13, 2026)
+
+The user ran the corrected operator pinned at `22e45cb287937315b75a463ca4ef0277cae57205`. **The second smoke succeeded (exit 0)**. Its actual compact output:
+
+```json
+{"collector_written": false, "decision_statuses": {"RESEARCH_ONLY": 24}, "forward_lookahead_used": false, "issued_epoch": 1791910088, "latency_seconds": 5, "model_candidates": {"independent": 15, "paired_complete": 15}, "real_player_flights_verified": false, "roster": 24, "sidecar_written": false, "source_heartbeat_age_seconds": 27, "specialists_untouched": true, "status": "V160_PRIVATE_PREVIEW_NO_WRITES", "websites_untouched": true}
+```
+
+The operator printed `SMOKE PASS; V160 timer is NOT enabled or installed`. The successful smoke verifies the isolated import package and one real VM preview with all 24 item identities, 27s collector heartbeat age and 5s capture latency. Each V151 variant offered **15 model-specific departure candidates** in this preview, with no proof that the two 15-item sets are identical. The 24 `RESEARCH_ONLY` statuses do NOT mean all 24 items had departure recommendations or validated forecasts.
+
+**At the smoke conclusion:** no V160 sidecar rows were written; no V160 timer was installed; no real forward arrivals or player flights were verified. There is still NO prospective V161 accuracy number or warranted model promotion. Preserve the original V2 graph, deployed `/experimental`, V75 specialists and V128 timers.
+
+### Next gate (requires explicit operator authorization)
+
+After the user affirmatively approves NEW isolated five-minute private V160 scheduled ledger writes, use the tested `enable` action only, which runs a second no-write smoke before installing/enabling `torn-fren-v160-forward24.timer`. Then inspect timer, actual `v160_ticks` batches and 24 immutable rows per issued tick. Subsequent V161 read-only reports must distinguish `PENDING`, `UNKNOWN`, `MISS`, abstention and WATCH confirmation, and compare only matched mature pairs. No production site or collector mutation is approved.
