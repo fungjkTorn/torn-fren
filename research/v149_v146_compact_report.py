@@ -67,7 +67,7 @@ def compact(result):
         "=== V149 COMPACT V146 REPLAY (HISTORICAL AS-OF / NOT LIVE FLIGHT PROOF) ===",
         f"24 items; {source['cohorts']} first-issued item/UTC-hour cohorts; NO DATABASE OR WEBSITE WRITES",
         f"V145 recovered NEW eligibility on {source['recovered_eligible']} cohorts; "
-        f"{source['mc_capped_recovery']} eligible (old or new) were unscored due to CPU cap;",
+        f"{source['mc_capped_eligible']} eligible (old or new) were unscored due to CPU cap;",
         f"  V145 simulations run: {source['mc_actual_evaluations']} (max {_num(result, 'replay_cap')}); "
         f"{source['insufficient_or_no_onset']} remain sparse/onset-unknown",
         f"V128 original proposals: {total_v128}/{source['cohorts']} ({100*total_v128/source['cohorts']:.1f}%)",
