@@ -41,6 +41,7 @@ from research.v148_observed_earliest_stock_cycle import first_reachable_stock_cy
 from research.v150_stock_window_failure_diagnostic import diagnose_window_failure
 from research.v151_stable_earliest_departure import stable_earliest_departure
 from research.v152_first_restock_timing_evidence import evaluate_next_completed_restock
+from research.v153_recent_completed_restock_baseline import recent_restock_forecasts
 from research.v88_poll_state_forward_report import observation
 
 DAY=86400
@@ -166,6 +167,21 @@ def _aggregate(rows):
             item["stable_status:"+r["stable_status"]]+=1
         if r.get("next_restock_status"):
             item["restock:"+r["next_restock_status"]]+=1
+        errors=r.get("recent_restocks_abs_errors_seconds",{})
+        for name,error in errors.items():
+            if type(error) is not int or error<0:
+                raise ValueError("invalid restock error")
+            prefix="recent_"+name
+            item[prefix+"_scored"]+=1
+            item[prefix+"_abs_total_seconds"]+=error
+            item[prefix+"_within_5m"]+=int(error<=300)
+            baseline_error=r.get("next_restock_abs_error_seconds")
+            if type(baseline_error) is int:
+                item[prefix+"_paired"]+=1
+                item[prefix+"_beats_v151"]+=int(error<baseline_error)
+                item["v151_beats_"+prefix]+=int(baseline_error<error)
+                item[prefix+"_ties"]+=int(error==baseline_error)
+                item[prefix+"_paired_baseline_sum"]+=baseline_error
         if r.get("next_restock_abs_error_seconds") is not None:
             first_restock_errors[key].append(r["next_restock_abs_error_seconds"])
         if r.get("stable_peak_scenario_stock_fraction") is not None:
@@ -396,6 +412,7 @@ def replay(*,collector=COLLECTOR, sidecar=SIDECAR, now=None,
                     "recovered":False,"new_departure":None,
                     "old_departure":None,"old_outcome":"NOT_PROPOSED",
                     "next_restock_status":None,"next_restock_abs_error_seconds":None,
+                    "recent_restocks_abs_errors_seconds":{},
                     "stable_departure":None,"stable_status":None,
                     "stable_outcome":"NOT_PROPOSED","stable_long_wait":False,
                     "explicit_departure":None,"explicit_status":None,
@@ -459,6 +476,7 @@ def replay(*,collector=COLLECTOR, sidecar=SIDECAR, now=None,
                     "old_arrival":baseline.get("earliest_arrival"),
                     "old_outcome":"NOT_PROPOSED",
                     "next_restock_status":None,"next_restock_abs_error_seconds":None,
+                    "recent_restocks_abs_errors_seconds":{},
                     "stable_departure":None,"stable_status":None,
                     "stable_outcome":"NOT_PROPOSED","stable_long_wait":False,
                     "explicit_departure":None,"explicit_status":None,
@@ -493,6 +511,8 @@ def replay(*,collector=COLLECTOR, sidecar=SIDECAR, now=None,
                     "peak_scenario_stock_fraction")
                 record["stable_supported_adjacent_pairs"]=stable.get(
                     "adjacent_supported_bin_count")
+                recent=recent_restock_forecasts(
+                    key,new,asof=issued)
                 if outcome_phases is not None:
                     time_to_restock=stable.get(
                         "first_next_restock_onset_median_seconds")
@@ -505,6 +525,14 @@ def replay(*,collector=COLLECTOR, sidecar=SIDECAR, now=None,
                     record["next_restock_status"]=result_next["status"]
                     record["next_restock_abs_error_seconds"]=result_next[
                         "absolute_forecast_error_seconds"]
+                    verified_start=result_next[
+                        "next_observed_complete_start_epoch"]
+                    if type(verified_start) is int:
+                        for name,variant in recent["forecasts"].items():
+                            predicted=variant["forecast_epoch"]
+                            if type(predicted) is int:
+                                record["recent_restocks_abs_errors_seconds"][name]=abs(
+                                    predicted-verified_start)
                 if stable["first_reachable"] is not None:
                     cand=stable["first_reachable"]
                     record["stable_departure"]=cand["departure_epoch"]
