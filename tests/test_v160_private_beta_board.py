@@ -90,6 +90,22 @@ class PrivateBetaBoardTests(unittest.TestCase):
         self.assertIn("FUTURE_WATCH",board.HTML)
         self.assertIn("RECENT_ISSUED_NOW_RECHECK",board.HTML)
 
+    def test_decision_first_page_keeps_accuracy_distinction_and_details_collapsed(self):
+        page=board.HTML
+        self.assertIn("Earliest upcoming departure",page)
+        self.assertIn("Next departure windows",page)
+        self.assertIn("Estimated landing",page)
+        self.assertIn("LEAVE AT ",page)
+        self.assertIn("RECHECK",page)
+        self.assertIn('<details id="technical">',page)
+        self.assertIn("Actual live success rate: not yet established",page)
+        self.assertIn("A scenario percentage is not a verified chance of success",page)
+        self.assertIn('recheckNow();',page)
+        self.assertIn('Check this item NOW',page)
+        self.assertIn('Recalculate this item NOW',page)
+        self.assertIn('mismatch',page)
+        self.assertNotIn("93% accurate",page)
+
     def test_true_pinned_roster_is_22_plus_two_exact_xanax_keys(self):
         from research.v128_full24_earliest_shadow import exact_roster
         source=ROOT/"research/v38_roster.json"
