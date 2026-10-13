@@ -236,6 +236,46 @@ class SameIssueReplayTests(unittest.TestCase):
             self.assertEqual(row["fine60_only_vs_now"],1)
             self.assertEqual(row["fine60_departure_median_wait_seconds"],60)
 
+    def test_paired_cycle_challenger_has_strict_same_issue_comparison(self):
+        with tempfile.TemporaryDirectory() as temp:
+            src,side,issued=make_db(temp)
+            flight=original.TRAVEL_SECONDS["uni"]
+            def planner(key,history,*,asof,scenarios,
+                        departure_step_seconds=300,
+                        cycle_sampling="independent"):
+                self.assertEqual(asof,issued)
+                self.assertEqual(history["last_observation"].epoch,issued)
+                delay=(600 if cycle_sampling=="paired_complete" else
+                       60 if departure_step_seconds==60 else 300)
+                bins=(481 if departure_step_seconds==60 else 97)
+                return {
+                    "status":"PROVISIONAL_SCENARIO_SUPPORTED_DEPARTURE",
+                    "score_now":0.3,"score_bins":[0.3]*bins,
+                    "first_next_restock_onset_median_seconds":450,
+                    "first_reachable":{
+                        "departure_epoch":issued+delay,
+                        "arrival_epoch":issued+delay+flight,
+                        "scenario_stock_fraction":0.7,
+                        "cadence_warning":None,
+                    }}
+            def score(db,country,item,arrival,now):
+                return "HIT" if arrival==issued+600+flight else "MISS"
+            with patch.object(m,"stable_earliest_departure",
+                              side_effect=planner),(
+                 patch.object(m,"_pair_score",side_effect=score)
+            ):
+                result=m.replay(collector=src,sidecar=side,
+                                now=issued+12000,max_model_evals=10)
+            row=result["items"][ITEM]
+            self.assertEqual(row["paired_proposals"],1)
+            self.assertEqual(row["paired_proxy_hit"],1)
+            self.assertEqual(row["paired_vs_independent_matched"],1)
+            self.assertEqual(row["paired_only_vs_independent"],1)
+            self.assertEqual(row["independent_only_vs_paired"],0)
+            self.assertEqual(row["paired_only_vs_leave_now"],1)
+            self.assertEqual(row["paired_median_wait_seconds"],600)
+            self.assertFalse(result["real_player_trip_success_certified"])
+
     def test_stable_no_candidate_still_preserves_no_data_vs_score_gate(self):
         with tempfile.TemporaryDirectory() as temp:
             src,side,issued=make_db(temp)
