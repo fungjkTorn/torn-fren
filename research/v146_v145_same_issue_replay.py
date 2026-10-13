@@ -38,6 +38,7 @@ from research.v145_provider_continuous_phases import (
     provider_continuous_phases, observed_cycle_evidence_tier,
 )
 from research.v148_observed_earliest_stock_cycle import first_reachable_stock_cycles
+from research.v150_stock_window_failure_diagnostic import diagnose_window_failure
 from research.v88_poll_state_forward_report import observation
 
 DAY=86400
@@ -153,6 +154,10 @@ def _aggregate(rows):
             item["recovered"]+=1
         if r.get("explicit_status"):
             item["explicit_status:"+r["explicit_status"]]+=1
+        if r.get("explicit_diagnostic_reason"):
+            item["diagnosis:"+r["explicit_diagnostic_reason"]]+=1
+        if r.get("median_only_scenario_available") is True:
+            item["median_only_nonactionable_scenario"]+=1
         if r.get("explicit_departure") is not None:
             item["explicit_proposals"]+=1
             explicit_wait_seconds[key].append(
@@ -287,6 +292,8 @@ def replay(*,collector=COLLECTOR, sidecar=SIDECAR, now=None,
                     "recovered":False,"new_departure":None,
                     "old_departure":None,"old_outcome":"NOT_PROPOSED",
                     "explicit_departure":None,"explicit_status":None,
+                    "explicit_diagnostic_reason":None,
+                    "median_only_scenario_available":False,
                     "explicit_outcome":"NOT_PROPOSED",
                     "new_outcome":"NOT_PROPOSED",
                     "leave_now_outcome":"NOT_PROPOSED",
@@ -326,6 +333,8 @@ def replay(*,collector=COLLECTOR, sidecar=SIDECAR, now=None,
                     "old_arrival":baseline.get("earliest_arrival"),
                     "old_outcome":"NOT_PROPOSED",
                     "explicit_departure":None,"explicit_status":None,
+                    "explicit_diagnostic_reason":None,
+                    "median_only_scenario_available":False,
                     "explicit_outcome":"NOT_PROPOSED",
                     "new_departure":None, "new_arrival":None,
                     "new_outcome":"NOT_PROPOSED",
@@ -348,6 +357,12 @@ def replay(*,collector=COLLECTOR, sidecar=SIDECAR, now=None,
                 # It forecasts next stock P1..P16, not V128's arrival score.
                 explicit=first_reachable_stock_cycles(key,new,asof=issued)
                 record["explicit_status"]=explicit["status"]
+                diagnosis=diagnose_window_failure(explicit)
+                record["explicit_diagnostic_reason"]=diagnosis[
+                    "reason_classification"]
+                record["median_only_scenario_available"]=(
+                    diagnosis["first_research_only_median_scenario"] is not None
+                    and explicit["first_reachable"] is None)
                 proposed=explicit["first_reachable"]
                 if proposed is not None:
                     record["explicit_departure"]=proposed[
