@@ -53,3 +53,9 @@ V145 **217 newly eligible** entries across the exact 552 issued records after be
 - **VM usability:** V149 compact output now prints <=45 lines including every item instead of enormous V146 JSON; user does not need to rerun V146 solely for report extraction.
 
 The live collector, original detailed V2 graph, experimental 24-item dashboard and services were not changed.
+
+## Research continuation after full replay
+
+Committed V150 stock-window failure diagnostics, regression tests and integration into the next *read-only* V146 replay. It explains the 22/23 conservative NO_CONSERVATIVE_REACHABLE_WINDOW outcomes for Japan Xanax by separating mismatched cross-quantile restock/stocked-lifetime bands from truly unreachable median stock windows. A median-only possible window is research output only, explicitly NOT an actionable flight or calibrated probability. Exact future performance remains untested on VM; the newly committed modules were NOT deployed. The VM replay helper stages V150 alongside V145/V148 and emits the newer concise V149 report; **user need not rerun the existing full replay** merely for compact display.
+
+A complete offline report and CSV were generated from the uploaded UTF-16LE full file and linked directly in the completion message.
