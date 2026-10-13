@@ -8,7 +8,7 @@ set -euo pipefail
 WORK=/home/ubuntu/torn-fren-v38-probe
 STAGE=/home/ubuntu/torn-fren-private-models/v128_stage/pinned/research
 VENV="$WORK/.venv/bin/python"
-PIN=2b765b7660cf01e761213bd13833b051d484ac4c
+PIN=410d1c8bc665a6957d2dce21fb9b39c026d62c90
 LIVE=/opt/torn-fren/data/stock_history.db
 V128=/var/lib/torn-fren-v38/v128_earliest24_shadow.db
 
@@ -31,7 +31,7 @@ for module in v145_provider_continuous_phases v148_observed_earliest_stock_cycle
   git show "${PIN}:research/${module}.py" > "$STAGE/$module.py"
   "$VENV" -m py_compile "$STAGE/$module.py"
 done
-echo "===== V159 FIXED AS-ISSUED PHASE CLUSTERS + V158 FLIGHT ROUTER: READ-ONLY ====="
+echo "===== V159 CORRECTED TOP-LEVEL PHASE REPORT + V158 FLIGHT ROUTER: READ-ONLY ====="
 export PYTHONDONTWRITEBYTECODE=1
 export OPENBLAS_NUM_THREADS=1
 export MKL_NUM_THREADS=1
