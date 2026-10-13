@@ -1,5 +1,9 @@
 """V160 isolated operator safety tests."""
+import hashlib
+import json
+import sqlite3
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -30,6 +34,39 @@ class PrivateV160OperatorTests(unittest.TestCase):
         self.assertIn('git -C "$WORK" rev-parse --show-toplevel',script)
         subprocess.run(["bash","-n",str(SH)],check=True)
 
+
+    def test_status_reports_real_complete_and_incomplete_batches_read_only(self):
+        script=SH.read_text(encoding="utf-8")
+        self.assertIn("source.as_uri()+\"?mode=ro\"",script)
+        self.assertIn("PRAGMA query_only=ON",script)
+        self.assertIn("LIMIT 3",script)
+        source=script.split("<<'PY_STATUS'\\n".replace("\\n","\n"),1)[1].split(
+            "\nPY_STATUS",1)[0]
+        with tempfile.TemporaryDirectory() as tmp:
+            db=Path(tmp)/"v160_v151_prospective24.db"
+            with sqlite3.connect(db) as con:
+                con.execute("CREATE TABLE v160_ticks(issued_epoch INTEGER,"
+                            "captured_epoch INTEGER,source_heartbeat_epoch INTEGER,"
+                            "policy_id TEXT,roster_count INTEGER)")
+                con.execute("CREATE TABLE v160_issued(item_key TEXT,"
+                            "issued_epoch INTEGER,policy_id TEXT,payload_json TEXT)")
+                for issue,rows in ((100,23),(200,24)):
+                    con.execute("INSERT INTO v160_ticks VALUES(?,?,?,?,?)",
+                                (issue,issue+1,issue-10,"p",24))
+                    con.executemany(
+                        "INSERT INTO v160_issued VALUES(?,?,?,?)",
+                        [(str(i),issue,"p","{}") for i in range(rows)])
+            digest=lambda:hashlib.sha256(db.read_bytes()).hexdigest()
+            before=digest()
+            result=subprocess.run([sys.executable,"-c",source,str(db)],
+                                  check=True,capture_output=True,text=True)
+            self.assertEqual(digest(),before)
+            report=json.loads(result.stdout)
+            self.assertEqual(
+                [(r["issued_epoch"],r["recorded_items"],r["batch_complete"])
+                 for r in report["last_three_batches"]],
+                [(200,24,True),(100,23,False)])
+            self.assertTrue(report["has_prospectively_recorded_batches"])
 
     def test_git_worktree_git_file_is_valid_checkout(self):
         # The VM can use a linked research worktree with .git as a FILE.
