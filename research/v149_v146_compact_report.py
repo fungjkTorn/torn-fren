@@ -143,6 +143,21 @@ def compact(result):
             raise ValueError("unbalanced recency paired comparison")
         mae=f"{aerr/nscored/60:.1f}m" if nscored else "N/A"
         recency_summary[name]=(n,w,l,ties,mae)
+    cluster=source.get("issue_phase_episode_audit")
+    if cluster is not None:
+        if (not isinstance(cluster,dict) or
+            cluster.get("method")!="GROUP_BY_ASISSUED_STOCK_PHASE_EPISODE"):
+            raise ValueError("invalid phase episode evidence")
+        phase_totals=cluster.get("totals",{})
+        if (phase_totals.get("raw_paired_exclusive_issue_wins",0)>
+            total("paired_only_vs_independent") or
+            phase_totals.get("raw_independent_exclusive_issue_wins",0)>
+            total("independent_only_vs_paired")):
+            raise ValueError("episode totals exceed same-issued pair comparisons")
+        grouped=cluster.get("items",{})
+    else:
+        phase_totals={}
+        grouped={}
     lines=[
         "=== V149 COMPACT V146 REPLAY (HISTORICAL AS-OF / NOT LIVE FLIGHT PROOF) ===",
         f"24 items; {source['cohorts']} first-issued item/UTC-hour cohorts; NO DATABASE OR WEBSITE WRITES",
@@ -175,16 +190,16 @@ def compact(result):
         f"{total('paired_only_vs_leave_now')-total('leave_now_only_vs_paired'):+d}; "
         f"paired restock MAE {paired_mae} (n={paired_n}), "
         f"timing head-to-head {paired_better} better/{paired_worse} worse/{paired_ties} ties",
-        f"  V156 per-item AS-ISSUED routing: {total_routed} proposals, "
-        f"{total('routed_selected_paired')} paired vs "
-        f"{total('routed_selected_independent')} independent; mature "
-        f"{_rate(rh,rm)}; matched vs independent "
-        f"{total('routed_vs_independent_matched')} cases net "
-        f"{total('routed_only_vs_independent')-total('independent_only_vs_routed'):+d} "
-        f"({total('routed_only_vs_independent')} routed-only/"
-        f"{total('independent_only_vs_routed')} independent-only); "
-        f"vs NOW {total('routed_vs_leave_now_matched')} pairs net "
-        f"{total('routed_only_vs_now')-total('now_only_vs_routed'):+d}",
+        f"  V159 as-issued stock-phase clusters: "
+        f"{phase_totals.get('raw_scorable_phase_episodes',0)} paired-score episodes "
+        f"({phase_totals.get('raw_paired_winning_episodes',0)} favor paired / "
+        f"{phase_totals.get('raw_independent_winning_episodes',0)} favor independent); "
+        f"V158: {phase_totals.get('v158_scorable_phase_episodes',0)} clusters "
+        f"({phase_totals.get('v158_winning_episodes',0)} win / "
+        f"{phase_totals.get('v158_losing_episodes',0)} loss); "
+        f"raw paired-only issue wins V158 skipped "
+        f"{phase_totals.get('raw_paired_only_missed_by_v158',0)}; "
+        f"phase grouping is NOT independent future-restock proof",
         f"  V157 PREQUENTIAL first-cycle selector: {total_prequential} proposals, "
         f"{total('prequential_paired_selected')} paired/ "
         f"{total('prequential_independent_selected')} independent; "
@@ -219,12 +234,13 @@ def compact(result):
         f"{_num(items['jap:Xanax'],'stable_peak_under_60pct_scenario_gate')} peak support below .60; "
         f"{_num(items['jap:Xanax'],'stable_single_supported_bin_only')} one-bin-only",
         "=== ITEM | old | recovered | V148 proposed/H/M/net | "
-        "V151 proposed/H/M/net | vs V148 | paired props/net | V156 picks/net | V157 picks/net | V158 picks/net | stock/low min | wait min ===",
+        "V151 proposed/H/M/net | vs V148 | raw paired net | V157 picks/net | V158 picks/net | paired phase episodes W/L | stock/low min | wait min ===",
     ]
     focus=["jap:Xanax","chi:Peony","swi:Edelweiss","uni:Xanax"]
     ordered=sorted(items,key=lambda k:(0 if k in focus else 1,focus.index(k) if k in focus else k))
     for name in ordered:
         it=items[name]
+        episode_item=grouped.get(name,{})
         wait=it.get("stable_departure_median_wait_seconds")
         if wait is not None and (
             not isinstance(wait,(int,float)) or wait<0):
@@ -252,14 +268,13 @@ def compact(result):
             f"{_num(it,'stable_proxy_miss'):>2}/"
             f"{_num(it,'stable_only_vs_now')-_num(it,'now_only_vs_stable'):+3} "
             f"{_num(it,'stable_only_vs_explicit')-_num(it,'explicit_only_vs_stable'):+3} "
-            f"{_num(it,'paired_proposals'):>2}/"
             f"{_num(it,'paired_only_vs_independent')-_num(it,'independent_only_vs_paired'):+3} "
-            f"{_num(it,'routed_selected_paired'):>2}/"
-            f"{_num(it,'routed_only_vs_independent')-_num(it,'independent_only_vs_routed'):+3} "
             f"{_num(it,'prequential_paired_selected'):>2}/"
             f"{_num(it,'prequential_only_vs_independent')-_num(it,'independent_only_vs_prequential'):+3} "
             f"{_num(it,'flight_horizon_selected_paired'):>2}/"
             f"{_num(it,'flight_horizon_only_vs_independent')-_num(it,'independent_only_vs_flight_horizon'):+3} "
+            f"{episode_item.get('raw_paired_winning_episodes',0)}/"
+            f"{episode_item.get('raw_independent_winning_episodes',0)} "
             f"{'N/A' if stock_mean is None else format(stock_mean,'.1f')}/"
             f"{'N/A' if low_mean is None else format(low_mean,'.1f')} "
             f"{'N/A' if wait is None else f'{wait/60:.1f}'}"
