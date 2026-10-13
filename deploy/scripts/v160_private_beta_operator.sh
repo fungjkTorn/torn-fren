@@ -14,7 +14,7 @@ LEDGER=/var/lib/torn-fren-v38/v160_v151_prospective24.db
 ROSTER="$PRIVATE/v160_stage/pinned/research/v38_roster.json"
 BRANCH=research/v38-full-roster-live-prep-20261009
 # Immutable source bundle containing the beta code AND dedicated systemd unit.
-PIN=2abfecb932cf5551a49039f865f49c8bf5718247
+PIN=e2898e65c40753059e1e75bb1a7fab5f952fb4a1
 
 if [[ "$ACTION" == status ]]; then
   echo "===== PRIVATE BETA SERVICE STATUS ====="
