@@ -36,6 +36,11 @@ COUNTRIES = {
 }
 VARIANTS = ("independent", "paired_complete")
 MAX_ROWS = 24
+# V128's actual exact_roster() adds the two V42-approved generic Xanax
+# specialists to the original 22-key v38_roster.json. This standalone
+# stdlib-only reader must reconstruct the SAME keys without importing V128.
+BASE_ROSTER_ROWS = 22
+EXTRA_XANAX_KEYS = frozenset(("can:Xanax", "uni:Xanax"))
 HTML = r"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -193,9 +198,18 @@ def snapshot(ledger=LEDGER, roster=ROSTER, *, now=None):
     roster=Path(roster)
     if roster.is_symlink() or not roster.is_file():
         raise ValueError("V160 pinned roster missing or is a symlink")
-    spec=json.loads(roster.read_text(encoding="utf-8"))["items"]
-    if not isinstance(spec,dict) or len(spec)!=MAX_ROWS:
-        raise ValueError("invalid 24-item roster")
+    payload=json.loads(roster.read_text(encoding="utf-8"))
+    spec=payload.get("items") if isinstance(payload,dict) else None
+    if (not isinstance(spec,dict) or len(spec)!=BASE_ROSTER_ROWS or
+        not all(isinstance(k,str) and k.count(":")==1 and
+                k.split(":",1)[0] in FLIGHTS and isinstance(meta,dict)
+                for k,meta in spec.items()) or
+        not EXTRA_XANAX_KEYS.isdisjoint(spec)):
+        raise ValueError("invalid 22-item pinned base roster")
+    # Mirror research.v128_full24_earliest_shadow.exact_roster() precisely.
+    identities=set(spec)|EXTRA_XANAX_KEYS
+    if len(identities)!=MAX_ROWS:
+        raise ValueError("invalid reconstructed 24-item roster")
     source=ledger.resolve(strict=True)
     with closing(sqlite3.connect(source.as_uri()+"?mode=ro",uri=True,timeout=3)) as db:
         db.execute("PRAGMA query_only=ON")
@@ -213,7 +227,8 @@ def snapshot(ledger=LEDGER, roster=ROSTER, *, now=None):
             "WHERE issued_epoch=? AND policy_id=? ORDER BY item_key LIMIT 25",
             (issued,POLICY)
         ).fetchall()
-    if len(raw)!=MAX_ROWS or {key for key,_ in raw}!=set(spec):
+    if (len(raw)!=MAX_ROWS or len({key for key,_ in raw})!=MAX_ROWS or
+        {key for key,_ in raw}!=identities):
         raise ValueError("incomplete or unknown V160 issuance")
     age=now-issued
     hb_age=issued-heartbeat if _int(heartbeat) else None
