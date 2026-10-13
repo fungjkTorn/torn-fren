@@ -78,6 +78,19 @@ class StableEarliestTests(unittest.TestCase):
         self.assertIsNotNone(r["first_reachable"])
         self.assertTrue(r["forward_performance_untested"])
 
+    def test_immediate_one_bin_stock_is_preferred_over_waiting_for_double_bin(self):
+        previous,issued=history(n=10,high=200,low=500,
+                                 source_switch=False)
+        r=stable_earliest_departure(
+            "cay:Stingray Plushie",previous,asof=issued,scenarios=48)
+        self.assertEqual(r["score_now"],1.0)
+        self.assertEqual(r["first_reachable"]["wait_seconds"],0)
+        self.assertEqual(r["first_reachable"]["status"],"RESEARCH_NOW")
+        self.assertFalse(r["first_reachable"]["two_adjacent_5min_bins"])
+        self.assertEqual(r["diagnostic"]["reason"],
+                         "EARLIEST_IMMEDIATE_SUPPORTED_BIN")
+        self.assertFalse(r["game_stock30_at_arrival_verified"])
+
     def test_sub_five_minute_stock_lifetime_kept_as_one_bin_research_signal(self):
         previous,issued=history(n=6,high=200,low=600,source_switch=False)
         r=stable_earliest_departure(
