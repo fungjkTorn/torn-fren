@@ -94,6 +94,7 @@ mkdir -p "$STAGE/research/plushie_champions"
 for name in \
   v34_prospective_ops_audit \
   v38_prediction_store \
+  v38_snapshot_schema \
   v57_exception_fingerprint \
   v60_private_snapshot_probe \
   v76_forward_research_report \
@@ -101,6 +102,7 @@ for name in \
   v102_restock_departure_bridge \
   v107_explicit_restock_cycle_baseline \
   v109_raw_restock_transition_event_audit \
+  v110_multicycle_restock_horizon_audit \
   v123_empirical_phase_survival_challenger \
   v125_earliest_credible_shadow \
   v128_full24_earliest_shadow \
