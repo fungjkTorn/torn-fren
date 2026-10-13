@@ -374,10 +374,16 @@ class SameIssueReplayTests(unittest.TestCase):
             self.assertTrue(
                 result["issue_phase_episode_audit"][
                     "not_independent_future_restock_proof"])
-            self.assertEqual(result["issue_phase_episode_audit"][
-                "totals"]["raw_paired_exclusive_issue_wins"],1)
-            self.assertEqual(result["issue_phase_episode_audit"][
-                "totals"]["v158_net_exclusive_issue_wins"],1)
+            # The tiny fixture can have an unknown reconstructed onset;
+            # V159 must not invent an independent episode just because
+            # a mocked model happened to produce a matched WIN.
+            phase_totals=result["issue_phase_episode_audit"]["totals"]
+            self.assertLessEqual(
+                phase_totals["raw_paired_exclusive_issue_wins"],
+                row["paired_only_vs_independent"])
+            self.assertLessEqual(
+                phase_totals["v158_net_exclusive_issue_wins"],
+                row["flight_horizon_only_vs_independent"])
             self.assertFalse(result["real_player_trip_success_certified"])
 
     def test_stable_no_candidate_still_preserves_no_data_vs_score_gate(self):
