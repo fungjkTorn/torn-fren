@@ -141,6 +141,11 @@ class CompactEvidenceTests(unittest.TestCase):
         item["paired_proxy_hit"]=2
         item["paired_only_vs_independent"]=2
         item["paired_vs_independent_matched"]=2
+        item["flight_horizon_proposals"]=2
+        item["flight_horizon_selected_paired"]=2
+        item["flight_horizon_proxy_hit"]=2
+        item["flight_horizon_vs_independent_matched"]=2
+        item["flight_horizon_only_vs_independent"]=1
         audit=data["issue_phase_episode_audit"]
         audit["totals"].update({
             "distinct_asof_phase_episodes":2,
