@@ -62,6 +62,22 @@ class PrivateBetaOperatorTests(unittest.TestCase):
         self.assertNotIn("stock_history.db",script)
         self.assertNotIn('sudo systemctl enable --now',script)
 
+    def test_user_recheck_upgrade_is_only_for_private_beta(self):
+        upgrade=ROOT/"deploy/scripts/v160_beta_decision_and_recheck_upgrade.sh"
+        script=upgrade.read_text(encoding="utf-8")
+        subprocess.run(["bash","-n",str(upgrade)],check=True)
+        self.assertIn("torn-fren-v160-beta-board.service",script)
+        self.assertIn("v160_single_item_recheck.py",script)
+        self.assertIn('git show "$PIN:deploy/scripts/v160_private_beta_board.py"',script)
+        self.assertIn('git show "$PIN:deploy/scripts/v160_single_item_recheck.py"',script)
+        self.assertIn("SINGLE-ITEM",script)
+        self.assertIn("READ-ONLY",script)
+        self.assertIn('install -m 0700 "$OLD" "$CODE"',script)
+        self.assertIn('sudo systemctl restart "$UNIT"',script)
+        self.assertNotIn("sudo systemctl restart torn-fren-web",script)
+        self.assertNotIn("torn-fren-v160-forward24.timer",script)
+        self.assertNotIn("systemctl enable --now",script)
+
     def test_unit_python_file_exists_and_is_stdlib_only(self):
         self.assertTrue(BOARD.is_file())
         spec=importlib.util.spec_from_file_location("private_beta_check",BOARD)
