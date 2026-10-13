@@ -141,7 +141,7 @@ All departure windows require a fresh check before you travel.</div>
 <footer>All times use your device timezone. Current stock is NOT the stock guaranteed when you land. Flight times assume PI + pilot. All 24 items remain displayed in technical details; the original V2 graph, experimental dashboard and V160 recorder are unchanged.</footer>
 <script>
 "use strict";
-let latest=null,selectedHero=null,lastCheck=null;
+let latest=null,selectedHero=null,lastCheck=null,lastCheckExpired=false;
 const el=id=>document.getElementById(id);
 const clock=t=>Number.isInteger(t)?new Date(t*1000).toLocaleTimeString([], {hour:"numeric",minute:"2-digit"}):"—";
 const absolute=t=>Number.isInteger(t)?new Date(t*1000).toLocaleString():"—";
@@ -173,7 +173,8 @@ function diagnose(row,now){
  const disagree=!!other&&Math.abs(other.departure-first.departure)>300;
  const agreement=!!other&&!disagree;
  const label=disagree?"MODELS DISAGREE":agreement?"MODELS AGREE":"ONE MODEL ONLY";
- const lead=first.departure<=now+30?"DUE NOW":"LEAVE AT "+clock(first.departure);
+ const lead=disagree?"TIMES CONFLICT · RECHECK":
+   first.departure<=now+30?"DUE NOW":"LEAVE AT "+clock(first.departure);
  const why=disagree?"Two models suggest different times. Recheck before acting.":
    agreement?"Models agree within five minutes. Still unvalidated.":
    "Only one model offers this departure. Recheck before acting.";
@@ -267,7 +268,10 @@ function render(){
                       signal(row,now)==="RECHECK"?"Recalculate now":"Wait for next issue"));
   table.append(tr);
  }
- if(lastCheck)renderCheck(lastCheck);
+ if(lastCheck && !lastCheckExpired && currentTime()-lastCheck.issued_epoch>30){
+   lastCheckExpired=true;
+   renderCheck(lastCheck);
+ }
 }
 function populate(items){
  const select=el("recheckItem"),preserve=select.value;
@@ -325,7 +329,7 @@ function renderCheck(data){
 }
 async function recheckNow(){
  const key=el("recheckItem").value;if(!key){el("recheckOutput").textContent="Choose an item first.";return;}
- const button=el("checkNow");button.disabled=true;lastCheck=null;
+ const button=el("checkNow");button.disabled=true;lastCheck=null;lastCheckExpired=false;
  el("recheckOutput").textContent="Calculating a fresh departure time…";
  try{
   const response=await fetch("/api/recheck",{method:"POST",cache:"no-store",
