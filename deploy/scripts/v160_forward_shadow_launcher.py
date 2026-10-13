@@ -51,7 +51,7 @@ def main():
     a=parser.parse_args()
     capture,report=load()
     if a.report:
-        output=report.score(days=7)
+        output=report.score(days=2)
         print(json.dumps(output,sort_keys=True))
         return
     output=capture.capture_once(record=a.record)
