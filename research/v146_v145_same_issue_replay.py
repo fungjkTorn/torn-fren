@@ -140,6 +140,7 @@ def _aggregate(rows):
     explicit_wait_seconds=defaultdict(list)
     stable_wait_seconds=defaultdict(list)
     fine60_wait_seconds=defaultdict(list)
+    paired_wait_seconds=defaultdict(list)
     first_restock_errors=defaultdict(list)
     for r in rows:
         c=r["comparison"]
@@ -198,6 +199,39 @@ def _aggregate(rows):
         # One-minute departure RESOLUTION challenger reuses the same
         # scenarios and the five-minute future support requirement.
         # Score only aligned mature outcomes; no survivor bias.
+        # Paired-cycle challenger uses only directly completed adjacent
+        # depletion -> stocked intervals. Never count abstention as a miss.
+        if r.get("paired_status"):
+            item["paired_status:"+r["paired_status"]]+=1
+        if r.get("paired_departure") is not None:
+            item["paired_proposals"]+=1
+            paired_wait_seconds[key].append(
+                r["paired_departure"]-r["issued_epoch"])
+            outcome=r.get("paired_outcome")
+            item["paired_proxy_hit"]+=int(outcome=="HIT")
+            item["paired_proxy_miss"]+=int(outcome=="MISS")
+            item["paired_proxy_pending"]+=int(outcome=="PENDING")
+            item["paired_proxy_unknown"]+=int(
+                isinstance(outcome,str) and outcome.startswith("UNKNOWN_"))
+            if outcome in ("HIT","MISS") and (
+                r.get("stable_outcome") in ("HIT","MISS")
+            ):
+                if (r["paired_departure"]==r["stable_departure"] and
+                    outcome!=r["stable_outcome"]):
+                    raise AssertionError("same departure produced conflicting outcomes")
+                item["paired_vs_independent_matched"]+=1
+                item["paired_only_vs_independent"]+=int(
+                    outcome=="HIT" and r["stable_outcome"]=="MISS")
+                item["independent_only_vs_paired"]+=int(
+                    outcome=="MISS" and r["stable_outcome"]=="HIT")
+            if outcome in ("HIT","MISS") and (
+                r.get("leave_now_outcome") in ("HIT","MISS")
+            ):
+                item["paired_vs_leave_now_matched"]+=1
+                item["paired_only_vs_leave_now"]+=int(
+                    outcome=="HIT" and r["leave_now_outcome"]=="MISS")
+                item["leave_now_only_vs_paired"]+=int(
+                    outcome=="MISS" and r["leave_now_outcome"]=="HIT")
         if r.get("fine60_status"):
             item["fine60_status:"+r["fine60_status"]]+=1
         if r.get("fine60_departure") is not None:
@@ -343,7 +377,13 @@ def _aggregate(rows):
     for v in out.values():
         # Convert Counter into plain JSON-friendly dict, including zero
         # denominators for sparse items; never hide absent model proposals.
-        for k in ("fine60_proposals","fine60_proxy_hit",
+        for k in ("paired_proposals","paired_proxy_hit","paired_proxy_miss",
+                  "paired_proxy_pending","paired_proxy_unknown",
+                  "paired_vs_independent_matched",
+                  "paired_only_vs_independent","independent_only_vs_paired",
+                  "paired_vs_leave_now_matched",
+                  "paired_only_vs_leave_now","leave_now_only_vs_paired",
+                  "fine60_proposals","fine60_proxy_hit",
                   "fine60_proxy_miss","fine60_proxy_pending",
                   "fine60_proxy_unknown","fine60_vs_coarse_matched",
                   "fine60_only_vs_coarse","coarse_only_vs_fine60",
@@ -392,6 +432,10 @@ def _aggregate(rows):
         v["next_restock_within_1m"]=sum(x<=60 for x in vals)
         v["next_restock_within_5m"]=sum(x<=300 for x in vals)
         v["next_restock_within_15m"]=sum(x<=900 for x in vals)
+        paired_waits=paired_wait_seconds[key]
+        v["paired_median_wait_seconds"]=(
+            round(statistics.median(paired_waits),1)
+            if paired_waits else None)
         fine_waits=fine60_wait_seconds[key]
         v["fine60_departure_median_wait_seconds"]=(
             round(statistics.median(fine_waits),1) if fine_waits else None)
@@ -467,6 +511,8 @@ def replay(*,collector=COLLECTOR, sidecar=SIDECAR, now=None,
                     "old_departure":None,"old_outcome":"NOT_PROPOSED",
                     "next_restock_status":None,"next_restock_abs_error_seconds":None,
                     "recent_restocks_abs_errors_seconds":{},
+                    "paired_departure":None,"paired_status":None,
+                    "paired_outcome":"NOT_PROPOSED",
                     "fine60_departure":None,"fine60_status":None,
                     "fine60_outcome":"NOT_PROPOSED",
                     "stable_departure":None,"stable_status":None,
@@ -533,6 +579,8 @@ def replay(*,collector=COLLECTOR, sidecar=SIDECAR, now=None,
                     "old_outcome":"NOT_PROPOSED",
                     "next_restock_status":None,"next_restock_abs_error_seconds":None,
                     "recent_restocks_abs_errors_seconds":{},
+                    "paired_departure":None,"paired_status":None,
+                    "paired_outcome":"NOT_PROPOSED",
                     "fine60_departure":None,"fine60_status":None,
                     "fine60_outcome":"NOT_PROPOSED",
                     "stable_departure":None,"stable_status":None,
@@ -574,6 +622,16 @@ def replay(*,collector=COLLECTOR, sidecar=SIDECAR, now=None,
                     and stable["first_next_restock_onset_median_seconds"]!=
                     fine["first_next_restock_onset_median_seconds"]):
                     raise AssertionError("V151 model scenario cohorts differ")
+                paired=stable_earliest_departure(
+                    key,new,asof=issued,scenarios=64,
+                    cycle_sampling="paired_complete")
+                record["paired_status"]=paired["status"]
+                pair_depart=paired["first_reachable"]
+                if pair_depart is not None:
+                    record["paired_departure"]=pair_depart["departure_epoch"]
+                    record["paired_arrival"]=pair_depart["arrival_epoch"]
+                    record["paired_outcome"]=_pair_score(
+                        stock,country,item,pair_depart["arrival_epoch"],current)
                 record["fine60_status"]=fine["status"]
                 fine_depart=fine["first_reachable"]
                 if fine_depart is not None:
@@ -626,6 +684,11 @@ def replay(*,collector=COLLECTOR, sidecar=SIDECAR, now=None,
                         stock,country,item,
                         issued+baseline["travel_seconds"],current)
                 if (record["fine60_departure"] is not None and
+                    record["leave_now_outcome"]=="NOT_PROPOSED"):
+                    record["leave_now_outcome"]=_pair_score(
+                        stock,country,item,
+                        issued+baseline["travel_seconds"],current)
+                if (record["paired_departure"] is not None and
                     record["leave_now_outcome"]=="NOT_PROPOSED"):
                     record["leave_now_outcome"]=_pair_score(
                         stock,country,item,
