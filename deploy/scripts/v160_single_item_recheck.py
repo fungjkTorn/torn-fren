@@ -7,6 +7,8 @@ Never treat its previews as mature independent forward-validation evidence.
 """
 from __future__ import annotations
 import json
+import os
+import runpy
 import sqlite3
 import sys
 import time
@@ -22,6 +24,7 @@ MAX_GAPS=15000
 SOURCE_AGE_LIMIT=180
 SAMPLE_COUNT=48
 MAX_LATENCY=90
+EVENT_ENGINE=Path('/home/ubuntu/torn-fren-private-models/v163_readonly_event_first_preview.py')
 
 
 def pinned_modules(*,stage=STAGE,work=WORK):
@@ -43,7 +46,8 @@ def pinned_modules(*,stage=STAGE,work=WORK):
 
 
 def recheck(item_key,*,now_fn=time.time,mono_fn=time.monotonic,
-            source=COLLECTOR,roster=BASE_ROSTER,modules=None):
+            source=COLLECTOR,roster=BASE_ROSTER,modules=None,
+            event_planner=None):
     """One current causal item recheck, with strict heartbeat/issue limits."""
     issued=int(now_fn())
     entries=json.loads(Path(roster).read_text(encoding="utf8"))["items"]
@@ -78,6 +82,26 @@ def recheck(item_key,*,now_fn=time.time,mono_fn=time.monotonic,
                 raise ValueError("missing or invalid item stock history")
             phases=continuous(obs,asof=issued,gaps=gaps)
             last=phases["last_observation"]
+            # Event-first is a DIFFERENT task from V151's one arrival bin.
+            # Reuse exactly this read-only as-of collector snapshot and
+            # forecast every replenishment in the next eight hours.
+            planner=event_planner
+            if planner is None:
+                engine=Path(os.environ.get("TORNFREN_V163_ENGINE",str(EVENT_ENGINE)))
+                if engine.is_file() and not engine.is_symlink():
+                    planner=runpy.run_path(str(engine))["predict_events"]
+            if planner is not None:
+                timeline=planner(item_key,phases,asof=issued)
+                if (timeline.get("item_key")!=item_key or
+                    timeline.get("asof_epoch")!=issued or
+                    not isinstance(timeline.get("restock_events"),list) or
+                    len(timeline["restock_events"])>64):
+                    raise ValueError("invalid v163 event model result")
+            else:
+                timeline={"item_key":item_key,"asof_epoch":issued,
+                          "status":"EVENT_ENGINE_NOT_DEPLOYED",
+                          "restock_events":[],"forecast_event_count":0,
+                          "restock_accuracy_verified":False}
             variants={}
             for variant in ("independent","paired_complete"):
                 res=model(item_key,phases,asof=issued,scenarios=SAMPLE_COUNT,
@@ -110,7 +134,7 @@ def recheck(item_key,*,now_fn=time.time,mono_fn=time.monotonic,
         "source_last_quantity":last.quantity if last else None,
         "source_provider":last.source if last else None,
         "flight_seconds":travel[country],
-        "models":variants,
+        "models":variants,"restock_timeline":timeline,
         "min_arrival_stock":30,"arrival_grace_seconds":10,
         "research_only":True,"private_ledger_written":False,
         "collector_written":False,"forecast_not_prospectively_recorded":True,
