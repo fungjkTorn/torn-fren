@@ -163,6 +163,12 @@ def _aggregate(rows):
         if r.get("stable_status"):
             item["stable_status:"+r["stable_status"]]+=1
         if r.get("stable_departure") is not None:
+            if r["stable_departure"] < r["issued_epoch"]:
+                raise ValueError("V151 proposed a past departure")
+            if r["stable_departure"] == r["issued_epoch"]:
+                item["stable_depart_now_proposals"]+=1
+            else:
+                item["stable_depart_future_proposals"]+=1
             item["stable_proposals"]+=1
             stable_wait_seconds[key].append(
                 r["stable_departure"]-r["issued_epoch"])
@@ -180,6 +186,17 @@ def _aggregate(rows):
                     outcome=="HIT" and r["leave_now_outcome"]=="MISS")
                 item["now_only_vs_stable"]+=int(
                     outcome=="MISS" and r["leave_now_outcome"]=="HIT")
+                if r["stable_departure"]==r["issued_epoch"] and (
+                    outcome!=r["leave_now_outcome"]
+                ):
+                    raise AssertionError(
+                        "same departure epoch gave different arrival proxy outcome")
+                if r["stable_departure"]>r["issued_epoch"]:
+                    item["matched_stable_delayed_vs_now"]+=1
+                    item["delayed_stable_only_vs_now"]+=int(
+                        outcome=="HIT" and r["leave_now_outcome"]=="MISS")
+                    item["delayed_now_only_vs_stable"]+=int(
+                        outcome=="MISS" and r["leave_now_outcome"]=="HIT")
             if r.get("stable_long_wait") is True:
                 item["stable_long_wait_flags"]+=1
         if r.get("explicit_departure") is not None:
@@ -199,6 +216,24 @@ def _aggregate(rows):
                     outcome=="HIT" and r["leave_now_outcome"]=="MISS")
                 item["now_only_vs_explicit"]+=int(
                     outcome=="MISS" and r["leave_now_outcome"]=="HIT")
+        # Direct V151 vs V148 head-to-head: exact same item/issue cohort
+        # and both arrivals mature/observable. An unconditional V151 rate
+        # cannot answer this paired question.
+        if (r.get("stable_departure") is not None
+            and r.get("explicit_departure") is not None
+            and r.get("stable_outcome") in ("HIT","MISS")
+            and r.get("explicit_outcome") in ("HIT","MISS")):
+            if (r["stable_departure"]==r["explicit_departure"]
+                and r["stable_outcome"]!=r["explicit_outcome"]):
+                raise AssertionError(
+                    "two models targeting the same departure have incompatible outcomes")
+            item["matched_stable_vs_explicit"]+=1
+            item["stable_only_vs_explicit"]+=int(
+                r["stable_outcome"]=="HIT" and r["explicit_outcome"]=="MISS")
+            item["explicit_only_vs_stable"]+=int(
+                r["stable_outcome"]=="MISS" and r["explicit_outcome"]=="HIT")
+            item["matched_different_departures"]+=int(
+                r["stable_departure"]!=r["explicit_departure"])
         if r["old_departure"] is not None:
             item["original_proposals"]+=1
             item["old_proxy_hit"]+=int(r["old_outcome"]=="HIT")
@@ -236,7 +271,15 @@ def _aggregate(rows):
     for v in out.values():
         # Convert Counter into plain JSON-friendly dict, including zero
         # denominators for sparse items; never hide absent model proposals.
-        for k in ("stable_proposals","stable_proxy_hit",
+        for k in ("stable_depart_now_proposals",
+                  "stable_depart_future_proposals",
+                  "matched_stable_delayed_vs_now",
+                  "delayed_stable_only_vs_now",
+                  "delayed_now_only_vs_stable",
+                  "matched_stable_vs_explicit",
+                  "stable_only_vs_explicit","explicit_only_vs_stable",
+                  "matched_different_departures",
+                  "stable_proposals","stable_proxy_hit",
                   "stable_proxy_miss","stable_proxy_pending",
                   "stable_proxy_unknown","matched_stable_vs_now",
                   "stable_only_vs_now","now_only_vs_stable",
@@ -271,6 +314,12 @@ def _aggregate(rows):
             round(statistics.median(explicit_waits),1)
             if explicit_waits else None
         )
+    for key,v in out.items():
+        if v["stable_depart_now_proposals"]+v["stable_depart_future_proposals"] != v["stable_proposals"]:
+            raise AssertionError("V151 now/future coverage does not balance")
+        if (v["matched_stable_vs_explicit"] <
+            v["stable_only_vs_explicit"]+v["explicit_only_vs_stable"]):
+            raise AssertionError("V151/V148 paired contradictions exceed scorable pairs")
     return dict(counters),{k:dict(v) for k,v in sorted(out.items())}
 
 
