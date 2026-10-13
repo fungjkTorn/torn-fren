@@ -273,7 +273,10 @@ class SameIssueReplayTests(unittest.TestCase):
             row=result["items"][ITEM]
             self.assertEqual(row["next_restock_scored"],1)
             self.assertEqual(row["next_restock_abs_error_total_seconds"],50)
-            self.assertEqual(row["recency_recent_3_scored"],1)
+            self.assertEqual(row.get("recency_recent_3_scored",0),1,
+                             msg=str({k:v for k,v in row.items()
+                                      if k.startswith("recency_") or
+                                         k.startswith("restock:")}))
             self.assertEqual(row["recency_recent_3_paired"],1)
             self.assertEqual(row["v151_beats_recency_recent_3"],1)
             self.assertEqual(row["recency_recent_3_beats_v151"],0)
