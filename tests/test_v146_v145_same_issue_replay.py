@@ -99,6 +99,9 @@ class SameIssueReplayTests(unittest.TestCase):
             src,side,issued=make_db(temp)
             recovered={
                 "status":"PROVISIONAL_FIRST_REACHABLE_STOCK_WINDOW",
+                "issued_epoch":issued,
+                "travel_seconds":original.TRAVEL_SECONDS["uni"],
+                "projected_windows":[],
                 "first_reachable":{
                     "cycle_number":7,
                     "earliest_departure_epoch":issued+300,
