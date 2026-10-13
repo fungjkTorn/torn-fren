@@ -123,7 +123,7 @@ def compact(result):
         )
     lines.extend([
         "Caution: first-UTC-hour cohorts share restock cycles; these are not independent trips.",
-"        "V148/V151 proxy rates condition on mature scored proposals; "
+        "V148/V151 proxy rates condition on mature scored proposals; "
         "V145 was capped at 4 model evaluations per item.",
         "Japan Xanax: separately inspect explicit NO_CONSERVATIVE_REACHABLE_WINDOW "
         "vs actual recorded restocks.",
