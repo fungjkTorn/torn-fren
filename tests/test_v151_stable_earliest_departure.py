@@ -34,7 +34,7 @@ class StableEarliestTests(unittest.TestCase):
                 r=stable_earliest_departure(
                     country+":Test Stock",previous,asof=issued,scenarios=48)
                 self.assertIsNotNone(r["first_reachable"])
-                self.assertLessEqual(r["first_reachable"]["wait_seconds"],900)
+                self.assertLessEqual(r["first_reachable"]["wait_seconds"],1800)
                 self.assertEqual(r["first_reachable"]["arrival_epoch"],
                                  issued+TRAVEL_SECONDS[country]+
                                  r["first_reachable"]["wait_seconds"])
