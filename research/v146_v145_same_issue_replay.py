@@ -394,6 +394,7 @@ def replay(*,collector=COLLECTOR, sidecar=SIDECAR, now=None,
                     "item_key":key,"comparison":"SOURCE_HISTORY_LIMIT",
                     "recovered":False,"new_departure":None,
                     "old_departure":None,"old_outcome":"NOT_PROPOSED",
+                    "next_restock_status":None,"next_restock_abs_error_seconds":None,
                     "stable_departure":None,"stable_status":None,
                     "stable_outcome":"NOT_PROPOSED","stable_long_wait":False,
                     "explicit_departure":None,"explicit_status":None,
@@ -456,6 +457,7 @@ def replay(*,collector=COLLECTOR, sidecar=SIDECAR, now=None,
                     "old_departure":baseline.get("earliest_departure"),
                     "old_arrival":baseline.get("earliest_arrival"),
                     "old_outcome":"NOT_PROPOSED",
+                    "next_restock_status":None,"next_restock_abs_error_seconds":None,
                     "stable_departure":None,"stable_status":None,
                     "stable_outcome":"NOT_PROPOSED","stable_long_wait":False,
                     "explicit_departure":None,"explicit_status":None,
@@ -490,6 +492,18 @@ def replay(*,collector=COLLECTOR, sidecar=SIDECAR, now=None,
                     "peak_scenario_stock_fraction")
                 record["stable_supported_adjacent_pairs"]=stable.get(
                     "adjacent_supported_bin_count")
+                if outcome_phases is not None:
+                    time_to_restock=stable.get(
+                        "first_next_restock_onset_median_seconds")
+                    forecast=(issued+time_to_restock
+                              if type(time_to_restock) is int else None)
+                    result_next=evaluate_next_completed_restock(
+                        outcome_obs,outcome_phases,issued=issued,
+                        predicted_onset_epoch=forecast,
+                        asof=current,gaps=gaps)
+                    record["next_restock_status"]=result_next["status"]
+                    record["next_restock_abs_error_seconds"]=result_next[
+                        "absolute_forecast_error_seconds"]
                 if stable["first_reachable"] is not None:
                     cand=stable["first_reachable"]
                     record["stable_departure"]=cand["departure_epoch"]
