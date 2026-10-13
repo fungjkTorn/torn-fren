@@ -200,7 +200,8 @@ class SameIssueReplayTests(unittest.TestCase):
             src,side,issued=make_db(temp)
             flight=original.TRAVEL_SECONDS["uni"]
             def planner(key,phases,*,asof,scenarios,
-                        departure_step_seconds=300):
+                        departure_step_seconds=300,
+                        cycle_sampling="independent"):
                 self.assertEqual(asof,issued)
                 self.assertEqual(phases["last_observation"].epoch,issued)
                 step=departure_step_seconds
@@ -299,7 +300,8 @@ class SameIssueReplayTests(unittest.TestCase):
                     [(issued+500,110,"yata","uni","Nessie Plushie"),
                      (issued+1000,0,"yata","uni","Nessie Plushie")])
             def v151_model(key,history,*,asof,scenarios,
-                           departure_step_seconds=300):
+                           departure_step_seconds=300,
+                           cycle_sampling="independent"):
                 self.assertEqual(asof,issued)
                 self.assertEqual(history["last_observation"].epoch,issued)
                 return {"status":"NO_TWO_BIN_SUPPORTED_DEPARTURE",
