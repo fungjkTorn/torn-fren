@@ -77,7 +77,7 @@ class EventTimelineTests(unittest.TestCase):
         self.assertEqual(report["restock_events"],[])
 
     def test_lookahead_rejected_by_readonly_collector_asof(self):
-        from tests.test_v160_prospective_v151_shadow import collector_fixture
+        from test_v160_prospective_v151_shadow import collector_fixture
         with tempfile.TemporaryDirectory() as tmp:
             root=Path(tmp)
             source=collector_fixture(root,issued=ASOF)
