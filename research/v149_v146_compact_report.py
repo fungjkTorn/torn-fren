@@ -127,8 +127,8 @@ def compact(result):
         f"24 items; {source['cohorts']} first-issued item/UTC-hour cohorts; NO DATABASE OR WEBSITE WRITES",
         f"V145 recovered NEW eligibility on {source['recovered_eligible']} cohorts; "
         f"{source['mc_capped_eligible']} eligible (old or new) were unscored due to CPU cap;",
-        f"V128 original proposals: {total_v128}/{source['cohorts']} ({100*total_v128/source['cohorts']:.1f}%)",
-        f"V145 MC capped: {total_v145}/{source['cohorts']} proposals, "
+        f"V128 original {total_v128}/{source['cohorts']} proposals; "
+        f"V145 MC capped {total_v145}/{source['cohorts']} proposals, "
         f"{_rate(h145,m145)} known; {pn145} pending",
         f"V148 explicit-stock-window proposals: {total_v148}/{source['cohorts']} "
         f"({100*total_v148/source['cohorts']:.1f}%); V148 proxy outcomes: "
