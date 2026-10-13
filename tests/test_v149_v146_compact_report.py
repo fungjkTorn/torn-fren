@@ -60,6 +60,22 @@ def fixture():
             "recovered":217,
         },
         "items":rows,
+        "issue_phase_episode_audit":{
+            "method":"GROUP_BY_ASISSUED_STOCK_PHASE_EPISODE",
+            "totals":{
+                "distinct_asof_phase_episodes":0,
+                "raw_scorable_phase_episodes":0,
+                "v158_scorable_phase_episodes":0,
+                "raw_paired_exclusive_issue_wins":0,
+                "raw_independent_exclusive_issue_wins":0,
+                "raw_paired_winning_episodes":0,
+                "raw_independent_winning_episodes":0,
+                "v158_winning_episodes":0,
+                "v158_losing_episodes":0,
+                "raw_paired_only_missed_by_v158":0,
+            },
+            "items":{},
+        },
     }
 
 
@@ -116,6 +132,59 @@ class CompactEvidenceTests(unittest.TestCase):
         self.assertIn("chi:Peony",output)
         item["recent_recent_5_paired"]=3
         with self.assertRaisesRegex(ValueError,"unbalanced recency"):
+            compact(data)
+
+    def test_v159_top_level_episode_results_render_nonzero_with_per_item_row(self):
+        data=fixture()
+        item=data["items"]["mex:Jaguar Plushie"]
+        item["paired_proposals"]=2
+        item["paired_proxy_hit"]=2
+        item["paired_only_vs_independent"]=2
+        item["paired_vs_independent_matched"]=2
+        audit=data["issue_phase_episode_audit"]
+        audit["totals"].update({
+            "distinct_asof_phase_episodes":2,
+            "raw_scorable_phase_episodes":2,
+            "v158_scorable_phase_episodes":2,
+            "raw_paired_exclusive_issue_wins":2,
+            "raw_paired_winning_episodes":2,
+            "v158_winning_episodes":1,
+            "raw_paired_only_missed_by_v158":1,
+        })
+        audit["items"]["mex:Jaguar Plushie"]={
+            "raw_scorable_phase_episodes":2,
+            "v158_scorable_phase_episodes":2,
+            "raw_paired_winning_episodes":2,
+            "raw_independent_winning_episodes":0,
+        }
+        output=compact(data)
+        self.assertIn("2 paired-score episodes (2 favor paired / 0 favor independent)",output)
+        self.assertIn("V158: 2 clusters (1 win / 0 loss)",output)
+        self.assertIn("raw paired-only issue wins V158 skipped 1",output)
+        jaguar=next(line for line in output.splitlines()
+                    if line.startswith("mex:Jaguar Plushie"))
+        self.assertIn("2/0",jaguar)
+
+    def test_v159_missing_top_level_audit_is_error_not_fake_zero(self):
+        data=fixture()
+        del data["issue_phase_episode_audit"]
+        with self.assertRaisesRegex(ValueError,"top-level phase episode evidence"):
+            compact(data)
+        # The previous bug looked in a separate ephemeral source dictionary:
+        # even false legacy data elsewhere must never replace the top level.
+        data["summary"]["issue_phase_episode_audit"]={
+            "method":"GROUP_BY_ASISSUED_STOCK_PHASE_EPISODE",
+            "totals":{"raw_scorable_phase_episodes":999},
+            "items":{},
+        }
+        with self.assertRaisesRegex(ValueError,"top-level phase episode evidence"):
+            compact(data)
+
+    def test_v159_per_item_episode_totals_fail_on_mismatch(self):
+        data=fixture()
+        audit=data["issue_phase_episode_audit"]
+        audit["totals"]["raw_scorable_phase_episodes"]=1
+        with self.assertRaisesRegex(ValueError,"item/total denominators"):
             compact(data)
 
     def test_no_partial_roster_or_database_write_claims(self):
