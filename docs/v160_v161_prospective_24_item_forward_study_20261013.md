@@ -1,3 +1,5 @@
+> **VM smoke incident / NEW tested PIN:** The first user-run smoke failed due to omitted V110; complete dependency check also found missing `v38_snapshot_schema`. See [Oct 13 smoke dependency correction](v160_smoke_dependency_fix_20261013.md). Use the operator pin in the PowerShell example below. V160 remains uninstalled and no genuine forward rows exist.
+
 # V160/V161: actual prospective 24-item departure evidence
 
 ## Why this step matters
@@ -25,7 +27,7 @@ $key = "C:\Users\fungb\Desktop\.ssh\torn-fren.key"
 $remote = "ubuntu@150.136.108.146"
 if (-not (Test-Path -LiteralPath $key)) { throw "SSH key missing: $key" }
 $branch = "research/v38-full-roster-live-prep-20261009"
-$pin = "ef96aeaa0ec75cf3992ae9e2d77615f34243d3f7"
+$pin = "22e45cb287937315b75a463ca4ef0277cae57205"
 $operator = "deploy/scripts/v160_forward24_operator.sh"
 $prefix = "cd /home/ubuntu/torn-fren-v38-probe && git fetch -q origin $branch"
 $command = $prefix + " && git show " + $pin + ":" + $operator + " | bash -s -- smoke"
@@ -40,6 +42,9 @@ Collect genuinely frozen issues over multiple complete restock cycles and countr
 
 
 ### Oct 13 forward-report integrity correction
-The operator at commit `ef96aeaa0ec75cf3992ae9e2d77615f34243d3f7` stages CI-validated research source commit `da6db7cee81588b38cb8ee522be611ad7e173bda`. V161 now counts PENDING separately from UNKNOWN and MISS for all models, leave-now, and V75; distinguishes pending future WATCH confirmation from genuinely unreconfirmed due departures; and includes guarded 24-item readiness metadata (incumbent is roster metadata until a real matched V75 forecast exists). Historical handoff VM-check corrections: [Oct 13 reconciliation](OCT13_HANDOFF_RECONCILIATION_AND_FORWARD_READINESS.md). Neither the operator commit nor this document installs a VM timer.
+The operator at commit `22e45cb287937315b75a463ca4ef0277cae57205` stages CI-validated research source commit `da6db7cee81588b38cb8ee522be611ad7e173bda`. V161 now counts PENDING separately from UNKNOWN and MISS for all models, leave-now, and V75; distinguishes pending future WATCH confirmation from genuinely unreconfirmed due departures; and includes guarded 24-item readiness metadata (incumbent is roster metadata until a real matched V75 forecast exists). Historical handoff VM-check corrections: [Oct 13 reconciliation](OCT13_HANDOFF_RECONCILIATION_AND_FORWARD_READINESS.md). Neither the operator commit nor this document installs a VM timer.
 
 The updated `status` action now prints the last three actual private issue batches, their expected and recorded row counts and age, querying the V160 sidecar in SQLite **mode=ro**. If the sidecar is absent it reports no verified recorded issues. It never silently treats an enabled timer as proof of complete predictions. This operator enhancement has automated tests on the research branch; the status command is observational and does not install/enable the private timer.
+
+
+**Latest corrected bundle:** operator `22e45cb287937315b75a463ca4ef0277cae57205`, tested source `0164d64c0c94f045a9e6680054edc780738bcb63`, all four CI workflows green at source. Do not use the older handoff/example operator pin; it will reproduce the missing import. Corrected smoke is still required on the VM. No new timer without explicit approval.
