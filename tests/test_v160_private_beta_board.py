@@ -2,6 +2,7 @@
 import hashlib
 import importlib.util
 import json
+import shutil
 import sqlite3
 import tempfile
 import threading
@@ -24,10 +25,15 @@ ISSUED=1791910560
 def fixture(root):
     ledger=root/"v160_v151_prospective24.db"
     roster=root/"roster.json"
-    names={}
     from research.v128_full24_earliest_shadow import exact_roster
-    names={k:{"category":"plushie"} for k in exact_roster()}
-    roster.write_text(json.dumps({"items":names}),encoding="utf-8")
+    # Use actual pinned 22-key JSON. Prior synthetic 24-key fixture
+    # masked a real VM install failure (24 = 22 base + 2 V42 Xanax).
+    shutil.copyfile(ROOT/"research/v38_roster.json",roster)
+    pinned=json.loads(roster.read_text(encoding="utf-8"))["items"]
+    assert len(pinned)==22
+    names=exact_roster(roster)
+    assert len(names)==24
+    assert set(names)==set(pinned)|board.EXTRA_XANAX_KEYS
     with closing(sqlite3.connect(ledger)) as db:
         db.executescript("""
             CREATE TABLE v160_ticks(issued_epoch INTEGER PRIMARY KEY,
@@ -67,6 +73,17 @@ def fixture(root):
 
 
 class PrivateBetaBoardTests(unittest.TestCase):
+    def test_true_pinned_roster_is_22_plus_two_exact_xanax_keys(self):
+        from research.v128_full24_earliest_shadow import exact_roster
+        source=ROOT/"research/v38_roster.json"
+        base=json.loads(source.read_text(encoding="utf-8"))["items"]
+        self.assertEqual(len(base),22)
+        self.assertEqual(board.BASE_ROSTER_ROWS,22)
+        self.assertEqual(board.EXTRA_XANAX_KEYS,
+                         frozenset(("can:Xanax","uni:Xanax")))
+        self.assertEqual(set(exact_roster(source)),
+                         set(base)|board.EXTRA_XANAX_KEYS)
+
     def test_24_live_candidates_exact_flight_and_no_db_writes(self):
         with tempfile.TemporaryDirectory() as tmp:
             ledger,roster=fixture(Path(tmp))
