@@ -24,6 +24,11 @@ def fixture():
             "matched_explicit_vs_now":15,
             "long_wait_needs_explanation":0,
             "explicit_departure_median_wait_seconds":700,
+            "stable_proposals":12,"stable_proxy_hit":8,
+            "stable_proxy_miss":2,"stable_proxy_pending":1,
+            "stable_proxy_unknown":1,"matched_stable_vs_now":10,
+            "stable_only_vs_now":3,"now_only_vs_stable":2,
+            "stable_departure_median_wait_seconds":300,
         }
     # Original Japanese Xanax can have zero usable proposals but VALID cycles.
     rows["jap:Xanax"].update({
@@ -35,6 +40,12 @@ def fixture():
         "matched_explicit_vs_now":0,
         "explicit_only_vs_now":0,"now_only_vs_explicit":0,
         "explicit_departure_median_wait_seconds":None,
+        "stable_proposals":0,"stable_proxy_hit":0,
+        "stable_proxy_miss":0,"stable_proxy_pending":0,
+        "stable_proxy_unknown":0,
+        "matched_stable_vs_now":0,"stable_only_vs_now":0,
+        "now_only_vs_stable":0,
+        "stable_departure_median_wait_seconds":None,
     })
     return {
         "status":"READ_ONLY_ASOF_REPLAY_NOT_PROSPECTIVE_CERTIFICATION",
@@ -59,6 +70,8 @@ class CompactEvidenceTests(unittest.TestCase):
         self.assertLess(len(lines),45)
         self.assertIn("V145 recovered NEW eligibility on 217 cohorts",output)
         self.assertIn("V148 explicit-stock-window proposals",output)
+        self.assertIn("V151 stable whole-cycle scenario departures",output)
+        self.assertIn("V151 matched vs leave-now",output)
         self.assertIn("net +",output)
         self.assertIn("jap:Xanax",output)
         self.assertIn("uni:Xanax",output)
@@ -67,6 +80,12 @@ class CompactEvidenceTests(unittest.TestCase):
     def test_json_sample_must_balance_outcomes(self):
         data=fixture()
         data["items"]["chi:Peony"]["explicit_proxy_hit"]+=1
+        with self.assertRaisesRegex(ValueError,"outcome denominators"):
+            compact(data)
+
+    def test_stable_denominator_check(self):
+        data=fixture()
+        data["items"]["chi:Peony"]["stable_proxy_hit"]+=1
         with self.assertRaisesRegex(ValueError,"outcome denominators"):
             compact(data)
 
