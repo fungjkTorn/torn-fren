@@ -89,6 +89,11 @@ def _origin_future_states(episodes,idx,horizons):
 def _simulator_probability(train,horizons,*,paired,seed):
     lows=[low for low,high in train]
     highs=[high for low,high in train]
+    # Extremely short or malformed historical cycles cannot support
+    # this horizon under our fixed CPU budget; ABSTAIN, don't abort the
+    # whole 24-item VM audit or silently score an unfinished simulation.
+    if MAX_SIM_TRANSITIONS*min(a+b for a,b in train) <= max(horizons):
+        return None
     rng=random.Random(seed)
     scores={h:0 for h in horizons}
     for _ in range(SIMS):
@@ -151,6 +156,8 @@ def _score_complete_episodes(item_key, episodes):
         seed=int.from_bytes(digest,"big")
         p=_simulator_probability(train,supported,paired=True,seed=seed)
         q=_simulator_probability(train,supported,paired=False,seed=seed)
+        if p is None or q is None:
+            continue
         lp=sum((p[h]-int(truth[h]))**2 for h in supported)
         li=sum((q[h]-int(truth[h]))**2 for h in supported)
         paired_loss+=lp
