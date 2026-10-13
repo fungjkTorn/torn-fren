@@ -44,6 +44,7 @@ def provider_continuous_phases(observations, *, asof, gaps=()):
     completed_high = []
     completed_low = []
     observed_bounded_stocked_windows = []
+    observed_bounded_depleted_windows = []
     observed_clean_restock_onsets = []
     c = Counter()
     for obs in observations:
@@ -83,6 +84,10 @@ def provider_continuous_phases(observations, *, asof, gaps=()):
                             observed_bounded_stocked_windows.append(
                                 (onset, obs.epoch)
                             )
+                        else:
+                            observed_bounded_depleted_windows.append(
+                                (onset, obs.epoch)
+                            )
                         c["completed_phases_with_observed_boundaries"] += 1
                     if high:
                         observed_clean_restock_onsets.append(obs.epoch)
@@ -98,6 +103,7 @@ def provider_continuous_phases(observations, *, asof, gaps=()):
         "stocked_durations": completed_high,
         "depleted_durations": completed_low,
         "observed_bounded_stocked_windows": observed_bounded_stocked_windows,
+        "observed_bounded_depleted_windows": observed_bounded_depleted_windows,
         "observed_clean_restock_onsets": observed_clean_restock_onsets,
         "diagnostics": dict(sorted(c.items())),
         "only_observed_clean_phase_boundaries": True,
