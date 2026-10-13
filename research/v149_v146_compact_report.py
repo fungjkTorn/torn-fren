@@ -103,6 +103,12 @@ def compact(result):
     delayed151=total("matched_stable_delayed_vs_now")
     delayed_wins151=total("delayed_stable_only_vs_now")
     delayed_now_wins=total("delayed_now_only_vs_stable")
+    heldout_reasons={
+        "sparse":total("prequential_reason:INSUFFICIENT_DIRECTLY_BOUNDED_PAIRS"),
+        "constant":total("prequential_reason:NONIDENTIFIABLE_CONSTANT_PHASE_DURATION"),
+        "not_better":total("prequential_reason:PAIRED_NOT_PROVEN_BETTER_PREQUENTIALLY"),
+        "better":total("prequential_reason:PREQUENTIAL_FIRST_CYCLE_SURVIVAL_IMPROVEMENT"),
+    }
     next_count=total("next_restock_scored")
     next_abs_total=total("next_restock_abs_error_total_seconds")
     next_mae=f"{next_abs_total/next_count/60:.1f} min" if next_count else "not scorable"
@@ -187,7 +193,10 @@ def compact(result):
         f"({total('prequential_only_vs_independent')} exclusive wins vs "
         f"{total('independent_only_vs_prequential')} losses), vs NOW "
         f"{total('prequential_vs_now_matched')} matched net "
-        f"{total('prequential_only_vs_now')-total('now_only_vs_prequential'):+d}",
+        f"{total('prequential_only_vs_now')-total('now_only_vs_prequential'):+d}; "
+        f"routing reasons sparse/constant/no-lift/paired: "
+        f"{heldout_reasons['sparse']}/{heldout_reasons['constant']}/"
+        f"{heldout_reasons['not_better']}/{heldout_reasons['better']}",
         f"  V151 next completed-restock forecast: {next_count} matched fully bounded starts, "
         f"MAE {next_mae}, within 1/5/15 min "
         f"{total('next_restock_within_1m')}/{total('next_restock_within_5m')}/"
