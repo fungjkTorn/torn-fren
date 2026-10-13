@@ -25,7 +25,7 @@ $key = "C:\Users\fungb\Desktop\.ssh\torn-fren.key"
 $remote = "ubuntu@150.136.108.146"
 if (-not (Test-Path -LiteralPath $key)) { throw "SSH key missing: $key" }
 $branch = "research/v38-full-roster-live-prep-20261009"
-$pin = "24cf6aab68e8cc6bbe05316d81c32607bc714d03"
+$pin = "ef96aeaa0ec75cf3992ae9e2d77615f34243d3f7"
 $operator = "deploy/scripts/v160_forward24_operator.sh"
 $prefix = "cd /home/ubuntu/torn-fren-v38-probe && git fetch -q origin $branch"
 $command = $prefix + " && git show " + $pin + ":" + $operator + " | bash -s -- smoke"
@@ -40,4 +40,6 @@ Collect genuinely frozen issues over multiple complete restock cycles and countr
 
 
 ### Oct 13 forward-report integrity correction
-The operator at commit `24cf6aab68e8cc6bbe05316d81c32607bc714d03` stages CI-validated research source commit `da6db7cee81588b38cb8ee522be611ad7e173bda`. V161 now counts PENDING separately from UNKNOWN and MISS for all models, leave-now, and V75; distinguishes pending future WATCH confirmation from genuinely unreconfirmed due departures; and includes guarded 24-item readiness metadata (incumbent is roster metadata until a real matched V75 forecast exists). Historical handoff VM-check corrections: [Oct 13 reconciliation](OCT13_HANDOFF_RECONCILIATION_AND_FORWARD_READINESS.md). Neither the operator commit nor this document installs a VM timer.
+The operator at commit `ef96aeaa0ec75cf3992ae9e2d77615f34243d3f7` stages CI-validated research source commit `da6db7cee81588b38cb8ee522be611ad7e173bda`. V161 now counts PENDING separately from UNKNOWN and MISS for all models, leave-now, and V75; distinguishes pending future WATCH confirmation from genuinely unreconfirmed due departures; and includes guarded 24-item readiness metadata (incumbent is roster metadata until a real matched V75 forecast exists). Historical handoff VM-check corrections: [Oct 13 reconciliation](OCT13_HANDOFF_RECONCILIATION_AND_FORWARD_READINESS.md). Neither the operator commit nor this document installs a VM timer.
+
+The updated `status` action now prints the last three actual private issue batches, their expected and recorded row counts and age, querying the V160 sidecar in SQLite **mode=ro**. If the sidecar is absent it reports no verified recorded issues. It never silently treats an enabled timer as proof of complete predictions. This operator enhancement has automated tests on the research branch; the status command is observational and does not install/enable the private timer.
