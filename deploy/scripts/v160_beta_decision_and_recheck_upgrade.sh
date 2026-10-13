@@ -78,9 +78,18 @@ if not data["healthy"] or data["recorded_items"]!=24:
 PY
 
 echo "===== CURRENT SINGLE-ITEM READ-ONLY MODEL + ALL-RESTOCK PREFLIGHT ====="
-TORNFREN_V163_ENGINE="$NEW_ENGINE" PYTHONDONTWRITEBYTECODE=1 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 \
+PREFLIGHT="$(TORNFREN_V163_ENGINE="$NEW_ENGINE" PYTHONDONTWRITEBYTECODE=1 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 \
  timeout 65s nice -n 19 "$WORK/.venv/bin/python" -I "$NEW_HELPER" \
- "mex:Jaguar Plushie"
+ "mex:Jaguar Plushie")"
+printf '%s\n' "$PREFLIGHT"
+printf '%s\n' "$PREFLIGHT" | python3 -c '
+import json,sys
+x=json.load(sys.stdin)
+e=x.get("restock_timeline")
+if x.get("item_key")!="mex:Jaguar Plushie" or not isinstance(e,dict) or e.get("status")=="EVENT_ENGINE_NOT_DEPLOYED" or not isinstance(e.get("restock_events"),list):
+    raise SystemExit("STOP on-demand model failed to load real V163 event engine")
+print("V163 EVENT ENGINE PREFLIGHT PASS, events",len(e["restock_events"]))
+'
 
 diagnostics() {
  echo "===== PRIVATE VIEWER STATUS (collector/other units untouched) ====="
