@@ -9,7 +9,7 @@ from unittest.mock import patch
 from research.plushie_champions.common import TRAVEL_SECONDS
 from research.v160_prospective_v151_shadow import capture_once
 from research.v161_prospective_v151_forward_report import score
-from tests.test_v160_prospective_v151_shadow import T,model,collector_fixture
+from test_v160_prospective_v151_shadow import T,model,collector_fixture
 
 
 class ForwardEvidenceTests(unittest.TestCase):
