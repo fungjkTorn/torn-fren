@@ -158,7 +158,9 @@ def score(*, ledger=DESTINATION, collector=COLLECTOR,
                 distinct_phase[item].add((phase,onset))
             now_status,now_hit,_=scorer(
                 db,country,name,issue+TRAVEL_SECONDS[country],asof)
-            if now_hit is None:
+            if now_status=="PENDING":
+                c["leave_now_pending"]+=1
+            elif now_hit is None:
                 c["leave_now_unknown"]+=1
             else:
                 c["leave_now_hit" if now_hit else "leave_now_miss"]+=1
@@ -179,9 +181,11 @@ def score(*, ledger=DESTINATION, collector=COLLECTOR,
                         break
             if specialist is not None:
                 c["v75_near_issued_proposals"]+=1
-                _,v75_hit,_=scorer(
+                v75_state,v75_hit,_=scorer(
                     db,country,name,specialist["arrival"],asof)
-                if v75_hit is None:
+                if v75_state=="PENDING":
+                    c["v75_pending"]+=1
+                elif v75_hit is None:
                     c["v75_unknown"]+=1
                 else:
                     c["v75_hit" if v75_hit else "v75_miss"]+=1
@@ -199,22 +203,26 @@ def score(*, ledger=DESTINATION, collector=COLLECTOR,
                 c[variant+"_proposals"]+=1
                 waits[item][variant].append((dep-issue)/60)
                 if dep>issue+300:
-                    # A future forecast cannot be treated as an executable
-                    # five-minute decision without an as-issued recheck.
-                    updates=[r for r in by_item[item]
-                             if issue<r["issued_epoch"]<=dep and
-                             dep-600<=r["issued_epoch"]]
-                    matching=[
-                        r for r in updates if
-                        r["models"][variant]["departure_epoch"] is not None and
-                        abs(r["models"][variant]["departure_epoch"]-dep)<=300 and
-                        r["models"][variant]["departure_epoch"]-r["issued_epoch"]<=300
-                    ]
-                    if not matching:
-                        c[variant+"_future_unreconfirmed"]+=1
+                    # A future WATCH is not a proven actionable decision.
+                    # Do not call it unreconfirmed before its departure time.
+                    if asof<dep:
+                        c[variant+"_future_reconfirmation_pending"]+=1
                     else:
-                        c[variant+"_future_reconfirmed"]+=1
-                _,hit,_=scorer(db,country,name,candidate["arrival_epoch"],asof)
+                        updates=[r for r in by_item[item]
+                                 if issue<r["issued_epoch"]<=dep and
+                                 dep-600<=r["issued_epoch"]]
+                        matching=[
+                            r for r in updates if
+                            r["models"][variant]["departure_epoch"] is not None and
+                            abs(r["models"][variant]["departure_epoch"]-dep)<=300 and
+                            r["models"][variant]["departure_epoch"]-r["issued_epoch"]<=300
+                        ]
+                        if not matching:
+                            c[variant+"_future_unreconfirmed"]+=1
+                        else:
+                            c[variant+"_future_reconfirmed"]+=1
+                proxy_status,hit,_=scorer(
+                    db,country,name,candidate["arrival_epoch"],asof)
                 outcomes[variant]=hit
                 if v75_hit is not None and hit is not None:
                     c[variant+"_matched_v75"]+=1
@@ -222,7 +230,8 @@ def score(*, ledger=DESTINATION, collector=COLLECTOR,
                         c[variant+"_only_vs_v75"]+=1
                     elif v75_hit and not hit:
                         c["v75_only_vs_"+variant]+=1
-                c[variant+("_unknown" if hit is None else
+                c[variant+("_pending" if proxy_status=="PENDING" else
+                           "_unknown" if hit is None else
                            "_hit" if hit else "_miss")]+=1
                 if hit is not None and now_hit is not None:
                     c[variant+"_matched_now"]+=1
@@ -247,19 +256,21 @@ def score(*, ledger=DESTINATION, collector=COLLECTOR,
         summary[item]={
             **{key:c[key] for key in (
                 "issued_item_hours","leave_now_hit","leave_now_miss",
-                "leave_now_unknown","independent_proposals",
+                "leave_now_pending","leave_now_unknown","independent_proposals",
                 "independent_abstain","independent_hit",
-                "independent_miss","independent_unknown",
+                "independent_miss","independent_pending","independent_unknown",
                 "paired_complete_proposals","paired_complete_abstain",
                 "paired_complete_hit","paired_complete_miss",
-                "paired_complete_unknown","paired_matched_independent",
+                "paired_complete_pending","paired_complete_unknown","paired_matched_independent",
                 "paired_only_hit","independent_only_hit",
                 "independent_future_reconfirmed",
                 "independent_future_unreconfirmed",
+                "independent_future_reconfirmation_pending",
                 "paired_complete_future_reconfirmed",
                 "paired_complete_future_unreconfirmed",
+                "paired_complete_future_reconfirmation_pending",
                 "v75_near_issued_proposals","v75_unmatched_or_no_proposal",
-                "v75_hit","v75_miss","v75_unknown",
+                "v75_hit","v75_miss","v75_pending","v75_unknown",
                 "independent_matched_v75","independent_only_vs_v75",
                 "v75_only_vs_independent",
                 "paired_complete_matched_v75",
@@ -276,10 +287,13 @@ def score(*, ledger=DESTINATION, collector=COLLECTOR,
     for key in (
         "issued_item_hours","paired_matched_independent",
         "paired_only_hit","independent_only_hit",
-        "independent_hit","independent_miss","independent_unknown",
-        "paired_complete_hit","paired_complete_miss",
-        "paired_complete_unknown","leave_now_hit","leave_now_miss",
-        "leave_now_unknown","independent_future_unreconfirmed",
+        "independent_hit","independent_miss","independent_pending",
+        "independent_unknown","paired_complete_hit","paired_complete_miss",
+        "paired_complete_pending","paired_complete_unknown",
+        "leave_now_hit","leave_now_miss","leave_now_pending",
+        "leave_now_unknown","independent_future_reconfirmation_pending",
+        "paired_complete_future_reconfirmation_pending",
+        "independent_future_unreconfirmed",
         "paired_complete_future_unreconfirmed",
     ):
         allcounts.setdefault(key,0)
