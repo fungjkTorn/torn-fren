@@ -21,10 +21,13 @@ from research.plushie_champions.common import TRAVEL_SECONDS
 from research.v88_poll_state_forward_report import observation
 from research.v128_full24_earliest_shadow import COLLECTOR,exact_roster
 from research.v160_prospective_v151_shadow import DESTINATION,POLICY,MODEL_VARIANTS
+from research.v76_forward_research_report import V75,eligible as valid_v75_proposal
 
 MAX_ROWS=20000
 MAX_DAYS=14
 GRACE=10
+MAX_V75_ROWS=120000
+MAX_BENCHMARK_AGE=180
 
 
 def _ro(path):
@@ -61,9 +64,45 @@ def _valid(item,issued,payload):
             raise ValueError("issued travel time or wait inconsistent")
 
 
+def _load_v75(v75, start, end):
+    """Only independently RECORDED V75 private decisions, never roster labels.
+
+    V75 is an existing 21-item private specialist research ledger. Its
+    issuance may be 0-180s before our new research snapshot; alignment
+    therefore is labeled near-issue, not EXACT simultaneous issuance.
+    """
+    if v75 is None:
+        return None,"DISABLED"
+    path=Path(v75)
+    if not path.is_file():
+        return None,"ABSENT"
+    with closing(_ro(path)) as conn:
+        conn.row_factory=sqlite3.Row
+        records=conn.execute(
+            """SELECT item_key,computed_at,stock_as_of,status,valid_until,
+                      departure,arrival,actual_player_departure
+               FROM v42_candidate_decisions
+               WHERE computed_at BETWEEN ? AND ?
+               ORDER BY computed_at,item_key LIMIT ?""",
+            (start-MAX_BENCHMARK_AGE,end,MAX_V75_ROWS+1),
+        ).fetchall()
+    if len(records)>MAX_V75_ROWS:
+        raise ValueError("unbounded V75 specialist candidate history")
+    by_key=defaultdict(list)
+    for row in records:
+        if valid_v75_proposal(row):
+            by_key[row["item_key"]].append({
+                "computed_at":row["computed_at"],
+                "valid_until":row["valid_until"],
+                "departure":row["departure"],
+                "arrival":row["arrival"],
+            })
+    return by_key,"READ_ONLY_V75_PRIVATE_CANDIDATE_LEDGER"
+
+
 def score(*, ledger=DESTINATION, collector=COLLECTOR,
           now=None,days=7,roster=None,max_rows=MAX_ROWS,
-          scorer=observation):
+          v75=V75,scorer=observation):
     if (type(days) is not int or not 1<=days<=MAX_DAYS or
         type(max_rows) is not int or not 1<=max_rows<=MAX_ROWS):
         raise ValueError("invalid requested report range")
@@ -95,6 +134,8 @@ def score(*, ledger=DESTINATION, collector=COLLECTOR,
         by_item[row["item_key"]].append(row)
     for rows in by_item.values():
         rows.sort(key=lambda r:r["issued_epoch"])
+    v75_by_item,v75_status=_load_v75(
+        v75,asof-days*86400,asof)
     first={}
     for row in decoded:
         item=row["item_key"]
@@ -121,6 +162,32 @@ def score(*, ledger=DESTINATION, collector=COLLECTOR,
                 c["leave_now_unknown"]+=1
             else:
                 c["leave_now_hit" if now_hit else "leave_now_miss"]+=1
+            # Optional specialist comparison is based on the actual V75
+            # private issued ledger. Reject any later-issued prediction,
+            # stale alignment, or proposal whose original validity expired.
+            specialist=None
+            if v75_by_item is not None:
+                candidates=v75_by_item.get(item,[])
+                for c0 in reversed(candidates):
+                    t0=c0["computed_at"]
+                    if t0>issue:
+                        continue
+                    if issue-t0>MAX_BENCHMARK_AGE:
+                        break
+                    if issue<=c0["valid_until"]:
+                        specialist=c0
+                        break
+            if specialist is not None:
+                c["v75_near_issued_proposals"]+=1
+                _,v75_hit,_=scorer(
+                    db,country,name,specialist["arrival"],asof)
+                if v75_hit is None:
+                    c["v75_unknown"]+=1
+                else:
+                    c["v75_hit" if v75_hit else "v75_miss"]+=1
+            else:
+                v75_hit=None
+                c["v75_unmatched_or_no_proposal"]+=1
             outcomes={}
             for variant in MODEL_VARIANTS:
                 candidate=row["models"][variant]
@@ -149,6 +216,12 @@ def score(*, ledger=DESTINATION, collector=COLLECTOR,
                         c[variant+"_future_reconfirmed"]+=1
                 _,hit,_=scorer(db,country,name,candidate["arrival_epoch"],asof)
                 outcomes[variant]=hit
+                if v75_hit is not None and hit is not None:
+                    c[variant+"_matched_v75"]+=1
+                    if hit and not v75_hit:
+                        c[variant+"_only_vs_v75"]+=1
+                    elif v75_hit and not hit:
+                        c["v75_only_vs_"+variant]+=1
                 c[variant+("_unknown" if hit is None else
                            "_hit" if hit else "_miss")]+=1
                 if hit is not None and now_hit is not None:
@@ -184,7 +257,13 @@ def score(*, ledger=DESTINATION, collector=COLLECTOR,
                 "independent_future_reconfirmed",
                 "independent_future_unreconfirmed",
                 "paired_complete_future_reconfirmed",
-                "paired_complete_future_unreconfirmed"
+                "paired_complete_future_unreconfirmed",
+                "v75_near_issued_proposals","v75_unmatched_or_no_proposal",
+                "v75_hit","v75_miss","v75_unknown",
+                "independent_matched_v75","independent_only_vs_v75",
+                "v75_only_vs_independent",
+                "paired_complete_matched_v75",
+                "paired_complete_only_vs_v75","v75_only_vs_paired_complete"
             )},
             "unique_issued_stock_phases":len(distinct_phase[item]),
             "independent_mean_wait_minutes":(
@@ -217,7 +296,13 @@ def score(*, ledger=DESTINATION, collector=COLLECTOR,
         "historically_reconstructed_issues":False,
         "actual_player_flights_verified":False,
         "per_country_freshness_verified":False,
-        "specialist_predictions_scored":False,
+        "v75_private_specialist_source_status":v75_status,
+        "v75_alignment":"actual privately issued V75 proposal <=180s prior, not simultaneous",
+        "v75_matched_pair_net_paired_minus_v75":(
+            allcounts["paired_complete_only_vs_v75"]-
+            allcounts["v75_only_vs_paired_complete"]),
+        "specialist_predictions_scored":bool(
+            allcounts["v75_near_issued_proposals"]),
         "website_or_collector_modified":False,
         "only_mature_observations_used_for_scoring":True,
         "stock_at_arrival_is_bracketed_poll_proxy":True,
