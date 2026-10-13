@@ -569,7 +569,9 @@ def replay(*,collector=COLLECTOR, sidecar=SIDECAR, now=None,
                 if ("score_bins" in stable and "score_bins" in fine
                     and stable["score_bins"]!=fine["score_bins"][::5]):
                     raise AssertionError("V151 60s and 300s scenario support diverged")
-                if (stable["first_next_restock_onset_median_seconds"]!=
+                if (("first_next_restock_onset_median_seconds" in stable and
+                     "first_next_restock_onset_median_seconds" in fine)
+                    and stable["first_next_restock_onset_median_seconds"]!=
                     fine["first_next_restock_onset_median_seconds"]):
                     raise AssertionError("V151 model scenario cohorts differ")
                 record["fine60_status"]=fine["status"]
