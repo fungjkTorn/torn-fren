@@ -152,6 +152,49 @@ class SameIssueReplayTests(unittest.TestCase):
             self.assertEqual(row["stable_departure_median_wait_seconds"],300)
             self.assertFalse(result["real_player_trip_success_certified"])
 
+    def test_direct_paired_v151_and_v148_and_delayed_value(self):
+        with tempfile.TemporaryDirectory() as temp:
+            src,side,issued=make_db(temp)
+            v151={
+                "status":"PROVISIONAL_SCENARIO_SUPPORTED_DEPARTURE",
+                "score_now":0.4,
+                "first_reachable":{
+                    "departure_epoch":issued+300,
+                    "arrival_epoch":issued+300+original.TRAVEL_SECONDS["uni"],
+                    "scenario_stock_fraction":0.75,
+                    "cadence_warning":None,
+                },
+            }
+            v148={
+                "status":"PROVISIONAL_FIRST_REACHABLE_STOCK_WINDOW",
+                "issued_epoch":issued,
+                "travel_seconds":original.TRAVEL_SECONDS["uni"],
+                "projected_windows":[],
+                "first_reachable":{
+                    "cycle_number":4,"earliest_departure_epoch":issued+900,
+                    "arrival_epoch":issued+900+original.TRAVEL_SECONDS["uni"],
+                    "provisional":True,
+                },
+            }
+            def outcome(db,country,item,arrival,now):
+                if arrival==issued+300+original.TRAVEL_SECONDS["uni"]:
+                    return "HIT"
+                return "MISS"
+            with patch.object(m,"stable_earliest_departure",return_value=v151), (
+                patch.object(m,"first_reachable_stock_cycles",return_value=v148)
+            ), patch.object(m,"_pair_score",side_effect=outcome):
+                result=m.replay(collector=src,sidecar=side,
+                                now=issued+12000,max_model_evals=10)
+            row=result["items"][ITEM]
+            self.assertEqual(row["matched_stable_vs_explicit"],1)
+            self.assertEqual(row["stable_only_vs_explicit"],1)
+            self.assertEqual(row["explicit_only_vs_stable"],0)
+            self.assertEqual(row["matched_different_departures"],1)
+            self.assertEqual(row["stable_depart_future_proposals"],1)
+            self.assertEqual(row["stable_depart_now_proposals"],0)
+            self.assertEqual(row["matched_stable_delayed_vs_now"],1)
+            self.assertEqual(row["delayed_stable_only_vs_now"],1)
+
     def test_stable_no_candidate_still_preserves_no_data_vs_score_gate(self):
         with tempfile.TemporaryDirectory() as temp:
             src,side,issued=make_db(temp)
