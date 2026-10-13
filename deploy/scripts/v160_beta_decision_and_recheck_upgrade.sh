@@ -12,7 +12,12 @@ LEDGER=/var/lib/torn-fren-v38/v160_v151_prospective24.db
 BRANCH=research/v38-full-roster-live-prep-20261009
 PIN=58da25f27eedb444fdd3bc5251fd95253c963c48
 
-systemctl is-active --quiet "$UNIT" || { echo "STOP existing private beta inactive"; exit 1; }
+if ! systemctl is-active --quiet "$UNIT"; then
+ echo "STOP previous private beta viewer inactive; no attempted upgrade"
+ systemctl show "$UNIT" -p ActiveState -p SubState -p Result -p ExecMainStatus --no-pager || true
+ sudo journalctl -u "$UNIT" -n 25 --no-pager -o short-iso || true
+ exit 1
+fi
 systemctl is-enabled --quiet "$UNIT" || { echo "STOP private beta not enabled"; exit 1; }
 test -f "$CODE" && test -r "$LEDGER" && test -x "$WORK/.venv/bin/python" ||
  { echo "STOP private viewer, research ledger or research venv unavailable"; exit 1; }
@@ -99,6 +104,7 @@ restore() {
 install -m 0700 "$NEW_HELPER" "$HELPER"
 install -m 0700 "$NEW" "$CODE"
 if ! sudo systemctl restart "$UNIT"; then
+ diagnostics
  restore
  exit 1
 fi
