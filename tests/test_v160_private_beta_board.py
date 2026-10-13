@@ -108,6 +108,64 @@ class PrivateBetaBoardTests(unittest.TestCase):
                     row["flight_seconds"])
             self.assertEqual(hashlib.sha256(ledger.read_bytes()).hexdigest(),before)
 
+    def test_issued_now_signal_survives_past_30s_without_claiming_new_departure(self):
+        """The exact reported 3/24 UI failure was caused by discarding NOW
+        timestamps and calling a successful candidate 'No departure'."""
+        with tempfile.TemporaryDirectory() as tmp:
+            ledger,roster=fixture(Path(tmp))
+            with closing(sqlite3.connect(ledger)) as db:
+                key,body=db.execute(
+                    "SELECT item_key,payload_json FROM v160_issued LIMIT 1"
+                ).fetchone()
+                value=json.loads(body)
+                country=key.split(":",1)[0]
+                v=value["models"]["independent"]
+                v.update(departure_epoch=ISSUED,
+                         arrival_epoch=ISSUED+board.FLIGHTS[country],
+                         wait_seconds=0,
+                         status="PROVISIONAL_SCENARIO_SUPPORTED_DEPARTURE")
+                db.execute("UPDATE v160_issued SET payload_json=? WHERE item_key=?",
+                           (json.dumps(value),key))
+                db.commit()
+            report=board.snapshot(ledger,roster,now=ISSUED+130)
+            self.assertTrue(report["healthy"])
+            row=next(r for r in report["items"] if r["item_key"]==key)
+            signal=row["models"]["independent"]
+            self.assertEqual(signal["signal"],"RECENT_ISSUED_NOW_RECHECK")
+            self.assertTrue(signal["issued_now"])
+            self.assertEqual(signal["issued_departure"],ISSUED)
+            self.assertEqual(signal["issued_arrival"],
+                             ISSUED+board.FLIGHTS[country])
+            self.assertIsNone(signal["departure"])
+            self.assertIsNone(signal["arrival"])
+            self.assertTrue(row["recent_now_signal"])
+            self.assertIn("Recently indicated",board.HTML)
+            self.assertIn("RECHECK NOW SIGNAL",board.HTML)
+            self.assertNotIn('return "No qualifying candidate";',board.HTML)
+
+    def test_issued_now_signal_becomes_expired_not_a_forecast(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ledger,roster=fixture(Path(tmp))
+            with closing(sqlite3.connect(ledger)) as db:
+                key,body=db.execute(
+                    "SELECT item_key,payload_json FROM v160_issued LIMIT 1"
+                ).fetchone()
+                value=json.loads(body)
+                country=key.split(":",1)[0]
+                v=value["models"]["paired_complete"]
+                v.update(departure_epoch=ISSUED,
+                         arrival_epoch=ISSUED+board.FLIGHTS[country],
+                         wait_seconds=0)
+                db.execute("UPDATE v160_issued SET payload_json=? WHERE item_key=?",
+                           (json.dumps(value),key))
+                db.commit()
+            row=next(r for r in board.snapshot(ledger,roster,now=ISSUED+310)["items"]
+                     if r["item_key"]==key)
+            self.assertEqual(row["models"]["paired_complete"]["signal"],
+                             "DEPARTURE_PASSED")
+            self.assertIsNone(row["models"]["paired_complete"]["departure"])
+            self.assertFalse(row["recent_now_signal"])
+
     def test_stale_tick_hides_all_departure_timestamps(self):
         with tempfile.TemporaryDirectory() as tmp:
             ledger,roster=fixture(Path(tmp))
