@@ -5,7 +5,9 @@ from copy import deepcopy
 from research.plushie_champions.common import TRAVEL_SECONDS
 from research.v107_explicit_restock_cycle_baseline import StockObservation
 from research.v145_provider_continuous_phases import provider_continuous_phases
-from research.v151_stable_earliest_departure import stable_earliest_departure
+from research.v151_stable_earliest_departure import (
+    stable_earliest_departure,_score_policy
+)
 
 T=1791800000
 
@@ -117,6 +119,57 @@ class StableEarliestTests(unittest.TestCase):
             "mex:Jaguar Plushie",previous,asof=issued,scenarios=32)
         self.assertEqual(r["status"],"INCONSISTENT_LAST_STOCK_PHASE")
         self.assertIsNone(r["first_reachable"])
+
+    def test_fine_60s_grid_uses_same_scenarios_as_original_5min(self):
+        past,issued=history(n=10,high=900,low=900)
+        original=stable_earliest_departure(
+            "chi:Panda Plushie",past,asof=issued,scenarios=48,
+            departure_step_seconds=300)
+        fine=stable_earliest_departure(
+            "chi:Panda Plushie",past,asof=issued,scenarios=48,
+            departure_step_seconds=60)
+        self.assertEqual(original["score_bins"],fine["score_bins"][::5])
+        self.assertEqual(original["first_next_restock_onset_median_seconds"],
+                         fine["first_next_restock_onset_median_seconds"])
+        self.assertEqual(fine["replan_by_epoch"],issued+300)
+        self.assertEqual(fine["required_future_support_span_seconds"],300)
+        if original["first_reachable"] is not None:
+            self.assertIsNotNone(fine["first_reachable"])
+            self.assertLessEqual(
+                fine["first_reachable"]["wait_seconds"],
+                original["first_reachable"]["wait_seconds"])
+        self.assertFalse(fine["game_stock30_at_arrival_verified"])
+
+    def test_fine_scan_finds_earlier_supported_window_without_shortening_support(self):
+        minute_scores=[.1,.8,.8,.8,.8,.8,.8,.5,.5,.5,.8]
+        early,_=_score_policy(
+            minute_scores,asof=T,flight=1200,floor=.60,
+            lifetime_sample=900,observed_cadence=1800,
+            step_seconds=60)
+        old,_=_score_policy(
+            minute_scores[::5],asof=T,flight=1200,floor=.60,
+            lifetime_sample=900,observed_cadence=1800,
+            step_seconds=300)
+        self.assertEqual(early["wait_seconds"],60)
+        self.assertEqual(old["wait_seconds"],300)
+        self.assertEqual(early["support_checks_apart_seconds"],300)
+        # Two adjacent *one-minute* checks are not enough: must remain
+        # supported when the arrival is five minutes later.
+        too_short=[.1,.8,.8,.8,.1,.1,.1]
+        rejected,diagnostic=_score_policy(
+            too_short,asof=T,flight=1200,floor=.60,
+            lifetime_sample=120,observed_cadence=300,
+            step_seconds=60)
+        self.assertIsNone(rejected)
+        self.assertGreater(diagnostic["single_bins_above_gate"],0)
+
+    def test_fine_resolution_refuses_invalid_grid_steps(self):
+        past,issued=history()
+        for grid in (0,30,90,120,150,600,True):
+            with self.subTest(grid=grid),self.assertRaises(ValueError):
+                stable_earliest_departure(
+                    "jap:Xanax",past,asof=issued,scenarios=8,
+                    departure_step_seconds=grid)
 
     def test_bound_scenarios_and_reject_future_data(self):
         previous,issued=history()
