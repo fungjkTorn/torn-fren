@@ -178,7 +178,6 @@ def compact(result):
         "Caution: first-UTC-hour cohorts share restock cycles; these are not independent trips.",
         "V148/V151 proxy rates condition on mature scored proposals; "
         "V145 was capped at 4 model evaluations per item.",
-        "Original V2 graph and deployed 24-item website are unchanged.",
     ])
     return "\n".join(lines)
 
