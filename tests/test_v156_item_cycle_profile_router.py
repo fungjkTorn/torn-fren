@@ -75,6 +75,30 @@ class ItemSpecificRouterTests(unittest.TestCase):
         self.assertEqual(p["predeclared_research_route"],"independent")
         self.assertEqual(p["selection_reason"],"SPARSE_DIRECTLY_MATCHED_EPISODES")
 
+    def test_short_stocked_windows_require_more_complete_pairs(self):
+        low=[100,200,300,400,500,600,700,800,900,1000,1100,1200]
+        high=[int(v*.20)+60 for v in low]
+        phases,t=history(stock_durations=high,depletion_durations=low)
+        p=item_cycle_profile("cay:Stingray Plushie",phases,asof=t)
+        self.assertEqual(p["predeclared_research_route"],"independent")
+        self.assertEqual(p["required_pairs_for_item_regime"],12)
+        self.assertEqual(
+            p["selection_reason"],
+            "STOCK_LIFETIME_OR_FLIGHT_NEEDS_MORE_COMPLETED_PAIRS")
+        self.assertTrue(p["stock_lifetime_under_five_minutes"])
+        self.assertGreater(p["paired_low_high_rank_correlation"],.95)
+
+    def test_long_flight_over_many_replenishments_demands_more_history(self):
+        low=[100,200,300,400,500,600,700,800,900]
+        high=[400,500,600,700,800,900,1000,1100,1200]
+        phases,t=history(stock_durations=high,depletion_durations=low)
+        p=item_cycle_profile("jap:Cherry Blossom",phases,asof=t)
+        self.assertTrue(p["flight_spans_three_or_more_cycles"])
+        self.assertEqual(p["required_pairs_for_item_regime"],10)
+        self.assertEqual(p["required_abs_rank_correlation"],.80)
+        self.assertEqual(p["predeclared_research_route"],"independent")
+        self.assertTrue(p["outcome_free_selection"])
+
     def test_router_falls_back_safely_and_never_uses_outcome_label(self):
         phases,t=history(
             stock_durations=[x+200 for x in range(100,1300,100)])
