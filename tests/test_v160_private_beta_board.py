@@ -2,8 +2,10 @@
 import hashlib
 import importlib.util
 import json
+import re
 import shutil
 import sqlite3
+import subprocess
 import tempfile
 import threading
 import unittest
@@ -73,6 +75,20 @@ def fixture(root):
 
 
 class PrivateBetaBoardTests(unittest.TestCase):
+    def test_browser_script_parses_with_node_when_available(self):
+        import shutil
+        if shutil.which("node") is None:
+            self.skipTest("Node JS parser unavailable in local environment")
+        scripts=re.findall(r"<script>(.*?)</script>",board.HTML,re.S)
+        self.assertEqual(len(scripts),1)
+        result=subprocess.run(["node","--check"],input=scripts[0],
+                              capture_output=True,text=True)
+        self.assertEqual(result.returncode,0,result.stderr)
+        self.assertIn("Where should I fly?",board.HTML)
+        self.assertIn("Recent",board.HTML)
+        self.assertIn("FUTURE_WATCH",board.HTML)
+        self.assertIn("RECENT_ISSUED_NOW_RECHECK",board.HTML)
+
     def test_true_pinned_roster_is_22_plus_two_exact_xanax_keys(self):
         from research.v128_full24_earliest_shadow import exact_roster
         source=ROOT/"research/v38_roster.json"
