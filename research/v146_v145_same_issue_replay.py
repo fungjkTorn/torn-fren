@@ -42,6 +42,9 @@ from research.v150_stock_window_failure_diagnostic import diagnose_window_failur
 from research.v151_stable_earliest_departure import stable_earliest_departure
 from research.v152_first_restock_timing_evidence import evaluate_next_completed_restock
 from research.v153_recent_completed_restock_baseline import recent_restock_forecasts
+from research.v156_item_cycle_profile_router import (
+    item_cycle_profile, route_issued_prediction,
+)
 from research.v88_poll_state_forward_report import observation
 
 DAY=86400
@@ -152,6 +155,48 @@ def _aggregate(rows):
             out[key]=Counter()
         item=out[key]
         item["issued_hourly_samples"]+=1
+        if r.get("item_profile_stocked") is not None:
+            item["profile_high_seconds_sum"]+=r["item_profile_stocked"]
+            item["profile_high_seconds_n"]+=1
+        if r.get("item_profile_depleted") is not None:
+            item["profile_low_seconds_sum"]+=r["item_profile_depleted"]
+            item["profile_low_seconds_n"]+=1
+        if r.get("item_stock_regime"):
+            item["stock_regime:"+r["item_stock_regime"]]+=1
+        if r.get("item_depletion_regime"):
+            item["depletion_regime:"+r["item_depletion_regime"]]+=1
+        if r.get("routing_predeclared"):
+            item["route_original:"+r["routing_predeclared"]]+=1
+            item["route_reason:"+r["routing_reason"]]+=1
+        if r.get("routed_departure") is not None:
+            item["routed_proposals"]+=1
+            if r["routing_actual"]=="paired_complete":
+                item["routed_selected_paired"]+=1
+            else:
+                item["routed_selected_independent"]+=1
+            outcome=r.get("routed_outcome")
+            item["routed_proxy_hit"]+=int(outcome=="HIT")
+            item["routed_proxy_miss"]+=int(outcome=="MISS")
+            item["routed_proxy_pending"]+=int(outcome=="PENDING")
+            item["routed_proxy_unknown"]+=int(
+                isinstance(outcome,str) and outcome.startswith("UNKNOWN_"))
+            if (outcome in ("HIT","MISS") and
+                r.get("stable_outcome") in ("HIT","MISS")):
+                if (r["routed_departure"]==r["stable_departure"] and
+                    outcome!=r["stable_outcome"]):
+                    raise AssertionError("routed same-departure outcome mismatch")
+                item["routed_vs_independent_matched"]+=1
+                item["routed_only_vs_independent"]+=int(
+                    outcome=="HIT" and r["stable_outcome"]=="MISS")
+                item["independent_only_vs_routed"]+=int(
+                    outcome=="MISS" and r["stable_outcome"]=="HIT")
+            if (outcome in ("HIT","MISS") and
+                r.get("leave_now_outcome") in ("HIT","MISS")):
+                item["routed_vs_leave_now_matched"]+=1
+                item["routed_only_vs_now"]+=int(
+                    outcome=="HIT" and r["leave_now_outcome"]=="MISS")
+                item["now_only_vs_routed"]+=int(
+                    outcome=="MISS" and r["leave_now_outcome"]=="HIT")
         item[c]+=1
         if r.get("original_source_status"):
             item["original_source:"+r["original_source_status"]]+=1
@@ -387,7 +432,14 @@ def _aggregate(rows):
     for v in out.values():
         # Convert Counter into plain JSON-friendly dict, including zero
         # denominators for sparse items; never hide absent model proposals.
-        for k in ("paired_proposals","paired_proxy_hit","paired_proxy_miss",
+        for k in ("routed_proposals","routed_selected_paired",
+                  "routed_selected_independent",
+                  "routed_proxy_hit","routed_proxy_miss","routed_proxy_pending",
+                  "routed_proxy_unknown","routed_vs_independent_matched",
+                  "routed_only_vs_independent","independent_only_vs_routed",
+                  "routed_vs_leave_now_matched","routed_only_vs_now",
+                  "now_only_vs_routed",
+                  "paired_proposals","paired_proxy_hit","paired_proxy_miss",
                   "paired_proxy_pending","paired_proxy_unknown",
                   "paired_vs_independent_matched",
                   "paired_only_vs_independent","independent_only_vs_paired",
@@ -521,6 +573,13 @@ def replay(*,collector=COLLECTOR, sidecar=SIDECAR, now=None,
                     "old_departure":None,"old_outcome":"NOT_PROPOSED",
                     "next_restock_status":None,"next_restock_abs_error_seconds":None,
                     "recent_restocks_abs_errors_seconds":{},
+                    "item_profile_stocked":None,
+                    "item_profile_depleted":None,
+                    "item_stock_regime":None,
+                    "item_depletion_regime":None,
+                    "routing_predeclared":None,
+                    "routing_reason":None,"routing_actual":None,
+                    "routed_departure":None,"routed_outcome":"NOT_PROPOSED",
                     "paired_departure":None,"paired_status":None,
                     "paired_outcome":"NOT_PROPOSED",
                     "paired_next_restock_abs_error_seconds":None,
@@ -590,6 +649,13 @@ def replay(*,collector=COLLECTOR, sidecar=SIDECAR, now=None,
                     "old_outcome":"NOT_PROPOSED",
                     "next_restock_status":None,"next_restock_abs_error_seconds":None,
                     "recent_restocks_abs_errors_seconds":{},
+                    "item_profile_stocked":None,
+                    "item_profile_depleted":None,
+                    "item_stock_regime":None,
+                    "item_depletion_regime":None,
+                    "routing_predeclared":None,
+                    "routing_reason":None,"routing_actual":None,
+                    "routed_departure":None,"routed_outcome":"NOT_PROPOSED",
                     "paired_departure":None,"paired_status":None,
                     "paired_outcome":"NOT_PROPOSED",
                     "paired_next_restock_abs_error_seconds":None,
@@ -637,6 +703,31 @@ def replay(*,collector=COLLECTOR, sidecar=SIDECAR, now=None,
                 paired=stable_earliest_departure(
                     key,new,asof=issued,scenarios=64,
                     cycle_sampling="paired_complete")
+                profile=item_cycle_profile(key,new,asof=issued)
+                chosen=route_issued_prediction(
+                    profile,
+                    {"item_key":key,"issued_epoch":issued,
+                     "cycle_sampling":"independent",
+                     "first_reachable":stable["first_reachable"]},
+                    {"item_key":key,"issued_epoch":issued,
+                     "cycle_sampling":"paired_complete",
+                     "first_reachable":paired["first_reachable"]})
+                record["item_profile_stocked"]=profile[
+                    "stocked_median_seconds"]
+                record["item_profile_depleted"]=profile[
+                    "depleted_median_seconds"]
+                record["item_stock_regime"]=profile["stock_duration_regime"]
+                record["item_depletion_regime"]=profile[
+                    "depletion_duration_regime"]
+                record["routing_predeclared"]=profile[
+                    "predeclared_research_route"]
+                record["routing_reason"]=profile["selection_reason"]
+                record["routing_actual"]=chosen["actual_model_used"]
+                if chosen["departure_epoch"] is not None:
+                    record["routed_departure"]=chosen["departure_epoch"]
+                    record["routed_arrival"]=chosen["arrival_epoch"]
+                    record["routed_outcome"]=_pair_score(
+                        stock,country,item,chosen["arrival_epoch"],current)
                 record["paired_status"]=paired["status"]
                 record["paired_completed_cycles"]=paired.get("completed_paired_cycles")
                 record["paired_peak_fraction"]=paired.get(
@@ -709,6 +800,11 @@ def replay(*,collector=COLLECTOR, sidecar=SIDECAR, now=None,
                         stock,country,item,
                         issued+baseline["travel_seconds"],current)
                 if (record["paired_departure"] is not None and
+                    record["leave_now_outcome"]=="NOT_PROPOSED"):
+                    record["leave_now_outcome"]=_pair_score(
+                        stock,country,item,
+                        issued+baseline["travel_seconds"],current)
+                if (record["routed_departure"] is not None and
                     record["leave_now_outcome"]=="NOT_PROPOSED"):
                     record["leave_now_outcome"]=_pair_score(
                         stock,country,item,
