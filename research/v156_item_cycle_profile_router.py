@@ -24,7 +24,7 @@ SHORT_STOCK_SECONDS=300
 
 
 def _median(values):
-    return float(statistics.median(values)) if values else None
+    return int(statistics.median(values)) if values else None
 
 
 def _ranks(values):
