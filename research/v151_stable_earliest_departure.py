@@ -57,10 +57,35 @@ def _score_policy(scores, *, asof, flight, floor, lifetime_sample,
                   observed_cadence):
     """Earliest two adjacent qualified 5-min bins, no arbitrary max-score wait.
 
-    If stocked windows tend to live less than one replan step, a single bin
-    can be acknowledged as a NONACTIONABLE sparse-window signal rather than
-    ignored as nonexistent history.
+    If NOW is supported by its own arrival-stock scenario bin, never impose
+    an artificial 5-minute waiting floor merely to find two adjacent bins.
+    Future single-bin opportunities remain NONACTIONABLE watches because
+    their narrow windows require very careful reconfirmation.
     """
+    # Earliest means NOW when its own arrival grid bin qualifies. Waiting
+    # for two adjacent bins must never discard an actually supported
+    # immediate-arrival opportunity on a short-lived stocked cycle.
+    if scores and scores[0]>=floor:
+        immediate={
+            "departure_epoch":asof,
+            "arrival_epoch":asof+flight,
+            "wait_seconds":0,
+            "scenario_stock_fraction":round(scores[0],6),
+            "two_adjacent_5min_bins":(
+                len(scores)>1 and scores[1]>=floor),
+            "provisional":True,
+            "stock_at_arrival_verified":False,
+            "scenario_fraction_calibrated_probability":False,
+            "cadence_warning":None,
+            "needs_reconfirmation":False,
+            "status":"RESEARCH_NOW",
+        }
+        return immediate,{
+            "reason":"EARLIEST_IMMEDIATE_SUPPORTED_BIN",
+            "short_window_single_bin":not immediate[
+                "two_adjacent_5min_bins"],
+            "long_wait_over_multiple_observed_cycles":False,
+        }
     candidate=None
     for i,score in enumerate(scores):
         if score < floor:
