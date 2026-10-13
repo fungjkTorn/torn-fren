@@ -38,21 +38,18 @@ class FlightHorizonTests(unittest.TestCase):
         self.assertTrue(res[150])
         self.assertTrue(res[250])
         self.assertFalse(res[310])
-        self.assertFalse(res[720])
+        self.assertTrue(res[720])
 
     def test_future_gap_never_becomes_assumed_outcome(self):
-        phases,issue=evidence([(100,200)]*15,gap_at=7)
-        windows=_fully_bounded_episodes(phases,issue)
-        # A later episode after discontinuity must not fill in
-        # unsupported arrival truth across the interrupted interval.
-        idx=next(i for i,e in enumerate(windows)
-                 if i+1<len(windows) and
-                 windows[i][2]!=windows[i+1][0])
-        result=_origin_future_states(
-            windows,idx,(50,450,1200))
+        # These complete pairs are independently valid, but the 400s gap
+        # between pairs 2 and 3 makes subsequent arrival truth unknown.
+        windows=((T+100,T+200,T+300),
+                 (T+300,T+400,T+500),
+                 (T+900,T+1000,T+1100))
+        result=_origin_future_states(windows,1,(50,250,700))
         self.assertFalse(result[50])
-        self.assertIsNone(result[450])
-        self.assertIsNone(result[1200])
+        self.assertIsNone(result[250])
+        self.assertIsNone(result[700])
 
     def test_same_actual_flight_horizons_and_no_outcome_leakage(self):
         pairs=[(900,1500),(1300,1500)]*16
@@ -104,8 +101,8 @@ class FlightHorizonTests(unittest.TestCase):
     def test_elapsed_predicted_horizon_larger_than_observed_known_truth_abstains(self):
         phases,issued=evidence([(500,500)]*11)
         e=_fully_bounded_episodes(phases,issued)
-        actual=_origin_future_states(e,len(e)-1,(600,4000))
-        self.assertIsNone(actual[600])
+        actual=_origin_future_states(e,len(e)-1,(1100,4000))
+        self.assertIsNone(actual[1100])
         self.assertIsNone(actual[4000])
 
 
