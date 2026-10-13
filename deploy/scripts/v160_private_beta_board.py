@@ -334,6 +334,41 @@ function renderCheck(data){
    " · last quantity change "+(lastChangeAge===null?"unknown":elapsed(lastChangeAge))+
    " ago · global collector heartbeat "+elapsed(data.source_heartbeat_age_seconds)+
    " old when checked. Unchanged quantities are not stale merely because time passed.","meta");
+ const timeline=data.restock_timeline;
+ const section=add(output,"div","","");
+ section.className="sep";
+ add(output,"h3","Predicted restocks — next 8 hours");
+ add(output,"p","Each restock is shown, even if your flight cannot reach it. Times are estimates, NOT 90%-verified.","muted small");
+ if(timeline&&Array.isArray(timeline.restock_events)&&timeline.restock_events.length){
+   const events=timeline.restock_events;
+   for(const e of events.slice(0,16)){
+     const card=add(output,"div","","card");
+     const when=Number.isInteger(e.predicted_restock_epoch)?
+       clock(e.predicted_restock_epoch):"unknown";
+     add(card,"strong","Restock "+e.event_index+" · around "+when);
+     const earliest=Number.isInteger(e.expected_departure_epoch)?
+       e.expected_departure_epoch:null;
+     const latest=Number.isInteger(e.expected_latest_departure_epoch)?
+       e.expected_latest_departure_epoch:null;
+     const tooLate=earliest!==null && currentTime()>latest;
+     const summary=earliest===null?
+       "UNREACHABLE for this flight — keep watching later restocks":
+       tooLate?"DEPARTURE WINDOW PASSED — recheck now":
+       "LEAVE "+(earliest<=currentTime()+30?"NOW":"AT "+clock(earliest))+
+         " · latest estimated departure "+clock(latest);
+     add(card,"div",summary,"meta");
+     add(card,"div","Restock timing estimate "+clock(e.restock_early_epoch)+" to "+
+       clock(e.restock_late_epoch)+" · expected stock until "+
+       clock(e.predicted_stock_below_30_epoch),"sub");
+   }
+   if(events.length>16)add(output,"p",String(events.length-16)+
+      " additional later event forecasts omitted from this compact view.","muted");
+ }else{
+   add(output,"p",timeline&&timeline.status?
+     "No restock timeline this issue: "+timeline.status.replaceAll("_"," ").toLowerCase()+
+      ". This does not mean there will be no restocks.":
+     "Restock timeline not available; existing departure forecast remains provisional.","muted");
+ }
  const technical=add(output,"details","","");
  add(technical,"summary","Show research scenario support (not accuracy)");
  for(const key of names){
