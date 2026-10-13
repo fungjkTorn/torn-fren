@@ -1,4 +1,4 @@
-"""V149: <45-line summary for V146 V128/V145/V148 same-issued replay.
+"""V149: <45-line summary for V146 V128/V145/V148/V151 same-issued replay.
 
 Use this for read-only VM operator output instead of dumping ~1,000 lines of
 per-item JSON. Does not alter sources, compute models, read databases, or
@@ -46,6 +46,7 @@ def compact(result):
     total_v128 = total("original_proposals")
     total_v145 = total("new_proposals")
     total_v148 = total("explicit_proposals")
+    total_v151 = total("stable_proposals")
     h145, m145, pn145, unk145 = (
         total("HIT"),total("MISS"),total("PENDING"),
         sum(total(key) for key in (
@@ -54,15 +55,22 @@ def compact(result):
     h148,m148,p148,u148 = (
         total("explicit_proxy_hit"),total("explicit_proxy_miss"),
         total("explicit_proxy_pending"),total("explicit_proxy_unknown"))
-    if (h148+m148+p148+u148 != total_v148 or
+    h151,m151,p151,u151 = (
+        total("stable_proxy_hit"),total("stable_proxy_miss"),
+        total("stable_proxy_pending"),total("stable_proxy_unknown"))
+    if (h151+m151+p151+u151 != total_v151 or
+        h148+m148+p148+u148 != total_v148 or
         h145+m145 > total_v145 or
-        total_v148>source["cohorts"] or total_v128>source["cohorts"]
+        total_v148>source["cohorts"] or total_v151>source["cohorts"]
+        or total_v128>source["cohorts"]
         or total_v145>source["mc_actual_evaluations"]):
         raise ValueError("model outcome denominators do not reconcile")
     p145=total("matched_new_vs_now")
     p148=total("matched_explicit_vs_now")
+    p151=total("matched_stable_vs_now")
     pair145=total("new_only")-total("now_only")
     pair148=total("explicit_only_vs_now")-total("now_only_vs_explicit")
+    pair151=total("stable_only_vs_now")-total("now_only_vs_stable")
     lines=[
         "=== V149 COMPACT V146 REPLAY (HISTORICAL AS-OF / NOT LIVE FLIGHT PROOF) ===",
         f"24 items; {source['cohorts']} first-issued item/UTC-hour cohorts; NO DATABASE OR WEBSITE WRITES",
@@ -78,37 +86,44 @@ def compact(result):
         f"V148 explicit-stock-window proposals: {total_v148}/{source['cohorts']} "
         f"({100*total_v148/source['cohorts']:.1f}%)",
         f"  V148 proxy outcomes: {_rate(h148,m148)}; {p148} pending, {u148} unknown",
+        f"V151 stable whole-cycle scenario departures: {total_v151}/{source['cohorts']}"
+        f" ({100*total_v151/source['cohorts']:.1f}%)",
+        f"  V151 proxy outcomes: {_rate(h151,m151)}; {p151} pending, {u151} unknown",
+        f"  V151 matched vs leave-now: {p151} pairs, net {pair151:+d}"
+        f" ({total('stable_only_vs_now')} V151-only vs {total('now_only_vs_stable')} now-only)",
         f"  V145 matched versus leave-now: {p145} mature pairs, net "
         f"{pair145:+d} model-only minus leave-now-only ({total('new_only')} vs {total('now_only')})",
         f"  V148 matched versus leave-now: {p148} mature pairs, net "
         f"{pair148:+d} model-only minus leave-now-only ({total('explicit_only_vs_now')} vs {total('now_only_vs_explicit')})",
         f"  V148 long-wait caution flags: {total('long_wait_needs_explanation')}; "
         "0 flags is NOT a guarantee of optimal timing",
-        "=== ITEM | old proposals | v145 MC | recovered eligible | "
-        "v148 proposals | v148 HIT/MISS/PEND/UNKNOWN | net vs now | wait median min ===",
+        "=== ITEM | old | recovered | V148 proposed/H/M/net | "
+        "V151 proposed/H/M/net | V151 median wait min ===",
     ]
     focus=["jap:Xanax","chi:Peony","swi:Edelweiss","uni:Xanax"]
     ordered=sorted(items,key=lambda k:(0 if k in focus else 1,focus.index(k) if k in focus else k))
     for name in ordered:
         it=items[name]
-        wait=it.get("explicit_departure_median_wait_seconds")
+        wait=it.get("stable_departure_median_wait_seconds")
         if wait is not None and (
             not isinstance(wait,(int,float)) or wait<0):
             raise ValueError("invalid wait value")
         lines.append(
-            f"{name:24} {_num(it,'original_proposals'):>3} "
-            f"{_num(it,'new_proposals'):>3} {_num(it,'recovered'):>3} "
-            f"{_num(it,'explicit_proposals'):>3} "
+            f"{name:24} {_num(it,'original_proposals'):>2} "
+            f"{_num(it,'recovered'):>2} "
+            f"{_num(it,'explicit_proposals'):>2}/"
             f"{_num(it,'explicit_proxy_hit'):>2}/"
             f"{_num(it,'explicit_proxy_miss'):>2}/"
-            f"{_num(it,'explicit_proxy_pending'):>2}/"
-            f"{_num(it,'explicit_proxy_unknown'):>2}  "
             f"{_num(it,'explicit_only_vs_now')-_num(it,'now_only_vs_explicit'):+3} "
+            f"{_num(it,'stable_proposals'):>2}/"
+            f"{_num(it,'stable_proxy_hit'):>2}/"
+            f"{_num(it,'stable_proxy_miss'):>2}/"
+            f"{_num(it,'stable_only_vs_now')-_num(it,'now_only_vs_stable'):+3} "
             f"{'—' if wait is None else f'{wait/60:.1f}'}"
         )
     lines.extend([
         "Caution: first-UTC-hour cohorts share restock cycles; these are not independent trips.",
-        "V148 proxy rate is conditional on mature scorable proposals; "
+"        "V148/V151 proxy rates condition on mature scored proposals; "
         "V145 was capped at 4 model evaluations per item.",
         "Japan Xanax: separately inspect explicit NO_CONSERVATIVE_REACHABLE_WINDOW "
         "vs actual recorded restocks.",
