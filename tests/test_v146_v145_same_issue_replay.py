@@ -249,6 +249,35 @@ class SameIssueReplayTests(unittest.TestCase):
             self.assertEqual(item["new_proxy_hit"] if "new_proxy_hit" in item
                              else 0,0)
 
+    def test_recency_restock_evaluated_against_exact_same_future_event(self):
+        with tempfile.TemporaryDirectory() as temp:
+            src,side,issued=make_db(temp)
+            # Extra collector changes are AFTER the saved issue time.
+            with sqlite3.connect(src) as db:
+                db.executemany(
+                    "INSERT INTO stock_history(timestamp,quantity,source,country,item_name) VALUES(?,?,?,?,?)",
+                    [(issued+500,110,"yata","uni","Nessie Plushie"),
+                     (issued+1000,0,"yata","uni","Nessie Plushie")])
+            def v151_model(key,history,*,asof,scenarios):
+                self.assertEqual(asof,issued)
+                self.assertEqual(history["last_observation"].epoch,issued)
+                return {"status":"NO_TWO_BIN_SUPPORTED_DEPARTURE",
+                        "score_now":0.1,"first_reachable":None,
+                        "first_next_restock_onset_median_seconds":550,
+                        "peak_scenario_stock_fraction":0.4,
+                        "adjacent_supported_bin_count":0}
+            with patch.object(m,"stable_earliest_departure",
+                              side_effect=v151_model):
+                result=m.replay(collector=src,sidecar=side,
+                                now=issued+1500,max_model_evals=10)
+            row=result["items"][ITEM]
+            self.assertEqual(row["next_restock_scored"],1)
+            self.assertEqual(row["next_restock_abs_error_total_seconds"],50)
+            self.assertEqual(row["recency_recent_3_scored"],1)
+            self.assertEqual(row["recency_recent_3_paired"],1)
+            self.assertEqual(row["v151_beats_recency_recent_3"],1)
+            self.assertEqual(row["recency_recent_3_beats_v151"],0)
+
     def test_replay_input_limits_guard_mutation_and_unbounded_cpu(self):
         with tempfile.TemporaryDirectory() as temp:
             src,side,issued=make_db(temp)
