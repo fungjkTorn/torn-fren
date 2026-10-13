@@ -243,8 +243,8 @@ class PrivateBetaBoardTests(unittest.TestCase):
                     with urlopen(base+"/",timeout=3) as response:
                         page=response.read().decode()
                         self.assertEqual(response.status,200)
-                        self.assertIn("Live research beta",page)
-                        self.assertIn("Research-only",page)
+                        self.assertIn("Where should I fly?",page)
+                        self.assertIn("Provisional guidance",page)
                     with self.assertRaises(HTTPError) as exc:
                         urlopen(base+"/api/live",timeout=3)
                     self.assertEqual(exc.exception.code,503)
