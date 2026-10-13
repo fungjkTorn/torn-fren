@@ -416,6 +416,25 @@ def replay(*,collector=COLLECTOR, sidecar=SIDECAR, now=None,
             times=[r.epoch for r in ordered]
             if times != sorted(times):
                 raise ValueError("unordered SQLite as-of evidence")
+            # The ORIGINAL issue-time snapshot remains unchanged.
+            # Later collector observations are only an outcome holdout.
+            future_rows=stock.execute(
+                """SELECT timestamp,quantity,source FROM stock_history
+                   WHERE country=? AND lower(item_name)=lower(?)
+                     AND timestamp>? AND timestamp<=?
+                   ORDER BY timestamp ASC,id ASC LIMIT ?""",
+                (country,item,top_issue,current,MAX_ITEM_ROWS+1)
+            ).fetchall()
+            if len(future_rows)<=MAX_ITEM_ROWS:
+                outcome_obs=ordered+[
+                    StockObservation(int(t),int(q),str(source))
+                    for t,q,source in future_rows
+                    if t is not None and q is not None and source is not None
+                ]
+                outcome_phases=provider_continuous_phases(
+                    outcome_obs,asof=current,gaps=gaps)
+            else:
+                outcome_obs=outcome_phases=None
             for issue in item_issues:
                 issued=issue["issued_epoch"]
                 subset=ordered[:bisect.bisect_right(times,issued)]
