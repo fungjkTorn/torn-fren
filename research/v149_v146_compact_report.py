@@ -48,6 +48,7 @@ def compact(result):
     total_v148 = total("explicit_proposals")
     total_v151 = total("stable_proposals")
     total_fine60 = total("fine60_proposals")
+    total_paired = total("paired_proposals")
     h145, m145, pn145, unk145 = (
         total("HIT"),total("MISS"),total("PENDING"),
         sum(total(key) for key in (
@@ -62,12 +63,17 @@ def compact(result):
     h60,m60,p60,u60=(
         total("fine60_proxy_hit"),total("fine60_proxy_miss"),
         total("fine60_proxy_pending"),total("fine60_proxy_unknown"))
-    if (h60+m60+p60+u60 != total_fine60 or
+    h_pair,m_pair,p_pair,u_pair=(
+        total("paired_proxy_hit"),total("paired_proxy_miss"),
+        total("paired_proxy_pending"),total("paired_proxy_unknown"))
+    if (h_pair+m_pair+p_pair+u_pair != total_paired or
+        h60+m60+p60+u60 != total_fine60 or
         h151+m151+pending151+u151 != total_v151 or
         h148+m148+pending148+u148 != total_v148 or
         h145+m145 > total_v145 or
         total_v148>source["cohorts"] or total_v151>source["cohorts"]
         or total_fine60>source["cohorts"]
+        or total_paired>source["cohorts"]
         or total_v128>source["cohorts"]
         or total_v145>source["mc_actual_evaluations"]):
         raise ValueError("model outcome denominators do not reconcile")
@@ -108,8 +114,8 @@ def compact(result):
         f"V145 MC capped: {total_v145}/{source['cohorts']} proposals, "
         f"{_rate(h145,m145)} known; {pn145} pending",
         f"V148 explicit-stock-window proposals: {total_v148}/{source['cohorts']} "
-        f"({100*total_v148/source['cohorts']:.1f}%)",
-        f"  V148 proxy outcomes: {_rate(h148,m148)}; {pending148} pending, {u148} unknown",
+        f"({100*total_v148/source['cohorts']:.1f}%); V148 proxy outcomes: "
+        f"{_rate(h148,m148)}, {pending148} pending, {u148} unknown",
         f"V151 stable whole-cycle scenario departures: {total_v151}/{source['cohorts']}"
         f" ({100*total_v151/source['cohorts']:.1f}%)",
         f"  V151 proxy outcomes: {_rate(h151,m151)}; {pending151} pending, {u151} unknown",
@@ -128,6 +134,14 @@ def compact(result):
         f"({total('fine60_only_vs_coarse')} finer-only vs "
         f"{total('coarse_only_vs_fine60')} coarse-only); "
         f"finer mature proxy {_rate(h60,m60)}",
+        f"  V151 complete LOW-HIGH paired cycles: {total_paired}/{source['cohorts']} "
+        f"proposals, mature {_rate(h_pair,m_pair)}, {p_pair} pending/{u_pair} unknown; "
+        f"vs independent {total('paired_vs_independent_matched')} paired, net "
+        f"{total('paired_only_vs_independent')-total('independent_only_vs_paired'):+d} "
+        f"({total('paired_only_vs_independent')} paired-only vs "
+        f"{total('independent_only_vs_paired')} independent-only); "
+        f"vs NOW {total('paired_vs_leave_now_matched')} pairs net "
+        f"{total('paired_only_vs_leave_now')-total('leave_now_only_vs_paired'):+d}",
         f"  V151 next completed-restock forecast: {next_count} matched fully bounded starts, "
         f"MAE {next_mae}, within 1/5/15 min "
         f"{total('next_restock_within_1m')}/{total('next_restock_within_5m')}/"
@@ -142,7 +156,7 @@ def compact(result):
         f"{_num(items['jap:Xanax'],'stable_peak_under_60pct_scenario_gate')} peak support below .60; "
         f"{_num(items['jap:Xanax'],'stable_single_supported_bin_only')} one-bin-only",
         "=== ITEM | old | recovered | V148 proposed/H/M/net | "
-        "V151 proposed/H/M/net | vs V148 | 1min delta vs 5min | restock MAE old/recent5 min | wait min ===",
+        "V151 proposed/H/M/net | vs V148 | 1min net | paired net | restock MAE base/recent5 | wait min ===",
     ]
     focus=["jap:Xanax","chi:Peony","swi:Edelweiss","uni:Xanax"]
     ordered=sorted(items,key=lambda k:(0 if k in focus else 1,focus.index(k) if k in focus else k))
@@ -170,6 +184,7 @@ def compact(result):
             f"{_num(it,'stable_only_vs_now')-_num(it,'now_only_vs_stable'):+3} "
             f"{_num(it,'stable_only_vs_explicit')-_num(it,'explicit_only_vs_stable'):+3} "
             f"{_num(it,'fine60_only_vs_coarse')-_num(it,'coarse_only_vs_fine60'):+3} "
+            f"{_num(it,'paired_only_vs_independent')-_num(it,'independent_only_vs_paired'):+3} "
             f"{'N/A' if next_abs_mean is None else f'{next_abs_mean/60:.1f}'}"
             f"/{'N/A' if recent5_avg is None else format(recent5_avg,'.1f')} "
             f"{'N/A' if wait is None else f'{wait/60:.1f}'}"
