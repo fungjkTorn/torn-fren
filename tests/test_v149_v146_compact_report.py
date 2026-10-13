@@ -180,6 +180,14 @@ class CompactEvidenceTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,"top-level phase episode evidence"):
             compact(data)
 
+    def test_mature_paired_outcomes_cannot_have_zero_phase_groups(self):
+        data=fixture()
+        data["items"]["chi:Peony"]["paired_proposals"]=1
+        data["items"]["chi:Peony"]["paired_proxy_hit"]=1
+        data["items"]["chi:Peony"]["paired_vs_independent_matched"]=1
+        with self.assertRaisesRegex(ValueError,"zero audited phases"):
+            compact(data)
+
     def test_v159_per_item_episode_totals_fail_on_mismatch(self):
         data=fixture()
         audit=data["issue_phase_episode_audit"]
