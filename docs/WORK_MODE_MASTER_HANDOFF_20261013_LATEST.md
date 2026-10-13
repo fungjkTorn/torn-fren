@@ -171,7 +171,7 @@ $key = "C:\Users\fungb\Desktop\.ssh\torn-fren.key"
 $remote = "ubuntu@150.136.108.146"
 if (-not (Test-Path -LiteralPath $key)) { throw "SSH key missing: $key" }
 $branch = "research/v38-full-roster-live-prep-20261009"
-$pin = "24cf6aab68e8cc6bbe05316d81c32607bc714d03"
+$pin = "ef96aeaa0ec75cf3992ae9e2d77615f34243d3f7"
 $script = "deploy/scripts/v160_forward24_operator.sh"
 $cmd = "cd /home/ubuntu/torn-fren-v38-probe && git fetch -q origin $branch && git show " + $pin + ":" + $script + " | bash -s -- smoke"
 & ssh -i "$key" "$remote" "$cmd"
@@ -251,4 +251,6 @@ A safe research-branch update to V161 after this handoff separated PENDING/UNKNO
 
 Read **[the Oct 13 reconciliation and forward readiness addendum](OCT13_HANDOFF_RECONCILIATION_AND_FORWARD_READINESS.md)** before following the older V139/V142 at-home action list or claiming the historical checks never happened.
 
-**Updated operator pin for new smoke sessions:** the PowerShell `smoke` example above now selects the linked-worktree-safe operator at `24cf6aab68e8cc6bbe05316d81c32607bc714d03`, which internally pins verified source `da6db7cee81588b38cb8ee522be611ad7e173bda`. This supersedes the original `cb2a25...` smoke command, not the historical pre-handoff SHA record. DO NOT enable timers unless explicitly approved.
+**Updated operator pin for new smoke sessions:** the PowerShell `smoke` example above now selects the linked-worktree-safe operator at `ef96aeaa0ec75cf3992ae9e2d77615f34243d3f7`, which internally pins verified source `da6db7cee81588b38cb8ee522be611ad7e173bda`. This supersedes the original `cb2a25...` smoke command, not the historical pre-handoff SHA record. DO NOT enable timers unless explicitly approved.
+
+**Operator read-only status improvement (Oct 13):** this newest pinned operator inspects the actual sidecar (if present) using SQLite `mode=ro`, returning the latest three issue epochs and counts, whether each has all 24 item rows, and issue age. The uninstalled status is not equivalent to evidence of a live 5-minute V160 study. Only user approval can authorize the separate `enable` action.
