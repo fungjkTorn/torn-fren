@@ -394,6 +394,12 @@ def replay_events(*,source=COLLECTOR,roster=None,asof=None,days=7,
                     proposals=[]
                     statuses["NO_PRIOR_STOCK_HISTORY"]+=1
                 results=match_events(proposals,truth,tolerance=tolerance)
+                # Tight timing is indispensable for fast Japan-style sellouts;
+                # coarse +/-10 minute matches must not be sold as precision.
+                c["matched_within_15s"]+=match_events(
+                    proposals,truth,tolerance=15)["matched"]
+                c["matched_within_60s"]+=match_events(
+                    proposals,truth,tolerance=60)["matched"]
                 for key,value in results.items():
                     c[key]+=value
                 c["predicted_restock_events"]+=len(proposals)
@@ -404,6 +410,14 @@ def replay_events(*,source=COLLECTOR,roster=None,asof=None,days=7,
                 "matched_timing":c["matched"],
                 "missed_observed_restocks":c["missed_actual"],
                 "unmatched_forecasts":c["false_predicted"],
+                "matched_within_15s":c["matched_within_15s"],
+                "matched_within_60s":c["matched_within_60s"],
+                "recall_within_15s":(
+                    round(c["matched_within_15s"]/c["actual_observed_restocks"],4)
+                    if c["actual_observed_restocks"] else None),
+                "recall_within_60s":(
+                    round(c["matched_within_60s"]/c["actual_observed_restocks"],4)
+                    if c["actual_observed_restocks"] else None),
                 "restock_recall":(
                     round(c["matched"]/c["actual_observed_restocks"],4)
                     if c["actual_observed_restocks"] else None),
@@ -420,6 +434,8 @@ def replay_events(*,source=COLLECTOR,roster=None,asof=None,days=7,
     matched=sum(v["matched_timing"] for v in all_results.values())
     actual=sum(v["observed_restocks"] for v in all_results.values())
     projected=sum(v["forecast_restocks"] for v in all_results.values())
+    hits15=sum(v["matched_within_15s"] for v in all_results.values())
+    hits60=sum(v["matched_within_60s"] for v in all_results.values())
     return {
         "status":"V163_HISTORICAL_ASOF_EVENT_REPLAY_NOT_GENUINE_LIVE_ISSUANCE",
         "asof_epoch":now,"window_days":days,
@@ -428,6 +444,9 @@ def replay_events(*,source=COLLECTOR,roster=None,asof=None,days=7,
         "items":all_results,"items_evaluated":len(all_results),
         "actual_observed_restocks":actual,
         "predicted_events":projected,"matched_timing":matched,
+        "matched_within_15s":hits15,"matched_within_60s":hits60,
+        "recall_within_15s":round(hits15/actual,4) if actual else None,
+        "recall_within_60s":round(hits60/actual,4) if actual else None,
         "restock_recall":round(matched/actual,4) if actual else None,
         "restock_precision":round(matched/projected,4) if projected else None,
         "not_live_forward_validation":True,
@@ -446,8 +465,10 @@ def format_replay(result):
         f"Observed clean restocks={result['actual_observed_restocks']}; "
         f"predicted events={result['predicted_events']}; "
         f"matched={result['matched_timing']}",
-        f"Observed-event recall={result['restock_recall']} "
-        f"(denominator ALL clean observed restocks in cohorts)",
+        f"Observed-event recall within 15s={result['recall_within_15s']}, "
+        f"within 60s={result['recall_within_60s']}, "
+        f"within +/-{result['timing_tolerance_seconds']//60}m={result['restock_recall']}.",
+        "ALL recall denominators include every clean observed restock in scored windows.",
         f"Forecast-event precision={result['restock_precision']} "
         f"(denominator ALL projected events within cohorts)",
         "Neither value is departure-success accuracy; no winner is promoted.",
