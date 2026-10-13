@@ -25,7 +25,7 @@ $key = "C:\Users\fungb\Desktop\.ssh\torn-fren.key"
 $remote = "ubuntu@150.136.108.146"
 if (-not (Test-Path -LiteralPath $key)) { throw "SSH key missing: $key" }
 $branch = "research/v38-full-roster-live-prep-20261009"
-$pin = "af455fe114545021fe87afdc225d5384c86e8160"
+$pin = "24cf6aab68e8cc6bbe05316d81c32607bc714d03"
 $operator = "deploy/scripts/v160_forward24_operator.sh"
 $prefix = "cd /home/ubuntu/torn-fren-v38-probe && git fetch -q origin $branch"
 $command = $prefix + " && git show " + $pin + ":" + $operator + " | bash -s -- smoke"
@@ -33,7 +33,11 @@ $command = $prefix + " && git show " + $pin + ":" + $operator + " | bash -s -- s
 Write-Host "Exit code: $LASTEXITCODE"
 ```
 
-Once the smoke passes, replace the final word `smoke` with `enable` to explicitly start private five-minute forward evidence. For read-only `report`, or `disable`, change that final word similarly. All run against the pinned research code.
+**Only after explicit user approval for NEW scheduled private ledger writes**, replace the final word `smoke` with `enable` to start the isolated five-minute forward study. For read-only `report`, or `disable`, change that final word similarly. All run against the pinned research code.
 
 ## Next validation gates
 Collect genuinely frozen issues over multiple complete restock cycles and country flights. Check mature matched V151 paired versus independent and actual V75 private candidates, proper abstentions, and reconfirmation near future departures. Re-evaluate by independent restock/phase episodes before promoting any item to experimental beta. Japan Xanax remains a separate survival/timing problem; never force a recommendation below its confidence gate. Only validated per-item strategies should be promoted by a reversible additive integration to the *experimental* view, preserving the original V2 page and all specialist functionality.
+
+
+### Oct 13 forward-report integrity correction
+The operator at commit `24cf6aab68e8cc6bbe05316d81c32607bc714d03` stages CI-validated research source commit `da6db7cee81588b38cb8ee522be611ad7e173bda`. V161 now counts PENDING separately from UNKNOWN and MISS for all models, leave-now, and V75; distinguishes pending future WATCH confirmation from genuinely unreconfirmed due departures; and includes guarded 24-item readiness metadata (incumbent is roster metadata until a real matched V75 forecast exists). Historical handoff VM-check corrections: [Oct 13 reconciliation](OCT13_HANDOFF_RECONCILIATION_AND_FORWARD_READINESS.md). Neither the operator commit nor this document installs a VM timer.
