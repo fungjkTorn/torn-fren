@@ -168,6 +168,8 @@ on:
       - 'tests/test_v160_forward_operator.py'
       - 'deploy/scripts/v160_private_beta_board.py'
       - 'tests/test_v160_private_beta_board.py'
+      - 'deploy/scripts/v160_single_item_recheck.py'
+      - 'tests/test_v160_single_item_recheck.py'
       - 'deploy/scripts/v160_private_beta_operator.sh'
       - 'deploy/scripts/v160_beta_safe_upgrade.sh'
       - 'deploy/systemd/torn-fren-v160-beta-board.service'
@@ -353,6 +355,8 @@ jobs:
         run: python -m unittest discover -s tests -p 'test_v160_forward_operator.py' -v
       - name: Verify user-usable loopback 24-item V160 live beta
         run: python -m unittest discover -s tests -p 'test_v160_private_beta_board.py' -v
+      - name: Verify read-only on-demand single-item fresh rechecks
+        run: python -m unittest discover -s tests -p 'test_v160_single_item_recheck.py' -v
       - name: Verify private beta service isolation and opt-in operator
         run: python -m unittest discover -s tests -p 'test_v160_private_beta_operator.py' -v
       - name: Verify Japan implementation compiles
