@@ -162,6 +162,12 @@ def _aggregate(rows):
             item["median_only_nonactionable_scenario"]+=1
         if r.get("stable_status"):
             item["stable_status:"+r["stable_status"]]+=1
+        if r.get("stable_peak_scenario_stock_fraction") is not None:
+            peak=r["stable_peak_scenario_stock_fraction"]
+            if peak<0.6:
+                item["stable_peak_under_60pct_scenario_gate"]+=1
+            elif r.get("stable_supported_adjacent_pairs",0)==0:
+                item["stable_single_supported_bin_only"]+=1
         if r.get("stable_departure") is not None:
             if r["stable_departure"] < r["issued_epoch"]:
                 raise ValueError("V151 proposed a past departure")
@@ -271,7 +277,9 @@ def _aggregate(rows):
     for v in out.values():
         # Convert Counter into plain JSON-friendly dict, including zero
         # denominators for sparse items; never hide absent model proposals.
-        for k in ("stable_depart_now_proposals",
+        for k in ("stable_peak_under_60pct_scenario_gate",
+                  "stable_single_supported_bin_only",
+                  "stable_depart_now_proposals",
                   "stable_depart_future_proposals",
                   "matched_stable_delayed_vs_now",
                   "delayed_stable_only_vs_now",
@@ -447,6 +455,10 @@ def replay(*,collector=COLLECTOR, sidecar=SIDECAR, now=None,
                     key,new,asof=issued,scenarios=64)
                 record["stable_status"]=stable["status"]
                 record["stable_scenario_score_now"]=stable["score_now"]
+                record["stable_peak_scenario_stock_fraction"]=stable.get(
+                    "peak_scenario_stock_fraction")
+                record["stable_supported_adjacent_pairs"]=stable.get(
+                    "adjacent_supported_bin_count")
                 if stable["first_reachable"] is not None:
                     cand=stable["first_reachable"]
                     record["stable_departure"]=cand["departure_epoch"]
