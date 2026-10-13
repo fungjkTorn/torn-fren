@@ -8,8 +8,8 @@ from research.v153_recent_completed_restock_baseline import recent_restock_forec
 T=1791800000
 
 
-def phase_history(low_durations=(900,900,900,300,300,300),
-                  high_durations=(300,)*6, *, source_churn=True):
+def phase_history(low_durations=(900,900,900,900,900,300,300,300),
+                  high_durations=(300,)*8, *, source_churn=True):
     t=T
     rows=[StockObservation(t,0,"yata")]
     for low,high in zip(low_durations,high_durations):
@@ -26,8 +26,8 @@ def phase_history(low_durations=(900,900,900,300,300,300),
 class RecentObservedRestockTests(unittest.TestCase):
     def test_recent_3_follows_changed_depletion_regime_without_future_data(self):
         hist,issued,_=phase_history()
-        self.assertEqual(len(hist["observed_bounded_depleted_windows"]),5)
-        self.assertEqual(len(hist["observed_bounded_stocked_windows"]),6)
+        self.assertEqual(len(hist["observed_bounded_depleted_windows"]),7)
+        self.assertEqual(len(hist["observed_bounded_stocked_windows"]),8)
         result=recent_restock_forecasts("chi:Peony",hist,asof=issued)
         self.assertEqual(result["status"],"ISSUED_PREDECLARED_RECENCY_CHALLENGERS")
         self.assertEqual(result["forecasts"]["recent_3"]["forecast_epoch"],
