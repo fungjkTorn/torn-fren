@@ -80,6 +80,19 @@ def compact(result):
     next_count=total("next_restock_scored")
     next_abs_total=total("next_restock_abs_error_total_seconds")
     next_mae=f"{next_abs_total/next_count/60:.1f} min" if next_count else "not scorable"
+    recency_summary={}
+    for name in ("recent_3","recent_5","recent_10","all_bounded"):
+        prefix="recent_"+name
+        n=total(prefix+"_paired")
+        w=total(prefix+"_beats_v151")
+        l=total("v151_beats_"+prefix)
+        ties=total(prefix+"_ties")
+        aerr=total(prefix+"_abs_total_seconds")
+        nscored=total(prefix+"_scored")
+        if w+l+ties != n or n>nscored:
+            raise ValueError("unbalanced recency paired comparison")
+        mae=f"{aerr/nscored/60:.1f}m" if nscored else "N/A"
+        recency_summary[name]=(n,w,l,ties,mae)
     lines=[
         "=== V149 COMPACT V146 REPLAY (HISTORICAL AS-OF / NOT LIVE FLIGHT PROOF) ===",
         f"24 items; {source['cohorts']} first-issued item/UTC-hour cohorts; NO DATABASE OR WEBSITE WRITES",
@@ -107,12 +120,16 @@ def compact(result):
         f"MAE {next_mae}, within 1/5/15 min "
         f"{total('next_restock_within_1m')}/{total('next_restock_within_5m')}/"
         f"{total('next_restock_within_15m')}",
+        "  V153 completed-history recency vs V151 next-restock errors (same event): "
+        + "; ".join(
+            f"{name} {v[0]} paired, {v[1]} better/{v[2]} worse/{v[3]} tied, MAE {v[4]}"
+            for name,v in recency_summary.items()),
         f"  V145 matched versus leave-now: {matched145} mature pairs, net "
         f"{pair145:+d} model-only minus leave-now-only ({total('new_only')} vs {total('now_only')})",
         f"  V148 matched versus leave-now: {matched148} mature pairs, net "
         f"{pair148:+d} model-only minus leave-now-only ({total('explicit_only_vs_now')} vs {total('now_only_vs_explicit')})",
         "=== ITEM | old | recovered | V148 proposed/H/M/net | "
-        "V151 proposed/H/M/net | V151-V148 paired net | next-restock MAE min | wait min ===",
+        "V151 proposed/H/M/net | vs V148 | restock MAE V151 / V153 recent5 min | wait min ===",
     ]
     focus=["jap:Xanax","chi:Peony","swi:Edelweiss","uni:Xanax"]
     ordered=sorted(items,key=lambda k:(0 if k in focus else 1,focus.index(k) if k in focus else k))
@@ -135,7 +152,8 @@ def compact(result):
             f"{_num(it,'stable_proxy_miss'):>2}/"
             f"{_num(it,'stable_only_vs_now')-_num(it,'now_only_vs_stable'):+3} "
             f"{_num(it,'stable_only_vs_explicit')-_num(it,'explicit_only_vs_stable'):+3} "
-            f"{'N/A' if next_abs_mean is None else f'{next_abs_mean/60:.1f}'} "
+            f"{'N/A' if next_abs_mean is None else f'{next_abs_mean/60:.1f}'}"
+            f"/{'N/A' if _num(it,'recent_recent_5_scored')==0 else f'{_num(it,'recent_recent_5_abs_total_seconds')/_num(it,'recent_recent_5_scored')/60:.1f}'} "
             f"{'N/A' if wait is None else f'{wait/60:.1f}'}"
         )
     lines.extend([
