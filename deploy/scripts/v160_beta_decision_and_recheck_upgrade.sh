@@ -8,6 +8,7 @@ WORK=/home/ubuntu/torn-fren-v38-probe
 ROOT=/home/ubuntu/torn-fren-private-models
 CODE="$ROOT/v160_beta_board.py"
 HELPER="$ROOT/v160_single_item_recheck.py"
+ENGINE="$ROOT/v163_readonly_event_first_preview.py"
 LEDGER=/var/lib/torn-fren-v38/v160_v151_prospective24.db
 BRANCH=research/v38-full-roster-live-prep-20261009
 PIN=f2d091336b8e2b3b13b06cb0633c008e2a474ac5
@@ -21,7 +22,7 @@ fi
 systemctl is-enabled --quiet "$UNIT" || { echo "STOP private beta not enabled"; exit 1; }
 test -f "$CODE" && test -r "$LEDGER" && test -x "$WORK/.venv/bin/python" ||
  { echo "STOP private viewer, research ledger or research venv unavailable"; exit 1; }
-test ! -L "$CODE" && test ! -L "$HELPER" && test ! -L "$LEDGER" ||
+test ! -L "$CODE" && test ! -L "$HELPER" && test ! -L "$ENGINE" && test ! -L "$LEDGER" ||
  { echo "STOP unexpected symlink"; exit 1; }
 [[ "$(git -C "$WORK" rev-parse --show-toplevel 2>/dev/null || true)" == "$WORK" ]] ||
  { echo "STOP expected research checkout missing"; exit 1; }
@@ -32,16 +33,24 @@ git cat-file -e "$PIN^{commit}"
 
 NEW="$(mktemp "$ROOT/.v160-board-new.XXXXXXXX")"
 NEW_HELPER="$(mktemp "$ROOT/.v160-check-new.XXXXXXXX")"
+NEW_ENGINE="$(mktemp "$ROOT/.v163-events-new.XXXXXXXX")"
 OLD="$(mktemp "$ROOT/.v160-board-old.XXXXXXXX")"
 OLD_HELPER="$(mktemp "$ROOT/.v160-check-old.XXXXXXXX")"
+OLD_ENGINE="$(mktemp "$ROOT/.v163-events-old.XXXXXXXX")"
 PROBE="$(mktemp "$ROOT/.v160-beta-probe.XXXXXXXX")"
-trap 'rm -f "$NEW" "$NEW_HELPER" "$OLD" "$OLD_HELPER" "$PROBE"' EXIT
+trap 'rm -f "$NEW" "$NEW_HELPER" "$NEW_ENGINE" "$OLD" "$OLD_HELPER" "$OLD_ENGINE" "$PROBE"' EXIT
 
 git show "$PIN:deploy/scripts/v160_private_beta_board.py" > "$NEW"
 git show "$PIN:deploy/scripts/v160_single_item_recheck.py" > "$NEW_HELPER"
+git show "$PIN:deploy/scripts/v163_readonly_event_first_preview.py" > "$NEW_ENGINE"
 git show "$PIN:deploy/scripts/v160_beta_http_readiness.py" > "$PROBE"
-python3 -m py_compile "$NEW" "$NEW_HELPER" "$PROBE"
+python3 -m py_compile "$NEW" "$NEW_HELPER" "$NEW_ENGINE" "$PROBE"
 cp -p "$CODE" "$OLD"
+HAS_OLD_ENGINE=0
+if [[ -f "$ENGINE" ]]; then
+ cp -p "$ENGINE" "$OLD_ENGINE"
+ HAS_OLD_ENGINE=1
+fi
 HAS_OLD_HELPER=0
 if [[ -f "$HELPER" ]]; then
  cp -p "$HELPER" "$OLD_HELPER"
@@ -68,8 +77,8 @@ if not data["healthy"] or data["recorded_items"]!=24:
     raise SystemExit("STOP: must have fresh complete 24-item research ledger")
 PY
 
-echo "===== CURRENT SINGLE-ITEM READ-ONLY MODEL PREFLIGHT ====="
-PYTHONDONTWRITEBYTECODE=1 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 \
+echo "===== CURRENT SINGLE-ITEM READ-ONLY MODEL + ALL-RESTOCK PREFLIGHT ====="
+TORNFREN_V163_ENGINE="$NEW_ENGINE" PYTHONDONTWRITEBYTECODE=1 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 \
  timeout 65s nice -n 19 "$WORK/.venv/bin/python" -I "$NEW_HELPER" \
  "mex:Jaguar Plushie"
 
@@ -87,6 +96,11 @@ restore() {
  else
    rm -f "$HELPER"
  fi
+ if [[ "$HAS_OLD_ENGINE" == 1 ]]; then
+   install -m 0700 "$OLD_ENGINE" "$ENGINE"
+ else
+   rm -f "$ENGINE"
+ fi
  if ! sudo systemctl restart "$UNIT"; then
    diagnostics
    echo "STOP rollback restart failed; manual investigation required"
@@ -100,7 +114,8 @@ restore() {
  echo "ROLLBACK VERIFIED: previous private viewer serves all 24 items."
 }
 
-# Replace only the dedicated private viewer executable/helper.
+# Replace only dedicated private viewer + event forecast helper.
+install -m 0700 "$NEW_ENGINE" "$ENGINE"
 install -m 0700 "$NEW_HELPER" "$HELPER"
 install -m 0700 "$NEW" "$CODE"
 if ! sudo systemctl restart "$UNIT"; then
