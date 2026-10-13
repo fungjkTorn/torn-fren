@@ -77,6 +77,17 @@ class CompactEvidenceTests(unittest.TestCase):
         self.assertIn("uni:Xanax",output)
         self.assertIn("not independent trips",output)
 
+    def test_pending_counts_are_not_overwritten_by_matched_counts(self):
+        data=fixture()
+        output=compact(data)
+        # 23 items have 1 pending V151 and V148; the Japan fixture has 0.
+        # 230 matched pairs exist; never print 230 'pending'.
+        self.assertIn("V148 proxy outcomes:",output)
+        self.assertIn("23 pending, 23 unknown",output)
+        self.assertIn("V151 proxy outcomes:",output)
+        self.assertIn("V151 matched vs leave-now: 230 pairs",output)
+        self.assertNotIn("230 pending",output)
+
     def test_json_sample_must_balance_outcomes(self):
         data=fixture()
         data["items"]["chi:Peony"]["explicit_proxy_hit"]+=1
