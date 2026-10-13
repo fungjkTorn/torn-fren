@@ -18,10 +18,9 @@ def load():
         raise RuntimeError("missing pinned 24-item roster")
     sys.path.insert(0,str(WORK.resolve(strict=True)))
     import research
-    research.__path__=[str(stage), *[
-        str(p) for p in research.__path__
-        if Path(p).resolve()!=stage
-    ]]
+    # This is an isolated, pinned V160 bundle. Never silently import a
+    # missing research dependency from the mutable VM checkout.
+    research.__path__=[str(stage)]
     importlib.invalidate_caches()
     for name in (
         "v60_private_snapshot_probe",
@@ -36,6 +35,12 @@ def load():
         module=importlib.import_module("research."+name)
         if Path(module.__file__).resolve().parent!=stage:
             raise RuntimeError("unpinned shadow module: "+name)
+    # Enforce *transitive* import isolation, not just direct entry modules.
+    for name,module in tuple(sys.modules.items()):
+        if not name.startswith("research.") or not getattr(module,"__file__",None):
+            continue
+        if not Path(module.__file__).resolve().is_relative_to(stage):
+            raise RuntimeError("unpinned transitive research import: "+name)
     return (
         importlib.import_module("research.v160_prospective_v151_shadow"),
         importlib.import_module("research.v161_prospective_v151_forward_report"),
