@@ -28,6 +28,8 @@ from research.v145_provider_continuous_phases import observed_cycle_evidence_tie
 
 THRESHOLD=30
 STEP_SECONDS=300
+FINE_STEP_SECONDS=60
+MIN_FUTURE_SUPPORT_SECONDS=300
 GRACE_SECONDS=10
 EIGHT_HOURS=28800
 DEFAULT_SCENARIOS=96
@@ -54,7 +56,7 @@ def _stable_seed(key, periods):
 
 
 def _score_policy(scores, *, asof, flight, floor, lifetime_sample,
-                  observed_cadence):
+                  observed_cadence, step_seconds=STEP_SECONDS):
     """Earliest two adjacent qualified 5-min bins, no arbitrary max-score wait.
 
     If NOW is supported by its own arrival-stock scenario bin, never impose
@@ -62,9 +64,13 @@ def _score_policy(scores, *, asof, flight, floor, lifetime_sample,
     Future single-bin opportunities remain NONACTIONABLE watches because
     their narrow windows require very careful reconfirmation.
     """
+    if (type(step_seconds) is not int or
+        step_seconds not in (FINE_STEP_SECONDS,STEP_SECONDS)):
+        raise ValueError("invalid departure-grid step")
+    support_offset=MIN_FUTURE_SUPPORT_SECONDS//step_seconds
     # Earliest means NOW when its own arrival grid bin qualifies. Waiting
-    # for two adjacent bins must never discard an actually supported
-    # immediate-arrival opportunity on a short-lived stocked cycle.
+    # for two support checks 5 min apart must never discard an actually
+    # supported immediate-arrival opportunity on a short-lived cycle.
     if scores and scores[0]>=floor:
         immediate={
             "departure_epoch":asof,
@@ -72,7 +78,10 @@ def _score_policy(scores, *, asof, flight, floor, lifetime_sample,
             "wait_seconds":0,
             "scenario_stock_fraction":round(scores[0],6),
             "two_adjacent_5min_bins":(
-                len(scores)>1 and scores[1]>=floor),
+                len(scores)>support_offset and
+                scores[support_offset]>=floor),
+            "departure_grid_step_seconds":step_seconds,
+            "support_checks_apart_seconds":MIN_FUTURE_SUPPORT_SECONDS,
             "provisional":True,
             "stock_at_arrival_verified":False,
             "scenario_fraction_calibrated_probability":False,
@@ -90,14 +99,16 @@ def _score_policy(scores, *, asof, flight, floor, lifetime_sample,
     for i,score in enumerate(scores):
         if score < floor:
             continue
-        if i+1 >= len(scores) or scores[i+1] < floor:
+        if i+support_offset >= len(scores) or scores[i+support_offset] < floor:
             continue
         candidate={
-            "departure_epoch":asof+i*STEP_SECONDS,
-            "arrival_epoch":asof+i*STEP_SECONDS+flight,
-            "wait_seconds":i*STEP_SECONDS,
+            "departure_epoch":asof+i*step_seconds,
+            "arrival_epoch":asof+i*step_seconds+flight,
+            "wait_seconds":i*step_seconds,
             "scenario_stock_fraction":round(score,6),
             "two_adjacent_5min_bins":True,
+            "departure_grid_step_seconds":step_seconds,
+            "support_checks_apart_seconds":MIN_FUTURE_SUPPORT_SECONDS,
             "provisional":True,
             "stock_at_arrival_verified":False,
             "scenario_fraction_calibrated_probability":False,
@@ -114,7 +125,7 @@ def _score_policy(scores, *, asof, flight, floor, lifetime_sample,
                 lifetime_sample is not None
                 and lifetime_sample < STEP_SECONDS),
             "first_single_bin_delay_seconds":(
-                possible[0][0]*STEP_SECONDS if possible else None),
+                possible[0][0]*step_seconds if possible else None),
         }
     wait=candidate["wait_seconds"]
     long=(observed_cadence is not None and
@@ -132,11 +143,20 @@ def _score_policy(scores, *, asof, flight, floor, lifetime_sample,
 
 def stable_earliest_departure(item_key, periods, *, asof,
                               scenarios=DEFAULT_SCENARIOS,
-                              score_floor=MIN_SCORE_FLOOR):
-    """Forecast on an eight-hour 5-min departure grid, research only."""
+                              score_floor=MIN_SCORE_FLOOR,
+                              departure_step_seconds=STEP_SECONDS):
+    """Forecast <=8h departure on a 5-min or 1-min research-only grid.
+
+    The 1-min challenger still requires arrival-stock support at both the
+    candidate departure and 5 minutes later for FUTURE candidates. It does
+    not loosen the .60 gate, source verification, 5min replan, or 10s grace.
+    The default remains byte-for-byte 5-minute baseline behavior.
+    """
     if (not isinstance(item_key,str) or item_key.count(":")!=1
         or type(asof) is not int or asof<=0
         or type(scenarios) is not int or not 1<=scenarios<=SCENARIO_MAX
+        or type(departure_step_seconds) is not int
+        or departure_step_seconds not in (STEP_SECONDS,FINE_STEP_SECONDS)
         or not isinstance(score_floor,(int,float)) or isinstance(score_floor,bool)
         or not .01<=score_floor<=1.0
         or not isinstance(periods,dict)):
@@ -171,6 +191,8 @@ def stable_earliest_departure(item_key, periods, *, asof,
         "game_stock30_at_arrival_verified":False,
         "forward_performance_untested":True,
         "replan_by_epoch":asof+STEP_SECONDS,
+        "departure_grid_step_seconds":departure_step_seconds,
+        "required_future_support_span_seconds":MIN_FUTURE_SUPPORT_SECONDS,
         "first_reachable":None,
         "secondary_research_signal":None,
         "first_next_restock_onset_median_seconds":None,
@@ -208,8 +230,10 @@ def stable_earliest_departure(item_key, periods, *, asof,
         if len(spacings)>=2:
             default["median_observed_restock_cadence_seconds"]=_median(spacings)
     rng=random.Random(_stable_seed(item_key,periods))
-    bins=EIGHT_HOURS//STEP_SECONDS+1
-    arrivals=[flight+GRACE_SECONDS+i*STEP_SECONDS for i in range(bins)]
+    bins=EIGHT_HOURS//departure_step_seconds+1
+    arrivals=[
+        flight+GRACE_SECONDS+i*departure_step_seconds for i in range(bins)
+    ]
     scores=[0]*bins
     first_next_restocks=[]
     max_arrival=arrivals[-1]
@@ -249,21 +273,23 @@ def stable_earliest_departure(item_key, periods, *, asof,
     peak=max(fractions)
     default["peak_scenario_stock_fraction"]=round(peak,6)
     default["first_peak_departure_delay_seconds"]=(
-        fractions.index(peak)*STEP_SECONDS
+        fractions.index(peak)*departure_step_seconds
     )
     default["at_least_floor_bin_count"]=sum(
         v>=score_floor for v in fractions
     )
     default["adjacent_supported_bin_count"]=sum(
-        fractions[i]>=score_floor and fractions[i+1]>=score_floor
-        for i in range(len(fractions)-1)
+        fractions[i]>=score_floor and
+        fractions[i+MIN_FUTURE_SUPPORT_SECONDS//departure_step_seconds]>=score_floor
+        for i in range(len(fractions)-MIN_FUTURE_SUPPORT_SECONDS//departure_step_seconds)
     )
     default["scenario_count"]=scenarios
     default["first_next_restock_onset_median_seconds"]=_median(first_next_restocks)
     winner,reason=_score_policy(
         fractions,asof=asof,flight=flight,floor=score_floor,
         lifetime_sample=_median(high),
-        observed_cadence=default["median_observed_restock_cadence_seconds"])
+        observed_cadence=default["median_observed_restock_cadence_seconds"],
+        step_seconds=departure_step_seconds)
     default["diagnostic"]=reason
     if winner:
         default["first_reachable"]=winner
