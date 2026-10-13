@@ -43,6 +43,16 @@ class GroupedIssueEpisodeTests(unittest.TestCase):
         self.assertTrue(evidence["not_independent_future_restock_proof"])
         self.assertTrue(evidence["historical_backfill_provenance_unfrozen"])
 
+    def test_selected_paired_with_independent_fallback_counts_missed_win(self):
+        row=issue(selected="paired_complete",routed="MISS")
+        row["flight_horizon_actual"]="independent"
+        result=episode_audit([row])
+        t=result["totals"]
+        self.assertEqual(t["raw_paired_only_missed_by_v158"],1)
+        self.assertEqual(
+            result["items"]["mex:Jaguar Plushie"]["v158_paired_chosen_issues"],0)
+        self.assertEqual(t["v158_winning_episodes"],0)
+
     def test_unknown_unmatured_results_are_not_losses_or_tied_episodes(self):
         rows=[
             issue(old="PENDING",paired="HIT",routed="MISS"),
