@@ -9,11 +9,12 @@ The collector is change-only; current zero can remain valid between polls.
 from __future__ import annotations
 
 import argparse
+import bisect
 import json
 import math
 import sqlite3
 import time
-from collections import Counter
+from collections import Counter,namedtuple
 from contextlib import closing
 from pathlib import Path
 
@@ -274,15 +275,215 @@ def format_report(report):
     return "\n".join(header)
 
 
+OBS=namedtuple("OBS",["epoch","quantity","source"])
+BACKTEST_WINDOW=4*3600
+MAX_ITEM_CHANGE_ROWS=50000
+
+
+def confirmed_restocks(rows,gaps,*,start,end):
+    """Clean <30 -> >=30 transitions, no cross-provider/gap inventions."""
+    events=[]
+    ambiguous=0
+    prev=None
+    for obs in rows:
+        if obs.epoch>end:
+            break
+        if prev is not None and start<obs.epoch<=end:
+            if prev.quantity<MIN_QTY<=obs.quantity:
+                if obs.source!=prev.source or any(
+                    gap_start<=obs.epoch and
+                    (gap_end is None or gap_end>=prev.epoch)
+                    for gap_start,gap_end in gaps
+                ):
+                    ambiguous+=1
+                else:
+                    events.append(obs.epoch)
+        prev=obs
+    return events,ambiguous
+
+
+def match_events(predicted,actual,*,tolerance=600):
+    """One-to-one event timing matches, counting ALL extra predicted events."""
+    if type(tolerance) is not int or tolerance<0:
+        raise ValueError("invalid event timing tolerance")
+    available=set(range(len(actual)))
+    errors=[]
+    for prediction in sorted(predicted):
+        eligible=[k for k in available if abs(actual[k]-prediction)<=tolerance]
+        if eligible:
+            idx=min(eligible,key=lambda k:(abs(actual[k]-prediction),actual[k]))
+            available.remove(idx)
+            errors.append(abs(actual[idx]-prediction))
+    return {
+        "matched":len(errors),
+        "missed_actual":len(available),
+        "false_predicted":len(predicted)-len(errors),
+        "sum_absolute_timing_error_seconds":sum(errors),
+    }
+
+
+def replay_events(*,source=COLLECTOR,roster=None,asof=None,days=7,
+                  tolerance=600,max_changes=MAX_ITEM_CHANGE_ROWS,
+                  limit_items=24):
+    """Historical as-of replay only; NEVER a truly issued V160/163 forecast.
+
+    One fixed, nonoverlapping 4-hour historical cohort per item; every
+    eligible observed restock within that window is counted. Reconstruct
+    predictions using ONLY <= cutoff data, then score after the cutoff.
+    This is not 5-minute replanning accuracy or a calibrated 90% result.
+    """
+    if (type(days) is not int or not 1<=days<=14
+        or type(tolerance) is not int or not 60<=tolerance<=1800
+        or type(max_changes) is not int or not 100<=max_changes<=MAX_ITEM_CHANGE_ROWS
+        or type(limit_items) is not int or not 1<=limit_items<=24):
+        raise ValueError("unbounded replay parameters")
+    now=int(time.time()) if asof is None else asof
+    start=now-days*86400
+    cutoffs=range(((start+BACKTEST_WINDOW-1)//BACKTEST_WINDOW)*BACKTEST_WINDOW,
+                  (now//BACKTEST_WINDOW)*BACKTEST_WINDOW,BACKTEST_WINDOW)
+    catalog=exact_roster() if roster is None else roster
+    if not isinstance(catalog,dict) or len(catalog)!=24:
+        raise ValueError("unexpected item identities")
+    all_results={}
+    with closing(sqlite3.connect(Path(source).resolve(strict=True).as_uri()+
+                                 "?mode=ro",uri=True,timeout=12)) as conn:
+        conn.execute("PRAGMA query_only=ON")
+        gaps=conn.execute(
+            """SELECT start_timestamp,end_timestamp FROM collection_gaps
+               WHERE start_timestamp<=? ORDER BY start_timestamp LIMIT ?""",
+            (now,MAX_GAPS+1)
+        ).fetchall()
+        if len(gaps)>MAX_GAPS:
+            raise ValueError("too many gaps")
+        for item in sorted(catalog)[:limit_items]:
+            country,name=item.split(":",1)
+            raw=conn.execute(
+                """SELECT timestamp,quantity,source FROM stock_history
+                   WHERE country=? AND lower(item_name)=lower(?)
+                     AND timestamp<=?
+                   ORDER BY timestamp ASC,id ASC LIMIT ?""",
+                (country,name,now,max_changes+1)
+            ).fetchall()
+            if len(raw)>max_changes:
+                raise ValueError("change history limit exceeded for "+item)
+            observations=[OBS(int(t),int(q),str(provider))
+                          for t,q,provider in raw if
+                          t is not None and q is not None and provider
+                          and int(q)>=0]
+            times=[row.epoch for row in observations]
+            c=Counter()
+            statuses=Counter()
+            for issue in cutoffs:
+                prefix=observations[:bisect.bisect_right(times,issue)]
+                truth,ambiguity=confirmed_restocks(
+                    observations,gaps,start=issue,end=issue+BACKTEST_WINDOW)
+                c["actual_observed_restocks"]+=len(truth)
+                c["ambiguous_threshold_crossings"]+=ambiguity
+                c["issued_four_hour_cohorts"]+=1
+                if prefix:
+                    evidence=provider_continuous_phases(
+                        prefix,asof=issue,
+                        gaps=[g for g in gaps if g[0]<=issue])
+                    forecast=predict_events(item,evidence,asof=issue,
+                                            horizon=BACKTEST_WINDOW)
+                    proposals=[x["predicted_restock_epoch"]
+                               for x in forecast["restock_events"]
+                               if issue<x["predicted_restock_epoch"]<=issue+BACKTEST_WINDOW]
+                    statuses[forecast["status"]]+=1
+                else:
+                    proposals=[]
+                    statuses["NO_PRIOR_STOCK_HISTORY"]+=1
+                results=match_events(proposals,truth,tolerance=tolerance)
+                for key,value in results.items():
+                    c[key]+=value
+                c["predicted_restock_events"]+=len(proposals)
+            all_results[item]={
+                "cohorts":c["issued_four_hour_cohorts"],
+                "observed_restocks":c["actual_observed_restocks"],
+                "forecast_restocks":c["predicted_restock_events"],
+                "matched_timing":c["matched"],
+                "missed_observed_restocks":c["missed_actual"],
+                "unmatched_forecasts":c["false_predicted"],
+                "restock_recall":(
+                    round(c["matched"]/c["actual_observed_restocks"],4)
+                    if c["actual_observed_restocks"] else None),
+                "restock_precision":(
+                    round(c["matched"]/c["predicted_restock_events"],4)
+                    if c["predicted_restock_events"] else None),
+                "matched_median_absolute_error_seconds":None,
+                "matched_mean_absolute_error_seconds":(
+                    round(c["sum_absolute_timing_error_seconds"]/c["matched"],1)
+                    if c["matched"] else None),
+                "ambiguous_crossings_excluded":c["ambiguous_threshold_crossings"],
+                "forecast_statuses":dict(statuses),
+            }
+    matched=sum(v["matched_timing"] for v in all_results.values())
+    actual=sum(v["observed_restocks"] for v in all_results.values())
+    projected=sum(v["forecast_restocks"] for v in all_results.values())
+    return {
+        "status":"V163_HISTORICAL_ASOF_EVENT_REPLAY_NOT_GENUINE_LIVE_ISSUANCE",
+        "asof_epoch":now,"window_days":days,
+        "cohort_spacing_seconds":BACKTEST_WINDOW,
+        "timing_tolerance_seconds":tolerance,
+        "items":all_results,"items_evaluated":len(all_results),
+        "actual_observed_restocks":actual,
+        "predicted_events":projected,"matched_timing":matched,
+        "restock_recall":round(matched/actual,4) if actual else None,
+        "restock_precision":round(matched/projected,4) if projected else None,
+        "not_live_forward_validation":True,
+        "not_five_minute_replanning":True,
+        "lookahead_used_in_prediction":False,
+        "collector_written":False,
+        "private_ledgers_written":False,
+    }
+
+
+def format_replay(result):
+    output=[
+        "V163 HISTORICAL REPLAY, NOT LIVE FORWARD ACCURACY",
+        f"Past {result['window_days']} days; fixed 4h issuance cohorts; "
+        f"event match within +/-{result['timing_tolerance_seconds']//60} min",
+        f"Observed clean restocks={result['actual_observed_restocks']}; "
+        f"predicted events={result['predicted_events']}; "
+        f"matched={result['matched_timing']}",
+        f"Observed-event recall={result['restock_recall']} "
+        f"(denominator ALL clean observed restocks in cohorts)",
+        f"Forecast-event precision={result['restock_precision']} "
+        f"(denominator ALL projected events within cohorts)",
+        "Neither value is departure-success accuracy; no winner is promoted.",
+        "",
+        f"{'ITEM':<27} {'ACTUAL':>6} {'PRED':>6} {'MATCH':>6} "
+        f"{'RECALL':>8} {'PRECISION':>9}  PRIMARY REASONS",
+        "-"*108,
+    ]
+    for key,v in sorted(result["items"].items()):
+        out=sorted(v["forecast_statuses"].items(),
+                   key=lambda x:-x[1])[:2]
+        output.append(
+            f"{key[:27]:<27} {v['observed_restocks']:>6} "
+            f"{v['forecast_restocks']:>6} {v['matched_timing']:>6} "
+            f"{str(v['restock_recall']):>8} {str(v['restock_precision']):>9}  "
+            +", ".join(f"{a}={b}" for a,b in out))
+    return "\n".join(output)
+
+
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--hours",type=int,default=8)
     parser.add_argument("--json",action="store_true")
+    parser.add_argument("--historical-replay-days",type=int,default=None)
+    parser.add_argument("--limit-items",type=int,default=24)
     args=parser.parse_args()
     if not 1<=args.hours<=8:
         parser.error("horizon must be 1-8 hours")
-    result=forecast_all(horizon=args.hours*3600)
-    print(json.dumps(result,sort_keys=True) if args.json else format_report(result))
+    if args.historical_replay_days is not None:
+        result=replay_events(days=args.historical_replay_days,
+                             limit_items=args.limit_items)
+        print(json.dumps(result,sort_keys=True) if args.json else
+              format_replay(result))
+    else:
+        result=forecast_all(horizon=args.hours*3600)
+        print(json.dumps(result,sort_keys=True) if args.json else format_report(result))
 
 
 if __name__=="__main__":
