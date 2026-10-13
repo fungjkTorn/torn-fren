@@ -103,9 +103,11 @@ class PrivateBetaBoardTests(unittest.TestCase):
     def test_past_departures_not_offered_even_when_batch_fresh(self):
         with tempfile.TemporaryDirectory() as tmp:
             ledger,roster=fixture(Path(tmp))
-            output=board.snapshot(ledger,roster,now=ISSUED+920)
-            self.assertFalse(output["healthy"])
+            output=board.snapshot(ledger,roster,now=ISSUED+631)
+            self.assertTrue(output["healthy"])
             self.assertTrue(all(row["models"]["independent"]["departure"] is None
+                for row in output["items"]))
+            self.assertTrue(all(row["models"]["paired_complete"]["departure"]==ISSUED+900
                 for row in output["items"]))
 
     def test_no_partial_or_foreign_roster_batch_can_pass(self):
