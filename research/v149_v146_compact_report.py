@@ -77,6 +77,9 @@ def compact(result):
     delayed151=total("matched_stable_delayed_vs_now")
     delayed_wins151=total("delayed_stable_only_vs_now")
     delayed_now_wins=total("delayed_now_only_vs_stable")
+    next_count=total("next_restock_scored")
+    next_abs_total=total("next_restock_abs_error_total_seconds")
+    next_mae=f"{next_abs_total/next_count/60:.1f} min" if next_count else "not scorable"
     lines=[
         "=== V149 COMPACT V146 REPLAY (HISTORICAL AS-OF / NOT LIVE FLIGHT PROOF) ===",
         f"24 items; {source['cohorts']} first-issued item/UTC-hour cohorts; NO DATABASE OR WEBSITE WRITES",
@@ -85,10 +88,8 @@ def compact(result):
         f"  V145 simulations run: {source['mc_actual_evaluations']} (max {_num(result, 'replay_cap')}); "
         f"{source['insufficient_or_no_onset']} remain sparse/onset-unknown",
         f"V128 original proposals: {total_v128}/{source['cohorts']} ({100*total_v128/source['cohorts']:.1f}%)",
-        f"V145 corrected Monte Carlo proposals: {total_v145}/{source['cohorts']} "
-        f"(budget-limited; NOT total potential coverage)",
-        f"  proxy results among V145 proposals: {_rate(h145,m145)}; "
-        f"{pn145} pending, remaining unknown/unmatched",
+        f"V145 MC capped: {total_v145}/{source['cohorts']} proposals, "
+        f"{_rate(h145,m145)} known; {pn145} pending",
         f"V148 explicit-stock-window proposals: {total_v148}/{source['cohorts']} "
         f"({100*total_v148/source['cohorts']:.1f}%)",
         f"  V148 proxy outcomes: {_rate(h148,m148)}; {pending148} pending, {u148} unknown",
@@ -102,12 +103,16 @@ def compact(result):
         f"  V151 chooses: {total('stable_depart_now_proposals')} NOW, "
         f"{total('stable_depart_future_proposals')} FUTURE; among {delayed151} mature delayed pairs "
         f"{delayed_wins151} V151-only vs {delayed_now_wins} leave-now-only",
+        f"  V151 next completed-restock forecast: {next_count} matched fully bounded starts, "
+        f"MAE {next_mae}, within 1/5/15 min "
+        f"{total('next_restock_within_1m')}/{total('next_restock_within_5m')}/"
+        f"{total('next_restock_within_15m')}",
         f"  V145 matched versus leave-now: {matched145} mature pairs, net "
         f"{pair145:+d} model-only minus leave-now-only ({total('new_only')} vs {total('now_only')})",
         f"  V148 matched versus leave-now: {matched148} mature pairs, net "
         f"{pair148:+d} model-only minus leave-now-only ({total('explicit_only_vs_now')} vs {total('now_only_vs_explicit')})",
         "=== ITEM | old | recovered | V148 proposed/H/M/net | "
-        "V151 proposed/H/M/net | V151-V148 paired net | V151 median wait min ===",
+        "V151 proposed/H/M/net | V151-V148 paired net | next-restock MAE min | wait min ===",
     ]
     focus=["jap:Xanax","chi:Peony","swi:Edelweiss","uni:Xanax"]
     ordered=sorted(items,key=lambda k:(0 if k in focus else 1,focus.index(k) if k in focus else k))
@@ -129,6 +134,7 @@ def compact(result):
             f"{_num(it,'stable_proxy_miss'):>2}/"
             f"{_num(it,'stable_only_vs_now')-_num(it,'now_only_vs_stable'):+3} "
             f"{_num(it,'stable_only_vs_explicit')-_num(it,'explicit_only_vs_stable'):+3} "
+            f"{'—' if it.get('next_restock_mean_abs_error_seconds') is None else f'{it['next_restock_mean_abs_error_seconds']/60:.1f}'} "
             f"{'—' if wait is None else f'{wait/60:.1f}'}"
         )
     lines.extend([
