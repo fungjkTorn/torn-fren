@@ -23,7 +23,7 @@ from research.v128_full24_earliest_shadow import COLLECTOR,exact_roster
 from research.v160_prospective_v151_shadow import DESTINATION,POLICY,MODEL_VARIANTS
 from research.v76_forward_research_report import V75,eligible as valid_v75_proposal
 
-MAX_ROWS=20000
+MAX_ROWS=120000
 MAX_DAYS=14
 GRACE=10
 MAX_V75_ROWS=120000
@@ -101,7 +101,7 @@ def _load_v75(v75, start, end):
 
 
 def score(*, ledger=DESTINATION, collector=COLLECTOR,
-          now=None,days=7,roster=None,max_rows=MAX_ROWS,
+          now=None,days=2,roster=None,max_rows=MAX_ROWS,
           v75=V75,scorer=observation):
     if (type(days) is not int or not 1<=days<=MAX_DAYS or
         type(max_rows) is not int or not 1<=max_rows<=MAX_ROWS):
@@ -311,7 +311,7 @@ def score(*, ledger=DESTINATION, collector=COLLECTOR,
 
 def main():
     p=argparse.ArgumentParser(description=__doc__)
-    p.add_argument("--days",type=int,default=7)
+    p.add_argument("--days",type=int,default=2)
     a=p.parse_args()
     print(json.dumps(score(days=a.days),sort_keys=True))
 
