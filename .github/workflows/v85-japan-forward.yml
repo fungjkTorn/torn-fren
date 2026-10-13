@@ -161,6 +161,8 @@ on:
       - 'research/v161_prospective_v151_forward_report.py'
       - 'tests/test_v160_prospective_v151_shadow.py'
       - 'tests/test_v161_prospective_v151_forward_report.py'
+      - 'deploy/scripts/v161_forward_24item_scorecard.py'
+      - 'tests/test_v161_forward_24item_scorecard.py'
       - 'deploy/scripts/v160_forward24_operator.sh'
       - 'deploy/scripts/v160_forward_shadow_launcher.py'
       - 'deploy/systemd/torn-fren-v160-forward24.service'
@@ -354,6 +356,7 @@ jobs:
         run: |
           python -m unittest discover -s tests -p 'test_v160_prospective_v151_shadow.py' -v
           python -m unittest discover -s tests -p 'test_v161_prospective_v151_forward_report.py' -v
+          python -m unittest discover -s tests -p 'test_v161_forward_24item_scorecard.py' -v
       - name: V160 isolated operator and private research timer safeguards
         run: python -m unittest discover -s tests -p 'test_v160_forward_operator.py' -v
       - name: Verify user-usable loopback 24-item V160 live beta
