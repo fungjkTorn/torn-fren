@@ -171,7 +171,7 @@ $key = "C:\Users\fungb\Desktop\.ssh\torn-fren.key"
 $remote = "ubuntu@150.136.108.146"
 if (-not (Test-Path -LiteralPath $key)) { throw "SSH key missing: $key" }
 $branch = "research/v38-full-roster-live-prep-20261009"
-$pin = "cb2a25ede37d462cb2760e16dac74376c347a73e"
+$pin = "24cf6aab68e8cc6bbe05316d81c32607bc714d03"
 $script = "deploy/scripts/v160_forward24_operator.sh"
 $cmd = "cd /home/ubuntu/torn-fren-v38-probe && git fetch -q origin $branch && git show " + $pin + ":" + $script + " | bash -s -- smoke"
 & ssh -i "$key" "$remote" "$cmd"
@@ -250,3 +250,5 @@ The next session MUST treat this as an active engineering project and move towar
 A safe research-branch update to V161 after this handoff separated PENDING/UNKNOWN/MISS, not-yet-due WATCH reconfirmation, and 24-item readiness with incumbent provenance. Current VM operator still needs a verified pinned source revision and the opt-in smoke steps; **V160 remains unverified on the VM, and no production rollout was approved**.
 
 Read **[the Oct 13 reconciliation and forward readiness addendum](OCT13_HANDOFF_RECONCILIATION_AND_FORWARD_READINESS.md)** before following the older V139/V142 at-home action list or claiming the historical checks never happened.
+
+**Updated operator pin for new smoke sessions:** the PowerShell `smoke` example above now selects the linked-worktree-safe operator at `24cf6aab68e8cc6bbe05316d81c32607bc714d03`, which internally pins verified source `da6db7cee81588b38cb8ee522be611ad7e173bda`. This supersedes the original `cb2a25...` smoke command, not the historical pre-handoff SHA record. DO NOT enable timers unless explicitly approved.
