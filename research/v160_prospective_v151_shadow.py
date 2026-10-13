@@ -41,8 +41,8 @@ def _source(source, destination, *, canonical):
     if src==dst.resolve(strict=False):
         raise ValueError("collector and sidecar must differ")
     if canonical:
-        if (not approved_collector_source(src) or
-            dst.resolve(strict=False)!=DESTINATION):
+        if (dst.resolve(strict=False)!=DESTINATION or
+            not approved_collector_source(src)):
             raise ValueError("nonapproved production source/private destination")
     elif src.resolve(strict=True)==dst.resolve(strict=False):
         raise ValueError("test collector cannot be destination")
