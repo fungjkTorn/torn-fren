@@ -143,21 +143,31 @@ def compact(result):
             raise ValueError("unbalanced recency paired comparison")
         mae=f"{aerr/nscored/60:.1f}m" if nscored else "N/A"
         recency_summary[name]=(n,w,l,ties,mae)
-    cluster=source.get("issue_phase_episode_audit")
-    if cluster is not None:
-        if (not isinstance(cluster,dict) or
-            cluster.get("method")!="GROUP_BY_ASISSUED_STOCK_PHASE_EPISODE"):
-            raise ValueError("invalid phase episode evidence")
-        phase_totals=cluster.get("totals",{})
-        if (phase_totals.get("raw_paired_exclusive_issue_wins",0)>
-            total("paired_only_vs_independent") or
-            phase_totals.get("raw_independent_exclusive_issue_wins",0)>
-            total("independent_only_vs_paired")):
-            raise ValueError("episode totals exceed same-issued pair comparisons")
-        grouped=cluster.get("items",{})
-    else:
-        phase_totals={}
-        grouped={}
+    # The episode audit is a TOP-LEVEL replay result, never a derived
+    # "source" summary field. Missing audit data must fail closed instead
+    # of silently printing 0 groups when hundreds of pairs were scored.
+    cluster=result.get("issue_phase_episode_audit")
+    if (not isinstance(cluster,dict) or
+        cluster.get("method")!="GROUP_BY_ASISSUED_STOCK_PHASE_EPISODE"):
+        raise ValueError("missing or invalid top-level phase episode evidence")
+    phase_totals=cluster.get("totals")
+    grouped=cluster.get("items")
+    if not isinstance(phase_totals,dict) or not isinstance(grouped,dict):
+        raise ValueError("missing phase episode totals or item breakdown")
+    if (phase_totals.get("raw_paired_exclusive_issue_wins",0)>
+        total("paired_only_vs_independent") or
+        phase_totals.get("raw_independent_exclusive_issue_wins",0)>
+        total("independent_only_vs_paired")):
+        raise ValueError("episode totals exceed same-issued pair comparisons")
+    if (sum(_num(v,"raw_scorable_phase_episodes")
+            for v in grouped.values())!=
+        _num(phase_totals,"raw_scorable_phase_episodes") or
+        sum(_num(v,"v158_scorable_phase_episodes")
+            for v in grouped.values())!=
+        _num(phase_totals,"v158_scorable_phase_episodes")):
+        raise ValueError("phase episode item/total denominators do not reconcile")
+    if _num(phase_totals,"distinct_asof_phase_episodes") > source["cohorts"]:
+        raise ValueError("episode grouping exceeds issued cohorts")
     lines=[
         "=== V149 COMPACT V146 REPLAY (HISTORICAL AS-OF / NOT LIVE FLIGHT PROOF) ===",
         f"24 items; {source['cohorts']} first-issued item/UTC-hour cohorts; NO DATABASE OR WEBSITE WRITES",
