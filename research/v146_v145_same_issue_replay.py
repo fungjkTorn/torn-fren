@@ -320,6 +320,7 @@ def _aggregate(rows):
         )
         vals=first_restock_errors[key]
         v["next_restock_scored"]=len(vals)
+        v["next_restock_abs_error_total_seconds"]=sum(vals)
         v["next_restock_mean_abs_error_seconds"]=(round(statistics.mean(vals),1) if vals else None)
         v["next_restock_within_1m"]=sum(x<=60 for x in vals)
         v["next_restock_within_5m"]=sum(x<=300 for x in vals)
