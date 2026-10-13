@@ -7,6 +7,7 @@ import shutil
 import sqlite3
 import subprocess
 import tempfile
+import sys
 import threading
 import unittest
 from contextlib import closing
@@ -14,7 +15,7 @@ from http.server import ThreadingHTTPServer
 from pathlib import Path
 from unittest.mock import patch
 from urllib.error import HTTPError
-from urllib.request import urlopen
+from urllib.request import urlopen,Request
 
 ROOT=Path(__file__).resolve().parents[1]
 SCRIPT=ROOT/"deploy/scripts/v160_private_beta_board.py"
@@ -265,6 +266,54 @@ class PrivateBetaBoardTests(unittest.TestCase):
                 finally:
                     server.shutdown()
                     thread.join(timeout=3)
+
+    def test_user_clicked_one_item_recheck_is_loopback_protected_and_throttled(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp)
+            ledger,roster=fixture(root)
+            key="mex:Jaguar Plushie"
+            fake=root/"one_item_test.py"
+            fake.write_text(
+                "import json,sys\n"
+                "print(json.dumps({'status':'CURRENT_ITEM_RECHECK_RESEARCH_ONLY',"
+                "'item_key':sys.argv[1],'issued_epoch':1791910605,"
+                "'collector_written':False,'private_ledger_written':False,"
+                "'models':{'independent':{},'paired_complete':{}}}))\n",
+                encoding="utf-8")
+            from urllib.error import HTTPError
+            with ThreadingHTTPServer(("127.0.0.1",0),
+                 board.handler_factory(ledger,roster,
+                      helper=fake,python=Path(sys.executable),work=ROOT)) as server:
+                worker=threading.Thread(target=server.serve_forever,daemon=True)
+                worker.start()
+                url="http://127.0.0.1:"+str(server.server_port)+"/api/recheck"
+                body=json.dumps({"item_key":key}).encode()
+                def request(with_header=True,**headers):
+                    h={"Content-Type":"application/json"}
+                    if with_header:
+                        h["X-Torn-Fren-Action"]="user-recheck"
+                    h.update(headers)
+                    return Request(url,data=body,headers=h,method="POST")
+                try:
+                    with patch.object(board.time,"time",return_value=ISSUED+45):
+                        with self.assertRaises(HTTPError) as missing:
+                            urlopen(request(with_header=False),timeout=4)
+                        self.assertEqual(missing.exception.code,403)
+                        with self.assertRaises(HTTPError) as foreign:
+                            urlopen(request(Origin="https://untrusted.example"),timeout=4)
+                        self.assertEqual(foreign.exception.code,403)
+                        with urlopen(request(),timeout=4) as response:
+                            rec=json.load(response)
+                            self.assertEqual(response.status,200)
+                            self.assertEqual(rec["item_key"],key)
+                            self.assertFalse(rec["collector_written"])
+                            self.assertFalse(rec["private_ledger_written"])
+                        with self.assertRaises(HTTPError) as cooldown:
+                            urlopen(request(),timeout=4)
+                        self.assertEqual(cooldown.exception.code,429)
+                finally:
+                    server.shutdown()
+                    worker.join(timeout=4)
 
     def test_shared_flight_geometry_matches_research_contract(self):
         from research.plushie_champions.common import TRAVEL_SECONDS
