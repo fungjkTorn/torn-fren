@@ -241,3 +241,12 @@ DONE (research/code): 24-item definitions; V145 history continuity; V146/V149 fr
 NOT DONE / NOT VERIFIED: V160 on VM (status/smoke/enable/private DB), any genuine V160 forward accuracy measurements, champion decisions against real incumbent specialists, reliable Japan Xanax supported arrivals, user-visible integration with existing detailed V2 and experimental board, exact deployed live source drift inspection, 24-item operational beta, 200+ catalog scaling or trip-profit planner.
 
 The next session MUST treat this as an active engineering project and move toward substantive user-visible completion, **not restart basic retrospective diagnosis or overclaim historical percentages**.
+
+
+## 13. Post-handoff reconciliation — read before asking for repeat VM work
+
+**IMPORTANT: newer evidence supersedes older pending wording.** The prior October 12 conversation already reported V142 live-site checks (HTTP 200 for both views; existing experimental API 24/24, no missing/duplicate items, V87 installed), several V128 24-row batches with a transient failure/recovery, and completion of V139's historical audit. These point-in-time facts are NOT proof of current deployed source or recent V160 forward evidence. The previous conversation also discussed deployed-source copies, but do not assume they reside in the GitHub research checkout.
+
+A safe research-branch update to V161 after this handoff separated PENDING/UNKNOWN/MISS, not-yet-due WATCH reconfirmation, and 24-item readiness with incumbent provenance. Current VM operator still needs a verified pinned source revision and the opt-in smoke steps; **V160 remains unverified on the VM, and no production rollout was approved**.
+
+Read **[the Oct 13 reconciliation and forward readiness addendum](OCT13_HANDOFF_RECONCILIATION_AND_FORWARD_READINESS.md)** before following the older V139/V142 at-home action list or claiming the historical checks never happened.
