@@ -28,8 +28,8 @@ class FirstCompletedNextRestockAuditTests(unittest.TestCase):
         self.assertFalse(report["source_freshness_certified"])
 
     def test_gap_before_future_restock_makes_first_event_uncertain(self):
-        obs=[O(T,0,"yata"),O(T+500,100,"yata"),
-             O(T+1000,0,"yata")]
+        obs=[O(T,0,"yata"),O(T+200,0,"yata"),O(T+400,0,"yata"),
+             O(T+500,100,"yata"),O(T+1000,0,"yata")]
         gap=[(T+220,T+340)]
         phases=provider_continuous_phases(obs,asof=T+1500,gaps=gap)
         r=evaluate_next_completed_restock(
