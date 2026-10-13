@@ -37,6 +37,7 @@ SCENARIO_MAX=256
 MAX_TRANSITIONS_PER_PATH=512
 MIN_SCORE_FLOOR=.60
 MAX_SOURCE_AGE=86400
+MIN_PAIRED_CYCLES=3
 
 
 def _median(xs):
@@ -53,6 +54,41 @@ def _stable_seed(key, periods):
     )
     return int.from_bytes(hashlib.blake2b(
         repr(state).encode("utf8"),digest_size=8).digest(),"big")
+
+
+def _paired_complete_cycles(phases, asof):
+    """Observed completed LOW followed immediately by completed HIGH.
+
+    Match exact observed boundary times; do not zip unrelated durations or
+    infer missing stock events across gaps/provider contradictions.
+    """
+    lows=phases.get("observed_bounded_depleted_windows")
+    highs=phases.get("observed_bounded_stocked_windows")
+    if not isinstance(lows,list) or not isinstance(highs,list):
+        return []
+    if len(lows)+len(highs)>20000:
+        raise ValueError("unbounded paired-cycle evidence")
+    high_by_start={}
+    for window in highs:
+        if (not isinstance(window,(tuple,list)) or len(window)!=2
+            or any(type(v) is not int for v in window)):
+            raise ValueError("invalid high interval")
+        start,end=window
+        if not 0<start<end<=asof or start in high_by_start:
+            raise ValueError("duplicate/out-of-range stocked intervals")
+        high_by_start[start]=end
+    pairs=[]
+    for window in lows:
+        if (not isinstance(window,(tuple,list)) or len(window)!=2
+            or any(type(v) is not int for v in window)):
+            raise ValueError("invalid low interval")
+        start,end=window
+        if not 0<start<end<=asof:
+            raise ValueError("invalid depleted interval")
+        high_end=high_by_start.get(end)
+        if high_end is not None:
+            pairs.append((end-start,high_end-end))
+    return pairs
 
 
 def _score_policy(scores, *, asof, flight, floor, lifetime_sample,
@@ -144,7 +180,8 @@ def _score_policy(scores, *, asof, flight, floor, lifetime_sample,
 def stable_earliest_departure(item_key, periods, *, asof,
                               scenarios=DEFAULT_SCENARIOS,
                               score_floor=MIN_SCORE_FLOOR,
-                              departure_step_seconds=STEP_SECONDS):
+                              departure_step_seconds=STEP_SECONDS,
+                              cycle_sampling="independent"):
     """Forecast <=8h departure on a 5-min or 1-min research-only grid.
 
     The 1-min challenger still requires arrival-stock support at both the
@@ -157,6 +194,7 @@ def stable_earliest_departure(item_key, periods, *, asof,
         or type(scenarios) is not int or not 1<=scenarios<=SCENARIO_MAX
         or type(departure_step_seconds) is not int
         or departure_step_seconds not in (STEP_SECONDS,FINE_STEP_SECONDS)
+        or cycle_sampling not in ("independent","paired_complete")
         or not isinstance(score_floor,(int,float)) or isinstance(score_floor,bool)
         or not .01<=score_floor<=1.0
         or not isinstance(periods,dict)):
@@ -192,6 +230,8 @@ def stable_earliest_departure(item_key, periods, *, asof,
         "forward_performance_untested":True,
         "replan_by_epoch":asof+STEP_SECONDS,
         "departure_grid_step_seconds":departure_step_seconds,
+        "cycle_sampling":cycle_sampling,
+        "completed_paired_cycles":0,
         "required_future_support_span_seconds":MIN_FUTURE_SUPPORT_SECONDS,
         "first_reachable":None,
         "secondary_research_signal":None,
@@ -229,7 +269,20 @@ def stable_earliest_departure(item_key, periods, *, asof,
                   if type(a) is int and type(b) is int and b>a]
         if len(spacings)>=2:
             default["median_observed_restock_cadence_seconds"]=_median(spacings)
-    rng=random.Random(_stable_seed(item_key,periods))
+    pairs=(_paired_complete_cycles(periods,asof)
+           if cycle_sampling=="paired_complete" else [])
+    default["completed_paired_cycles"]=len(pairs)
+    if cycle_sampling=="paired_complete" and len(pairs)<MIN_PAIRED_CYCLES:
+        default["status"]="INSUFFICIENT_DIRECTLY_PAIRED_CYCLES"
+        return default
+    paired_survivors=([] if cycle_sampling!="paired_complete" else
+        [(low,high) for low,high in pairs
+         if (low if phase=="LOW" else high)>age])
+    if cycle_sampling=="paired_complete" and not paired_survivors:
+        default["status"]="NO_PAIRED_CURRENT_PHASE_SURVIVAL_ANALOG"
+        return default
+    rng=random.Random(_stable_seed(item_key,periods)+
+                      (1 if cycle_sampling=="paired_complete" else 0))
     bins=EIGHT_HOURS//departure_step_seconds+1
     arrivals=[
         flight+GRACE_SECONDS+i*departure_step_seconds for i in range(bins)
@@ -240,7 +293,14 @@ def stable_earliest_departure(item_key, periods, *, asof,
     all_high=tuple(high)
     all_low=tuple(low)
     for _ in range(scenarios):
-        position=rng.choice(surviving)
+        if cycle_sampling=="paired_complete":
+            chosen_low,chosen_high=rng.choice(paired_survivors)
+            position=(chosen_low if phase=="LOW" else chosen_high)-age
+            # Match the first future stocked interval to this completed LOW.
+            pending_high=chosen_high if phase=="LOW" else None
+        else:
+            position=rng.choice(surviving)
+            pending_high=None
         state=phase
         stocked_starts=[]
         stocked_ends=[]
@@ -252,7 +312,16 @@ def stable_earliest_departure(item_key, periods, *, asof,
         while position<=max_arrival and loops<MAX_TRANSITIONS_PER_PATH:
             loops+=1
             state="HIGH" if state=="LOW" else "LOW"
-            duration=rng.choice(all_high if state=="HIGH" else all_low)
+            if cycle_sampling=="paired_complete":
+                if state=="LOW":
+                    duration,pending_high=rng.choice(pairs)
+                else:
+                    if pending_high is None:
+                        raise AssertionError("paired LOW to HIGH link missing")
+                    duration=pending_high
+                    pending_high=None
+            else:
+                duration=rng.choice(all_high if state=="HIGH" else all_low)
             if state=="HIGH":
                 if first_restock is None:
                     first_restock=position
