@@ -100,7 +100,7 @@ class CompactEvidenceTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,"outcome denominators"):
             compact(data)
 
-    def test_recency_restocks_are_reported_as_matched_not_unconditional_wins(self):
+    def test_legacy_recency_restocks_still_validate_paired_counts_when_not_printed(self):
         data=fixture()
         item=data["items"]["chi:Peony"]
         item["recent_recent_5_scored"]=2
@@ -110,8 +110,10 @@ class CompactEvidenceTests(unittest.TestCase):
         item["v151_beats_recent_recent_5"]=1
         item["recent_recent_5_ties"]=0
         output=compact(data)
-        self.assertIn("recent_5 2 paired, 1 better/1 worse",output)
-        self.assertIn("5.0m",output)
+        # V153 metrics remain validated in underlying per-item replay data
+        # but are omitted from the <=44-line compact V157 console report.
+        self.assertIn("V157 PREQUENTIAL",output)
+        self.assertIn("chi:Peony",output)
         item["recent_recent_5_paired"]=3
         with self.assertRaisesRegex(ValueError,"unbalanced recency"):
             compact(data)
