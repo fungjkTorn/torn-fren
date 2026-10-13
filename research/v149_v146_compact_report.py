@@ -135,8 +135,8 @@ def compact(result):
             f"{_num(it,'stable_proxy_miss'):>2}/"
             f"{_num(it,'stable_only_vs_now')-_num(it,'now_only_vs_stable'):+3} "
             f"{_num(it,'stable_only_vs_explicit')-_num(it,'explicit_only_vs_stable'):+3} "
-            f"{'—' if next_abs_mean is None else f'{next_abs_mean/60:.1f}'} "
-            f"{'—' if wait is None else f'{wait/60:.1f}'}"
+            f"{'N/A' if next_abs_mean is None else f'{next_abs_mean/60:.1f}'} "
+            f"{'N/A' if wait is None else f'{wait/60:.1f}'}"
         )
     lines.extend([
         "Caution: first-UTC-hour cohorts share restock cycles; these are not independent trips.",
