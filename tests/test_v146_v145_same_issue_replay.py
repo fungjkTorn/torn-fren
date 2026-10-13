@@ -276,6 +276,55 @@ class SameIssueReplayTests(unittest.TestCase):
             self.assertEqual(row["paired_median_wait_seconds"],600)
             self.assertFalse(result["real_player_trip_success_certified"])
 
+    def test_v157_routing_is_frozen_before_future_outcome_scoring(self):
+        with tempfile.TemporaryDirectory() as temp:
+            src,side,issued=make_db(temp)
+            flight=original.TRAVEL_SECONDS["uni"]
+            def model(key,phases,*,asof,scenarios,
+                      departure_step_seconds=300,
+                      cycle_sampling="independent"):
+                self.assertEqual(asof,issued)
+                self.assertEqual(phases["last_observation"].epoch,issued)
+                delay=(600 if cycle_sampling=="paired_complete" else
+                       60 if departure_step_seconds==60 else 300)
+                return {
+                    "status":"PROVISIONAL_SCENARIO_SUPPORTED_DEPARTURE",
+                    "score_now":.2,
+                    "score_bins":[.2]*(481 if departure_step_seconds==60 else 97),
+                    "first_next_restock_onset_median_seconds":800,
+                    "first_reachable":{
+                        "departure_epoch":issued+delay,
+                        "arrival_epoch":issued+delay+flight,
+                        "wait_seconds":delay,
+                        "scenario_stock_fraction":.65,
+                        "cadence_warning":None,
+                    },
+                }
+            def select(key,history,*,asof):
+                self.assertEqual(asof,issued)
+                self.assertEqual(history["last_observation"].epoch,issued)
+                return {
+                    "selected_sampling":"paired_complete",
+                    "reason":"PREQUENTIAL_FIRST_CYCLE_SURVIVAL_IMPROVEMENT",
+                    "heldout_episodes":7,
+                }
+            def score(db,country,item,arrival,now):
+                return "HIT" if arrival==issued+600+flight else "MISS"
+            with patch.object(m,"stable_earliest_departure",side_effect=model),(
+                 patch.object(m,"prequential_item_route",side_effect=select)
+            ), patch.object(m,"_pair_score",side_effect=score):
+                result=m.replay(collector=src,sidecar=side,
+                                now=issued+12000,max_model_evals=10)
+            row=result["items"][ITEM]
+            self.assertEqual(row["prequential_proposals"],1)
+            self.assertEqual(row["prequential_paired_selected"],1)
+            self.assertEqual(row["prequential_vs_independent_matched"],1)
+            self.assertEqual(row["prequential_only_vs_independent"],1)
+            self.assertEqual(row["independent_only_vs_prequential"],0)
+            self.assertEqual(row["prequential_only_vs_now"],1)
+            self.assertEqual(row["prequential_scored_issue_hours"],1)
+            self.assertFalse(result["real_player_trip_success_certified"])
+
     def test_stable_no_candidate_still_preserves_no_data_vs_score_gate(self):
         with tempfile.TemporaryDirectory() as temp:
             src,side,issued=make_db(temp)
