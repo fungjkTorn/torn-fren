@@ -55,11 +55,38 @@ class ForwardEvidenceTests(unittest.TestCase):
             result=score(
                 collector=source,ledger=ledger,now=T+86400,
                 days=2,scorer=scorer)
-            self.assertEqual(result["totals"]["independent_unknown"],24)
-            self.assertEqual(result["totals"]["paired_complete_unknown"],24)
+            self.assertEqual(result["totals"]["independent_pending"],24)
+            self.assertEqual(result["totals"]["paired_complete_pending"],24)
+            self.assertEqual(result["totals"]["leave_now_pending"],24)
+            self.assertEqual(result["totals"]["independent_unknown"],0)
+            self.assertEqual(result["totals"]["paired_complete_unknown"],0)
             self.assertEqual(result["totals"]["paired_matched_independent"],0)
             self.assertEqual(result["totals"]["paired_only_hit"],0)
             self.assertEqual(result["totals"]["paired_complete_miss"],0)
+
+    def test_mature_unobservable_stock_is_unknown_not_pending(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            source,ledger=self.make_ledger(Path(tmp))
+            result=score(
+                collector=source,ledger=ledger,now=T+86400,days=2,
+                scorer=lambda *args:("NO_POLL_BRACKET",None,{}))
+            self.assertEqual(result["totals"]["independent_unknown"],24)
+            self.assertEqual(result["totals"]["paired_complete_unknown"],24)
+            self.assertEqual(result["totals"]["leave_now_unknown"],24)
+            self.assertEqual(result["totals"]["independent_pending"],0)
+            self.assertEqual(result["totals"]["paired_complete_pending"],0)
+            self.assertEqual(result["totals"]["paired_matched_independent"],0)
+
+    def test_watch_not_yet_due_is_pending_reconfirmation_not_failed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            source,ledger=self.make_ledger(Path(tmp))
+            report=score(
+                collector=source,ledger=ledger,now=T+300,days=2,
+                scorer=lambda *args:("PENDING",None,{}))
+            self.assertEqual(report["totals"]["paired_complete_future_reconfirmation_pending"],24)
+            self.assertEqual(report["totals"]["paired_complete_future_unreconfirmed"],0)
+            self.assertEqual(report["totals"]["paired_complete_future_reconfirmed"],0)
+            self.assertEqual(report["totals"]["paired_complete_pending"],24)
 
     def test_true_v75_near_issue_specialist_is_scored_only_if_prior_and_valid(self):
         with tempfile.TemporaryDirectory() as tmp:
