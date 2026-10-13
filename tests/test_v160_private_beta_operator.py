@@ -44,6 +44,24 @@ class PrivateBetaOperatorTests(unittest.TestCase):
         self.assertNotIn("web/app.py",unit)
         self.assertNotIn("0.0.0.0:8765",unit)
 
+    def test_rollback_safe_upgrade_only_touches_private_beta(self):
+        upgrade=ROOT/"deploy/scripts/v160_beta_safe_upgrade.sh"
+        script=upgrade.read_text(encoding="utf-8")
+        subprocess.run(["bash","-n",str(upgrade)],check=True)
+        self.assertIn("torn-fren-v160-beta-board.service",script)
+        self.assertIn('systemctl is-active --quiet "$UNIT"',script)
+        self.assertIn('git show "$PIN:deploy/scripts/v160_private_beta_board.py"',script)
+        self.assertIn('python3 -m py_compile "$NEW"',script)
+        self.assertIn('r=m["snapshot"]()',script)
+        self.assertIn('cp -p "$CODE" "$BACKUP"',script)
+        self.assertIn('install -m 0700 "$BACKUP" "$CODE"',script)
+        self.assertIn("Where should I fly?",script)
+        self.assertIn("NEW_PRIVATE_BETA_HTTP_PASS 24/24",script)
+        self.assertNotIn("systemctl restart torn-fren-web",script)
+        self.assertNotIn("torn-fren-v160-forward24.timer",script)
+        self.assertNotIn("stock_history.db",script)
+        self.assertNotIn('sudo systemctl enable --now',script)
+
     def test_unit_python_file_exists_and_is_stdlib_only(self):
         self.assertTrue(BOARD.is_file())
         spec=importlib.util.spec_from_file_location("private_beta_check",BOARD)
