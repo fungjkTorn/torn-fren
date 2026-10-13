@@ -23,7 +23,7 @@ The two conditional observed proxy rates (77.3% vs 72.4%) are NOT yet the precis
 
 ## What must be tested before recommending deployment
 
-- First rerun the pinned one-shot **read-only** VM research comparison when CI for the final commit is green. The new report will include direct paired V151 vs V148; mature outcomes vs leave-now for delayed recommendations alone; observed next-restock timing MAE against completed cycles; and Spain? No: preserve the exact 24 supported countries/items only.
+- First rerun the pinned one-shot **read-only** VM research comparison when CI for the final commit is green. The new report will include direct paired V151 vs V148; mature outcomes vs leave-now for delayed recommendations alone; observed next-restock timing MAE against completed cycles; and exact 24-item roster consistency.
 - Audit unresolved/pending statuses and source freshness before treating poll-state data as in-game evidence. Ensure no lookahead or post-issue model inputs.
 - If direct V151 wins on sufficient independent stocked/depleted restock events AND waits stay sensible, then conduct a private as-issued prospective trial before item-by-item deployment. Preserve both original V2 graph and current experimental 24-item dashboard.
 
