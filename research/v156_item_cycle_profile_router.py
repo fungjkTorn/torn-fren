@@ -46,7 +46,7 @@ def _spearman(a,b):
     if len(a)!=len(b) or len(a)<3:
         return None
     ra,rb=_ranks(a),_ranks(b)
-    ma,mb=_median(ra),_median(rb)
+    ma,mb=statistics.mean(ra),statistics.mean(rb)
     va=sum((x-ma)**2 for x in ra)
     vb=sum((y-mb)**2 for y in rb)
     if va==0 or vb==0:
