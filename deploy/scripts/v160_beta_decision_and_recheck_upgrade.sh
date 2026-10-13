@@ -29,11 +29,13 @@ NEW="$(mktemp "$ROOT/.v160-board-new.XXXXXXXX")"
 NEW_HELPER="$(mktemp "$ROOT/.v160-check-new.XXXXXXXX")"
 OLD="$(mktemp "$ROOT/.v160-board-old.XXXXXXXX")"
 OLD_HELPER="$(mktemp "$ROOT/.v160-check-old.XXXXXXXX")"
-trap 'rm -f "$NEW" "$NEW_HELPER" "$OLD" "$OLD_HELPER"' EXIT
+PROBE="$(mktemp "$ROOT/.v160-beta-probe.XXXXXXXX")"
+trap 'rm -f "$NEW" "$NEW_HELPER" "$OLD" "$OLD_HELPER" "$PROBE"' EXIT
 
 git show "$PIN:deploy/scripts/v160_private_beta_board.py" > "$NEW"
 git show "$PIN:deploy/scripts/v160_single_item_recheck.py" > "$NEW_HELPER"
-python3 -m py_compile "$NEW" "$NEW_HELPER"
+git show "$PIN:deploy/scripts/v160_beta_http_readiness.py" > "$PROBE"
+python3 -m py_compile "$NEW" "$NEW_HELPER" "$PROBE"
 cp -p "$CODE" "$OLD"
 HAS_OLD_HELPER=0
 if [[ -f "$HELPER" ]]; then
@@ -66,13 +68,31 @@ PYTHONDONTWRITEBYTECODE=1 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 MKL_NUM_THREA
  timeout 65s nice -n 19 "$WORK/.venv/bin/python" -I "$NEW_HELPER" \
  "mex:Jaguar Plushie"
 
+diagnostics() {
+ echo "===== PRIVATE VIEWER STATUS (collector/other units untouched) ====="
+ systemctl show "$UNIT" -p ActiveState -p SubState -p Result -p ExecMainStatus -p NRestarts --no-pager || true
+ echo "===== PRIVATE VIEWER RECENT LOG ====="
+ sudo journalctl -u "$UNIT" -n 35 --no-pager -o short-iso || true
+}
 restore() {
  echo "Restoring previous beta viewer only."
  install -m 0700 "$OLD" "$CODE"
  if [[ "$HAS_OLD_HELPER" == 1 ]]; then
    install -m 0700 "$OLD_HELPER" "$HELPER"
+ else
+   rm -f "$HELPER"
  fi
- sudo systemctl restart "$UNIT" || true
+ if ! sudo systemctl restart "$UNIT"; then
+   diagnostics
+   echo "STOP rollback restart failed; manual investigation required"
+   return 1
+ fi
+ if ! python3 -I "$PROBE" --mode rollback --wait 25; then
+   diagnostics
+   echo "STOP rollback page not healthy; manual investigation required"
+   return 1
+ fi
+ echo "ROLLBACK VERIFIED: previous private viewer serves all 24 items."
 }
 
 # Replace only the dedicated private viewer executable/helper.
@@ -83,23 +103,16 @@ if ! sudo systemctl restart "$UNIT"; then
  exit 1
 fi
 
-echo "===== NEW PRIVATE RESEARCH PAGE AND API SELF-CHECK ====="
-if ! python3 - <<'PY'
-import json,urllib.request
-base="http://127.0.0.1:8765"
-with urllib.request.urlopen(base,timeout=4) as r:
-    content=r.read(180000).decode("utf8")
-    assert "Where should I fly?" in content
-    assert "Recalculate this item NOW" in content
-with urllib.request.urlopen(base+"/api/live",timeout=4) as r:
-    data=json.load(r)
-    assert len(data["items"])==24 and data["healthy"]
-    assert "signal" in data["items"][0]["models"]["independent"]
-print("PASS: 24-item prioritized page + current one-item UI")
-PY
-then
- restore
- echo "FAILED new private page smoke; old private page restored."
+echo "===== BOUNDED NEW PRIVATE PAGE STARTUP & API READINESS ====="
+# systemctl restart can return before Python has bound 127.0.0.1.
+# Do not mistake a normal startup race for a broken deployment.
+if ! python3 -I "$PROBE" --mode new --wait 40; then
+ diagnostics
+ if restore; then
+   echo "FAILED new private page readiness; previous page restored and verified."
+ else
+   echo "FAILED: beta rollback also needs operator attention; see diagnostics."
+ fi
  exit 1
 fi
 echo "SUCCESS: live private beta updated. Original V2, /experimental, collector and V160 timer unchanged."
