@@ -122,6 +122,7 @@ def compact(result):
         if wait is not None and (
             not isinstance(wait,(int,float)) or wait<0):
             raise ValueError("invalid wait value")
+        next_abs_mean=it.get('next_restock_mean_abs_error_seconds')
         lines.append(
             f"{name:24} {_num(it,'original_proposals'):>2} "
             f"{_num(it,'recovered'):>2} "
@@ -134,7 +135,7 @@ def compact(result):
             f"{_num(it,'stable_proxy_miss'):>2}/"
             f"{_num(it,'stable_only_vs_now')-_num(it,'now_only_vs_stable'):+3} "
             f"{_num(it,'stable_only_vs_explicit')-_num(it,'explicit_only_vs_stable'):+3} "
-            f"{'—' if it.get('next_restock_mean_abs_error_seconds') is None else f'{it['next_restock_mean_abs_error_seconds']/60:.1f}'} "
+            f"{'—' if next_abs_mean is None else f'{next_abs_mean/60:.1f}'} "
             f"{'—' if wait is None else f'{wait/60:.1f}'}"
         )
     lines.extend([
