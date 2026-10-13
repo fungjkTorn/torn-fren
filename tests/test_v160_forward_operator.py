@@ -1,5 +1,8 @@
 """V160 isolated operator safety tests."""
+import ast
 import hashlib
+import re
+import shutil
 import json
 import sqlite3
 import subprocess
@@ -96,6 +99,87 @@ class PrivateV160OperatorTests(unittest.TestCase):
             ],text=True).strip()
             self.assertEqual(inside,"true")
             self.assertEqual(root,str(worktree))
+
+    @staticmethod
+    def _staged_names(script):
+        match=re.search(r"for name in \\\n(.*?)\ndo\n",script,re.S)
+        if not match:
+            raise AssertionError("operator must explicitly enumerate pinned stage modules")
+        return re.findall(r"(?m)^\s*(v[0-9][A-Za-z0-9_]*)\b",match.group(1))
+
+    def test_stage_contains_full_recursive_research_import_closure(self):
+        # A CI pass on the checkout is insufficient: on the VM the pinned
+        # staging directory intentionally contains far fewer modules.
+        names=self._staged_names(SH.read_text(encoding="utf-8"))
+        self.assertEqual(len(names),len(set(names)))
+        self.assertIn("v110_multicycle_restock_horizon_audit",names)
+        self.assertIn("v38_snapshot_schema",names)
+        roots={f"research/{name}.py" for name in names}
+        roots|={"research/plushie_champions/common.py",
+                "research/plushie_champions/__init__.py"}
+        for path in sorted(roots):
+            source=ROOT/path
+            self.assertTrue(source.is_file(),str(source))
+            tree=ast.parse(source.read_text(encoding="utf-8"),filename=str(source))
+            for node in ast.walk(tree):
+                modules=[]
+                if isinstance(node,ast.ImportFrom) and node.module:
+                    modules.append(node.module)
+                    if node.module=="research":
+                        modules.extend("research."+alias.name for alias in node.names)
+                elif isinstance(node,ast.Import):
+                    modules.extend(alias.name for alias in node.names)
+                for module in modules:
+                    if not module.startswith("research."):
+                        continue
+                    parts=module.split(".")
+                    if parts[1]=="plushie_champions":
+                        required=("research/plushie_champions/"+
+                                  (parts[2] if len(parts)>2 else "__init__")+".py")
+                    else:
+                        required="research/"+parts[1]+".py"
+                    if (ROOT/required).is_file():
+                        self.assertIn(required,roots,
+                            f"{path} requires unbundled {required}")
+
+    def test_isolated_stage_imports_succeed_and_missing_dependency_fails_closed(self):
+        names=self._staged_names(SH.read_text(encoding="utf-8"))
+        with tempfile.TemporaryDirectory() as tmp:
+            stage=Path(tmp)/"pinned"/"research"
+            champion=stage/"plushie_champions"
+            champion.mkdir(parents=True)
+            for name in names:
+                shutil.copy2(ROOT/"research"/(name+".py"),stage/(name+".py"))
+            for name in ("__init__.py","common.py"):
+                shutil.copy2(ROOT/"research/plushie_champions"/name,champion/name)
+            shutil.copy2(ROOT/"research/v38_roster.json",stage/"v38_roster.json")
+            script=r"""
+import importlib.util
+import sys
+from pathlib import Path
+launcher=Path(sys.argv[1])
+spec=importlib.util.spec_from_file_location("isolated_v160",launcher)
+module=importlib.util.module_from_spec(spec)
+spec.loader.exec_module(module)
+module.WORK=Path(sys.argv[2])
+module.STAGE=Path(sys.argv[3]).parent
+module.load()
+print("ISOLATED_STAGED_IMPORT_OK")
+"""
+            def load():
+                return subprocess.run(
+                    [sys.executable,"-c",script,str(LAUNCH),str(ROOT),
+                     str(champion)],
+                    text=True,capture_output=True,check=False)
+            first=load()
+            self.assertEqual(first.returncode,0,first.stderr)
+            self.assertIn("ISOLATED_STAGED_IMPORT_OK",first.stdout)
+            # Remove a transitive module while keeping it in the checkout:
+            # the isolated importer must NOT recover it from the checkout.
+            (stage/"v110_multicycle_restock_horizon_audit.py").unlink()
+            failure=load()
+            self.assertNotEqual(failure.returncode,0)
+            self.assertIn("v110_multicycle_restock_horizon_audit",failure.stderr)
 
     def test_new_timer_and_service_isolate_budget(self):
         service=SERVICE.read_text(encoding="utf-8")
