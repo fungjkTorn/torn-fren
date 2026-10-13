@@ -40,6 +40,7 @@ from research.v145_provider_continuous_phases import (
 from research.v148_observed_earliest_stock_cycle import first_reachable_stock_cycles
 from research.v150_stock_window_failure_diagnostic import diagnose_window_failure
 from research.v151_stable_earliest_departure import stable_earliest_departure
+from research.v152_first_restock_timing_evidence import evaluate_next_completed_restock
 from research.v88_poll_state_forward_report import observation
 
 DAY=86400
@@ -137,6 +138,7 @@ def _aggregate(rows):
     wait_seconds=defaultdict(list)
     explicit_wait_seconds=defaultdict(list)
     stable_wait_seconds=defaultdict(list)
+    first_restock_errors=defaultdict(list)
     for r in rows:
         c=r["comparison"]
         counters.update([c])
@@ -162,6 +164,10 @@ def _aggregate(rows):
             item["median_only_nonactionable_scenario"]+=1
         if r.get("stable_status"):
             item["stable_status:"+r["stable_status"]]+=1
+        if r.get("next_restock_status"):
+            item["restock:"+r["next_restock_status"]]+=1
+        if r.get("next_restock_abs_error_seconds") is not None:
+            first_restock_errors[key].append(r["next_restock_abs_error_seconds"])
         if r.get("stable_peak_scenario_stock_fraction") is not None:
             peak=r["stable_peak_scenario_stock_fraction"]
             if peak<0.6:
@@ -312,6 +318,12 @@ def _aggregate(rows):
         v["new_departure_median_wait_seconds"]=(
             round(statistics.median(waits),1) if waits else None
         )
+        vals=first_restock_errors[key]
+        v["next_restock_scored"]=len(vals)
+        v["next_restock_mean_abs_error_seconds"]=(round(statistics.mean(vals),1) if vals else None)
+        v["next_restock_within_1m"]=sum(x<=60 for x in vals)
+        v["next_restock_within_5m"]=sum(x<=300 for x in vals)
+        v["next_restock_within_15m"]=sum(x<=900 for x in vals)
         stable_waits=stable_wait_seconds[key]
         v["stable_departure_median_wait_seconds"]=(
             round(statistics.median(stable_waits),1)
