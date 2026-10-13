@@ -42,145 +42,218 @@ MAX_ROWS = 24
 BASE_ROSTER_ROWS = 22
 EXTRA_XANAX_KEYS = frozenset(("can:Xanax", "uni:Xanax"))
 HTML = r"""<!doctype html>
-<html lang="en"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta http-equiv="Cache-Control" content="no-store">
-<title>Torn Fren · Live 24-item Research Beta</title>
+<title>TORN-FREN · Departure Planner Beta</title>
 <style>
-:root{color-scheme:dark;font-family:system-ui,-apple-system,sans-serif;background:#111820;color:#ecf2f7}
-*{box-sizing:border-box}body{max-width:1550px;margin:auto;padding:24px}
-h1{margin:0 0 8px;font-size:1.7rem}h2{font-size:1.1rem}
-a{color:#8bd4ff}.muted{color:#b0bfcc}.warn{color:#ffd697}.good{color:#8ae0bb}
-.top{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap}
-.sub{font-size:.94rem;margin:8px 0 22px}
-.banners{background:#202c39;border:1px solid #52657b;border-radius:12px;padding:15px;margin:12px 0}
-.metrics{display:flex;gap:12px;flex-wrap:wrap;margin:16px 0}
-.metric{border:1px solid #405065;background:#192430;padding:12px 17px;border-radius:10px;min-width:130px}
-.metric strong{font-size:1.5rem;display:block}
-.controls{display:flex;flex-wrap:wrap;gap:12px;margin:14px 0}
-button,select,input{background:#1c2a38;color:#eef5fa;padding:10px;border:1px solid #536c82;border-radius:8px;font:inherit}
-button{cursor:pointer}button:focus,input:focus,select:focus{outline:2px solid #8bd4ff}
-.tablewrap{overflow:auto;border:1px solid #33495b;border-radius:10px}
-table{width:100%;border-collapse:collapse;min-width:1050px}
-th,td{padding:12px 11px;text-align:left;border-bottom:1px solid #314151;vertical-align:top}
-th{background:#233141;position:sticky;top:0;white-space:nowrap}
-tbody tr:hover{background:#1d2b39}
-.small{font-size:.8rem;line-height:1.5;color:#b0bfcc}
-strong{font-weight:650}.mono{font-variant-numeric:tabular-nums}
-.status{font-weight:650}footer{font-size:.86rem;line-height:1.6;padding:16px 0}
-@media(max-width:700px){body{padding:12px}th,td{padding:8px}}
-</style></head><body>
-<div class="top"><div><h1>Torn Fren · Live research beta</h1>
-<p class="sub muted">24 foreign items · V160 forward snapshots · refreshed every 30 seconds</p></div>
-<button id="refresh" type="button">Refresh now</button></div>
-<div class="banners"><strong>Research-only — not a verified travel instruction.</strong>
-Predicted availability means modeled ≥30 stock upon arrival, not guaranteed real-game stock.
-Do not interpret scenario fractions as calibrated success probabilities. Future departures must be reconfirmed within five minutes of leaving.</div>
-<div id="health" class="banners" role="status">Loading current research ledger…</div>
-<div class="metrics"><div class="metric"><strong id="covered">—</strong><span class="small">Items with fresh proposals</span></div>
-<div class="metric"><strong id="agree">—</strong><span class="small">Model agreement (within 5m)</span></div>
-<div class="metric"><strong id="updated">—</strong><span class="small">Latest issue (your time)</span></div></div>
-<div class="controls"><label>Search <input id="search" type="search" placeholder="Item or country"></label>
-<label>Show <select id="filter"><option value="all">All 24 items</option>
-<option value="proposals">With departure candidates</option>
-<option value="watch">Future watches</option>
-<option value="none">No usable forecast</option></select></label>
-<label>Sort <select id="sort"><option value="departure">Earliest departure</option>
-<option value="country">Country / item</option></select></label></div>
-<div class="tablewrap"><table><thead><tr><th>Destination / item</th><th>Observed last quantity</th>
-<th>Independent model</th><th>Paired model</th><th>Research status</th><th>Flight</th></tr></thead>
+:root{color-scheme:dark;font-family:system-ui,-apple-system,Segoe UI,sans-serif;background:#0f1721;color:#eaf2fa;font-size:14px}
+*{box-sizing:border-box}body{max-width:1450px;margin:auto;padding:20px}
+h1{font-size:1.7rem;margin:0 0 5px}h2{font-size:1.15rem;margin:0 0 8px}
+p{line-height:1.55;margin:6px 0}.muted{color:#a7b9cc}.sub{font-size:.85rem;color:#9eb1c1}
+a{color:#91d6ff}.head{display:flex;justify-content:space-between;align-items:start;gap:14px;flex-wrap:wrap}
+.meta{margin:9px 0 16px;color:#bfd2e1}.banner{padding:13px 15px;border:1px solid #42576b;border-radius:9px;background:#1b2b39;margin:12px 0}
+.banner.fault{border-color:#a56950;background:#392520}.banner.good{border-color:#426a61}
+.stats{display:grid;grid-template-columns:repeat(5,minmax(140px,1fr));gap:11px;margin:14px 0 20px}
+.stat{padding:13px;background:#192735;border:1px solid #354a5f;border-radius:9px}
+.stat b{font-size:1.45rem;display:block;margin-bottom:3px}.stat span{color:#b1c1d0;font-size:.84rem}
+.columns{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:0 0 18px}
+.panel{padding:15px;background:#16232f;border:1px solid #33485b;border-radius:10px;min-height:150px}
+.opportunity{border-top:1px solid #2e4154;padding:11px 0}
+.opportunity:first-of-type{border-top:0}.opportunity strong{display:block}
+.opportunity .why{font-size:.85rem;color:#adc2d4;margin:4px 0}
+.tag{display:inline-block;padding:3px 7px;border-radius:5px;font-weight:650;font-size:.75rem;background:#334557;color:#d8e8f5}
+.tag.watch{background:#244b48;color:#a6f2d1}
+.tag.review{background:#55442a;color:#f8d8a1}
+.tag.none{background:#3b4249;color:#c4cfda}
+.controls{display:flex;gap:11px;align-items:end;flex-wrap:wrap;margin:15px 0}
+label{font-size:.88rem}label>*{display:block;margin-top:5px}
+input,select,button{font:inherit;color:inherit;background:#223343;border:1px solid #516b80;border-radius:7px;padding:9px}
+button{cursor:pointer}button:focus,select:focus,input:focus{outline:2px solid #8bd4ff}
+.tablewrap{overflow:auto;border:1px solid #34485b;border-radius:10px}
+table{border-collapse:collapse;width:100%;min-width:1060px}
+th{text-align:left;background:#243446;color:#e6f2fb;white-space:nowrap}
+th,td{padding:12px 10px;vertical-align:top;border-bottom:1px solid #2d3f50}
+tbody tr:hover{background:#1a2a38}.small{font-size:.84rem;color:#aec0d0;line-height:1.45}
+.when{font-variant-numeric:tabular-nums;font-weight:700}.hint{font-size:.78rem;color:#c3b5a0;margin-top:3px}
+.countdown{font-variant-numeric:tabular-nums;color:#b2f2d5}
+footer{padding:20px 2px;color:#a7bacb;font-size:.84rem;line-height:1.6}
+@media(max-width:800px){body{padding:12px}.stats{grid-template-columns:repeat(2,minmax(130px,1fr))}.columns{grid-template-columns:1fr}}
+</style></head>
+<body>
+<header class="head"><div><h1>Where should I fly?</h1>
+<p class="meta">TORN-FREN · 24-item departure planner · latest genuine V160 research issues</p></div>
+<button id="refresh">Refresh predictions</button></header>
+<div class="banner"><strong>Provisional guidance—not verified stock on landing.</strong>
+ A model finding a supported arrival at its issue time does not mean it will still be safe minutes later.
+ The site separates upcoming windows, recent NOW signals requiring another check, and true abstentions.
+ <span class="muted"> ≥30 stock at arrival · PI + pilot flights · 5-minute research updates.</span></div>
+<div id="health" class="banner" role="status">Connecting to private prospective ledger…</div>
+<section class="stats" aria-label="Research signal counts">
+<div class="stat"><b id="availableCount">—</b><span>Future / currently due forecasts</span></div>
+<div class="stat"><b id="recheckCount">—</b><span>Recent NOW signals to reconfirm</span></div>
+<div class="stat"><b id="noCount">—</b><span>Without a usable proposal</span></div>
+<div class="stat"><b id="agreeCount">—</b><span>Both variants agree ≤5 min</span></div>
+<div class="stat"><b id="nextTick">—</b><span>Next planned 5-min issue</span></div>
+</section>
+<div class="columns">
+<section class="panel"><h2>Upcoming departure opportunities</h2>
+<p class="small">Scheduled WATCH signals from this issue. Check again near departure before acting.</p>
+<div id="upcoming"></div></section>
+<section class="panel"><h2>Recently indicated “leave now”</h2>
+<p class="small">These models recommended departing at their issue timestamp. The timestamp has passed; this is a prompt to reconfirm, <strong>not</strong> a fresh departure instruction.</p>
+<div id="recheck"></div></section></div>
+<h2>All 24 items and why</h2>
+<div class="controls">
+<label>Search<input type="search" id="search" placeholder="Country or item"></label>
+<label>Decisions<select id="filter"><option value="all">All items</option>
+<option value="upcoming">Upcoming / due</option><option value="recheck">Reconfirm NOW signal</option>
+<option value="none">No candidate / passed</option></select></label>
+<label>Sort<select id="sort"><option value="priority">Decision priority</option>
+<option value="time">Departure time</option><option value="country">Country / item</option></select></label>
+</div>
+<div class="tablewrap"><table><thead><tr><th>Destination / item</th><th>Observed stock</th>
+<th>Independent</th><th>Paired</th><th>What to do next</th><th>Flight</th></tr></thead>
 <tbody id="rows"><tr><td colspan="6">Loading…</td></tr></tbody></table></div>
-<footer class="muted">This is a separate private preview, not a replacement for the existing original V2 stock graph or experimental dashboard.
-Provider freshness is not verified separately by country. No real player flights or purchases are validated.
-If this feed goes stale, departure recommendations disappear rather than remaining actionable.</footer>
+<footer>The “last observed” quantity can be high even if the model predicts that stock will be sold before your flight arrives. The model's scenario fraction is <strong>not</strong> a validated success probability. A missing proposal means no departure met the current model's criteria, not that restocking will never happen.
+ Neither country-specific provider freshness nor player flights have been verified. The original V2 detailed graph and deployed experimental dashboard remain unchanged.</footer>
 <script>
 "use strict";
-let current=null, loadedAt=0;
-const byId=x=>document.getElementById(x);
+let latest=null;
+const el=id=>document.getElementById(id);
+const clock=t=>Number.isInteger(t)?new Date(t*1000).toLocaleTimeString():"—";
 const local=t=>Number.isInteger(t)?new Date(t*1000).toLocaleString():"—";
-const duration=s=>{if(!Number.isFinite(s))return "—";const n=Math.max(0,Math.floor(s));
- return Math.floor(n/3600)+"h "+Math.floor(n%3600/60)+"m "+n%60+"s";};
-function cell(tr,value,cls){const td=tr.insertCell();td.textContent=value;
- if(cls)td.className=cls;return td;}
-function candidate(row,variant,now,fresh){
- const v=row.models[variant];if(!v)return "No model data";
- if(!Number.isInteger(v.departure)){
-  const reason=typeof v.status==="string"?v.status.replaceAll("_"," ").toLowerCase():"unknown";
-  return "No departure · "+reason;
- }
- if(!fresh)return "STALE · recheck feed";
- if(v.departure<now-30)return "PASSED · await a fresh forecast";
- const when=v.departure<=now+30?"LEAVE NOW · research only":
-    "WATCH · "+duration(v.departure-now);
- const frac=typeof v.fraction==="number"?" · scenario "+Math.round(v.fraction*100)+"%":"";
- return when+" | "+local(v.departure)+" | arrival "+local(v.arrival)+frac;
+function span(seconds){
+ if(!Number.isFinite(seconds))return "—";
+ const n=Math.max(0,Math.floor(seconds)),h=Math.floor(n/3600),m=Math.floor((n%3600)/60),s=n%60;
+ return h>0?h+"h "+m+"m":m+"m "+s+"s";
 }
-function sortKey(row,now){
- const ds=Object.values(row.models).map(v=>v.departure)
-   .filter(x=>Number.isInteger(x)&&x>=now-30);
- return ds.length?Math.min(...ds):9999999999;
+function addCell(tr,main,cls,sub){
+ const td=tr.insertCell(),strong=document.createElement("div");strong.textContent=main;
+ if(cls)strong.className=cls;td.append(strong);
+ if(sub){const small=document.createElement("div");small.className="small";small.textContent=sub;td.append(small);}
+ return td;
+}
+function classify(row,now,healthy){
+ const all=Object.values(row.models);
+ if(!healthy)return "stale";
+ if(all.some(v=>v.signal==="FUTURE_WATCH"||v.signal==="DUE_NOW")&&
+    all.some(v=>Number.isInteger(v.departure)&&v.departure>=now-30))return "upcoming";
+ if(all.some(v=>v.signal==="RECENT_ISSUED_NOW_RECHECK"||
+          (v.issued_now && v.issued_departure!==null && now-v.issued_departure<300 && now>=v.issued_departure)))return "recheck";
+ return "none";
+}
+function proposalText(v,now,healthy){
+ if(!healthy)return ["STALE · no live guidance","Wait for a current complete issue"];
+ if(v.signal==="FUTURE_WATCH")return ["WATCH · leave in "+span(v.departure-now),
+   "Depart "+local(v.departure)+" · arrive "+local(v.arrival)+" · modeled "+Math.round((v.fraction||0)*100)+"%"];
+ if(v.signal==="DUE_NOW")return ["DUE NOW · research only",
+   "As issued "+local(v.issued_departure)+" · projected arrival "+local(v.issued_arrival)];
+ if(v.signal==="RECENT_ISSUED_NOW_RECHECK")return ["RECHECK NOW SIGNAL",
+   "Model said leave at "+clock(v.issued_departure)+" · refresh before flight"];
+ if(v.signal==="DEPARTURE_PASSED")return ["MISSED ISSUE-TIME WINDOW",
+   "Last proposed departure "+clock(v.issued_departure)+" · await next issue"];
+ if(v.signal==="STALE_RESEARCH_ISSUE")return ["STALE · recheck feed",
+   "Prior issue "+clock(v.issued_departure)];
+ const reason=(v.status||"unknown").replaceAll("_"," ").toLowerCase();
+ return ["NO QUALIFYING DEPARTURE",reason];
+}
+function firstDeparture(row,now){
+ return Math.min(...Object.values(row.models).map(v=>v.departure)
+     .filter(x=>Number.isInteger(x)&&x>=now-30).concat([9999999999]));
 }
 function render(){
- if(!current)return;
- const now=Math.floor(Date.now()/1000),rows=current.items.slice();
- const fresh=current.healthy && now-current.issued_epoch<=660;
- const q=byId("search").value.trim().toLowerCase(),filter=byId("filter").value;
- const matches=r=>r.item_key.toLowerCase().includes(q)||r.country_name.toLowerCase().includes(q);
- function has(r){return fresh&&Object.values(r.models).some(v=>Number.isInteger(v.departure)&&v.departure>=now-30);}
- function isWatch(r){return has(r)&&Object.values(r.models).some(v=>Number.isInteger(v.departure)&&v.departure>now+30);}
- const filtered=rows.filter(r=>matches(r)&&
-  (filter==="all"||(filter==="proposals"&&has(r))||
-   (filter==="watch"&&isWatch(r))||(filter==="none"&&!has(r))));
- const sort=byId("sort").value;
- filtered.sort((a,b)=>sort==="country"?a.item_key.localeCompare(b.item_key):
-  sortKey(a,now)-sortKey(b,now)||a.item_key.localeCompare(b.item_key));
- const body=byId("rows");body.replaceChildren();
- for(const r of filtered){
-  const tr=body.insertRow();
-  cell(tr,r.country_name+" · "+r.item);
-  cell(tr,r.source_quantity===null?"Unknown":r.source_quantity+" (last observed)");
-  cell(tr,candidate(r,"independent",now,fresh));
-  cell(tr,candidate(r,"paired_complete",now,fresh));
-  const a=r.models.independent,b=r.models.paired_complete;
-  const both=has(r)&&Number.isInteger(a.departure)&&Number.isInteger(b.departure)&&
-   a.departure>=now-30&&b.departure>=now-30;
-  const label=both?(Math.abs(a.departure-b.departure)<=300?
-   "AGREE ≤5m · still unvalidated":"DISAGREE · do not assume winner"):
-   has(r)?"ONE MODEL ONLY · unvalidated":"NO CURRENT DEPARTURE";
-  cell(tr,label,r.available?"status":"status warn");
-  cell(tr,duration(r.flight_seconds));
+ if(!latest)return;
+ const now=Math.floor(Date.now()/1000);
+ const healthy=latest.healthy && now-latest.issued_epoch<=660;
+ const items=latest.items.map(r=>({...r,decision:classify(r,now,healthy)}));
+ const upcoming=items.filter(r=>r.decision==="upcoming")
+   .sort((a,b)=>firstDeparture(a,now)-firstDeparture(b,now));
+ const recheck=items.filter(r=>r.decision==="recheck")
+   .sort((a,b)=>b.source_quantity-a.source_quantity);
+ el("availableCount").textContent=upcoming.length+"/24";
+ el("recheckCount").textContent=recheck.length;
+ el("noCount").textContent=items.filter(r=>r.decision==="none"||r.decision==="stale").length;
+ el("agreeCount").textContent=items.filter(r=>{
+   const a=r.models.independent,b=r.models.paired_complete;
+   return r.decision!=="stale" && a.issued_departure!==null && b.issued_departure!==null &&
+      Math.abs(a.issued_departure-b.issued_departure)<=300;
+ }).length;
+ el("nextTick").textContent=span(latest.issued_epoch+300-now);
+ el("health").textContent=(healthy?"Research feed current":"Research feed STALE · no actionable forecasts")+" · issued "+local(latest.issued_epoch)+
+   " · "+span(now-latest.issued_epoch)+" ago · collector heartbeat age at issue "+span(latest.source_heartbeat_age_seconds)+
+   ". Next five-minute refresh is an estimate, not guaranteed.";
+ el("health").className="banner "+(healthy?"good":"fault");
+ function paintCards(target,list,state){
+  target.replaceChildren();
+  if(!list.length){const p=document.createElement("p");p.className="small";
+    p.textContent=healthy?"None at this snapshot. Check the next issue.":"Current feed unavailable; no recommendations.";target.append(p);return;}
+  for(const row of list.slice(0,8)){
+   const box=document.createElement("div");box.className="opportunity";
+   const name=document.createElement("strong");name.textContent=row.country_name+" · "+row.item;box.append(name);
+   const tag=document.createElement("div");tag.className="why";
+   const models=Object.entries(row.models).filter(([k,v])=>
+      state==="upcoming"?Number.isInteger(v.departure)&&v.departure>=now-30:v.signal==="RECENT_ISSUED_NOW_RECHECK");
+   const details=models.map(([k,v])=>k.replace("_complete","")+" — "+
+      (state==="upcoming"?"in "+span(v.departure-now)+" ("+clock(v.departure)+")":"said NOW at "+clock(v.issued_departure)));
+   tag.textContent=details.join(" · ");box.append(tag);
+   const sub=document.createElement("div");sub.className="small";
+   sub.textContent="Flight "+span(row.flight_seconds)+
+    " · last observed "+(row.source_quantity===null?"unknown":row.source_quantity)+
+    " · "+(state==="upcoming"?"Reconfirm near departure":"Recheck next fresh issue; not a live NOW recommendation");
+   box.append(sub);target.append(box);
+  }
  }
- if(!filtered.length){const tr=body.insertRow();cell(tr,"No matching items").colSpan=6;}
- const valid=rows.filter(has);
- byId("covered").textContent=valid.length+"/24";
- byId("agree").textContent=valid.filter(r=>Number.isInteger(r.models.independent.departure)&&
-  Number.isInteger(r.models.paired_complete.departure)&&
-  r.models.independent.departure>=now-30&&r.models.paired_complete.departure>=now-30&&
-  Math.abs(r.models.independent.departure-r.models.paired_complete.departure)<=300).length;
- byId("updated").textContent=current.issued_epoch?new Date(current.issued_epoch*1000).toLocaleTimeString():"—";
- byId("health").textContent=(!fresh?"NOT FRESH · forecasts hidden. ":
- "LIVE PRIVATE RESEARCH · ")+"Last issue "+local(current.issued_epoch)+
- ", collector heartbeat age at issue "+duration(current.source_heartbeat_age_seconds)+
- ". "+current.note;
- byId("health").className="banners "+(fresh?"good":"warn");
+ paintCards(el("upcoming"),upcoming,"upcoming");
+ paintCards(el("recheck"),recheck,"recheck");
+ const q=el("search").value.trim().toLowerCase(),filter=el("filter").value;
+ const rows=items.filter(r=>(r.item_key+" "+r.country_name).toLowerCase().includes(q)
+    &&(filter==="all"||filter===r.decision||(filter==="none"&&(r.decision==="none"||r.decision==="stale"))));
+ if(el("sort").value==="country")rows.sort((a,b)=>a.item_key.localeCompare(b.item_key));
+ else if(el("sort").value==="time")rows.sort((a,b)=>firstDeparture(a,now)-firstDeparture(b,now)||a.item_key.localeCompare(b.item_key));
+ else {
+  const priority={upcoming:0,recheck:1,none:2,stale:3};
+  rows.sort((a,b)=>priority[a.decision]-priority[b.decision]||
+    firstDeparture(a,now)-firstDeparture(b,now)||a.item_key.localeCompare(b.item_key));
+ }
+ const tbody=el("rows");tbody.replaceChildren();
+ for(const row of rows){
+  const tr=tbody.insertRow();
+  addCell(tr,row.country_name+" · "+row.item,"",row.phase?"Latest phase "+row.phase:"");
+  addCell(tr,row.source_quantity===null?"Unknown":String(row.source_quantity),"when",
+    row.source_last_epoch?"Observed "+clock(row.source_last_epoch):"Last observed, age unknown");
+  for(const name of ["independent","paired_complete"]){
+   const [main,sub]=proposalText(row.models[name],now,healthy);
+   addCell(tr,main,"when",sub);
+  }
+  const action={
+    upcoming:["WATCH / DUE","Verify fresh signal near departure"],
+    recheck:["RECHECK NOW","Previously issued leave-now; do not assume it remains valid"],
+    none:["NO SUPPORTED WINDOW","Keep monitoring; do not infer arrival stock from current quantity"],
+    stale:["FEED STALE","Wait for valid collection and reissue"]
+  }[row.decision];
+  addCell(tr,action[0],"when",action[1]);
+  addCell(tr,span(row.flight_seconds),"small");
+ }
+ if(!rows.length){const tr=tbody.insertRow();addCell(tr,"No matching items").colSpan=6;}
 }
 async function refresh(){
  try{
   const response=await fetch("/api/live",{cache:"no-store"});
   const data=await response.json();
-  if(!data||!Array.isArray(data.items)||data.items.length!==24)
-   throw Error("Incomplete research batch or no ledger yet");
-  current=data;loadedAt=Date.now();render();
- }catch(err){
-  current=null;byId("covered").textContent="0/24";byId("agree").textContent="—";
-  byId("health").textContent="LIVE BETA UNAVAILABLE: "+err.message+
-   ". Research forecasts are hidden until a complete 24-item batch is available.";
-  byId("health").className="banners warn";byId("rows").replaceChildren();
+  if(!Array.isArray(data.items)||data.items.length!==24)
+   throw Error("Missing or incomplete V160 private batch");
+  latest=data;render();
+ }catch(e){
+  latest=null;
+  el("health").className="banner fault";
+  el("health").textContent="Research unavailable: "+e.message+". No departure instructions.";
+  for(const name of ["availableCount","recheckCount","noCount","agreeCount","nextTick"])el(name).textContent="—";
+  for(const name of ["upcoming","recheck","rows"])el(name).replaceChildren();
  }
 }
-for(const id of ["search","filter","sort"])byId(id).addEventListener("input",render);
-byId("refresh").addEventListener("click",refresh);
-setInterval(()=>{if(current)render();},1000);
+for(const name of ["search","filter","sort"])el(name).addEventListener("input",render);
+el("refresh").addEventListener("click",refresh);
+setInterval(()=>{if(latest)render();},1000);
 setInterval(refresh,30000);refresh();
 </script></body></html>"""
 
