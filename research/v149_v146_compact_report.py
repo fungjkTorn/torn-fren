@@ -50,6 +50,7 @@ def compact(result):
     total_fine60 = total("fine60_proposals")
     total_paired = total("paired_proposals")
     total_routed = total("routed_proposals")
+    total_prequential = total("prequential_proposals")
     h145, m145, pn145, unk145 = (
         total("HIT"),total("MISS"),total("PENDING"),
         sum(total(key) for key in (
@@ -70,7 +71,12 @@ def compact(result):
     rh,rm,rp,ru=(
         total("routed_proxy_hit"),total("routed_proxy_miss"),
         total("routed_proxy_pending"),total("routed_proxy_unknown"))
-    if (rh+rm+rp+ru != total_routed or
+    qh,qm,qp,qu=(
+        total("prequential_proxy_hit"),total("prequential_proxy_miss"),
+        total("prequential_proxy_pending"),total("prequential_proxy_unknown"))
+    if (qh+qm+qp+qu != total_prequential or
+        total("prequential_paired_selected")+total("prequential_independent_selected") != total_prequential or
+        rh+rm+rp+ru != total_routed or
         total("routed_selected_paired")+total("routed_selected_independent") != total_routed or
         h_pair+m_pair+p_pair+u_pair != total_paired or
         h60+m60+p60+u60 != total_fine60 or
@@ -81,6 +87,7 @@ def compact(result):
         or total_fine60>source["cohorts"]
         or total_paired>source["cohorts"]
         or total_routed>source["cohorts"]
+        or total_prequential>source["cohorts"]
         or total_v128>source["cohorts"]
         or total_v145>source["mc_actual_evaluations"]):
         raise ValueError("model outcome denominators do not reconcile")
@@ -171,21 +178,28 @@ def compact(result):
         f"{total('independent_only_vs_routed')} independent-only); "
         f"vs NOW {total('routed_vs_leave_now_matched')} pairs net "
         f"{total('routed_only_vs_now')-total('now_only_vs_routed'):+d}",
+        f"  V157 PREQUENTIAL first-cycle selector: {total_prequential} proposals, "
+        f"{total('prequential_paired_selected')} paired/ "
+        f"{total('prequential_independent_selected')} independent; "
+        f"mature {_rate(qh,qm)}, vs independent "
+        f"{total('prequential_vs_independent_matched')} matched net "
+        f"{total('prequential_only_vs_independent')-total('independent_only_vs_prequential'):+d} "
+        f"({total('prequential_only_vs_independent')} exclusive wins vs "
+        f"{total('independent_only_vs_prequential')} losses), vs NOW "
+        f"{total('prequential_vs_now_matched')} matched net "
+        f"{total('prequential_only_vs_now')-total('now_only_vs_prequential'):+d}",
         f"  V151 next completed-restock forecast: {next_count} matched fully bounded starts, "
         f"MAE {next_mae}, within 1/5/15 min "
         f"{total('next_restock_within_1m')}/{total('next_restock_within_5m')}/"
         f"{total('next_restock_within_15m')}",
-        "  V153 completed-history recency vs V151 next-restock errors (same event): "
-        + "; ".join(
-            f"{name} {v[0]} paired, {v[1]} better/{v[2]} worse/{v[3]} tied, MAE {v[4]}"
-            for name,v in recency_summary.items()),
+
         f"  V148 matched versus leave-now: {matched148} mature pairs, net "
         f"{pair148:+d} model-only minus leave-now-only ({total('explicit_only_vs_now')} vs {total('now_only_vs_explicit')})",
         "  Japan Xanax V151 no-departure diagnoses: "
         f"{_num(items['jap:Xanax'],'stable_peak_under_60pct_scenario_gate')} peak support below .60; "
         f"{_num(items['jap:Xanax'],'stable_single_supported_bin_only')} one-bin-only",
         "=== ITEM | old | recovered | V148 proposed/H/M/net | "
-        "V151 proposed/H/M/net | vs V148 | paired proposals/net | V156 paired picks/net | stock/low min | wait min ===",
+        "V151 proposed/H/M/net | vs V148 | paired proposals/net | V156 picks/net | V157 picks/net | stock/low min | wait min ===",
     ]
     focus=["jap:Xanax","chi:Peony","swi:Edelweiss","uni:Xanax"]
     ordered=sorted(items,key=lambda k:(0 if k in focus else 1,focus.index(k) if k in focus else k))
@@ -222,6 +236,8 @@ def compact(result):
             f"{_num(it,'paired_only_vs_independent')-_num(it,'independent_only_vs_paired'):+3} "
             f"{_num(it,'routed_selected_paired'):>2}/"
             f"{_num(it,'routed_only_vs_independent')-_num(it,'independent_only_vs_routed'):+3} "
+            f"{_num(it,'prequential_paired_selected'):>2}/"
+            f"{_num(it,'prequential_only_vs_independent')-_num(it,'independent_only_vs_prequential'):+3} "
             f"{'N/A' if stock_mean is None else format(stock_mean,'.1f')}/"
             f"{'N/A' if low_mean is None else format(low_mean,'.1f')} "
             f"{'N/A' if wait is None else f'{wait/60:.1f}'}"
