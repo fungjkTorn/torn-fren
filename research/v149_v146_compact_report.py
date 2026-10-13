@@ -168,7 +168,7 @@ def compact(result):
         f"{_num(items['jap:Xanax'],'stable_peak_under_60pct_scenario_gate')} peak support below .60; "
         f"{_num(items['jap:Xanax'],'stable_single_supported_bin_only')} one-bin-only",
         "=== ITEM | old | recovered | V148 proposed/H/M/net | "
-        "V151 proposed/H/M/net | vs V148 | 1min net | paired net | restock MAE base/recent5 | wait min ===",
+        "V151 proposed/H/M/net | vs V148 | 1min net | paired proposals/net | restock MAE base/recent5 | wait min ===",
     ]
     focus=["jap:Xanax","chi:Peony","swi:Edelweiss","uni:Xanax"]
     ordered=sorted(items,key=lambda k:(0 if k in focus else 1,focus.index(k) if k in focus else k))
@@ -196,6 +196,7 @@ def compact(result):
             f"{_num(it,'stable_only_vs_now')-_num(it,'now_only_vs_stable'):+3} "
             f"{_num(it,'stable_only_vs_explicit')-_num(it,'explicit_only_vs_stable'):+3} "
             f"{_num(it,'fine60_only_vs_coarse')-_num(it,'coarse_only_vs_fine60'):+3} "
+            f"{_num(it,'paired_proposals'):>2}/"
             f"{_num(it,'paired_only_vs_independent')-_num(it,'independent_only_vs_paired'):+3} "
             f"{'N/A' if next_abs_mean is None else f'{next_abs_mean/60:.1f}'}"
             f"/{'N/A' if recent5_avg is None else format(recent5_avg,'.1f')} "
