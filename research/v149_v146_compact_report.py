@@ -71,6 +71,12 @@ def compact(result):
     pair145=total("new_only")-total("now_only")
     pair148=total("explicit_only_vs_now")-total("now_only_vs_explicit")
     pair151=total("stable_only_vs_now")-total("now_only_vs_stable")
+    paired151148=total("matched_stable_vs_explicit")
+    wins151148=total("stable_only_vs_explicit")
+    wins148151=total("explicit_only_vs_stable")
+    delayed151=total("matched_stable_delayed_vs_now")
+    delayed_wins151=total("delayed_stable_only_vs_now")
+    delayed_now_wins=total("delayed_now_only_vs_stable")
     lines=[
         "=== V149 COMPACT V146 REPLAY (HISTORICAL AS-OF / NOT LIVE FLIGHT PROOF) ===",
         f"24 items; {source['cohorts']} first-issued item/UTC-hour cohorts; NO DATABASE OR WEBSITE WRITES",
@@ -91,6 +97,11 @@ def compact(result):
         f"  V151 proxy outcomes: {_rate(h151,m151)}; {pending151} pending, {u151} unknown",
         f"  V151 matched vs leave-now: {matched151} pairs, net {pair151:+d}"
         f" ({total('stable_only_vs_now')} V151-only vs {total('now_only_vs_stable')} now-only)",
+        f"  V151 vs V148 identical issue: {paired151148} mature pairs, net "
+        f"{wins151148-wins148151:+d} (V151-only {wins151148}, V148-only {wins148151})",
+        f"  V151 chooses: {total('stable_depart_now_proposals')} NOW, "
+        f"{total('stable_depart_future_proposals')} FUTURE; among {delayed151} mature delayed pairs "
+        f"{delayed_wins151} V151-only vs {delayed_now_wins} leave-now-only",
         f"  V145 matched versus leave-now: {matched145} mature pairs, net "
         f"{pair145:+d} model-only minus leave-now-only ({total('new_only')} vs {total('now_only')})",
         f"  V148 matched versus leave-now: {matched148} mature pairs, net "
