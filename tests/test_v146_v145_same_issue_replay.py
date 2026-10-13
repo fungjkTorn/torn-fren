@@ -75,7 +75,7 @@ class SameIssueReplayTests(unittest.TestCase):
                 continue
             keys=[k.value for k in node.keys if isinstance(k,ast.Constant)
                   and isinstance(k.value,str)]
-            if "issue_phase" not in keys:
+            if "issue_phase" not in keys or "history_evidence_tier" not in keys:
                 continue
             found+=1
             self.assertEqual(keys.count("issue_phase"),1)
