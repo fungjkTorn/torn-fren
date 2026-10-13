@@ -5,9 +5,11 @@ The router examines only completed HIGH/LOW phases available when an issue
 was recorded; it NEVER observes the later success outcome to pick a model.
 
 Predeclared hypothesis: correlated adjacent LOW->HIGH durations may benefit
-from V151's paired-cycle bootstrap. Use it ONLY with >=8 validated pairs,
-nondegenerate HIGH/LOW variability, rank-correlation magnitude >=.65 and
-same-direction correlations in both chronological halves. Otherwise retain
+from V151's paired-cycle bootstrap. Require >=8 verified pairs and rho>=.65
+in ordinary regimes, >=10 pairs and rho>=.8 for multi-cycle flights, and
+>=12 pairs and rho>=.8 for stocked windows shorter than five minutes.
+Always require nondegenerate variability and same-direction chronological
+half-correlations. These are conservative research gates, not calibrated. Otherwise retain
 the already measured independent V151. This is a research hypothesis, not
 a fitted item leaderboard, calibrated confidence or a production selector.
 """
@@ -103,17 +105,32 @@ def item_cycle_profile(item_key, phases, *, asof):
         cut=len(pairs)//2
         half_a=_spearman(low_pairs[:cut],high_pairs[:cut])
         half_b=_spearman(low_pairs[cut:],high_pairs[cut:])
+    multi_cycle_flight=(cycle is not None and flight>=3*cycle)
+    very_short_stock=(stocked is not None and stocked<SHORT_STOCK_SECONDS)
+    infrequent_depletion=(depleted is not None and depleted>=5400)
+    # The safety bar differs by observed timing regime, not by an item's
+    # previously observed success rate. Short stocked lifetimes leave less
+    # room for error; multi-cycle flights and infrequent replenishments
+    # have greater phase drift. Require more complete cycles before trying
+    # to exploit LOW/HIGH correlation in those riskier conditions.
+    min_pairs=(12 if very_short_stock else
+               10 if multi_cycle_flight or infrequent_depletion else
+               MIN_PAIRS_TO_ROUTE)
+    rho_threshold=(0.80 if very_short_stock or multi_cycle_flight else
+                   MIN_ABS_RANK_CORRELATION)
     stable_sign=(rho is not None and
                  half_a is not None and half_b is not None and
-                 abs(rho)>=MIN_ABS_RANK_CORRELATION and
+                 abs(rho)>=rho_threshold and
                  rho*half_a>0 and rho*half_b>0)
-    paired_allowed=(len(pairs)>=MIN_PAIRS_TO_ROUTE and stable_sign)
+    paired_allowed=(len(pairs)>=min_pairs and stable_sign)
     routing="paired_complete" if paired_allowed else "independent"
     if len(pairs)<MIN_PAIRS_TO_ROUTE:
         reason="SPARSE_DIRECTLY_MATCHED_EPISODES"
     elif rho is None or half_a is None or half_b is None:
         reason="NO_IDENTIFIABLE_DEPENDENCE"
-    elif not paired_allowed:
+    elif len(pairs)<min_pairs:
+        reason="STOCK_LIFETIME_OR_FLIGHT_NEEDS_MORE_COMPLETED_PAIRS"
+    elif not stable_sign:
         reason="INSUFFICIENT_STABLE_PAIR_DEPENDENCE"
     else:
         reason="PREDECLARED_STABLE_PAIR_DEPENDENCE"
@@ -126,6 +143,10 @@ def item_cycle_profile(item_key, phases, *, asof):
         "completed_stocked_periods":len(high),
         "completed_depleted_periods":len(low),
         "direct_completed_low_to_high_pairs":len(pairs),
+        "required_pairs_for_item_regime":min_pairs,
+        "required_abs_rank_correlation":rho_threshold,
+        "flight_spans_three_or_more_cycles":multi_cycle_flight,
+        "stock_lifetime_under_five_minutes":very_short_stock,
         "stock_duration_regime":stock_type,
         "depletion_duration_regime":low_type,
         "flight_over_median_cycle":(
