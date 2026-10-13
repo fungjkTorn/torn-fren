@@ -8,7 +8,7 @@ set -euo pipefail
 WORK=/home/ubuntu/torn-fren-v38-probe
 STAGE=/home/ubuntu/torn-fren-private-models/v128_stage/pinned/research
 VENV="$WORK/.venv/bin/python"
-PIN=e1d58ef10e4eac5f535feb27b9eb429b19eaec35
+PIN=ca66ec8fa41f0d5d1355269bb488ba12876ca0b6
 LIVE=/opt/torn-fren/data/stock_history.db
 V128=/var/lib/torn-fren-v38/v128_earliest24_shadow.db
 
@@ -26,7 +26,7 @@ test ! -L "$STAGE" || { echo "STOP: stage is symlink"; exit 1; }
 cd "$WORK"
 git fetch -q origin research/v38-full-roster-live-prep-20261009 2>/dev/null
 git cat-file -e "${PIN}^{commit}"
-for module in v145_provider_continuous_phases v148_observed_earliest_stock_cycle v146_v145_same_issue_replay v149_v146_compact_report; do
+for module in v145_provider_continuous_phases v148_observed_earliest_stock_cycle v150_stock_window_failure_diagnostic v146_v145_same_issue_replay v149_v146_compact_report; do
   test ! -L "$STAGE/$module.py" || { echo "STOP: staged module symlink"; exit 1; }
   git show "${PIN}:research/${module}.py" > "$STAGE/$module.py"
   "$VENV" -m py_compile "$STAGE/$module.py"
