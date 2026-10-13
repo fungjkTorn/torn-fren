@@ -58,3 +58,41 @@ The operator printed `SMOKE PASS; V160 timer is NOT enabled or installed`. The s
 ### Next gate (requires explicit operator authorization)
 
 After the user affirmatively approves NEW isolated five-minute private V160 scheduled ledger writes, use the tested `enable` action only, which runs a second no-write smoke before installing/enabling `torn-fren-v160-forward24.timer`. Then inspect timer, actual `v160_ticks` batches and 24 immutable rows per issued tick. Subsequent V161 read-only reports must distinguish `PENDING`, `UNKNOWN`, `MISS`, abstention and WATCH confirmation, and compare only matched mature pairs. No production site or collector mutation is approved.
+
+
+## User-approved V160 five-minute recorder ENABLED, first immutable 24/24 issue CONFIRMED
+
+The user explicitly approved starting isolated V160 research recording. The operator `enable` reran the **successful no-write preview**, producing 24 research-only items, source heartbeat age **4 seconds**, **6 seconds** latency, independent V151 **17 candidates** and paired-complete V151 **17 candidates** (proposal coverage ONLY, NOT accuracy).
+
+The operator output then confirmed: `Only new V160 private timer enabled. V75/V128/V2/experimental site untouched.`
+
+The subsequent operator **status** returned `enabled`, `active`, a scheduled next timer occurrence **2026-10-13 17:01:00 UTC**, prior run at **16:56:00 UTC**, and an existing permission mode `-rw-------` **40K** private SQLite database at:
+
+`/var/lib/torn-fren-v38/v160_v151_prospective24.db`
+
+Most importantly, **the first independently issued five-minute prospective batch is verified complete**:
+
+```json
+{"status":"V160_PRIVATE_LEDGER_READ_ONLY_STATUS",
+ "has_prospectively_recorded_batches":true,
+ "last_three_batches":[{
+   "issued_epoch":1791910560,
+   "captured_epoch":1791910579,
+   "issued_age_seconds":25,
+   "expected_items":24,
+   "recorded_items":24,
+   "batch_complete":true
+ }],
+ "collector_and_websites_untouched":true}
+```
+
+This supersedes the earlier section's `timer not enabled` milestone. The earlier section remains to document the historical smoke failure and fixes. **The recorder is NOW ACTIVE**, although one complete batch does NOT demonstrate recurring persistence yet. No player flight, actual Torn purchase, forward stock-at-arrival hit rate, country-specific feed freshness, or V75 model superiority has been verified.
+
+### Low-risk follow-up for the beta
+
+1. On a later VM check, run the pinned operator `status` (read-only) and verify last three batches are timely and have exactly 24 rows each. Watch `journalctl -u torn-fren-v160-forward24.service` for service errors, and `systemctl show torn-fren-v160-forward24.timer -p ActiveState -p SubState` to detect stalled schedules.
+2. After flight horizons and stock observations mature, run pinned `report` (read-only V161) and compare *paired vs independent*, actual as-issued *leave-now*, and valid *near-issued V75* only on matched scoreable outcomes. **PENDING, UNKNOWN, future WATCH not yet due, and ABSTAIN are not misses.** Avoid a positive hit-rate interpretation based on very few independent restock/depletion phases.
+3. Continue research-branch, rollback-safe work toward adding validated forecast guidance to BOTH existing original V2 graph and `/experimental`. Reconcile actual deployed source drift before touching website assets.
+4. Changes to the staged pinned research bundle are **not automatically deployed** by GitHub commits; this running service remains pinned to tested source `0164d64c0c94f045a9e6680054edc780738bcb63` until a deliberate reviewed operator change and operator execution. Do not silently overwrite the operating study.
+
+The user has not approved any production website/collector modification, gameplay automation, or other independent scheduled services.
