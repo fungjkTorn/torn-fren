@@ -8,7 +8,7 @@ set -euo pipefail
 WORK=/home/ubuntu/torn-fren-v38-probe
 STAGE=/home/ubuntu/torn-fren-private-models/v128_stage/pinned/research
 VENV="$WORK/.venv/bin/python"
-PIN=79a1c7c74962313c235675477f7a7c121547212c
+PIN=2e08e1556ae675b7ca3283da3e3a52de9509d41d
 LIVE=/opt/torn-fren/data/stock_history.db
 V128=/var/lib/torn-fren-v38/v128_earliest24_shadow.db
 
@@ -26,12 +26,12 @@ test ! -L "$STAGE" || { echo "STOP: stage is symlink"; exit 1; }
 cd "$WORK"
 git fetch -q origin research/v38-full-roster-live-prep-20261009 2>/dev/null
 git cat-file -e "${PIN}^{commit}"
-for module in v145_provider_continuous_phases v148_observed_earliest_stock_cycle v150_stock_window_failure_diagnostic v151_stable_earliest_departure v152_first_restock_timing_evidence v153_recent_completed_restock_baseline v156_item_cycle_profile_router v146_v145_same_issue_replay v149_v146_compact_report; do
+for module in v145_provider_continuous_phases v148_observed_earliest_stock_cycle v150_stock_window_failure_diagnostic v151_stable_earliest_departure v152_first_restock_timing_evidence v153_recent_completed_restock_baseline v156_item_cycle_profile_router v157_prequential_stock_survival_router v146_v145_same_issue_replay v149_v146_compact_report; do
   test ! -L "$STAGE/$module.py" || { echo "STOP: staged module symlink"; exit 1; }
   git show "${PIN}:research/${module}.py" > "$STAGE/$module.py"
   "$VENV" -m py_compile "$STAGE/$module.py"
 done
-echo "===== V156 ITEM-SPECIFIC STOCK LIFETIME/RESTOCK ROUTE VS V151 BASELINES ====="
+echo "===== V157 AS-ISSUED CHRONOLOGICAL HELDOUT ITEM ROUTER VS V151 BASELINES ====="
 export PYTHONDONTWRITEBYTECODE=1
 export OPENBLAS_NUM_THREADS=1
 export MKL_NUM_THREADS=1
