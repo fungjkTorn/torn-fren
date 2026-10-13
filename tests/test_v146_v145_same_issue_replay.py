@@ -371,6 +371,13 @@ class SameIssueReplayTests(unittest.TestCase):
             self.assertEqual(row["independent_only_vs_flight_horizon"],0)
             self.assertEqual(row["flight_horizon_only_vs_now"],1)
             self.assertEqual(row["flight_horizon_valid_origins"],6)
+            self.assertTrue(
+                result["issue_phase_episode_audit"][
+                    "not_independent_future_restock_proof"])
+            self.assertEqual(result["issue_phase_episode_audit"][
+                "totals"]["raw_paired_exclusive_issue_wins"],1)
+            self.assertEqual(result["issue_phase_episode_audit"][
+                "totals"]["v158_net_exclusive_issue_wins"],1)
             self.assertFalse(result["real_player_trip_success_certified"])
 
     def test_stable_no_candidate_still_preserves_no_data_vs_score_gate(self):
