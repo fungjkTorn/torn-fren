@@ -145,6 +145,8 @@ on:
       - 'tests/test_v150_stock_window_failure_diagnostic.py'
       - 'research/v151_stable_earliest_departure.py'
       - 'tests/test_v151_stable_earliest_departure.py'
+      - 'research/v152_first_restock_timing_evidence.py'
+      - 'tests/test_v152_first_restock_timing_evidence.py'
       - 'deploy/scripts/v85_japan_forward_timer.sh'
       - 'deploy/systemd/torn-fren-v85-japan-forward.service'
       - 'deploy/systemd/torn-fren-v85-japan-forward.timer'
@@ -306,6 +308,8 @@ jobs:
         run: python -m unittest discover -s tests -p 'test_v150_stock_window_failure_diagnostic.py' -v
       - name: Stable V151 whole-cycle earliest-arrival scoring on real observed period fixtures
         run: python -m unittest discover -s tests -p 'test_v151_stable_earliest_departure.py' -v
+      - name: Verify first completed restock 1m 5m 15m timing audit excludes gaps and ambiguous sources
+        run: python -m unittest discover -s tests -p 'test_v152_first_restock_timing_evidence.py' -v
       - name: Verify Japan implementation compiles
         run: python -m py_compile research/v84_japan_forward_canary.py research/v86_japan_forward_report.py research/v87_experimental24_overlay.py research/v88_poll_state_forward_report.py research/v89_pending_horizon_diagnostic.py research/v91_travel_decision_contract.py research/v93_arrival_observation_policy.py research/v97_experimental_dashboard_state.py research/v98_ready_vs_watch_forward_audit.py research/v99_issued_stock_vs_forecast_audit.py research/v100_future_watch_reconfirmation_audit.py research/v101_watch_to_actionable_audit.py research/v102_restock_departure_bridge.py research/v103_champion_score_curves.py research/v104_real_champion_earliest_replay.py research/v105_dynamic_champion_earliest_replay.py research/v106_risk_budget_earliest_replay.py research/v107_explicit_restock_cycle_baseline.py research/v108_explicit_cycle_dynamic_replay.py research/v109_raw_restock_transition_event_audit.py research/v110_multicycle_restock_horizon_audit.py research/v111_arrival_proxy_evidence_audit.py research/v112_matched_immediate_vs_restock_flight_audit.py research/v113_phase_offset_departure_comparison.py research/v114_matched_poll_heartbeat_flight_audit.py research/v115_targeted_v88_forward_evidence.py research/v116_attributed_hourly_forward_audit.py research/v117_first_executable_replan_audit.py research/v118_watch_convergence_diagnostic.py research/v119_stable_commitment_vs_fresh_replay.py research/v120_commitment_departure_reconfirmation.py research/v121_nessie_native_vs_earliest_forward_proxy.py research/v122_nessie_selector_discrimination_audit.py research/v123_empirical_phase_survival_challenger.py research/v124_prospective_survival_shadow.py research/v125_earliest_credible_shadow.py research/v126_unknown_onset_sensitivity.py research/v128_full24_earliest_shadow.py research/v129_full24_forward_report.py research/v130_phase_pinned_mc_challenger.py research/v131_multiledger_historical_arrival_audit.py research/v132_departure_timing_quality_audit.py research/v133_private_departure_panel.py research/v134_original_graph_v2_audit.py research/v135_morning_departure_brief.py research/v137_original_v2_stock_at_arrival_audit.py research/v138_enhanced_departure_evidence_brief.py research/v140_existing_experimental_beta_board.py research/v141_v2_feasible_departure_window.py research/v2_beta_departure_bridge.py research/v2_native_specialist_adapter.py
       - name: Validate guarded opt-in service installer syntax
