@@ -203,6 +203,16 @@ def _aggregate(rows):
         # depletion -> stocked intervals. Never count abstention as a miss.
         if r.get("paired_status"):
             item["paired_status:"+r["paired_status"]]+=1
+        if r.get("paired_next_restock_abs_error_seconds") is not None:
+            error=r["paired_next_restock_abs_error_seconds"]
+            item["paired_restock_scored"]+=1
+            item["paired_restock_abs_sum_seconds"]+=error
+            old_error=r.get("next_restock_abs_error_seconds")
+            if type(old_error) is int:
+                item["paired_restock_mature_comparisons"]+=1
+                item["paired_restock_better"]+=int(error<old_error)
+                item["paired_restock_worse"]+=int(error>old_error)
+                item["paired_restock_tie"]+=int(error==old_error)
         if r.get("paired_departure") is not None:
             item["paired_proposals"]+=1
             paired_wait_seconds[key].append(
@@ -513,6 +523,7 @@ def replay(*,collector=COLLECTOR, sidecar=SIDECAR, now=None,
                     "recent_restocks_abs_errors_seconds":{},
                     "paired_departure":None,"paired_status":None,
                     "paired_outcome":"NOT_PROPOSED",
+                    "paired_next_restock_abs_error_seconds":None,
                     "fine60_departure":None,"fine60_status":None,
                     "fine60_outcome":"NOT_PROPOSED",
                     "stable_departure":None,"stable_status":None,
@@ -581,6 +592,7 @@ def replay(*,collector=COLLECTOR, sidecar=SIDECAR, now=None,
                     "recent_restocks_abs_errors_seconds":{},
                     "paired_departure":None,"paired_status":None,
                     "paired_outcome":"NOT_PROPOSED",
+                    "paired_next_restock_abs_error_seconds":None,
                     "fine60_departure":None,"fine60_status":None,
                     "fine60_outcome":"NOT_PROPOSED",
                     "stable_departure":None,"stable_status":None,
@@ -626,6 +638,9 @@ def replay(*,collector=COLLECTOR, sidecar=SIDECAR, now=None,
                     key,new,asof=issued,scenarios=64,
                     cycle_sampling="paired_complete")
                 record["paired_status"]=paired["status"]
+                record["paired_completed_cycles"]=paired.get("completed_paired_cycles")
+                record["paired_peak_fraction"]=paired.get(
+                    "peak_scenario_stock_fraction")
                 pair_depart=paired["first_reachable"]
                 if pair_depart is not None:
                     record["paired_departure"]=pair_depart["departure_epoch"]
@@ -664,6 +679,11 @@ def replay(*,collector=COLLECTOR, sidecar=SIDECAR, now=None,
                         "absolute_forecast_error_seconds"]
                     verified_start=result_next[
                         "next_observed_complete_start_epoch"]
+                    paired_ttr=paired.get(
+                        "first_next_restock_onset_median_seconds")
+                    if type(verified_start) is int and type(paired_ttr) is int:
+                        record["paired_next_restock_abs_error_seconds"]=abs(
+                            issued+paired_ttr-verified_start)
                     if type(verified_start) is int:
                         for name,variant in recent["forecasts"].items():
                             predicted=variant["forecast_epoch"]
