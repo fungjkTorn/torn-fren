@@ -1,4 +1,6 @@
 # TORN-FREN — COMPLETE MASTER HANDOFF (13 OCTOBER 2026)
+> **UPDATED VM STATUS, Oct 13 (supersedes old pending language):** The user ran V160 status: `not-found`, `inactive`, zero timers, no prospective DB. The first smoke FAILED before forecasting because the staged bundle omitted `research.v110_multicycle_restock_horizon_audit`. A dependency-closure audit found also missing `research.v38_snapshot_schema`. GitHub research-only fixes are committed with isolated CI checks; the corrected operator is pinned at `22e45cb287937315b75a463ca4ef0277cae57205` and internally stages tested source `0164d64c0c94f045a9e6680054edc780738bcb63`. **V160 is still NOT enabled or producing verified forward issues.** Rerun ONLY the corrected `smoke` command below; do not enable or record without user approval. Details: [V160 smoke dependency incident](v160_smoke_dependency_fix_20261013.md).
+
 
 **For:** Next ChatGPT conversation within the TORN Projects project, ideally Work mode for extended GitHub implementation.
 **Repository:** https://github.com/fungjkTorn/torn-fren
@@ -171,7 +173,7 @@ $key = "C:\Users\fungb\Desktop\.ssh\torn-fren.key"
 $remote = "ubuntu@150.136.108.146"
 if (-not (Test-Path -LiteralPath $key)) { throw "SSH key missing: $key" }
 $branch = "research/v38-full-roster-live-prep-20261009"
-$pin = "ef96aeaa0ec75cf3992ae9e2d77615f34243d3f7"
+$pin = "22e45cb287937315b75a463ca4ef0277cae57205"
 $script = "deploy/scripts/v160_forward24_operator.sh"
 $cmd = "cd /home/ubuntu/torn-fren-v38-probe && git fetch -q origin $branch && git show " + $pin + ":" + $script + " | bash -s -- smoke"
 & ssh -i "$key" "$remote" "$cmd"
@@ -251,6 +253,8 @@ A safe research-branch update to V161 after this handoff separated PENDING/UNKNO
 
 Read **[the Oct 13 reconciliation and forward readiness addendum](OCT13_HANDOFF_RECONCILIATION_AND_FORWARD_READINESS.md)** before following the older V139/V142 at-home action list or claiming the historical checks never happened.
 
-**Updated operator pin for new smoke sessions:** the PowerShell `smoke` example above now selects the linked-worktree-safe operator at `ef96aeaa0ec75cf3992ae9e2d77615f34243d3f7`, which internally pins verified source `da6db7cee81588b38cb8ee522be611ad7e173bda`. This supersedes the original `cb2a25...` smoke command, not the historical pre-handoff SHA record. DO NOT enable timers unless explicitly approved.
+**Updated operator pin for new smoke sessions:** the PowerShell `smoke` example above now selects the linked-worktree-safe operator at `22e45cb287937315b75a463ca4ef0277cae57205`, which internally pins verified source `da6db7cee81588b38cb8ee522be611ad7e173bda`. This supersedes the original `cb2a25...` smoke command, not the historical pre-handoff SHA record. DO NOT enable timers unless explicitly approved.
 
 **Operator read-only status improvement (Oct 13):** this newest pinned operator inspects the actual sidecar (if present) using SQLite `mode=ro`, returning the latest three issue epochs and counts, whether each has all 24 item rows, and issue age. The uninstalled status is not equivalent to evidence of a live 5-minute V160 study. Only user approval can authorize the separate `enable` action.
+
+**Latest pinned V160 smoke package (Oct 13 corrective follow-up):** operator `22e45cb287937315b75a463ca4ef0277cae57205`, source `0164d64c0c94f045a9e6680054edc780738bcb63`. Four GitHub CI workflows succeeded at the source commit, including a real isolated-stage import regression. Initial VM smoke failure is documented in `docs/v160_smoke_dependency_fix_20261013.md`. The old assertion that V160 status/smoke were never run is superseded by the observed failed run; the final successful VM smoke has not yet happened. No timer or sidecar was installed.
