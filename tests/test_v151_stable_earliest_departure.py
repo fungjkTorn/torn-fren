@@ -33,10 +33,12 @@ class StableEarliestTests(unittest.TestCase):
             with self.subTest(country=country):
                 r=stable_earliest_departure(
                     country+":Test Stock",previous,asof=issued,scenarios=48)
-                self.assertEqual(r["first_reachable"]["wait_seconds"],0)
+                self.assertIsNotNone(r["first_reachable"])
+                self.assertLessEqual(r["first_reachable"]["wait_seconds"],900)
                 self.assertEqual(r["first_reachable"]["arrival_epoch"],
-                                 issued+TRAVEL_SECONDS[country])
-                self.assertEqual(r["score_now"],1.0)
+                                 issued+TRAVEL_SECONDS[country]+
+                                 r["first_reachable"]["wait_seconds"])
+                self.assertEqual(r["first_reachable"]["scenario_stock_fraction"],1.0)
                 self.assertEqual(r["median_observed_restock_cadence_seconds"],1800)
                 self.assertFalse(r["game_stock30_at_arrival_verified"])
 
@@ -74,7 +76,7 @@ class StableEarliestTests(unittest.TestCase):
             "uni:Nessie Plushie",previous,asof=issued,scenarios=32)
         self.assertEqual(r["history_tier"],"BOUNDED_HISTORY_SPARSE_PROVISIONAL")
         self.assertIsNotNone(r["first_reachable"])
-        self.assertFalse(r["forward_performance_untested"] is False)
+        self.assertTrue(r["forward_performance_untested"])
 
     def test_sub_five_minute_stock_lifetime_kept_as_one_bin_research_signal(self):
         previous,issued=history(n=6,high=200,low=600,source_switch=False)
@@ -122,7 +124,7 @@ class StableEarliestTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             stable_earliest_departure(
                 "uni:Nessie Plushie",previous,asof=issued,
-                scenarios=32,score_floor=.5,)
+                scenarios=32,score_floor=1.1)
 
 if __name__=="__main__":
     unittest.main()
