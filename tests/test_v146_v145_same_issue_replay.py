@@ -1,4 +1,6 @@
 """V146: representative issue-locked comparison including mature vs pending."""
+import ast
+import inspect
 import json
 import sqlite3
 import tempfile
@@ -64,6 +66,26 @@ def make_db(folder):
 
 
 class SameIssueReplayTests(unittest.TestCase):
+    def test_issue_phase_literal_not_overwritten_by_duplicate_dict_key(self):
+        source=inspect.getsource(m.replay)
+        root=ast.parse(source)
+        found=0
+        for node in ast.walk(root):
+            if not isinstance(node,ast.Dict):
+                continue
+            keys=[k.value for k in node.keys if isinstance(k,ast.Constant)
+                  and isinstance(k.value,str)]
+            if "issue_phase" not in keys:
+                continue
+            found+=1
+            self.assertEqual(keys.count("issue_phase"),1)
+            self.assertEqual(keys.count("issue_phase_onset"),1)
+            values={k.value:v for k,v in zip(node.keys,node.values)
+                    if isinstance(k,ast.Constant) and isinstance(k.value,str)}
+            self.assertIsInstance(values["issue_phase"],ast.Subscript)
+            self.assertIsInstance(values["issue_phase_onset"],ast.Subscript)
+        self.assertEqual(found,1)
+
     def test_strict_old_recovery_is_not_new_live_success_claim(self):
         with tempfile.TemporaryDirectory() as temp:
             src,side,issued=make_db(temp)
@@ -274,6 +296,13 @@ class SameIssueReplayTests(unittest.TestCase):
             self.assertEqual(row["independent_only_vs_paired"],0)
             self.assertEqual(row["paired_only_vs_leave_now"],1)
             self.assertEqual(row["paired_median_wait_seconds"],600)
+            # This fixture has a directly observed, as-issued LOW phase
+            # onset. V159 MUST now cluster its successful paired decision.
+            phases=result["issue_phase_episode_audit"]
+            self.assertEqual(phases["totals"]["raw_scorable_phase_episodes"],1)
+            self.assertEqual(phases["totals"]["raw_paired_winning_episodes"],1)
+            self.assertEqual(phases["totals"]["raw_paired_exclusive_issue_wins"],1)
+            self.assertEqual(phases["items"][ITEM]["raw_paired_winning_episodes"],1)
             self.assertFalse(result["real_player_trip_success_certified"])
 
     def test_v157_routing_is_frozen_before_future_outcome_scoring(self):
