@@ -293,6 +293,7 @@ def score(*, ledger=DESTINATION, collector=COLLECTOR,
         "leave_now_hit","leave_now_miss","leave_now_pending",
         "leave_now_unknown","independent_future_reconfirmation_pending",
         "paired_complete_future_reconfirmation_pending",
+        "independent_future_reconfirmed","paired_complete_future_reconfirmed",
         "independent_future_unreconfirmed",
         "paired_complete_future_unreconfirmed",
     ):
