@@ -100,6 +100,22 @@ class CompactEvidenceTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,"outcome denominators"):
             compact(data)
 
+    def test_recency_restocks_are_reported_as_matched_not_unconditional_wins(self):
+        data=fixture()
+        item=data["items"]["chi:Peony"]
+        item["recent_recent_5_scored"]=2
+        item["recent_recent_5_abs_total_seconds"]=600
+        item["recent_recent_5_paired"]=2
+        item["recent_recent_5_beats_v151"]=1
+        item["v151_beats_recent_recent_5"]=1
+        item["recent_recent_5_ties"]=0
+        output=compact(data)
+        self.assertIn("recent_5 2 paired, 1 better/1 worse",output)
+        self.assertIn("5.0m",output)
+        item["recent_recent_5_paired"]=3
+        with self.assertRaisesRegex(ValueError,"unbalanced recency"):
+            compact(data)
+
     def test_no_partial_roster_or_database_write_claims(self):
         for mode in ("absent","write","issue_mismatch","extra_monte_carlo"):
             data=fixture()
