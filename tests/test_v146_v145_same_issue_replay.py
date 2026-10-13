@@ -298,7 +298,8 @@ class SameIssueReplayTests(unittest.TestCase):
                     "INSERT INTO stock_history(timestamp,quantity,source,country,item_name) VALUES(?,?,?,?,?)",
                     [(issued+500,110,"yata","uni","Nessie Plushie"),
                      (issued+1000,0,"yata","uni","Nessie Plushie")])
-            def v151_model(key,history,*,asof,scenarios):
+            def v151_model(key,history,*,asof,scenarios,
+                           departure_step_seconds=300):
                 self.assertEqual(asof,issued)
                 self.assertEqual(history["last_observation"].epoch,issued)
                 return {"status":"NO_TWO_BIN_SUPPORTED_DEPARTURE",
