@@ -52,269 +52,316 @@ BASE_ROSTER_ROWS = 22
 EXTRA_XANAX_KEYS = frozenset(("can:Xanax", "uni:Xanax"))
 HTML = r"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<meta http-equiv="Cache-Control" content="no-store">
-<title>TORN-FREN · Departure Planner Beta</title>
+<meta http-equiv="Cache-Control" content="no-store"><title>TORN-FREN · Travel Decisions</title>
 <style>
-:root{color-scheme:dark;font-family:system-ui,-apple-system,Segoe UI,sans-serif;background:#0f1721;color:#eaf2fa;font-size:14px}
-*{box-sizing:border-box}body{max-width:1450px;margin:auto;padding:20px}
-h1{font-size:1.7rem;margin:0 0 5px}h2{font-size:1.15rem;margin:0 0 8px}
-p{line-height:1.55;margin:6px 0}.muted{color:#a7b9cc}.sub{font-size:.85rem;color:#9eb1c1}
-a{color:#91d6ff}.head{display:flex;justify-content:space-between;align-items:start;gap:14px;flex-wrap:wrap}
-.meta{margin:9px 0 16px;color:#bfd2e1}.banner{padding:13px 15px;border:1px solid #42576b;border-radius:9px;background:#1b2b39;margin:12px 0}
-.banner.fault{border-color:#a56950;background:#392520}.banner.good{border-color:#426a61}
-.stats{display:grid;grid-template-columns:repeat(5,minmax(140px,1fr));gap:11px;margin:14px 0 20px}
-.stat{padding:13px;background:#192735;border:1px solid #354a5f;border-radius:9px}
-.stat b{font-size:1.45rem;display:block;margin-bottom:3px}.stat span{color:#b1c1d0;font-size:.84rem}
-.columns{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:0 0 18px}
-.panel{padding:15px;background:#16232f;border:1px solid #33485b;border-radius:10px;min-height:150px}
-.opportunity{border-top:1px solid #2e4154;padding:11px 0}
-.opportunity:first-of-type{border-top:0}.opportunity strong{display:block}
-.opportunity .why{font-size:.85rem;color:#adc2d4;margin:4px 0}
-.tag{display:inline-block;padding:3px 7px;border-radius:5px;font-weight:650;font-size:.75rem;background:#334557;color:#d8e8f5}
-.tag.watch{background:#244b48;color:#a6f2d1}
-.tag.review{background:#55442a;color:#f8d8a1}
-.tag.none{background:#3b4249;color:#c4cfda}
-.controls{display:flex;gap:11px;align-items:end;flex-wrap:wrap;margin:15px 0}
-label{font-size:.88rem}label>*{display:block;margin-top:5px}
-input,select,button{font:inherit;color:inherit;background:#223343;border:1px solid #516b80;border-radius:7px;padding:9px}
-button{cursor:pointer}button:focus,select:focus,input:focus{outline:2px solid #8bd4ff}
-.tablewrap{overflow:auto;border:1px solid #34485b;border-radius:10px}
-table{border-collapse:collapse;width:100%;min-width:1060px}
-th{text-align:left;background:#243446;color:#e6f2fb;white-space:nowrap}
-th,td{padding:12px 10px;vertical-align:top;border-bottom:1px solid #2d3f50}
-tbody tr:hover{background:#1a2a38}.small{font-size:.84rem;color:#aec0d0;line-height:1.45}
-.when{font-variant-numeric:tabular-nums;font-weight:700}.hint{font-size:.78rem;color:#c3b5a0;margin-top:3px}
-.countdown{font-variant-numeric:tabular-nums;color:#b2f2d5}
-footer{padding:20px 2px;color:#a7bacb;font-size:.84rem;line-height:1.6}
-@media(max-width:800px){body{padding:12px}.stats{grid-template-columns:repeat(2,minmax(130px,1fr))}.columns{grid-template-columns:1fr}}
-</style></head>
-<body>
-<header class="head"><div><h1>Where should I fly?</h1>
-<p class="meta">TORN-FREN · 24-item departure planner · latest genuine V160 research issues</p></div>
-<button id="refresh">Refresh predictions</button></header>
-<div class="banner"><strong>Provisional guidance—not verified stock on landing.</strong>
- A model finding a supported arrival at its issue time does not mean it will still be safe minutes later.
- The site separates upcoming windows, recent NOW signals requiring another check, and true abstentions.
- <span class="muted"> ≥30 stock at arrival · PI + pilot flights · 5-minute research updates.</span></div>
-<div id="health" class="banner" role="status">Connecting to private prospective ledger…</div>
-<section class="stats" aria-label="Research signal counts">
-<div class="stat"><b id="availableCount">—</b><span>Future / currently due forecasts</span></div>
-<div class="stat"><b id="recheckCount">—</b><span>Recent NOW signals to reconfirm</span></div>
-<div class="stat"><b id="noCount">—</b><span>Without a usable proposal</span></div>
-<div class="stat"><b id="agreeCount">—</b><span>Both variants agree ≤5 min</span></div>
-<div class="stat"><b id="nextTick">—</b><span>Next planned 5-min issue</span></div>
+:root{color-scheme:dark;font:15px system-ui,-apple-system,Segoe UI,sans-serif;background:#0d1520;color:#eef4fa}
+*{box-sizing:border-box}body{max-width:1310px;margin:auto;padding:22px}
+h1{font-size:2rem;letter-spacing:-.035em;margin:4px 0}h2{font-size:1.15rem;margin:0 0 12px}h3{font-size:1rem;margin:0}
+p{line-height:1.5}button,input,select{font:inherit;color:inherit;background:#233347;border:1px solid #53677a;border-radius:8px;padding:11px}
+button{cursor:pointer}button:disabled{opacity:.5;cursor:wait}button:focus,input:focus,select:focus,summary:focus{outline:2px solid #8ccdfc}
+button.primary{background:#345d91;border-color:#6294c8;font-weight:700}
+button.tiny{font-size:.85rem;padding:8px 12px}
+.muted{color:#a8bbcd}.small{font-size:.86rem}.eyebrow{color:#83b8e7;font-size:.8rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
+.head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.head p{margin:0;color:#a8bbcd}.shell{background:#162333;border:1px solid #334d62;border-radius:14px;padding:20px;margin:15px 0}
+.notice{padding:12px 14px;background:#1a2939;border-left:3px solid #7a99b9;border-radius:7px;margin:14px 0;font-size:.9rem}
+.health{padding:10px 14px;border-radius:8px;background:#142d2c;border:1px solid #375b55;color:#b8ebda;margin:12px 0}
+.health.bad{background:#3b2525;border-color:#a45c5c;color:#ffcece}
+.health strong{margin-right:8px}.pill{display:inline-block;padding:4px 8px;border-radius:7px;background:#384e63;font-size:.78rem;font-weight:700}
+.pill.watch{background:#2e554f;color:#b3edd4}.pill.review{background:#594527;color:#f7deab}.pill.none{background:#414953;color:#d7dfeb}
+.hero{display:grid;grid-template-columns:minmax(230px,1fr) minmax(220px,1fr);gap:22px;align-items:center}
+.big{font-size:2.2rem;line-height:1.2;font-weight:800;letter-spacing:-.03em;margin:8px 0}
+.actiontime{font-size:1.6rem;line-height:1.2;font-weight:750;margin:6px 0}
+.support{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:15px 0}
+.support div{padding:12px;border:1px solid #375064;border-radius:9px}
+.support b{display:block;font-size:1.1rem;margin:4px 0}
+.cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.card{background:#182737;border:1px solid #354f62;padding:16px;border-radius:11px}
+.card strong{display:block;font-size:1.08rem}.card .time{font-size:1.45rem;font-weight:750;font-variant-numeric:tabular-nums;margin:9px 0 3px}
+.card .row{display:flex;justify-content:space-between;align-items:start;gap:12px}
+.meta{color:#b7c7d4;font-size:.86rem;line-height:1.55;margin-top:7px}
+.buttons{display:flex;align-items:end;flex-wrap:wrap;gap:12px}
+.control{display:flex;flex-direction:column;gap:6px;font-size:.89rem}
+.control select{min-width:240px;max-width:100%}
+.checkresult{min-height:75px;padding:16px;background:#0f1c2a;border:1px solid #3b5164;border-radius:10px;margin-top:13px}
+.checkresult .big{font-size:1.8rem}.checkresult.error{border-color:#8d5c5c}
+.sep{height:1px;background:#304457;margin:17px 0}
+details{margin:16px 0;padding:14px 18px;background:#152230;border:1px solid #33485b;border-radius:12px}
+summary{cursor:pointer;font-weight:700;font-size:1.02rem}
+.tablewrap{overflow:auto;margin-top:14px}table{width:100%;border-collapse:collapse;min-width:860px}
+th,td{text-align:left;border-bottom:1px solid #304455;padding:10px;vertical-align:top}
+th{color:#c3d8e9}.sub{font-size:.8rem;color:#9caebe}
+footer{margin:23px 0;color:#9cafbf;font-size:.82rem;line-height:1.6}
+@media(max-width:760px){body{padding:12px}.hero,.cards{grid-template-columns:1fr}.support{grid-template-columns:1fr 1fr}.big{font-size:1.8rem}}
+</style></head><body>
+<header class="head"><div>
+<span class="eyebrow">TORN-FREN · 24-item private beta</span>
+<h1>Where should I fly?</h1>
+<p>Departure times first. Research details only if you want them.</p></div>
+<button id="refresh" class="tiny">Refresh forecast</button></header>
+<div class="notice"><strong>Provisional guidance.</strong> Our models estimate the earliest flight likely to arrive while stock is ≥30.
+<strong>Actual live success rate: not yet established.</strong> A scenario percentage is not a verified chance of success.
+All departure windows require a fresh check before you travel.</div>
+<div id="health" class="health" role="status">Checking the latest five-minute predictions…</div>
+<section class="shell" aria-label="Top next opportunity">
+<span class="eyebrow">Earliest upcoming departure</span>
+<div class="hero"><div><h2 id="heroItem" class="big">Loading…</h2>
+<div id="heroState" class="pill review">Checking</div>
+<p id="heroWhy" class="muted">Waiting for a complete V160 forecast.</p></div>
+<div><div id="heroTime" class="actiontime">—</div><div id="heroArrival" class="muted">—</div>
+<div id="heroFlight" class="meta">—</div>
+<button id="heroCheck" type="button" class="primary" style="margin-top:13px">Check this item NOW</button>
+</div></div>
 </section>
-<section class="panel" id="singleCheck" style="margin:12px 0 18px">
-<h2>Check one item right now</h2>
-<p class="small">Uses the current collector snapshot to recalculate both models for the selected item, rather than relying on a five-minute-old NOW signal. Research-only, not guaranteed stock; results expire quickly. This preview is not added to forward-accuracy metrics.</p>
-<div class="controls"><label>Destination / item<select id="recheckItem"><option value="">Select an item</option></select></label>
-<button id="checkNow" type="button">Recalculate this item NOW</button></div>
-<div id="recheckOutput" class="banner">Select an item, then request a fresh one-item calculation.</div>
+<div class="support"><div><span class="small muted">Upcoming windows</span><b id="upcomingCount">—</b></div>
+<div><span class="small muted">Previous leave-now signals</span><b id="recheckCount">—</b></div>
+<div><span class="small muted">No supported window</span><b id="noneCount">—</b></div></div>
+<section class="shell">
+<h2>Next departure windows</h2>
+<p class="muted small">Arranged by earliest time to leave—not by estimated profit or proven accuracy.</p>
+<div class="cards" id="upcoming"><p class="muted">Loading…</p></div></section>
+<section class="shell">
+<h2>Want to check an item before flying?</h2>
+<p class="muted small">Recalculate from the collector right now. This is a new research estimate, not a guaranteed stock prediction.</p>
+<div class="buttons"><label class="control">Country / item
+<select id="recheckItem"><option value="">Choose item</option></select></label>
+<button class="primary" id="checkNow" type="button">Recalculate this item NOW</button></div>
+<div id="recheckOutput" class="checkresult" aria-live="polite"><strong>Pick an item to get a fresh departure estimate.</strong>
+<p class="muted small">You will see whether to leave now, leave later, or wait for a better forecast.</p></div>
 </section>
-<div class="columns">
-<section class="panel"><h2>Upcoming departure opportunities</h2>
-<p class="small">Scheduled WATCH signals from this issue. Check again near departure before acting.</p>
-<div id="upcoming"></div></section>
-<section class="panel"><h2>Recently indicated “leave now”</h2>
-<p class="small">These models recommended departing at their issue timestamp. The timestamp has passed; this is a prompt to reconfirm, <strong>not</strong> a fresh departure instruction.</p>
-<div id="recheck"></div></section></div>
-<h2>All 24 items and why</h2>
-<div class="controls">
-<label>Search<input type="search" id="search" placeholder="Country or item"></label>
-<label>Decisions<select id="filter"><option value="all">All items</option>
-<option value="upcoming">Upcoming / due</option><option value="recheck">Reconfirm NOW signal</option>
-<option value="none">No candidate / passed</option></select></label>
-<label>Sort<select id="sort"><option value="priority">Decision priority</option>
-<option value="time">Departure time</option><option value="country">Country / item</option></select></label>
-</div>
-<div class="tablewrap"><table><thead><tr><th>Destination / item</th><th>Observed stock</th>
-<th>Independent</th><th>Paired</th><th>What to do next</th><th>Flight</th></tr></thead>
-<tbody id="rows"><tr><td colspan="6">Loading…</td></tr></tbody></table></div>
-<footer>The “last observed” quantity can be high even if the model predicts that stock will be sold before your flight arrives. The model's scenario fraction is <strong>not</strong> a validated success probability. A missing proposal means no departure met the current model's criteria, not that restocking will never happen.
- Neither country-specific provider freshness nor player flights have been verified. The original V2 detailed graph and deployed experimental dashboard remain unchanged.</footer>
+<section class="shell">
+<h2>Recently indicated “leave now”</h2>
+<p class="muted small">The previous issue-time recommendation has passed. These are <strong>RECHECK NOW SIGNAL</strong> items—not permission to depart based on an old timestamp.</p>
+<div class="cards" id="recheckCards"></div></section>
+<details id="technical"><summary>Show all 24 items and technical model details</summary>
+<p class="muted small">Independent and paired models may disagree. Scenario support is based on simulations, not observed forward hit rates. Terms: FUTURE_WATCH = estimated later departure; RECENT_ISSUED_NOW_RECHECK = an expired issue-time NOW forecast.</p>
+<div class="tablewrap"><table><thead><tr><th>Item</th><th>Stock last seen</th><th>Independent</th><th>Paired</th><th>Next step</th></tr></thead>
+<tbody id="rows"><tr><td colspan="5">Loading…</td></tr></tbody></table></div>
+</details>
+<footer>All times use your device timezone. Current stock is NOT the stock guaranteed when you land. Flight times assume PI + pilot. All 24 items remain displayed in technical details; the original V2 graph, experimental dashboard and V160 recorder are unchanged.</footer>
 <script>
 "use strict";
-let latest=null;
+let latest=null,selectedHero=null,lastCheck=null;
 const el=id=>document.getElementById(id);
-const clock=t=>Number.isInteger(t)?new Date(t*1000).toLocaleTimeString():"—";
-const local=t=>Number.isInteger(t)?new Date(t*1000).toLocaleString():"—";
-function span(seconds){
- if(!Number.isFinite(seconds))return "—";
- const n=Math.max(0,Math.floor(seconds)),h=Math.floor(n/3600),m=Math.floor((n%3600)/60),s=n%60;
- return h>0?h+"h "+m+"m":m+"m "+s+"s";
+const clock=t=>Number.isInteger(t)?new Date(t*1000).toLocaleTimeString([], {hour:"numeric",minute:"2-digit"}):"—";
+const absolute=t=>Number.isInteger(t)?new Date(t*1000).toLocaleString():"—";
+const elapsed=n=>{if(!Number.isFinite(n))return "—";let x=Math.max(0,Math.round(n));
+ let h=Math.floor(x/3600),m=Math.floor(x%3600/60),s=x%60;
+ return h?h+"h "+m+"m":m?m+"m "+s+"s":s+"s";};
+function node(type,txt,cls){const x=document.createElement(type);x.textContent=txt;
+ if(cls)x.className=cls;return x;}
+function add(parent,type,txt,cls){const x=node(type,txt,cls);parent.append(x);return x;}
+const currentTime=()=>Math.floor(Date.now()/1000);
+function fresh(){return !!latest&&latest.healthy && currentTime()-latest.issued_epoch<=660;}
+function variants(row){return Object.entries(row.models);}
+function future(row,now){return variants(row).filter(([name,m])=>
+ Number.isInteger(m.departure)&&m.departure>=now-30);}
+function priority(row,now){return future(row,now).reduce((p,[name,m])=>Math.min(p,m.departure),Infinity);}
+function signal(row,now){
+ if(!fresh())return "STALE";
+ if(future(row,now).length)return "WATCH";
+ if(variants(row).some(([name,m])=>m.signal==="RECENT_ISSUED_NOW_RECHECK"||
+   (m.issued_now && Number.isInteger(m.issued_departure)&&now-m.issued_departure>=0&&now-m.issued_departure<300)))
+   return "RECHECK";
+ return "NONE";
 }
-function addCell(tr,main,cls,sub){
- const td=tr.insertCell(),strong=document.createElement("div");strong.textContent=main;
- if(cls)strong.className=cls;td.append(strong);
- if(sub){const small=document.createElement("div");small.className="small";small.textContent=sub;td.append(small);}
- return td;
+function diagnose(row,now){
+ let futureModels=future(row,now);
+ if(!futureModels.length)return null;
+ futureModels.sort((a,b)=>a[1].departure-b[1].departure);
+ const first=futureModels[0][1],other=futureModels.length>1?futureModels[1][1]:null;
+ const disagree=!!other&&Math.abs(other.departure-first.departure)>300;
+ const agreement=!!other&&!disagree;
+ const label=disagree?"MODELS DISAGREE":agreement?"MODELS AGREE":"ONE MODEL ONLY";
+ const lead=first.departure<=now+30?"DUE NOW":"LEAVE AT "+clock(first.departure);
+ const why=disagree?"Two models suggest different times. Recheck before acting.":
+   agreement?"Models agree within five minutes. Still unvalidated.":
+   "Only one model offers this departure. Recheck before acting.";
+ return {first,lead,label,why,disagree,agreement,
+   eta:first.arrival,when:first.departure,
+   alternate:disagree?other.departure:null};
 }
-function classify(row,now,healthy){
- const all=Object.values(row.models);
- if(!healthy)return "stale";
- if(all.some(v=>v.signal==="FUTURE_WATCH"||v.signal==="DUE_NOW")&&
-    all.some(v=>Number.isInteger(v.departure)&&v.departure>=now-30))return "upcoming";
- if(all.some(v=>v.signal==="RECENT_ISSUED_NOW_RECHECK"||
-          (v.issued_now && v.issued_departure!==null && now-v.issued_departure<300 && now>=v.issued_departure)))return "recheck";
- return "none";
-}
-function proposalText(v,now,healthy){
- if(!healthy)return ["STALE · no live guidance","Wait for a current complete issue"];
- if(v.signal==="FUTURE_WATCH")return ["WATCH · leave in "+span(v.departure-now),
-   "Depart "+local(v.departure)+" · arrive "+local(v.arrival)+" · modeled "+Math.round((v.fraction||0)*100)+"%"];
- if(v.signal==="DUE_NOW")return ["DUE NOW · research only",
-   "As issued "+local(v.issued_departure)+" · projected arrival "+local(v.issued_arrival)];
- if(v.signal==="RECENT_ISSUED_NOW_RECHECK")return ["RECHECK NOW SIGNAL",
-   "Model said leave at "+clock(v.issued_departure)+" · refresh before flight"];
- if(v.signal==="DEPARTURE_PASSED")return ["MISSED ISSUE-TIME WINDOW",
-   "Last proposed departure "+clock(v.issued_departure)+" · await next issue"];
- if(v.signal==="STALE_RESEARCH_ISSUE")return ["STALE · recheck feed",
-   "Prior issue "+clock(v.issued_departure)];
- const reason=(v.status||"unknown").replaceAll("_"," ").toLowerCase();
- return ["NO QUALIFYING DEPARTURE",reason];
-}
-function firstDeparture(row,now){
- return Math.min(...Object.values(row.models).map(v=>v.departure)
-     .filter(x=>Number.isInteger(x)&&x>=now-30).concat([9999999999]));
+function chooseRecheck(key){
+ const select=el("recheckItem");
+ if(latest&&latest.items.some(r=>r.item_key===key))select.value=key;
+ select.scrollIntoView({behavior:"smooth",block:"center"});
 }
 function render(){
  if(!latest)return;
- const now=Math.floor(Date.now()/1000);
- const healthy=latest.healthy && now-latest.issued_epoch<=660;
- const items=latest.items.map(r=>({...r,decision:classify(r,now,healthy)}));
- const upcoming=items.filter(r=>r.decision==="upcoming")
-   .sort((a,b)=>firstDeparture(a,now)-firstDeparture(b,now));
- const recheck=items.filter(r=>r.decision==="recheck")
-   .sort((a,b)=>b.source_quantity-a.source_quantity);
- el("availableCount").textContent=upcoming.length+"/24";
- el("recheckCount").textContent=recheck.length;
- el("noCount").textContent=items.filter(r=>r.decision==="none"||r.decision==="stale").length;
- el("agreeCount").textContent=items.filter(r=>{
-   const a=r.models.independent,b=r.models.paired_complete;
-   return r.decision!=="stale" && a.issued_departure!==null && b.issued_departure!==null &&
-      Math.abs(a.issued_departure-b.issued_departure)<=300;
- }).length;
- el("nextTick").textContent=span(latest.issued_epoch+300-now);
- el("health").textContent=(healthy?"Research feed current":"Research feed STALE · no actionable forecasts")+" · issued "+local(latest.issued_epoch)+
-   " · "+span(now-latest.issued_epoch)+" ago · collector heartbeat age at issue "+span(latest.source_heartbeat_age_seconds)+
-   ". Next five-minute refresh is an estimate, not guaranteed.";
- el("health").className="banner "+(healthy?"good":"fault");
- function paintCards(target,list,state){
-  target.replaceChildren();
-  if(!list.length){const p=document.createElement("p");p.className="small";
-    p.textContent=healthy?"None at this snapshot. Check the next issue.":"Current feed unavailable; no recommendations.";target.append(p);return;}
-  for(const row of list.slice(0,8)){
-   const box=document.createElement("div");box.className="opportunity";
-   const name=document.createElement("strong");name.textContent=row.country_name+" · "+row.item;box.append(name);
-   const tag=document.createElement("div");tag.className="why";
-   const models=Object.entries(row.models).filter(([k,v])=>
-      state==="upcoming"?Number.isInteger(v.departure)&&v.departure>=now-30:v.signal==="RECENT_ISSUED_NOW_RECHECK");
-   const details=models.map(([k,v])=>k.replace("_complete","")+" — "+
-      (state==="upcoming"?"in "+span(v.departure-now)+" ("+clock(v.departure)+")":"said NOW at "+clock(v.issued_departure)));
-   tag.textContent=details.join(" · ");box.append(tag);
-   const sub=document.createElement("div");sub.className="small";
-   sub.textContent="Flight "+span(row.flight_seconds)+
-    " · last observed "+(row.source_quantity===null?"unknown":row.source_quantity)+
-    " · "+(state==="upcoming"?"Reconfirm near departure":"Recheck next fresh issue; not a live NOW recommendation");
-   box.append(sub);target.append(box);
+ const now=currentTime(),rows=latest.items.slice(),ok=fresh();
+ const windows=rows.filter(r=>signal(r,now)==="WATCH").sort((a,b)=>priority(a,now)-priority(b,now));
+ const recent=rows.filter(r=>signal(r,now)==="RECHECK")
+   .sort((a,b)=>a.flight_seconds-b.flight_seconds);
+ el("upcomingCount").textContent=windows.length+" / 24";
+ el("recheckCount").textContent=recent.length+" to check";
+ el("noneCount").textContent=rows.length-windows.length-recent.length;
+ el("health").className="health"+(ok?"":" bad");
+ el("health").textContent=(ok?"Feed current":"Feed stale · no departure guidance")+
+   " · updated "+clock(latest.issued_epoch)+
+   " ("+elapsed(now-latest.issued_epoch)+" ago) · next issue expected in "+
+   elapsed(Math.max(0,latest.issued_epoch+300-now));
+ let chosen=windows[0];
+ selectedHero=chosen?chosen.item_key:null;
+ const head=chosen?diagnose(chosen,now):null;
+ el("heroItem").textContent=chosen?chosen.country_name+" · "+chosen.item:
+   (recent.length?"Nothing upcoming; recheck a recent NOW signal":"No upcoming departure");
+ el("heroState").textContent=head?head.label:"NO VERIFIED DEPARTURE";
+ el("heroState").className="pill "+(head&&!head.disagree?"watch":"review");
+ el("heroTime").textContent=head?head.lead:"WAIT / RECHECK";
+ el("heroArrival").textContent=head?"Estimated landing: "+clock(head.eta):
+   "New forecast required before choosing a flight.";
+ el("heroFlight").textContent=chosen?"Flight "+elapsed(chosen.flight_seconds)+
+   " · stock last observed "+(chosen.source_quantity??"unknown")+
+   " · target ≥30 on arrival":"Current verified accuracy: not available.";
+ el("heroWhy").textContent=head?head.why+
+   (head.alternate?" Alternative model: "+clock(head.alternate)+".":""):
+   "A prediction is not an instruction to depart without a fresh check.";
+ el("heroCheck").disabled=!chosen;
+ el("upcoming").replaceChildren();
+ for(const row of windows.slice(0,12)){
+   const d=diagnose(row,now);if(!d)continue;
+   const card=node("article","","card"),top=node("div","","row");
+   add(top,"strong",row.country_name+" · "+row.item);
+   add(top,"span",d.label,"pill "+(d.disagree?"review":"watch"));card.append(top);
+   add(card,"div",d.lead,d.disagree?"time muted":"time");
+   add(card,"div",d.when>now?"Leave in "+elapsed(d.when-now):"Departure due","muted");
+   add(card,"p","Estimated arrival "+clock(d.eta)+" · "+elapsed(row.flight_seconds)+" flight","meta");
+   add(card,"p",d.why+(d.alternate?" Other model: "+clock(d.alternate):""),"meta");
+   const button=add(card,"button","Check now","tiny");
+   button.addEventListener("click",()=>chooseRecheck(row.item_key));
+   el("upcoming").append(card);
+ }
+ if(!windows.length){add(el("upcoming"),"p",
+   ok?"No future windows this issue. Recheck a recent NOW signal below.":"Wait for a fresh V160 issue.","muted");}
+ el("recheckCards").replaceChildren();
+ for(const row of recent.slice(0,8)){
+   const card=node("article","","card");
+   add(card,"strong",row.country_name+" · "+row.item);
+   add(card,"div","RECHECK NOW — prior signal expired","time");
+   add(card,"div","Flight "+elapsed(row.flight_seconds)+
+     " · stock last observed "+(row.source_quantity??"unknown"),"meta");
+   const button=add(card,"button","Check now","tiny");
+   button.addEventListener("click",()=>chooseRecheck(row.item_key));
+   el("recheckCards").append(card);
+ }
+ if(!recent.length)add(el("recheckCards"),"p",
+  "No recently issued NOW signals.","muted");
+ const table=el("rows");table.replaceChildren();
+ for(const row of rows.sort((a,b)=>signal(a,now).localeCompare(signal(b,now))||
+                             a.item_key.localeCompare(b.item_key))){
+  const tr=table.insertRow();
+  const values=[row.country_name+" · "+row.item,row.source_quantity??"unknown"];
+  for(const val of values)tr.append(node("td",String(val)));
+  for(const kind of ["independent","paired_complete"]){
+    const m=row.models[kind],value=m.signal==="FUTURE_WATCH"?
+      "WATCH "+clock(m.departure):m.signal==="DUE_NOW"?"DUE NOW":
+      m.signal==="RECENT_ISSUED_NOW_RECHECK"?"Recent NOW · expired":
+      m.signal==="DEPARTURE_PASSED"?"Passed":
+      m.signal==="NO_MODEL_CANDIDATE"?"Abstained":"Stale";
+    const td=node("td",value);
+    add(td,"div",(m.status||"Unknown").replaceAll("_"," ").toLowerCase(),"sub");
+    tr.append(td);
   }
+  tr.append(node("td",signal(row,now)==="WATCH"?"Recheck near departure":
+                      signal(row,now)==="RECHECK"?"Recalculate now":"Wait for next issue"));
+  table.append(tr);
  }
- paintCards(el("upcoming"),upcoming,"upcoming");
- paintCards(el("recheck"),recheck,"recheck");
- const q=el("search").value.trim().toLowerCase(),filter=el("filter").value;
- const rows=items.filter(r=>(r.item_key+" "+r.country_name).toLowerCase().includes(q)
-    &&(filter==="all"||filter===r.decision||(filter==="none"&&(r.decision==="none"||r.decision==="stale"))));
- if(el("sort").value==="country")rows.sort((a,b)=>a.item_key.localeCompare(b.item_key));
- else if(el("sort").value==="time")rows.sort((a,b)=>firstDeparture(a,now)-firstDeparture(b,now)||a.item_key.localeCompare(b.item_key));
- else {
-  const priority={upcoming:0,recheck:1,none:2,stale:3};
-  rows.sort((a,b)=>priority[a.decision]-priority[b.decision]||
-    firstDeparture(a,now)-firstDeparture(b,now)||a.item_key.localeCompare(b.item_key));
- }
- const tbody=el("rows");tbody.replaceChildren();
- for(const row of rows){
-  const tr=tbody.insertRow();
-  addCell(tr,row.country_name+" · "+row.item,"",row.phase?"Latest phase "+row.phase:"");
-  addCell(tr,row.source_quantity===null?"Unknown":String(row.source_quantity),"when",
-    row.source_last_epoch?"Observed "+clock(row.source_last_epoch):"Last observed, age unknown");
-  for(const name of ["independent","paired_complete"]){
-   const [main,sub]=proposalText(row.models[name],now,healthy);
-   addCell(tr,main,"when",sub);
-  }
-  const action={
-    upcoming:["WATCH / DUE","Verify fresh signal near departure"],
-    recheck:["RECHECK NOW","Previously issued leave-now; do not assume it remains valid"],
-    none:["NO SUPPORTED WINDOW","Keep monitoring; do not infer arrival stock from current quantity"],
-    stale:["FEED STALE","Wait for valid collection and reissue"]
-  }[row.decision];
-  addCell(tr,action[0],"when",action[1]);
-  addCell(tr,span(row.flight_seconds),"small");
- }
- if(!rows.length){const tr=tbody.insertRow();addCell(tr,"No matching items").colSpan=6;}
+ if(lastCheck)renderCheck(lastCheck);
 }
-function populateRecheckSelect(items){
- const sel=el("recheckItem"),chosen=sel.value;
- sel.replaceChildren();
- const def=document.createElement("option");def.value="";def.textContent="Select an item";sel.append(def);
- for(const r of items.slice().sort((a,b)=>(a.country_name+" "+a.item).localeCompare(b.country_name+" "+b.item))){
-  const opt=document.createElement("option");opt.value=r.item_key;opt.textContent=r.country_name+" · "+r.item;sel.append(opt);
+function populate(items){
+ const select=el("recheckItem"),preserve=select.value;
+ select.replaceChildren();select.append(node("option","Choose item"));
+ select.firstChild.value="";
+ for(const r of items.slice().sort((a,b)=>
+   (a.country_name+a.item).localeCompare(b.country_name+b.item))){
+  const option=node("option",r.country_name+" · "+r.item);
+  option.value=r.item_key;select.append(option);
  }
- if(items.some(x=>x.item_key===chosen))sel.value=chosen;
+ if(items.some(r=>r.item_key===preserve))select.value=preserve;
+}
+function renderCheck(data){
+ const output=el("recheckOutput");
+ output.replaceChildren();
+ if(!data)return;
+ const age=currentTime()-data.issued_epoch;
+ const names=["independent","paired_complete"];
+ const m=names.map(key=>data.models[key]);
+ const valid=m.filter(v=>Number.isInteger(v.departure_epoch)&&v.departure_epoch>=currentTime()-30)
+   .sort((a,b)=>a.departure_epoch-b.departure_epoch);
+ const mismatch=valid.length===2&&Math.abs(valid[0].departure_epoch-valid[1].departure_epoch)>300;
+ const two=valid.length===2&&!mismatch;
+ const exp=age>30 || !valid.length;
+ let state,caption;
+ if(age>30){state="RECHECK — RESULT EXPIRED";caption="Calculation is over 30 seconds old. Run another check.";}
+ else if(!valid.length){state="NO SUPPORTED DEPARTURE";caption="Neither model currently supports an eligible flight.";}
+ else if(mismatch){state="MODELS DISAGREE";caption="Both models produced different times; no single recommended departure.";}
+ else if(valid[0].departure_epoch<=currentTime()+30){
+    state=two?"LEAVE NOW · BOTH MODELS":"LEAVE NOW · ONE MODEL";
+    caption="Provisional only. Confirm current stock context before spending energy or traveling.";}
+ else {state="LEAVE AT "+clock(valid[0].departure_epoch);
+    caption=two?"Both models agree within five minutes; reconfirm near departure.":
+      "One model supports this window; reconfirm near departure.";}
+ add(output,"div",data.item_key+" · checked "+clock(data.issued_epoch),"eyebrow");
+ add(output,"div",state,"big");
+ add(output,"p",caption,"muted");
+ if(valid.length){
+   add(output,"div","Projected arrival "+clock(valid[0].arrival_epoch)+
+     " · flight "+elapsed(data.flight_seconds)+
+     " · target ≥30 on arrival","meta");
+   if(mismatch)add(output,"p","Other model departure "+clock(valid[1].departure_epoch),"meta");
+ }else if(exp)add(output,"p","Wait for a fresher result.","meta");
+ add(output,"div","Stock last observed "+(data.source_last_quantity??"unknown")+
+   " · source heartbeat "+elapsed(data.source_heartbeat_age_seconds)+
+   " old when checked.","meta");
+ const technical=add(output,"details","","");
+ add(technical,"summary","Show research scenario support (not accuracy)");
+ for(const key of names){
+  const v=data.models[key],score=Number.isFinite(v.scenario_stock_fraction)?
+    Math.round(v.scenario_stock_fraction*100)+"% simulated support":"no qualifying forecast";
+  add(technical,"p",key.replaceAll("_"," ")+": "+score+" · "+
+    (v.status||"unknown").replaceAll("_"," ").toLowerCase(),"small");
+ }
 }
 async function recheckNow(){
- const key=el("recheckItem").value;
- if(!key){el("recheckOutput").textContent="Select an item first.";return;}
- const button=el("checkNow");button.disabled=true;
- el("recheckOutput").textContent="Calculating from current observed history. This may take a little while…";
+ const key=el("recheckItem").value;if(!key){el("recheckOutput").textContent="Choose an item first.";return;}
+ const button=el("checkNow");button.disabled=true;lastCheck=null;
+ el("recheckOutput").textContent="Calculating a fresh departure time…";
  try{
   const response=await fetch("/api/recheck",{method:"POST",cache:"no-store",
     headers:{"Content-Type":"application/json","X-Torn-Fren-Action":"user-recheck"},
     body:JSON.stringify({item_key:key})});
-  const r=await response.json();
-  if(!response.ok||r.status!=="CURRENT_ITEM_RECHECK_RESEARCH_ONLY")
-    throw Error(r.note||"Current research check unavailable (HTTP "+response.status+")");
-  const age=Math.floor(Date.now()/1000)-r.issued_epoch;
-  const messages=[];
-  for(const name of ["independent","paired_complete"]){
-   const m=r.models[name],label=name==="paired_complete"?"Paired":"Independent";
-   if(!Number.isInteger(m.departure_epoch)){messages.push(label+": no qualifying departure ("+
-    (m.status||"unknown").replaceAll("_"," ")+")");continue;}
-   if(age>30){messages.push(label+": calculation is already >30s old; recheck again");continue;}
-   const when=m.departure_epoch<=r.issued_epoch+30?
-     "NOW, provisionally (checked "+clock(r.issued_epoch)+")":
-     "WATCH "+clock(m.departure_epoch)+" · in "+span(m.departure_epoch-Math.floor(Date.now()/1000));
-   messages.push(label+": "+when+"; modeled arrival "+local(m.arrival_epoch)+
-      "; scenario support "+Math.round(m.scenario_stock_fraction*100)+"%"+
-      (m.sustained_five_minute_support===false?"; narrow NOW window":""));
-  }
-  el("recheckOutput").textContent=key+" · freshly checked "+local(r.issued_epoch)+
-   " · last observed quantity "+(r.source_last_quantity??"unknown")+" · flight "+span(r.flight_seconds)+
-   ". "+messages.join(" | ")+". Provisional model support only, not a validated player arrival.";
-  el("recheckOutput").className="banner "+(age>30?"fault":"good");
- }catch(e){el("recheckOutput").textContent="Recheck failed: "+e.message+
-   ". No new departure time is authorized.";el("recheckOutput").className="banner fault";}
- finally{button.disabled=false;}
+  const result=await response.json();
+  if(!response.ok||result.status!=="CURRENT_ITEM_RECHECK_RESEARCH_ONLY")
+   throw Error(result.note||"Could not calculate a current flight.");
+  lastCheck=result;renderCheck(result);
+ }catch(err){
+  el("recheckOutput").replaceChildren();
+  add(el("recheckOutput"),"strong","NO NEW DEPARTURE");
+  add(el("recheckOutput"),"p",err.message+" · Wait for a fresh issue or retry shortly.","muted");
+ }finally{button.disabled=false;}
 }
+el("heroCheck").addEventListener("click",()=>{if(selectedHero)chooseRecheck(selectedHero);});
 el("checkNow").addEventListener("click",recheckNow);
+el("refresh").addEventListener("click",refresh);
 async function refresh(){
  try{
   const response=await fetch("/api/live",{cache:"no-store"});
   const data=await response.json();
-  if(!Array.isArray(data.items)||data.items.length!==24)
-   throw Error("Missing or incomplete V160 private batch");
-  latest=data;populateRecheckSelect(data.items);render();
- }catch(e){
-  latest=null;
-  el("health").className="banner fault";
-  el("health").textContent="Research unavailable: "+e.message+". No departure instructions.";
-  for(const name of ["availableCount","recheckCount","noCount","agreeCount","nextTick"])el(name).textContent="—";
-  for(const name of ["upcoming","recheck","rows"])el(name).replaceChildren();
+  if(!Array.isArray(data.items)||data.items.length!==24)throw Error("No complete 24-item issue.");
+  latest=data;populate(data.items);render();
+ }catch(err){
+  latest=null;selectedHero=null;
+  el("health").className="health bad";
+  el("health").textContent="Forecast feed unavailable: "+err.message;
+  el("upcoming").replaceChildren();el("recheckCards").replaceChildren();
+  el("heroItem").textContent="WAIT FOR FRESH DATA";
+  el("heroTime").textContent="NO DEPARTURE";
+  el("heroCheck").disabled=true;
  }
 }
-for(const name of ["search","filter","sort"])el(name).addEventListener("input",render);
-el("refresh").addEventListener("click",refresh);
 setInterval(()=>{if(latest)render();},1000);
-setInterval(refresh,30000);refresh();
+setInterval(refresh,30000);
+refresh();
 </script></body></html>"""
 
 
