@@ -32,7 +32,7 @@ def compact(result):
     source = {
         "cohorts": _num(result, "hourly_issued_cohorts"),
         "mc_actual_evaluations": _num(result, "monte_carlo_replayed"),
-        "mc_capped_recovery": _num(counts, "NEW_ELIGIBLE_BUT_RESOURCE_LIMIT"),
+        "mc_capped_eligible": _num(counts, "NEW_ELIGIBLE_BUT_RESOURCE_LIMIT"),
         "recovered_eligible": _num(counts, "recovered"),
         "insufficient_or_no_onset": _num(
             counts, "OBSERVED_HISTORY_SPARSE_OR_ONSET_UNKNOWN"),
@@ -67,7 +67,7 @@ def compact(result):
         "=== V149 COMPACT V146 REPLAY (HISTORICAL AS-OF / NOT LIVE FLIGHT PROOF) ===",
         f"24 items; {source['cohorts']} first-issued item/UTC-hour cohorts; NO DATABASE OR WEBSITE WRITES",
         f"V145 recovered NEW eligibility on {source['recovered_eligible']} cohorts; "
-        f"{source['mc_capped_recovery']} newly eligible were unscored due to CPU cap;",
+        f"{source['mc_capped_recovery']} eligible (old or new) were unscored due to CPU cap;",
         f"  V145 simulations run: {source['mc_actual_evaluations']} (max {_num(result, 'replay_cap')}); "
         f"{source['insufficient_or_no_onset']} remain sparse/onset-unknown",
         f"V128 original proposals: {total_v128}/{source['cohorts']} ({100*total_v128/source['cohorts']:.1f}%)",
