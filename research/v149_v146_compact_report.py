@@ -109,7 +109,7 @@ def compact(result):
         f"  V148 long-wait caution flags: {total('long_wait_needs_explanation')}; "
         "0 flags is NOT a guarantee of optimal timing",
         "=== ITEM | old | recovered | V148 proposed/H/M/net | "
-        "V151 proposed/H/M/net | V151 median wait min ===",
+        "V151 proposed/H/M/net | V151-V148 paired net | V151 median wait min ===",
     ]
     focus=["jap:Xanax","chi:Peony","swi:Edelweiss","uni:Xanax"]
     ordered=sorted(items,key=lambda k:(0 if k in focus else 1,focus.index(k) if k in focus else k))
@@ -130,6 +130,7 @@ def compact(result):
             f"{_num(it,'stable_proxy_hit'):>2}/"
             f"{_num(it,'stable_proxy_miss'):>2}/"
             f"{_num(it,'stable_only_vs_now')-_num(it,'now_only_vs_stable'):+3} "
+            f"{_num(it,'stable_only_vs_explicit')-_num(it,'explicit_only_vs_stable'):+3} "
             f"{'—' if wait is None else f'{wait/60:.1f}'}"
         )
     lines.extend([
