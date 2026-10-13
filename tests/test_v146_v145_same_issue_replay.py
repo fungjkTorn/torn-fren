@@ -195,6 +195,46 @@ class SameIssueReplayTests(unittest.TestCase):
             self.assertEqual(row["matched_stable_delayed_vs_now"],1)
             self.assertEqual(row["delayed_stable_only_vs_now"],1)
 
+    def test_60sec_candidate_is_paired_with_same_issue_300sec_outcome(self):
+        with tempfile.TemporaryDirectory() as temp:
+            src,side,issued=make_db(temp)
+            flight=original.TRAVEL_SECONDS["uni"]
+            def planner(key,phases,*,asof,scenarios,
+                        departure_step_seconds=300):
+                self.assertEqual(asof,issued)
+                self.assertEqual(phases["last_observation"].epoch,issued)
+                step=departure_step_seconds
+                departure=issued+(60 if step==60 else 300)
+                return {
+                    "status":"PROVISIONAL_SCENARIO_SUPPORTED_DEPARTURE",
+                    "score_now":0.2,
+                    "score_bins":[0.2]*(481 if step==60 else 97),
+                    "first_next_restock_onset_median_seconds":360,
+                    "first_reachable":{
+                        "departure_epoch":departure,
+                        "arrival_epoch":departure+flight,
+                        "scenario_stock_fraction":0.75,
+                        "cadence_warning":None,
+                    },
+                }
+            def score(db,country,item,arrival,now):
+                return "HIT" if arrival==issued+60+flight else "MISS"
+            with patch.object(m,"stable_earliest_departure",
+                              side_effect=planner),(
+                patch.object(m,"_pair_score",side_effect=score)
+            ):
+                result=m.replay(collector=src,sidecar=side,
+                                now=issued+12000,max_model_evals=10)
+            row=result["items"][ITEM]
+            self.assertEqual(row["fine60_proposals"],1)
+            self.assertEqual(row["fine60_earlier_than_coarse"],1)
+            self.assertEqual(row["fine60_vs_coarse_matched"],1)
+            self.assertEqual(row["fine60_only_vs_coarse"],1)
+            self.assertEqual(row["coarse_only_vs_fine60"],0)
+            self.assertEqual(row["fine60_vs_now_matched"],1)
+            self.assertEqual(row["fine60_only_vs_now"],1)
+            self.assertEqual(row["fine60_departure_median_wait_seconds"],60)
+
     def test_stable_no_candidate_still_preserves_no_data_vs_score_gate(self):
         with tempfile.TemporaryDirectory() as temp:
             src,side,issued=make_db(temp)
