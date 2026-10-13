@@ -8,7 +8,7 @@ set -euo pipefail
 WORK=/home/ubuntu/torn-fren-v38-probe
 STAGE=/home/ubuntu/torn-fren-private-models/v128_stage/pinned/research
 VENV="$WORK/.venv/bin/python"
-PIN=80aa3aba8f9c2c85aa444023f5a463ae6af21cb6
+PIN=3ff4612bdad458008088b6a705e5d53bc1b85c67
 LIVE=/opt/torn-fren/data/stock_history.db
 V128=/var/lib/torn-fren-v38/v128_earliest24_shadow.db
 
@@ -26,12 +26,12 @@ test ! -L "$STAGE" || { echo "STOP: stage is symlink"; exit 1; }
 cd "$WORK"
 git fetch -q origin research/v38-full-roster-live-prep-20261009 2>/dev/null
 git cat-file -e "${PIN}^{commit}"
-for module in v145_provider_continuous_phases v148_observed_earliest_stock_cycle v150_stock_window_failure_diagnostic v151_stable_earliest_departure v152_first_restock_timing_evidence v153_recent_completed_restock_baseline v156_item_cycle_profile_router v157_prequential_stock_survival_router v158_flight_horizon_router v146_v145_same_issue_replay v149_v146_compact_report; do
+for module in v145_provider_continuous_phases v148_observed_earliest_stock_cycle v150_stock_window_failure_diagnostic v151_stable_earliest_departure v152_first_restock_timing_evidence v153_recent_completed_restock_baseline v156_item_cycle_profile_router v157_prequential_stock_survival_router v158_flight_horizon_router v159_issue_phase_episode_audit v146_v145_same_issue_replay v149_v146_compact_report; do
   test ! -L "$STAGE/$module.py" || { echo "STOP: staged module symlink"; exit 1; }
   git show "${PIN}:research/${module}.py" > "$STAGE/$module.py"
   "$VENV" -m py_compile "$STAGE/$module.py"
 done
-echo "===== V158 ACTUAL COUNTRY-FLIGHT HORIZON ROUTER VS V151/V157: AS-ISSUED CHECKS ====="
+echo "===== V159 CLUSTERED PHASE EPISODES + V158 FLIGHT ROUTER: FROZEN AS-ISSUED COHORTS ====="
 export PYTHONDONTWRITEBYTECODE=1
 export OPENBLAS_NUM_THREADS=1
 export MKL_NUM_THREADS=1
@@ -39,6 +39,8 @@ export OMP_NUM_THREADS=1
 nice -n 19 timeout 240s "$VENV" - <<'PY'
 import importlib
 import json
+import os
+import time
 from pathlib import Path
 import research
 stage=Path("/home/ubuntu/torn-fren-private-models/v128_stage/pinned/research").resolve(strict=True)
@@ -46,7 +48,18 @@ research.__path__=[str(stage), *[str(x) for x in research.__path__ if Path(x).re
 importlib.invalidate_caches()
 audit=importlib.import_module("research.v146_v145_same_issue_replay")
 assert Path(audit.__file__).resolve().parent == stage
-result=audit.replay(days=1,max_model_evals=96)
+raw=os.environ.get("REPLAY_ASOF_EPOCH")
+if raw is None:
+    asof=int(time.time())
+elif len(raw)<=11 and raw.isdecimal():
+    asof=int(raw)
+else:
+    raise ValueError("REPLAY_ASOF_EPOCH must be decimal Unix epoch")
+if asof<=0 or asof>int(time.time())+5:
+    raise ValueError("invalid or future replay cutoff")
+print(f"===== FIXED READ-ONLY ASOF_EPOCH={asof}; DAYS=1; MC_BUDGET=96 =====",flush=True)
+result=audit.replay(now=asof,days=1,max_model_evals=96)
+assert result["asof_epoch"]==asof
 report=importlib.import_module("research.v149_v146_compact_report")
 print(report.compact(result))
 PY
