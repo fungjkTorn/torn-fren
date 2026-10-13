@@ -15,7 +15,7 @@ WORK=/home/ubuntu/torn-fren-v38-probe
 STAGE=/home/ubuntu/torn-fren-private-models/v160_stage/pinned
 PRIVATE=/var/lib/torn-fren-v38
 COLLECTOR=/opt/torn-fren/data/stock_history.db
-PIN=510ea2fd2d6cfe3f124493a786cd1ef338c5995b
+PIN=da6db7cee81588b38cb8ee522be611ad7e173bda
 PY="$WORK/.venv/bin/python"
 
 if [[ "$ACTION" == status ]]; then
