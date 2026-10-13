@@ -8,7 +8,7 @@ set -euo pipefail
 WORK=/home/ubuntu/torn-fren-v38-probe
 STAGE=/home/ubuntu/torn-fren-private-models/v128_stage/pinned/research
 VENV="$WORK/.venv/bin/python"
-PIN=5619132ae8057f0874ec4f25c2e70cf9da1ab38a
+PIN=70e3e78666c66329243f6c8b66f3de3ca81decc4
 LIVE=/opt/torn-fren/data/stock_history.db
 V128=/var/lib/torn-fren-v38/v128_earliest24_shadow.db
 
