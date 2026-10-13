@@ -52,22 +52,22 @@ def compact(result):
         sum(total(key) for key in (
             "unknown_or_no_proposal",))
     )
-    h148,m148,p148,u148 = (
+    h148,m148,pending148,u148 = (
         total("explicit_proxy_hit"),total("explicit_proxy_miss"),
         total("explicit_proxy_pending"),total("explicit_proxy_unknown"))
-    h151,m151,p151,u151 = (
+    h151,m151,pending151,u151 = (
         total("stable_proxy_hit"),total("stable_proxy_miss"),
         total("stable_proxy_pending"),total("stable_proxy_unknown"))
-    if (h151+m151+p151+u151 != total_v151 or
-        h148+m148+p148+u148 != total_v148 or
+    if (h151+m151+pending151+u151 != total_v151 or
+        h148+m148+pending148+u148 != total_v148 or
         h145+m145 > total_v145 or
         total_v148>source["cohorts"] or total_v151>source["cohorts"]
         or total_v128>source["cohorts"]
         or total_v145>source["mc_actual_evaluations"]):
         raise ValueError("model outcome denominators do not reconcile")
-    p145=total("matched_new_vs_now")
-    p148=total("matched_explicit_vs_now")
-    p151=total("matched_stable_vs_now")
+    matched145=total("matched_new_vs_now")
+    matched148=total("matched_explicit_vs_now")
+    matched151=total("matched_stable_vs_now")
     pair145=total("new_only")-total("now_only")
     pair148=total("explicit_only_vs_now")-total("now_only_vs_explicit")
     pair151=total("stable_only_vs_now")-total("now_only_vs_stable")
@@ -85,15 +85,15 @@ def compact(result):
         f"{pn145} pending, remaining unknown/unmatched",
         f"V148 explicit-stock-window proposals: {total_v148}/{source['cohorts']} "
         f"({100*total_v148/source['cohorts']:.1f}%)",
-        f"  V148 proxy outcomes: {_rate(h148,m148)}; {p148} pending, {u148} unknown",
+        f"  V148 proxy outcomes: {_rate(h148,m148)}; {pending148} pending, {u148} unknown",
         f"V151 stable whole-cycle scenario departures: {total_v151}/{source['cohorts']}"
         f" ({100*total_v151/source['cohorts']:.1f}%)",
-        f"  V151 proxy outcomes: {_rate(h151,m151)}; {p151} pending, {u151} unknown",
-        f"  V151 matched vs leave-now: {p151} pairs, net {pair151:+d}"
+        f"  V151 proxy outcomes: {_rate(h151,m151)}; {pending151} pending, {u151} unknown",
+        f"  V151 matched vs leave-now: {matched151} pairs, net {pair151:+d}"
         f" ({total('stable_only_vs_now')} V151-only vs {total('now_only_vs_stable')} now-only)",
-        f"  V145 matched versus leave-now: {p145} mature pairs, net "
+        f"  V145 matched versus leave-now: {matched145} mature pairs, net "
         f"{pair145:+d} model-only minus leave-now-only ({total('new_only')} vs {total('now_only')})",
-        f"  V148 matched versus leave-now: {p148} mature pairs, net "
+        f"  V148 matched versus leave-now: {matched148} mature pairs, net "
         f"{pair148:+d} model-only minus leave-now-only ({total('explicit_only_vs_now')} vs {total('now_only_vs_explicit')})",
         f"  V148 long-wait caution flags: {total('long_wait_needs_explanation')}; "
         "0 flags is NOT a guarantee of optimal timing",
