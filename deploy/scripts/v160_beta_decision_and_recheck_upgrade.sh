@@ -10,7 +10,7 @@ CODE="$ROOT/v160_beta_board.py"
 HELPER="$ROOT/v160_single_item_recheck.py"
 LEDGER=/var/lib/torn-fren-v38/v160_v151_prospective24.db
 BRANCH=research/v38-full-roster-live-prep-20261009
-PIN=0225bb0b222a7b56cae5168f3102c5b8362fc7db
+PIN=58da25f27eedb444fdd3bc5251fd95253c963c48
 
 systemctl is-active --quiet "$UNIT" || { echo "STOP existing private beta inactive"; exit 1; }
 systemctl is-enabled --quiet "$UNIT" || { echo "STOP private beta not enabled"; exit 1; }
