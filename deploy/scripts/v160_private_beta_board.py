@@ -185,6 +185,7 @@ function chooseRecheck(key){
  const select=el("recheckItem");
  if(latest&&latest.items.some(r=>r.item_key===key))select.value=key;
  select.scrollIntoView({behavior:"smooth",block:"center"});
+ recheckNow();
 }
 function render(){
  if(!latest)return;
