@@ -347,7 +347,7 @@ function renderCheck(data){
  add(output,"p","Each restock is shown, even if your flight cannot reach it. Times are estimates, NOT 90%-verified.","muted small");
  if(timeline&&Array.isArray(timeline.restock_events)&&timeline.restock_events.length){
    const events=timeline.restock_events;
-   for(const e of events.slice(0,16)){
+   for(const e of events){
      const card=add(output,"div","","card");
      const when=Number.isInteger(e.predicted_restock_epoch)?
        clock(e.predicted_restock_epoch):"unknown";
@@ -367,8 +367,7 @@ function renderCheck(data){
        clock(e.restock_late_epoch)+" · expected stock until "+
        clock(e.predicted_stock_below_30_epoch),"sub");
    }
-   if(events.length>16)add(output,"p",String(events.length-16)+
-      " additional later event forecasts omitted from this compact view.","muted");
+
  }else{
    add(output,"p",timeline&&timeline.status?
      "No restock timeline this issue: "+timeline.status.replaceAll("_"," ").toLowerCase()+
@@ -614,7 +613,7 @@ def handler_factory(ledger=LEDGER,roster=ROSTER,
                              MKL_NUM_THREADS="1"),
                     text=True,capture_output=True,timeout=RECHECK_TIMEOUT_SECONDS,
                     check=False)
-                if run.returncode or len(run.stdout)>12000:
+                if run.returncode or len(run.stdout)>125000:
                     self._json(503,{"status":"RECHECK_UNAVAILABLE",
                         "note":"Live one-item forecast could not be safely computed"})
                     return
