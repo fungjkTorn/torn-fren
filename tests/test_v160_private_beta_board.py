@@ -90,6 +90,44 @@ class PrivateBetaBoardTests(unittest.TestCase):
         self.assertIn("FUTURE_WATCH",board.HTML)
         self.assertIn("RECENT_ISSUED_NOW_RECHECK",board.HTML)
 
+    def test_item_stock_recency_caution_executes_real_browser_decision_logic(self):
+        import shutil
+        if shutil.which("node") is None:
+            self.skipTest("Node runtime not available")
+        js=re.findall(r"<script>(.*?)</script>",board.HTML,re.S)[0]
+        first=js.index("const currentTime=")
+        last=js.index("function chooseRecheck(")
+        logic=js[first:last]
+        script="""let latest={healthy:true,issued_epoch:Math.floor(Date.now()/1000)-25};
+function elapsed(n){return n+"s";}
+function clock(n){return String(n);}
+"""+logic+"""
+const now=Math.floor(Date.now()/1000);
+function makeRow(lastObserved){
+ return {source_last_epoch:lastObserved,models:{
+   independent:{departure:now+600,arrival:now+1620,signal:"FUTURE_WATCH"},
+   paired_complete:{departure:now+600,arrival:now+1620,signal:"FUTURE_WATCH"}
+ }};
+}
+const old=makeRow(now-798);
+if(itemReportAge(old,now)!==798)throw Error("Item report age is wrong");
+if(!reportNeedsRecheck(old,now))throw Error("Stale per-item report ignored");
+const output=diagnose(old,now);
+if(output.lead!=="VERIFY STOCK FIRST"||output.label!=="OLD STOCK REPORT")
+ throw Error("Stale item stock shown as trusted departure");
+if(!output.why.includes("Global heartbeat does not confirm"))
+ throw Error("Missing source heartbeat caution");
+const recent=makeRow(now-25);
+if(reportNeedsRecheck(recent,now))throw Error("Fresh item incorrectly flagged stale");
+if(!diagnose(recent,now).lead.startsWith("LEAVE AT"))
+ throw Error("Fresh forecast departure hidden");
+const missing=makeRow(null);
+if(diagnose(missing,now).lead!=="VERIFY STOCK FIRST")
+ throw Error("Unknown individual stock report treated fresh");
+"""
+        result=subprocess.run(["node","-e",script],capture_output=True,text=True)
+        self.assertEqual(result.returncode,0,result.stderr)
+
     def test_decision_first_page_keeps_accuracy_distinction_and_details_collapsed(self):
         page=board.HTML
         self.assertIn("Earliest upcoming departure",page)
