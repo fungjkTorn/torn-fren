@@ -23,8 +23,46 @@ if [[ "$ACTION" == status ]]; then
   systemctl is-enabled "$TIMER" 2>/dev/null || true
   systemctl is-active "$TIMER" 2>/dev/null || true
   systemctl list-timers --all "$TIMER" --no-pager || true
-  test ! -f "$PRIVATE/v160_v151_prospective24.db" ||
+  if [[ -e "$PRIVATE/v160_v151_prospective24.db" ]]; then
+    test ! -L "$PRIVATE/v160_v151_prospective24.db" ||
+      { echo "STOP private forward sidecar symlink"; exit 1; }
     ls -lh "$PRIVATE/v160_v151_prospective24.db"
+    test -x "$PY" || { echo "STOP Python venv unavailable for sidecar status"; exit 1; }
+    "$PY" - "$PRIVATE/v160_v151_prospective24.db" <<'PY_STATUS'
+import json
+import sqlite3
+import sys
+import time
+from pathlib import Path
+
+source=Path(sys.argv[1]).resolve(strict=True)
+db=sqlite3.connect(source.as_uri()+"?mode=ro",uri=True,timeout=4)
+try:
+    db.execute("PRAGMA query_only=ON")
+    ticks=db.execute(
+        """SELECT t.issued_epoch,t.captured_epoch,t.roster_count,
+                  (SELECT COUNT(*) FROM v160_issued i
+                   WHERE i.issued_epoch=t.issued_epoch
+                     AND i.policy_id=t.policy_id)
+           FROM v160_ticks t ORDER BY t.issued_epoch DESC LIMIT 3"""
+    ).fetchall()
+finally:
+    db.close()
+print(json.dumps({
+    "status":"V160_PRIVATE_LEDGER_READ_ONLY_STATUS",
+    "last_three_batches":[{
+        "issued_epoch":int(issue),"captured_epoch":int(captured),
+        "issued_age_seconds":int(time.time())-int(issue),
+        "expected_items":int(expected),"recorded_items":int(actual),
+        "batch_complete":expected==actual==24}
+        for issue,captured,expected,actual in ticks],
+    "has_prospectively_recorded_batches":bool(ticks),
+    "collector_and_websites_untouched":True,
+},sort_keys=True))
+PY_STATUS
+  else
+    echo "V160 private sidecar not present; no recorded forward issues confirmed."
+  fi
   echo "Collector and original/experimental websites not modified."
   exit 0
 fi
