@@ -90,7 +90,9 @@ class PrivateBetaBoardTests(unittest.TestCase):
         self.assertIn("FUTURE_WATCH",board.HTML)
         self.assertIn("RECENT_ISSUED_NOW_RECHECK",board.HTML)
 
-    def test_item_stock_recency_caution_executes_real_browser_decision_logic(self):
+    def test_delta_only_stock_change_older_than_ten_minutes_not_false_stale(self):
+        # Collector stock_history is DELTA-only: an unchanged zero can
+        # persist many successful poll cycles without any new stock row.
         import shutil
         if shutil.which("node") is None:
             self.skipTest("Node runtime not available")
@@ -103,27 +105,27 @@ function elapsed(n){return n+"s";}
 function clock(n){return String(n);}
 """+logic+"""
 const now=Math.floor(Date.now()/1000);
-function makeRow(lastObserved){
- return {source_last_epoch:lastObserved,models:{
+function makeRow(lastChange){
+ return {source_last_epoch:lastChange,models:{
    independent:{departure:now+600,arrival:now+1620,signal:"FUTURE_WATCH"},
    paired_complete:{departure:now+600,arrival:now+1620,signal:"FUTURE_WATCH"}
  }};
 }
-const old=makeRow(now-798);
-if(itemReportAge(old,now)!==798)throw Error("Item report age is wrong");
-if(!reportNeedsRecheck(old,now))throw Error("Stale per-item report ignored");
-const output=diagnose(old,now);
-if(output.lead!=="VERIFY STOCK FIRST"||output.label!=="OLD STOCK REPORT")
- throw Error("Stale item stock shown as trusted departure");
-if(!output.why.includes("Global heartbeat does not confirm"))
- throw Error("Missing source heartbeat caution");
+const unchangedZero=makeRow(now-798);
+if(lastStockChangeAge(unchangedZero,now)!==798)
+ throw Error("Last quantity change duration lost");
+const output=diagnose(unchangedZero,now);
+if(output.lead!=="LEAVE AT "+clock(now+600))
+ throw Error("Unchanged zero incorrectly hidden as stale");
+if(output.label!=="MODELS AGREE")throw Error("Independent model agreement lost");
+if(!output.why.includes("unchanged values remain valid"))
+ throw Error("Missing change-only collector explanation");
 const recent=makeRow(now-25);
-if(reportNeedsRecheck(recent,now))throw Error("Fresh item incorrectly flagged stale");
 if(!diagnose(recent,now).lead.startsWith("LEAVE AT"))
- throw Error("Fresh forecast departure hidden");
+ throw Error("Recent observed change forecast hidden");
 const missing=makeRow(null);
-if(diagnose(missing,now).lead!=="VERIFY STOCK FIRST")
- throw Error("Unknown individual stock report treated fresh");
+if(lastStockChangeAge(missing,now)!==null)
+ throw Error("Null last change should be unknown");
 """
         result=subprocess.run(["node","-e",script],capture_output=True,text=True)
         self.assertEqual(result.returncode,0,result.stderr)
