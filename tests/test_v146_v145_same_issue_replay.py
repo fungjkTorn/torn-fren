@@ -124,6 +124,50 @@ class SameIssueReplayTests(unittest.TestCase):
             self.assertEqual(row["now_only_vs_explicit"],0)
             self.assertFalse(result["source_provider_freshness_certified"])
 
+    def test_stable_v151_is_scored_before_outcomes_with_shared_issue(self):
+        with tempfile.TemporaryDirectory() as temp:
+            src,side,issued=make_db(temp)
+            fake={
+                "status":"PROVISIONAL_SCENARIO_SUPPORTED_DEPARTURE",
+                "score_now":0.5,
+                "first_reachable":{
+                    "departure_epoch":issued+300,
+                    "arrival_epoch":issued+300+
+                                    original.TRAVEL_SECONDS["uni"],
+                    "scenario_stock_fraction":0.75,
+                    "cadence_warning":None,
+                },
+            }
+            with patch.object(m,"stable_earliest_departure",
+                              return_value=fake), (
+                 patch.object(m,"_pair_score",return_value="HIT")
+            ):
+                result=m.replay(collector=src,sidecar=side,
+                                now=issued+12000,max_model_evals=10)
+            row=result["items"][ITEM]
+            self.assertEqual(row["stable_proposals"],1)
+            self.assertEqual(row["stable_proxy_hit"],1)
+            self.assertEqual(row["matched_stable_vs_now"],1)
+            self.assertEqual(row["stable_only_vs_now"],0)
+            self.assertEqual(row["stable_departure_median_wait_seconds"],300)
+            self.assertFalse(result["real_player_trip_success_certified"])
+
+    def test_stable_no_candidate_still_preserves_no_data_vs_score_gate(self):
+        with tempfile.TemporaryDirectory() as temp:
+            src,side,issued=make_db(temp)
+            fake={
+                "status":"NO_TWO_BIN_SUPPORTED_DEPARTURE",
+                "score_now":0.1,
+                "first_reachable":None,
+            }
+            with patch.object(m,"stable_earliest_departure",return_value=fake):
+                result=m.replay(collector=src,sidecar=side,
+                                now=issued+12000,max_model_evals=10)
+            row=result["items"][ITEM]
+            self.assertEqual(row["stable_proposals"],0)
+            self.assertEqual(row["stable_status:NO_TWO_BIN_SUPPORTED_DEPARTURE"],1)
+            self.assertEqual(row["matched_stable_vs_now"],0)
+
     def test_a_mutated_historical_snapshot_is_not_claimed_matched(self):
         with tempfile.TemporaryDirectory() as temp:
             src,side,issued=make_db(temp)
