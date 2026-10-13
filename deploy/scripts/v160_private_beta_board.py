@@ -352,6 +352,10 @@ function renderCheck(data){
      const when=Number.isInteger(e.predicted_restock_epoch)?
        clock(e.predicted_restock_epoch):"unknown";
      add(card,"strong","Restock "+e.event_index+" · around "+when);
+     const count=add(card,"div","Restock in "+elapsed(
+       e.predicted_restock_epoch-currentTime()),"meta");
+     count.dataset.countdownEpoch=String(e.predicted_restock_epoch);
+     count.dataset.countdownLabel="Restock";
      const earliest=Number.isInteger(e.expected_departure_epoch)?
        e.expected_departure_epoch:null;
      const latest=Number.isInteger(e.expected_latest_departure_epoch)?
@@ -363,6 +367,12 @@ function renderCheck(data){
        "LEAVE "+(earliest<=currentTime()+30?"NOW":"AT "+clock(earliest))+
          " · latest estimated departure "+clock(latest);
      add(card,"div",summary,"meta");
+     if(earliest!==null && !tooLate){
+       const departCountdown=add(card,"div","Leave in "+
+          elapsed(earliest-currentTime()),"meta");
+       departCountdown.dataset.countdownEpoch=String(earliest);
+       departCountdown.dataset.countdownLabel="Leave";
+     }
      add(card,"div","Restock timing estimate "+clock(e.restock_early_epoch)+" to "+
        clock(e.restock_late_epoch)+" · expected stock until "+
        clock(e.predicted_stock_below_30_epoch),"sub");
@@ -420,7 +430,16 @@ async function refresh(){
   el("heroCheck").disabled=true;
  }
 }
-setInterval(()=>{if(latest)render();},1000);
+function tickEventCountdowns(){
+ for(const target of document.querySelectorAll("[data-countdown-epoch]")){
+   const epoch=Number(target.dataset.countdownEpoch);
+   const label=target.dataset.countdownLabel==="Leave"?"Leave":"Restock";
+   const left=epoch-currentTime();
+   target.textContent=left>=0?label+" in "+elapsed(left):
+     label+" estimate passed — recheck forecast";
+ }
+}
+setInterval(()=>{if(latest)render();tickEventCountdowns();},1000);
 setInterval(refresh,30000);
 refresh();
 </script></body></html>"""
