@@ -67,8 +67,13 @@ def episode_audit(rows):
             independent_only+=1
         if routed_delta is not None:
             routed_lifts+=routed_delta
+        # A selector can request paired but fall back to independent if
+        # the paired model has no supported departure. Attribute actual
+        # landed-stock outcomes to the model USED, not the desired route.
+        used=row.get("flight_horizon_actual") or row.get(
+            "flight_horizon_selection")
         groups[(item,phase,onset)].append(
-            (raw_delta,routed_delta,row.get("flight_horizon_selection"))
+            (raw_delta,routed_delta,used)
         )
     items=defaultdict(lambda:{
         "mature_issued_comparisons":0,
