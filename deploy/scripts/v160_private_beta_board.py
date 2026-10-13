@@ -9,7 +9,10 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sqlite3
+import subprocess
+import threading
 import time
 from contextlib import closing
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -36,6 +39,12 @@ COUNTRIES = {
 }
 VARIANTS = ("independent", "paired_complete")
 MAX_ROWS = 24
+RECHECK_HELPER = Path("/home/ubuntu/torn-fren-private-models/v160_single_item_recheck.py")
+RECHECK_PYTHON = Path("/home/ubuntu/torn-fren-v38-probe/.venv/bin/python")
+RECHECK_TIMEOUT_SECONDS = 65
+RECHECK_COOLDOWN_SECONDS = 20
+_RECHECK_MUTEX = threading.Lock()
+_RECHECK_LAST = {}
 # V128's actual exact_roster() adds the two V42-approved generic Xanax
 # specialists to the original 22-key v38_roster.json. This standalone
 # stdlib-only reader must reconstruct the SAME keys without importing V128.
@@ -94,6 +103,13 @@ footer{padding:20px 2px;color:#a7bacb;font-size:.84rem;line-height:1.6}
 <div class="stat"><b id="noCount">—</b><span>Without a usable proposal</span></div>
 <div class="stat"><b id="agreeCount">—</b><span>Both variants agree ≤5 min</span></div>
 <div class="stat"><b id="nextTick">—</b><span>Next planned 5-min issue</span></div>
+</section>
+<section class="panel" id="singleCheck" style="margin:12px 0 18px">
+<h2>Check one item right now</h2>
+<p class="small">Uses the current collector snapshot to recalculate both models for the selected item, rather than relying on a five-minute-old NOW signal. Research-only, not guaranteed stock; results expire quickly. This preview is not added to forward-accuracy metrics.</p>
+<div class="controls"><label>Destination / item<select id="recheckItem"><option value="">Select an item</option></select></label>
+<button id="checkNow" type="button">Recalculate this item NOW</button></div>
+<div id="recheckOutput" class="banner">Select an item, then request a fresh one-item calculation.</div>
 </section>
 <div class="columns">
 <section class="panel"><h2>Upcoming departure opportunities</h2>
@@ -236,13 +252,57 @@ function render(){
  }
  if(!rows.length){const tr=tbody.insertRow();addCell(tr,"No matching items").colSpan=6;}
 }
+function populateRecheckSelect(items){
+ const sel=el("recheckItem"),chosen=sel.value;
+ sel.replaceChildren();
+ const def=document.createElement("option");def.value="";def.textContent="Select an item";sel.append(def);
+ for(const r of items.slice().sort((a,b)=>(a.country_name+" "+a.item).localeCompare(b.country_name+" "+b.item))){
+  const opt=document.createElement("option");opt.value=r.item_key;opt.textContent=r.country_name+" · "+r.item;sel.append(opt);
+ }
+ if(items.some(x=>x.item_key===chosen))sel.value=chosen;
+}
+async function recheckNow(){
+ const key=el("recheckItem").value;
+ if(!key){el("recheckOutput").textContent="Select an item first.";return;}
+ const button=el("checkNow");button.disabled=true;
+ el("recheckOutput").textContent="Calculating from current observed history. This may take a little while…";
+ try{
+  const response=await fetch("/api/recheck",{method:"POST",cache:"no-store",
+    headers:{"Content-Type":"application/json","X-Torn-Fren-Action":"user-recheck"},
+    body:JSON.stringify({item_key:key})});
+  const r=await response.json();
+  if(!response.ok||r.status!=="CURRENT_ITEM_RECHECK_RESEARCH_ONLY")
+    throw Error(r.note||"Current research check unavailable (HTTP "+response.status+")");
+  const age=Math.floor(Date.now()/1000)-r.issued_epoch;
+  const messages=[];
+  for(const name of ["independent","paired_complete"]){
+   const m=r.models[name],label=name==="paired_complete"?"Paired":"Independent";
+   if(!Number.isInteger(m.departure_epoch)){messages.push(label+": no qualifying departure ("+
+    (m.status||"unknown").replaceAll("_"," ")+")");continue;}
+   if(age>30){messages.push(label+": calculation is already >30s old; recheck again");continue;}
+   const when=m.departure_epoch<=r.issued_epoch+30?
+     "NOW, provisionally (checked "+clock(r.issued_epoch)+")":
+     "WATCH "+clock(m.departure_epoch)+" · in "+span(m.departure_epoch-Math.floor(Date.now()/1000));
+   messages.push(label+": "+when+"; modeled arrival "+local(m.arrival_epoch)+
+      "; scenario support "+Math.round(m.scenario_stock_fraction*100)+"%"+
+      (m.sustained_five_minute_support===false?"; narrow NOW window":""));
+  }
+  el("recheckOutput").textContent=key+" · freshly checked "+local(r.issued_epoch)+
+   " · last observed quantity "+(r.source_last_quantity??"unknown")+" · flight "+span(r.flight_seconds)+
+   ". "+messages.join(" | ")+". Provisional model support only, not a validated player arrival.";
+  el("recheckOutput").className="banner "+(age>30?"fault":"good");
+ }catch(e){el("recheckOutput").textContent="Recheck failed: "+e.message+
+   ". No new departure time is authorized.";el("recheckOutput").className="banner fault";}
+ finally{button.disabled=false;}
+}
+el("checkNow").addEventListener("click",recheckNow);
 async function refresh(){
  try{
   const response=await fetch("/api/live",{cache:"no-store"});
   const data=await response.json();
   if(!Array.isArray(data.items)||data.items.length!==24)
    throw Error("Missing or incomplete V160 private batch");
-  latest=data;render();
+  latest=data;populateRecheckSelect(data.items);render();
  }catch(e){
   latest=null;
   el("health").className="banner fault";
@@ -392,8 +452,87 @@ def snapshot(ledger=LEDGER, roster=ROSTER, *, now=None):
     }
 
 
-def handler_factory(ledger=LEDGER,roster=ROSTER):
+def handler_factory(ledger=LEDGER,roster=ROSTER,
+                    helper=RECHECK_HELPER,python=RECHECK_PYTHON):
     class Handler(BaseHTTPRequestHandler):
+        def do_POST(self):
+            if self.path!="/api/recheck":
+                self.send_error(404)
+                return
+            # Localhost is not sufficient against cross-origin browser POSTs.
+            if (self.headers.get("X-Torn-Fren-Action")!="user-recheck" or
+                self.headers.get("Origin") not in (None,"http://127.0.0.1:8765")):
+                self.send_error(403)
+                return
+            try:
+                length=int(self.headers.get("Content-Length","0"))
+                if not 2<=length<=180:
+                    raise ValueError("invalid request size")
+                body=json.loads(self.rfile.read(length))
+                key=body["item_key"]
+                if not isinstance(key,str):
+                    raise ValueError("invalid identity")
+                ledger_data=snapshot(ledger,roster)
+                if not ledger_data["healthy"] or key not in {
+                    row["item_key"] for row in ledger_data["items"]}:
+                    raise ValueError("stale/invalid private item")
+            except (ValueError,KeyError,TypeError,sqlite3.Error,OSError):
+                self._json(503,{"status":"RECHECK_UNAVAILABLE",
+                    "note":"No fresh research snapshot or invalid item"})
+                return
+            if not _RECHECK_MUTEX.acquire(blocking=False):
+                self._json(429,{"status":"RECHECK_BUSY",
+                    "note":"Another item is being checked; retry shortly"})
+                return
+            try:
+                now=time.monotonic()
+                if now-_RECHECK_LAST.get(key,-1e9)<RECHECK_COOLDOWN_SECONDS:
+                    self._json(429,{"status":"RECHECK_COOLDOWN",
+                        "note":"This item was checked recently; wait 20 seconds"})
+                    return
+                _RECHECK_LAST[key]=now
+                if (not Path(helper).is_file() or Path(helper).is_symlink()
+                    or not Path(python).is_file()):
+                    self._json(503,{"status":"RECHECK_UNAVAILABLE",
+                        "note":"Pinned one-item recheck helper is not installed"})
+                    return
+                run=subprocess.run(
+                    [str(python),"-I",str(helper),key],
+                    cwd="/home/ubuntu/torn-fren-v38-probe",
+                    env=dict(os.environ,PYTHONDONTWRITEBYTECODE="1",
+                             OPENBLAS_NUM_THREADS="1",OMP_NUM_THREADS="1",
+                             MKL_NUM_THREADS="1"),
+                    text=True,capture_output=True,timeout=RECHECK_TIMEOUT_SECONDS,
+                    check=False)
+                if run.returncode or len(run.stdout)>12000:
+                    self._json(503,{"status":"RECHECK_UNAVAILABLE",
+                        "note":"Live one-item forecast could not be safely computed"})
+                    return
+                result=json.loads(run.stdout)
+                if (result.get("item_key")!=key
+                    or result.get("status")!="CURRENT_ITEM_RECHECK_RESEARCH_ONLY"
+                    or result.get("private_ledger_written") is not False
+                    or result.get("collector_written") is not False):
+                    raise ValueError("invalid recheck result")
+                self._json(200,result)
+            except (subprocess.TimeoutExpired,ValueError,TypeError,KeyError,
+                    OSError,json.JSONDecodeError):
+                self._json(503,{"status":"RECHECK_UNAVAILABLE",
+                    "note":"Timed out or invalid recheck; no travel recommendation"})
+            finally:
+                _RECHECK_MUTEX.release()
+
+        def _json(self,code,data):
+            content=json.dumps(data,separators=(",",":"),sort_keys=True).encode()
+            self.send_response(code)
+            self.send_header("Content-Type","application/json; charset=utf-8")
+            self.send_header("Content-Length",str(len(content)))
+            self.send_header("Cache-Control","no-store, max-age=0")
+            self.send_header("X-Content-Type-Options","nosniff")
+            self.send_header("Access-Control-Allow-Origin","http://127.0.0.1:8765")
+            self.end_headers()
+            self.wfile.write(content)
+
         def do_GET(self):
             path=self.path.split("?",1)[0]
             if path=="/":
