@@ -46,6 +46,20 @@ class ForwardEvidenceTests(unittest.TestCase):
             self.assertFalse(result["specialist_predictions_scored"])
             self.assertFalse(result["actual_player_flights_verified"])
             self.assertTrue(result["only_mature_observations_used_for_scoring"])
+            from research.v128_full24_earliest_shadow import exact_roster
+            roster=exact_roster()
+            self.assertEqual(set(result["items"]),set(roster))
+            for key,metadata in roster.items():
+                row=result["items"][key]
+                self.assertEqual(row["incumbent_model_family"],
+                                 metadata["incumbent_model_family"])
+                self.assertEqual(row["incumbent_source_verified"],
+                                 metadata["incumbent_source_verified"])
+                self.assertEqual(row["forward_evidence_status"],
+                                 "MATURE_POLL_PROXY_COMPARISONS_ONLY")
+                self.assertEqual(row["incumbent_forward_evidence_status"],
+                                 "NO_MATCHED_REAL_V75_FORECAST")
+                self.assertFalse(row["model_promotion_authorized"])
 
     def test_pending_and_unknown_are_not_falsely_counted_as_misses(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -63,6 +77,9 @@ class ForwardEvidenceTests(unittest.TestCase):
             self.assertEqual(result["totals"]["paired_matched_independent"],0)
             self.assertEqual(result["totals"]["paired_only_hit"],0)
             self.assertEqual(result["totals"]["paired_complete_miss"],0)
+            self.assertEqual(
+                result["items"]["arg:Monkey Plushie"]["forward_evidence_status"],
+                "NO_MATURE_MATCHED_MODEL_COMPARISONS")
 
     def test_mature_unobservable_stock_is_unknown_not_pending(self):
         with tempfile.TemporaryDirectory() as tmp:
