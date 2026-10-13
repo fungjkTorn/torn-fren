@@ -61,6 +61,57 @@ class ForwardEvidenceTests(unittest.TestCase):
             self.assertEqual(result["totals"]["paired_only_hit"],0)
             self.assertEqual(result["totals"]["paired_complete_miss"],0)
 
+    def test_true_v75_near_issue_specialist_is_scored_only_if_prior_and_valid(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp)
+            source,ledger=self.make_ledger(root)
+            v75=root/"v75_private_predictions.db"
+            from research.v128_full24_earliest_shadow import exact_roster
+            items=sorted(exact_roster())
+            with sqlite3.connect(v75) as db:
+                db.execute(
+                    "CREATE TABLE v42_candidate_decisions("
+                    "item_key TEXT,computed_at INTEGER,stock_as_of INTEGER,"
+                    "status TEXT,valid_until INTEGER,departure INTEGER,"
+                    "arrival INTEGER,actual_player_departure INTEGER)")
+                for key in items:
+                    country=key.split(":",1)[0]
+                    flight=TRAVEL_SECONDS[country]
+                    db.execute("INSERT INTO v42_candidate_decisions VALUES(?,?,?,?,?,?,?,?)",
+                        (key,T-60,T-80,"RESEARCH_PROPOSAL_ONLY",T+240,
+                         T+900,T+900+flight,0))
+            def scorer(con,country,item,arrival,asof):
+                base=T+TRAVEL_SECONDS[country]
+                return ("BRACKET",arrival in (base+600,base+900),{})
+            report=score(collector=source,ledger=ledger,v75=v75,
+                         now=T+86400,days=2,scorer=scorer)
+            self.assertEqual(report["totals"]["v75_near_issued_proposals"],24)
+            self.assertEqual(report["totals"]["paired_complete_matched_v75"],24)
+            self.assertEqual(report["v75_matched_pair_net_paired_minus_v75"],0)
+            self.assertTrue(report["specialist_predictions_scored"])
+            self.assertIn("<=180s prior",report["v75_alignment"])
+            with sqlite3.connect(v75) as db:
+                db.execute("UPDATE v42_candidate_decisions SET computed_at=?",
+                           (T+50,))
+            future=score(collector=source,ledger=ledger,v75=v75,
+                         now=T+86400,days=2,scorer=scorer)
+            self.assertEqual(
+                future["totals"].get("v75_near_issued_proposals",0),0)
+            self.assertFalse(future["specialist_predictions_scored"])
+
+    def test_absent_v75_is_reported_not_invented(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp)
+            source,ledger=self.make_ledger(root)
+            report=score(collector=source,ledger=ledger,
+                         v75=root/"absent_v75.db",
+                         now=T+86400,days=2,
+                         scorer=lambda *args:("PENDING",None,{}))
+            self.assertEqual(report["v75_private_specialist_source_status"],
+                             "ABSENT")
+            self.assertEqual(report["totals"].get("v75_near_issued_proposals",0),0)
+            self.assertFalse(report["specialist_predictions_scored"])
+
     def test_written_decision_mutation_fails_integrity_checks(self):
         with tempfile.TemporaryDirectory() as tmp:
             source,ledger=self.make_ledger(Path(tmp))
