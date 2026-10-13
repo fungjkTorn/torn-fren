@@ -107,6 +107,53 @@ class EventTimelineTests(unittest.TestCase):
         self.assertGreater(widths[-1],widths[0])
         self.assertTrue(all(e["predicted_restock_epoch"]<=ASOF+28800 for e in events))
 
+    def test_event_matching_is_one_to_one_and_penalizes_missed_and_extra(self):
+        result=m.match_events([100,150,300],[103,306,500],tolerance=10)
+        self.assertEqual(result["matched"],2)
+        self.assertEqual(result["missed_actual"],1)
+        self.assertEqual(result["false_predicted"],1)
+        self.assertEqual(result["sum_absolute_timing_error_seconds"],9)
+
+    def test_historical_four_hour_replay_denominator_includes_all_clean_restocks(self):
+        from test_v160_prospective_v151_shadow import collector_fixture
+        from research.v128_full24_earliest_shadow import exact_roster
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp)
+            src=collector_fixture(root,issued=ASOF)
+            start=(ASOF-90000)//1200*1200
+            with sqlite3.connect(src) as db:
+                for key in exact_roster():
+                    country,item=key.split(":",1)
+                    db.executemany(
+                        """INSERT INTO stock_history(timestamp,quantity,source,country,item_name)
+                           VALUES(?,?,?,?,?)""",
+                        [(start+i*1200+offset,qty,"yata",country,item)
+                         for i in range(72)
+                         for offset,qty in ((0,0),(600,200),(900,0))])
+            before=src.read_bytes()
+            result=m.replay_events(
+                source=src,asof=ASOF,days=1,tolerance=600,
+                roster=exact_roster(),limit_items=2)
+            self.assertEqual(result["items_evaluated"],2)
+            self.assertGreater(result["actual_observed_restocks"],4)
+            self.assertTrue(result["not_live_forward_validation"])
+            self.assertTrue(result["not_five_minute_replanning"])
+            self.assertFalse(result["collector_written"])
+            self.assertFalse(result["lookahead_used_in_prediction"])
+            self.assertLessEqual(result["matched_timing"],
+                                 result["actual_observed_restocks"])
+            self.assertLessEqual(result["matched_timing"],result["predicted_events"])
+            self.assertIn("OBSERVED",m.format_replay(result).upper())
+            self.assertEqual(src.read_bytes(),before)
+
+    def test_cross_provider_threshold_not_claimed_as_clean_restock_truth(self):
+        OBS=m.OBS
+        rows=[OBS(100,0,"yata"),OBS(200,300,"prometheus"),
+              OBS(300,0,"prometheus"),OBS(400,100,"prometheus")]
+        events,amb=m.confirmed_restocks(rows,[],start=100,end=500)
+        self.assertEqual(events,[400])
+        self.assertEqual(amb,1)
+
     def test_invalid_inputs_and_future_evidence_fail_closed(self):
         with self.assertRaises(ValueError):
             m.predict_events("jap:Xanax",phase(),asof=ASOF,horizon=10)
