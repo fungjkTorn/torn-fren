@@ -98,8 +98,6 @@ def compact(result):
         f"24 items; {source['cohorts']} first-issued item/UTC-hour cohorts; NO DATABASE OR WEBSITE WRITES",
         f"V145 recovered NEW eligibility on {source['recovered_eligible']} cohorts; "
         f"{source['mc_capped_eligible']} eligible (old or new) were unscored due to CPU cap;",
-        f"  V145 simulations run: {source['mc_actual_evaluations']} (max {_num(result, 'replay_cap')}); "
-        f"{source['insufficient_or_no_onset']} remain sparse/onset-unknown",
         f"V128 original proposals: {total_v128}/{source['cohorts']} ({100*total_v128/source['cohorts']:.1f}%)",
         f"V145 MC capped: {total_v145}/{source['cohorts']} proposals, "
         f"{_rate(h145,m145)} known; {pn145} pending",
@@ -124,10 +122,11 @@ def compact(result):
         + "; ".join(
             f"{name} {v[0]} paired, {v[1]} better/{v[2]} worse/{v[3]} tied, MAE {v[4]}"
             for name,v in recency_summary.items()),
-        f"  V145 matched versus leave-now: {matched145} mature pairs, net "
-        f"{pair145:+d} model-only minus leave-now-only ({total('new_only')} vs {total('now_only')})",
         f"  V148 matched versus leave-now: {matched148} mature pairs, net "
         f"{pair148:+d} model-only minus leave-now-only ({total('explicit_only_vs_now')} vs {total('now_only_vs_explicit')})",
+        "  Japan Xanax V151 no-departure diagnoses: "
+        f"{_num(items['jap:Xanax'],'stable_peak_under_60pct_scenario_gate')} peak support below .60; "
+        f"{_num(items['jap:Xanax'],'stable_single_supported_bin_only')} one-bin-only",
         "=== ITEM | old | recovered | V148 proposed/H/M/net | "
         "V151 proposed/H/M/net | vs V148 | restock MAE V151 / V153 recent5 min | wait min ===",
     ]
