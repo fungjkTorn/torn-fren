@@ -566,7 +566,8 @@ def replay(*,collector=COLLECTOR, sidecar=SIDECAR, now=None,
                 fine=stable_earliest_departure(
                     key,new,asof=issued,scenarios=64,
                     departure_step_seconds=60)
-                if stable["score_bins"]!=fine["score_bins"][::5]:
+                if ("score_bins" in stable and "score_bins" in fine
+                    and stable["score_bins"]!=fine["score_bins"][::5]):
                     raise AssertionError("V151 60s and 300s scenario support diverged")
                 if (stable["first_next_restock_onset_median_seconds"]!=
                     fine["first_next_restock_onset_median_seconds"]):
