@@ -39,6 +39,7 @@ from research.v145_provider_continuous_phases import (
 )
 from research.v148_observed_earliest_stock_cycle import first_reachable_stock_cycles
 from research.v150_stock_window_failure_diagnostic import diagnose_window_failure
+from research.v151_stable_earliest_departure import stable_earliest_departure
 from research.v88_poll_state_forward_report import observation
 
 DAY=86400
@@ -135,6 +136,7 @@ def _aggregate(rows):
     out={}
     wait_seconds=defaultdict(list)
     explicit_wait_seconds=defaultdict(list)
+    stable_wait_seconds=defaultdict(list)
     for r in rows:
         c=r["comparison"]
         counters.update([c])
@@ -158,6 +160,28 @@ def _aggregate(rows):
             item["diagnosis:"+r["explicit_diagnostic_reason"]]+=1
         if r.get("median_only_scenario_available") is True:
             item["median_only_nonactionable_scenario"]+=1
+        if r.get("stable_status"):
+            item["stable_status:"+r["stable_status"]]+=1
+        if r.get("stable_departure") is not None:
+            item["stable_proposals"]+=1
+            stable_wait_seconds[key].append(
+                r["stable_departure"]-r["issued_epoch"])
+            outcome=r.get("stable_outcome")
+            item["stable_proxy_hit"]+=int(outcome=="HIT")
+            item["stable_proxy_miss"]+=int(outcome=="MISS")
+            item["stable_proxy_pending"]+=int(outcome=="PENDING")
+            item["stable_proxy_unknown"]+=int(
+                isinstance(outcome,str) and outcome.startswith("UNKNOWN_"))
+            if outcome in ("HIT","MISS") and (
+                r.get("leave_now_outcome") in ("HIT","MISS")
+            ):
+                item["matched_stable_vs_now"]+=1
+                item["stable_only_vs_now"]+=int(
+                    outcome=="HIT" and r["leave_now_outcome"]=="MISS")
+                item["now_only_vs_stable"]+=int(
+                    outcome=="MISS" and r["leave_now_outcome"]=="HIT")
+            if r.get("stable_long_wait") is True:
+                item["stable_long_wait_flags"]+=1
         if r.get("explicit_departure") is not None:
             item["explicit_proposals"]+=1
             explicit_wait_seconds[key].append(
@@ -212,7 +236,12 @@ def _aggregate(rows):
     for v in out.values():
         # Convert Counter into plain JSON-friendly dict, including zero
         # denominators for sparse items; never hide absent model proposals.
-        for k in ("explicit_proposals","explicit_proxy_hit",
+        for k in ("stable_proposals","stable_proxy_hit",
+                  "stable_proxy_miss","stable_proxy_pending",
+                  "stable_proxy_unknown","matched_stable_vs_now",
+                  "stable_only_vs_now","now_only_vs_stable",
+                  "stable_long_wait_flags",
+                  "explicit_proposals","explicit_proxy_hit",
                   "explicit_proxy_miss","explicit_proxy_pending",
                   "explicit_proxy_unknown","matched_explicit_vs_now",
                   "explicit_only_vs_now","now_only_vs_explicit",
@@ -231,6 +260,11 @@ def _aggregate(rows):
         )
         v["new_departure_median_wait_seconds"]=(
             round(statistics.median(waits),1) if waits else None
+        )
+        stable_waits=stable_wait_seconds[key]
+        v["stable_departure_median_wait_seconds"]=(
+            round(statistics.median(stable_waits),1)
+            if stable_waits else None
         )
         explicit_waits=explicit_wait_seconds[key]
         v["explicit_departure_median_wait_seconds"]=(
@@ -291,6 +325,8 @@ def replay(*,collector=COLLECTOR, sidecar=SIDECAR, now=None,
                     "item_key":key,"comparison":"SOURCE_HISTORY_LIMIT",
                     "recovered":False,"new_departure":None,
                     "old_departure":None,"old_outcome":"NOT_PROPOSED",
+                    "stable_departure":None,"stable_status":None,
+                    "stable_outcome":"NOT_PROPOSED","stable_long_wait":False,
                     "explicit_departure":None,"explicit_status":None,
                     "explicit_diagnostic_reason":None,
                     "median_only_scenario_available":False,
@@ -332,6 +368,8 @@ def replay(*,collector=COLLECTOR, sidecar=SIDECAR, now=None,
                     "old_departure":baseline.get("earliest_departure"),
                     "old_arrival":baseline.get("earliest_arrival"),
                     "old_outcome":"NOT_PROPOSED",
+                    "stable_departure":None,"stable_status":None,
+                    "stable_outcome":"NOT_PROPOSED","stable_long_wait":False,
                     "explicit_departure":None,"explicit_status":None,
                     "explicit_diagnostic_reason":None,
                     "median_only_scenario_available":False,
@@ -352,6 +390,27 @@ def replay(*,collector=COLLECTOR, sidecar=SIDECAR, now=None,
                 if type(record["old_arrival"]) is int:
                     record["old_outcome"]=_pair_score(
                         stock,country,item,record["old_arrival"],current)
+                # V151 is independent of V128's arbitrary 5 HIGH+LOW MC
+                # eligibility and V148's potentially disjoint quantile bands.
+                # Score the entire 5-minute grid from SAME saved issue-time
+                # history, before looking at future poll-state outcomes.
+                stable=stable_earliest_departure(
+                    key,new,asof=issued,scenarios=64)
+                record["stable_status"]=stable["status"]
+                record["stable_scenario_score_now"]=stable["score_now"]
+                if stable["first_reachable"] is not None:
+                    cand=stable["first_reachable"]
+                    record["stable_departure"]=cand["departure_epoch"]
+                    record["stable_arrival"]=cand["arrival_epoch"]
+                    record["stable_scenario_fraction"]=cand[
+                        "scenario_stock_fraction"]
+                    record["stable_long_wait"]=(
+                        cand["cadence_warning"] is not None)
+                    record["stable_outcome"]=_pair_score(
+                        stock,country,item,cand["arrival_epoch"],current)
+                    record["leave_now_outcome"]=_pair_score(
+                        stock,country,item,
+                        issued+baseline["travel_seconds"],current)
                 # Independent explicit-restock/depletion baseline from
                 # observed V145 periods, including sparse bounded history.
                 # It forecasts next stock P1..P16, not V128's arrival score.
