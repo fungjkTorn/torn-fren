@@ -98,7 +98,11 @@ const duration=s=>{if(!Number.isFinite(s))return "—";const n=Math.max(0,Math.f
 function cell(tr,value,cls){const td=tr.insertCell();td.textContent=value;
  if(cls)td.className=cls;return td;}
 function candidate(row,variant,now,fresh){
- const v=row.models[variant];if(!v || !Number.isInteger(v.departure))return "No qualifying candidate";
+ const v=row.models[variant];if(!v)return "No model data";
+ if(!Number.isInteger(v.departure)){
+  const reason=typeof v.status==="string"?v.status.replaceAll("_"," ").toLowerCase():"unknown";
+  return "No departure · "+reason;
+ }
  if(!fresh)return "STALE · recheck feed";
  if(v.departure<now-30)return "PASSED · await a fresh forecast";
  const when=v.departure<=now+30?"LEAVE NOW · research only":
