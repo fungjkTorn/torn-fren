@@ -73,6 +73,8 @@ def episode_audit(rows):
     items=defaultdict(lambda:{
         "mature_issued_comparisons":0,
         "distinct_issue_phase_episodes":0,
+        "raw_scorable_phase_episodes":0,
+        "v158_scorable_phase_episodes":0,
         "raw_paired_winning_episodes":0,
         "raw_independent_winning_episodes":0,
         "raw_tied_or_mixed_episodes":0,
@@ -92,6 +94,8 @@ def episode_audit(rows):
         raw=[x for x,_,_ in members if x is not None]
         chosen=[x for _,x,_ in members if x is not None]
         def bucket(score_list,prefix):
+            if not score_list:
+                return
             value=sum(score_list)
             if value>0:
                 v[prefix+"_winning_episodes"]+=1
@@ -100,13 +104,17 @@ def episode_audit(rows):
             else:
                 v[prefix+"_tied_or_mixed_episodes"]+=1
         # For raw independent advantage use unambiguous naming in output.
-        raw_sum=sum(raw)
-        if raw_sum>0:
-            v["raw_paired_winning_episodes"]+=1
-        elif raw_sum<0:
-            v["raw_independent_winning_episodes"]+=1
-        else:
-            v["raw_tied_or_mixed_episodes"]+=1
+        if raw:
+            v["raw_scorable_phase_episodes"]+=1
+            raw_sum=sum(raw)
+            if raw_sum>0:
+                v["raw_paired_winning_episodes"]+=1
+            elif raw_sum<0:
+                v["raw_independent_winning_episodes"]+=1
+            else:
+                v["raw_tied_or_mixed_episodes"]+=1
+        if chosen:
+            v["v158_scorable_phase_episodes"]+=1
         bucket(chosen,"v158")
         for raw_delta,chosen_delta,selection in members:
             v["raw_paired_exclusive_issues"]+=int(raw_delta==1)
@@ -120,6 +128,8 @@ def episode_audit(rows):
         "eligible_mature_issue_rows":eligible,
         "unknown_or_unsupportable_issue_phase_rows":unknown_phase,
         "distinct_asof_phase_episodes":len(groups),
+        "raw_scorable_phase_episodes":sum(x["raw_scorable_phase_episodes"] for x in items.values()),
+        "v158_scorable_phase_episodes":sum(x["v158_scorable_phase_episodes"] for x in items.values()),
         "raw_paired_exclusive_issue_wins":paired_only,
         "raw_independent_exclusive_issue_wins":independent_only,
         "v158_net_exclusive_issue_wins":routed_lifts,
