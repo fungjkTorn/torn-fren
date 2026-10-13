@@ -6,7 +6,7 @@ from research.plushie_champions.common import TRAVEL_SECONDS
 from research.v107_explicit_restock_cycle_baseline import StockObservation
 from research.v145_provider_continuous_phases import provider_continuous_phases
 from research.v151_stable_earliest_departure import (
-    stable_earliest_departure,_score_policy
+    stable_earliest_departure,_score_policy,_paired_complete_cycles
 )
 
 T=1791800000
@@ -170,6 +170,55 @@ class StableEarliestTests(unittest.TestCase):
                 stable_earliest_departure(
                     "jap:Xanax",past,asof=issued,scenarios=8,
                     departure_step_seconds=grid)
+
+    def test_explicitly_completed_low_high_pairs_preserved_across_churn(self):
+        past,issued=history(n=12,high=600,low=1000,
+                            source_switch=True)
+        cycles=_paired_complete_cycles(past,issued)
+        self.assertEqual(len(cycles),11)
+        self.assertEqual(set(cycles),{(1000,600)})
+        model=stable_earliest_departure(
+            "uni:Nessie Plushie",past,asof=issued,scenarios=48,
+            cycle_sampling="paired_complete")
+        self.assertEqual(model["completed_paired_cycles"],11)
+        self.assertEqual(model["cycle_sampling"],"paired_complete")
+        self.assertIsNotNone(model["first_reachable"])
+        self.assertFalse(model["game_stock30_at_arrival_verified"])
+        self.assertEqual(model,stable_earliest_departure(
+            "uni:Nessie Plushie",past,asof=issued,scenarios=48,
+            cycle_sampling="paired_complete"))
+
+    def test_paired_mode_does_not_invent_missing_completed_pair(self):
+        past,issued=history(n=12,high=600,low=1000,
+                            source_switch=True)
+        past["observed_bounded_depleted_windows"]=[]
+        model=stable_earliest_departure(
+            "jap:Xanax",past,asof=issued,scenarios=48,
+            cycle_sampling="paired_complete")
+        self.assertEqual(model["status"],
+                         "INSUFFICIENT_DIRECTLY_PAIRED_CYCLES")
+        self.assertIsNone(model["first_reachable"])
+        self.assertIsNone(model["score_now"])
+
+    def test_paired_mode_rejects_unfinished_future_and_mismatched_edges(self):
+        past,issued=history(n=12,high=600,low=1000,
+                            source_switch=False)
+        # Removing a LOW->HIGH exact match leaves no complete pair,
+        # even though individual HIGH and LOW durations still exist.
+        past["observed_bounded_depleted_windows"]=[
+            (a+1,b+1) for a,b in past["observed_bounded_depleted_windows"]]
+        self.assertEqual(_paired_complete_cycles(past,issued),[])
+        bad=past.copy()
+        bad["observed_bounded_stocked_windows"]=[
+            (issued+1,issued+10)]
+        with self.assertRaises(ValueError):
+            _paired_complete_cycles(bad,issued)
+
+    def test_sampling_mode_invalid_is_not_silently_promoted(self):
+        past,issued=history()
+        with self.assertRaises(ValueError):
+            stable_earliest_departure("chi:Peony",past,asof=issued,
+                                      cycle_sampling="unverified")
 
     def test_bound_scenarios_and_reject_future_data(self):
         previous,issued=history()
