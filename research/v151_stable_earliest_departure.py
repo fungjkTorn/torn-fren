@@ -246,6 +246,18 @@ def stable_earliest_departure(item_key, periods, *, asof,
     fractions=[v/scenarios for v in scores]
     default["score_now"]=round(fractions[0],6)
     default["score_bins"]=[round(v,6) for v in fractions]
+    peak=max(fractions)
+    default["peak_scenario_stock_fraction"]=round(peak,6)
+    default["first_peak_departure_delay_seconds"]=(
+        fractions.index(peak)*STEP_SECONDS
+    )
+    default["at_least_floor_bin_count"]=sum(
+        v>=score_floor for v in fractions
+    )
+    default["adjacent_supported_bin_count"]=sum(
+        fractions[i]>=score_floor and fractions[i+1]>=score_floor
+        for i in range(len(fractions)-1)
+    )
     default["scenario_count"]=scenarios
     default["first_next_restock_onset_median_seconds"]=_median(first_next_restocks)
     winner,reason=_score_policy(
