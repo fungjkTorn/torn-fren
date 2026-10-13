@@ -106,8 +106,6 @@ def compact(result):
         f"{pair145:+d} model-only minus leave-now-only ({total('new_only')} vs {total('now_only')})",
         f"  V148 matched versus leave-now: {matched148} mature pairs, net "
         f"{pair148:+d} model-only minus leave-now-only ({total('explicit_only_vs_now')} vs {total('now_only_vs_explicit')})",
-        f"  V148 long-wait caution flags: {total('long_wait_needs_explanation')}; "
-        "0 flags is NOT a guarantee of optimal timing",
         "=== ITEM | old | recovered | V148 proposed/H/M/net | "
         "V151 proposed/H/M/net | V151-V148 paired net | V151 median wait min ===",
     ]
@@ -137,8 +135,6 @@ def compact(result):
         "Caution: first-UTC-hour cohorts share restock cycles; these are not independent trips.",
         "V148/V151 proxy rates condition on mature scored proposals; "
         "V145 was capped at 4 model evaluations per item.",
-        "Japan Xanax: separately inspect explicit NO_CONSERVATIVE_REACHABLE_WINDOW "
-        "vs actual recorded restocks.",
         "Original V2 graph and deployed 24-item website are unchanged.",
     ])
     return "\n".join(lines)
