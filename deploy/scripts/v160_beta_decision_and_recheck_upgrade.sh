@@ -10,7 +10,7 @@ CODE="$ROOT/v160_beta_board.py"
 HELPER="$ROOT/v160_single_item_recheck.py"
 LEDGER=/var/lib/torn-fren-v38/v160_v151_prospective24.db
 BRANCH=research/v38-full-roster-live-prep-20261009
-PIN=f80440e0fa8188cb81185f4a010701a911eccf7b
+PIN=f2d091336b8e2b3b13b06cb0633c008e2a474ac5
 
 if ! systemctl is-active --quiet "$UNIT"; then
  echo "STOP previous private beta viewer inactive; no attempted upgrade"
