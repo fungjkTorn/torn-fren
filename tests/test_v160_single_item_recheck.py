@@ -63,6 +63,39 @@ class SingleItemRecheckTests(unittest.TestCase):
             self.assertEqual(before,hashlib.sha256(collector.read_bytes()).hexdigest())
             self.assertFalse(ledger.exists())
 
+    def test_on_demand_recheck_emits_all_restocks_not_only_first_eligible_flight(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp)
+            collector=collector_fixture(root)
+            modules=(TRAVEL_SECONDS,_read_item,read_heartbeat,
+                     provider_continuous_phases,model)
+            calls=[]
+            def events(key,history,*,asof):
+                calls.append((key,asof))
+                return {"item_key":key,"asof_epoch":asof,
+                    "status":"EVENT_TIMELINE_FORECAST_AVAILABLE",
+                    "restock_events":[
+                        {"event_index":1,"predicted_restock_epoch":asof+600,
+                         "expected_departure_epoch":None,
+                         "reason":"MODELED_RESTOCK_NOT_REACHABLE_WITH_CURRENT_FLIGHT"},
+                        {"event_index":2,"predicted_restock_epoch":asof+2400,
+                         "expected_departure_epoch":asof+360,
+                         "reason":"MODELED_REACHABLE_RECONFIRM"}],
+                    "forecast_event_count":2,
+                    "restock_accuracy_verified":False}
+            report=worker.recheck(ITEM,source=collector,
+                                  roster=ROOT/"research/v38_roster.json",
+                                  modules=modules,now_fn=lambda:T,
+                                  event_planner=events)
+            self.assertEqual(calls,[(ITEM,T)])
+            self.assertEqual(report["restock_timeline"]["forecast_event_count"],2)
+            self.assertIsNone(report["restock_timeline"]["restock_events"][0]
+                              ["expected_departure_epoch"])
+            self.assertEqual(report["restock_timeline"]["restock_events"][1]
+                             ["expected_departure_epoch"],T+360)
+            self.assertFalse(report["forecast_not_prospectively_recorded"] is False)
+            self.assertFalse((root/"v160_v151_prospective24.db").exists())
+
     def test_reject_unknown_item_and_stale_source_without_writes(self):
         with tempfile.TemporaryDirectory() as tmp:
             source=collector_fixture(Path(tmp))
