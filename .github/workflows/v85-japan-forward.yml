@@ -169,6 +169,7 @@ on:
       - 'deploy/scripts/v160_private_beta_board.py'
       - 'tests/test_v160_private_beta_board.py'
       - 'deploy/scripts/v160_private_beta_operator.sh'
+      - 'deploy/scripts/v160_beta_safe_upgrade.sh'
       - 'deploy/systemd/torn-fren-v160-beta-board.service'
       - 'tests/test_v160_private_beta_operator.py'
       - 'deploy/scripts/v85_japan_forward_timer.sh'
