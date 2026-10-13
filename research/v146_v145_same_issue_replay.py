@@ -47,6 +47,7 @@ from research.v156_item_cycle_profile_router import (
 )
 from research.v157_prequential_stock_survival_router import prequential_item_route
 from research.v158_flight_horizon_router import flight_horizon_item_route
+from research.v159_issue_phase_episode_audit import episode_audit
 from research.v88_poll_state_forward_report import observation
 
 DAY=86400
@@ -662,6 +663,7 @@ def replay(*,collector=COLLECTOR, sidecar=SIDECAR, now=None,
                     "old_departure":None,"old_outcome":"NOT_PROPOSED",
                     "next_restock_status":None,"next_restock_abs_error_seconds":None,
                     "recent_restocks_abs_errors_seconds":{},
+                    "issue_phase":None,"issue_phase_onset":None,
                     "item_profile_stocked":None,
                     "item_profile_depleted":None,
                     "item_stock_regime":None,
@@ -743,12 +745,15 @@ def replay(*,collector=COLLECTOR, sidecar=SIDECAR, now=None,
                     "old_completed_low":len(old["depleted_durations"]),
                     "new_completed_low":len(new["depleted_durations"]),
                     "history_evidence_tier":observed_cycle_evidence_tier(new)["tier"],
+                    "issue_phase":new["phase"],
+                    "issue_phase_onset":new["phase_onset"],
                     "recovered":False,
                     "old_departure":baseline.get("earliest_departure"),
                     "old_arrival":baseline.get("earliest_arrival"),
                     "old_outcome":"NOT_PROPOSED",
                     "next_restock_status":None,"next_restock_abs_error_seconds":None,
                     "recent_restocks_abs_errors_seconds":{},
+                    "issue_phase":None,"issue_phase_onset":None,
                     "item_profile_stocked":None,
                     "item_profile_depleted":None,
                     "item_stock_regime":None,
@@ -1048,6 +1053,7 @@ def replay(*,collector=COLLECTOR, sidecar=SIDECAR, now=None,
                             stock,country,item,
                             issued+baseline["travel_seconds"],current)
                 results.append(record)
+    episode_result=episode_audit(results)
     agg,by_item=_aggregate(results)
     total=sum(x["issued_hourly_samples"] for x in by_item.values())
     if total!=len(results):
@@ -1062,6 +1068,7 @@ def replay(*,collector=COLLECTOR, sidecar=SIDECAR, now=None,
         "per_item_budget":per_item_budget,
         "summary":agg,
         "items":by_item,
+        "issue_phase_episode_audit":episode_result,
         "no_writes":True,
         "orig_v128_site_or_worker_modified":False,
         "source_provider_freshness_certified":False,
