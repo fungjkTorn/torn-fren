@@ -140,6 +140,10 @@ class EventTimelineTests(unittest.TestCase):
             self.assertTrue(result["not_five_minute_replanning"])
             self.assertFalse(result["collector_written"])
             self.assertFalse(result["lookahead_used_in_prediction"])
+            self.assertLessEqual(result["matched_within_15s"],
+                                 result["matched_within_60s"])
+            self.assertLessEqual(result["matched_within_60s"],
+                                 result["matched_timing"])
             self.assertLessEqual(result["matched_timing"],
                                  result["actual_observed_restocks"])
             self.assertLessEqual(result["matched_timing"],result["predicted_events"])
