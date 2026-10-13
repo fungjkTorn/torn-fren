@@ -453,7 +453,8 @@ def snapshot(ledger=LEDGER, roster=ROSTER, *, now=None):
 
 
 def handler_factory(ledger=LEDGER,roster=ROSTER,
-                    helper=RECHECK_HELPER,python=RECHECK_PYTHON):
+                    helper=RECHECK_HELPER,python=RECHECK_PYTHON,
+                    work=Path("/home/ubuntu/torn-fren-v38-probe")):
     class Handler(BaseHTTPRequestHandler):
         def do_POST(self):
             if self.path!="/api/recheck":
@@ -498,7 +499,7 @@ def handler_factory(ledger=LEDGER,roster=ROSTER,
                     return
                 run=subprocess.run(
                     [str(python),"-I",str(helper),key],
-                    cwd="/home/ubuntu/torn-fren-v38-probe",
+                    cwd=str(work),
                     env=dict(os.environ,PYTHONDONTWRITEBYTECODE="1",
                              OPENBLAS_NUM_THREADS="1",OMP_NUM_THREADS="1",
                              MKL_NUM_THREADS="1"),
