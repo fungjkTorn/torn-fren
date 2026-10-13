@@ -38,7 +38,15 @@ fi
 test -r "$COLLECTOR" || { echo "STOP approved collector unreadable"; exit 1; }
 test -d "$PRIVATE" || { echo "STOP private sidecar dir missing"; exit 1; }
 test -x "$PY" || { echo "STOP Python venv unavailable"; exit 1; }
-test -d "$WORK/.git" || { echo "STOP research checkout unavailable"; exit 1; }
+# A linked git worktree uses a regular .git FILE, not a directory.
+# Check with git itself: reject missing repositories or the wrong parent
+# checkout without rejecting a valid gitdir indirection.
+if [[ "$(git -C "$WORK" rev-parse --is-inside-work-tree 2>/dev/null || true)" != "true" ||
+      "$(git -C "$WORK" rev-parse --show-toplevel 2>/dev/null || true)" != "$WORK" ]]; then
+  echo "STOP research checkout is not a readable Git worktree at $WORK"
+  exit 1
+fi
+echo "Verified research Git worktree: $WORK"
 test ! -L "$STAGE" || { echo "STOP isolated research stage symlink"; exit 1; }
 cd "$WORK"
 git fetch -q origin research/v38-full-roster-live-prep-20261009
