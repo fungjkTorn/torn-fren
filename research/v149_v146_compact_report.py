@@ -168,6 +168,18 @@ def compact(result):
         raise ValueError("phase episode item/total denominators do not reconcile")
     if _num(phase_totals,"distinct_asof_phase_episodes") > source["cohorts"]:
         raise ValueError("episode grouping exceeds issued cohorts")
+    if (_num(phase_totals,"raw_scorable_phase_episodes") >
+        total("paired_vs_independent_matched") or
+        _num(phase_totals,"v158_scorable_phase_episodes") >
+        total("flight_horizon_vs_independent_matched")):
+        raise ValueError("phase episode grouping exceeds mature paired samples")
+    # V151 cannot issue a mature paired comparison without a known V145
+    # current HIGH/LOW phase onset. Zero audited groups despite matched
+    # model comparisons is a broken evidence transfer or report, not a
+    # legitimate model result.
+    if (total("paired_vs_independent_matched")>0 and
+        _num(phase_totals,"raw_scorable_phase_episodes")==0):
+        raise ValueError("matched V151 paired outcomes but zero audited phases")
     lines=[
         "=== V149 COMPACT V146 REPLAY (HISTORICAL AS-OF / NOT LIVE FLIGHT PROOF) ===",
         f"24 items; {source['cohorts']} first-issued item/UTC-hour cohorts; NO DATABASE OR WEBSITE WRITES",
