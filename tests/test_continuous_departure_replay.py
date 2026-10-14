@@ -67,6 +67,9 @@ class ContinuousTests(unittest.TestCase):
             self.assertEqual(families['v163']['observed'],families['daily_template']['observed'])
             for policy,c in report["policies"].items():
                 self.assertEqual(c["issues"],288)
+                rc=report["items"][next(iter(report["items"]))]["policies"][policy]["replanned_hourly_starts"]
+                self.assertEqual(rc["starts"],24)
+                self.assertEqual(sum(rc.get(k,0) for k in ("SUCCESS","FAILURE","PENDING","UNKNOWN","ABSTAIN")),24)
                 self.assertEqual(sum(c.get(k,0) for k in ("SUCCESS","FAILURE","PENDING","UNKNOWN","ABSTAIN")),288)
                 self.assertEqual(c["proposals"]+c.get("ABSTAIN",0),288)
             item=next(iter(report["items"].values()))

@@ -9,6 +9,9 @@ COHERENT_POLICIES={
     'midpoint_recent_8':('recent_8','midpoint'),
     'late_onset_all_history':('all_history','late'),
     'quarter_with_current_stock':('all_history','current_quarter'),
+    'phase_analog_quarter':('phase_analogs_18','quarter'),
+    'phase_analog_midpoint':('phase_analogs_18','midpoint'),
+    'phase_analog_current_quarter':('phase_analogs_18','current_quarter'),
 }
 
 
