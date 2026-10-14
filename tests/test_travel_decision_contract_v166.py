@@ -50,7 +50,7 @@ class TravelDecisionContractTests(unittest.TestCase):
         self.assertIsNone(report["verified_arrival_stock_success_probability"])
 
     def test_active_window_from_current_estimated_stock(self):
-        e=make_event(NOW-200,length=1000,early=NOW-300,late=NOW-100)
+        e=make_event(NOW-200,length=1600,early=NOW-300,late=NOW-100)
         report=self.decision([e])
         self.assertEqual(report["status"],STATUS_ACTIVE)
         self.assertEqual(report["estimated_departure_epoch"],NOW)
