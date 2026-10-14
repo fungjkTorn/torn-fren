@@ -46,6 +46,8 @@ RestrictSUIDSGID=yes
 RestrictRealtime=yes
 RestrictNamespaces=yes
 RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+# Block cloud-instance metadata addresses from workflow code.
+IPAddressDeny=169.254.0.0/16
 ReadWritePaths=/var/lib/torn-fren-research-runner
 ReadOnlyPaths=/var/lib/torn-fren-research
 InaccessiblePaths=/opt/torn-fren/data /home/ubuntu /var/lib/torn-fren-v38
