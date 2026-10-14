@@ -199,6 +199,23 @@ class EventTimelineTests(unittest.TestCase):
         self.assertEqual(len(ambiguous),amb)
         self.assertTrue(callable(cross))
 
+    def test_recent_window_changes_only_past_phase_durations(self):
+        p=phase(kind="LOW",age=200,low=1200,high=600)
+        p["depleted_durations"]=[1200]*32+[3600]*8
+        p["stocked_durations"]=[600]*32+[900]*8
+        old=m.predict_events("mex:Jaguar Plushie",p,asof=ASOF)
+        short=m.predict_events("mex:Jaguar Plushie",p,asof=ASOF,
+                               recent_cycles=8)
+        self.assertNotEqual(old["restock_events"][0]["predicted_restock_epoch"],
+                            short["restock_events"][0]["predicted_restock_epoch"])
+        self.assertEqual(short["cycle_window"],8)
+        self.assertNotIn("cycle_window",m.predict_events(
+            "mex:Jaguar Plushie",dict(p,phase_onset=ASOF+1),
+            asof=ASOF))
+        with self.assertRaises(ValueError):
+            m.predict_events("mex:Jaguar Plushie",p,asof=ASOF,
+                             recent_cycles=0)
+
     def test_historical_four_hour_replay_denominator_includes_all_clean_restocks(self):
         from test_v160_prospective_v151_shadow import collector_fixture
         from research.v128_full24_earliest_shadow import exact_roster
@@ -233,6 +250,24 @@ class EventTimelineTests(unittest.TestCase):
                                  result["actual_observed_restocks"])
             self.assertLessEqual(result["matched_timing"],result["predicted_events"])
             self.assertIn("OBSERVED",m.format_replay(result).upper())
+            self.assertEqual(src.read_bytes(),before)
+            comparison=m.replay_events(source=src,asof=ASOF,days=1,
+                 tolerance=600,roster=exact_roster(),
+                 limit_items=2,cycle_windows=(8,16,32))
+            for field in ("actual_observed_restocks","predicted_events",
+                          "matched_timing","restock_recall","restock_precision"):
+                self.assertEqual(result[field],comparison[field])
+            self.assertEqual(set(comparison["recent_cycle_challengers"]),
+                             {"recent_8","recent_16","recent_32"})
+            for name,challenge in comparison["recent_cycle_challengers"].items():
+                self.assertEqual(challenge["observed_restocks"],
+                                 comparison["actual_observed_restocks"])
+                self.assertLessEqual(challenge["matched_timing"],
+                                     challenge["observed_restocks"])
+                self.assertLessEqual(challenge["matched_timing"],
+                                     challenge["forecast_restocks"])
+            self.assertIn("CAUSAL CYCLE-HISTORY TOURNAMENT",
+                          m.format_replay(comparison))
             self.assertEqual(src.read_bytes(),before)
 
     def test_cross_provider_threshold_not_claimed_as_clean_restock_truth(self):
