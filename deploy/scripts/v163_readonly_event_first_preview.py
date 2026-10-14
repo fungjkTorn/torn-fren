@@ -658,6 +658,36 @@ def format_replay(result):
             f"{v['forecast_restocks']:>6} {v['matched_timing']:>6} "
             f"{str(v['restock_recall']):>8} {str(v['restock_precision']):>9}  "
             +", ".join(f"{a}={b}" for a,b in out))
+    if result.get("recent_cycle_challengers"):
+        output+=["","CAUSAL CYCLE-HISTORY TOURNAMENT (SAME RESTOCKS AND 4-HOUR COHORTS)",
+                 "Research-only comparison; no champion or thresholds selected from this data.",
+                 f"{'POLICY':<14} {'ACTUAL':>7} {'PREDICTED':>10} {'MATCHED':>8} "
+                 f"{'RECALL15s':>10} {'RECALL60s':>10} {'RECALL10m':>10} {'PRECISION10m':>14}"]
+        baseline={
+            "observed_restocks":result["actual_observed_restocks"],
+            "forecast_restocks":result["predicted_events"],
+            "matched_timing":result["matched_timing"],
+            "recall_within_15s":result["recall_within_15s"],
+            "recall_within_60s":result["recall_within_60s"],
+            "restock_recall":result["restock_recall"],
+            "restock_precision":result["restock_precision"],
+        }
+        for name,r in (("all_history",baseline),
+                       *sorted(result["recent_cycle_challengers"].items())):
+            output.append(
+                f"{name:<14} {r['observed_restocks']:>7} "
+                f"{r['forecast_restocks']:>10} {r['matched_timing']:>8} "
+                f"{str(r['recall_within_15s']):>10} "
+                f"{str(r['recall_within_60s']):>10} "
+                f"{str(r['restock_recall']):>10} "
+                f"{str(r['restock_precision']):>14}"
+            )
+        for key in ("jap:Xanax","uni:Nessie Plushie"):
+            if key in result["items"]:
+                row=result["items"][key]
+                output.append(f"{key} comparison: all={row['restock_recall']} "+
+                    " ".join(f"{name}={r['restock_recall']}"
+                    for name,r in sorted(row["recent_cycle_challengers"].items())))
     return "\n".join(output)
 
 
@@ -667,6 +697,8 @@ def main():
     parser.add_argument("--json",action="store_true")
     parser.add_argument("--historical-replay-days",type=int,default=None)
     parser.add_argument("--limit-items",type=int,default=24)
+    parser.add_argument("--compare-recent",action="store_true",
+                        help="Research only: score recent 8/16/32 cycle variants versus unchanged V163 baseline")
     args=parser.parse_args()
     if not 1<=args.hours<=8:
         parser.error("horizon must be 1-8 hours")
@@ -675,7 +707,8 @@ def main():
             print(f"V163 replay processed {done}/{total} items: {item}",
                   file=sys.stderr,flush=True)
         result=replay_events(days=args.historical_replay_days,
-                             limit_items=args.limit_items,progress=progress)
+                             limit_items=args.limit_items,progress=progress,
+                             cycle_windows=(8,16,32) if args.compare_recent else ())
         print(json.dumps(result,sort_keys=True) if args.json else
               format_replay(result))
     else:
