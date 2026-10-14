@@ -20,6 +20,7 @@ from pathlib import Path
 from deploy.scripts import v163_readonly_event_first_preview as model
 from services.travel_decision_contract_v166 import build_item_travel_decision
 from research.causal_daily_template import DailyTemplate
+from research.causal_phase_analogs import PhaseAnalogs
 from services.travel_window_policy import project_policy
 from research.v151_stable_earliest_departure import stable_earliest_departure
 
@@ -34,7 +35,10 @@ POLICIES = (("v166_all_history", None, "median"),
             ("daily_template_first_window", None, "template_first_center"),
             ("daily_event_quarter", None, "quarter"),
             ("daily_event_current_quarter", None, "current_quarter"),
-            ("v151_independent_48", None, "v151"))
+            ("v151_independent_48", None, "v151"),
+            ("phase_analog_quarter", None, "quarter"),
+            ("phase_analog_midpoint", None, "midpoint"),
+            ("phase_analog_current_quarter", None, "current_quarter"))
 MAX_POLLS = 400000
 VERSION = "continuous_departure_replay_v1"
 
@@ -125,7 +129,7 @@ def replay(*, source, days=2, asof=None, limit_items=24,
     path = Path(source).resolve(strict=True)
     results = {}
     totals = {p:Counter() for p,_,_ in POLICIES}
-    event_totals={p:Counter() for p in ('v163','daily_template')}
+    event_totals={p:Counter() for p in ('v163','daily_template','phase_analogs')}
     with closing(sqlite3.connect(path.as_uri()+"?mode=ro", uri=True)) as db:
         db.execute("PRAGMA query_only=ON")
         db.execute("BEGIN")
@@ -153,6 +157,7 @@ def replay(*, source, days=2, asof=None, limit_items=24,
             evidence = ArrivalEvidence(obs,polls,gaps,now)
             template_model=DailyTemplate(obs,crosses)
             phases = model._ReplayPhases(crosses)
+            analogs = PhaseAnalogs(crosses)
             cursor = 0
             stats = {p:Counter() for p,_,_ in POLICIES}
             episode_stats = {p:Counter() for p,_,_ in POLICIES}
@@ -164,8 +169,9 @@ def replay(*, source, days=2, asof=None, limit_items=24,
             event_stats={p:Counter() for p in event_totals}
             for issued in issues:
                 while cursor<len(obs) and obs[cursor].epoch<=issued:
-                    phases.add(obs[cursor]); cursor+=1
+                    phases.add(obs[cursor]); analogs.add(obs[cursor]); cursor+=1
                 state = phases.asof()
+                analog_events = analogs.forecast(key, state, asof=issued)
                 pi = bisect.bisect_right(polls,issued)-1
                 age = issued-polls[pi] if pi>=0 else None
                 if crosses(issued,issued):
@@ -181,7 +187,7 @@ def replay(*, source, days=2, asof=None, limit_items=24,
                     forecasts[None]=model.predict_events(key,state,asof=issued)
                     end=min(issued+4*3600,now)
                     truths=clean[bisect.bisect_right(clean,issued):bisect.bisect_right(clean,end)]
-                    for family,stream in (('v163',forecasts[None]),('daily_template',template_events)):
+                    for family,stream in (('v163',forecasts[None]),('daily_template',template_events),('phase_analogs',analog_events)):
                         predictions=[e['predicted_restock_epoch'] for e in stream['restock_events']
                                      if issued<e['predicted_restock_epoch']<=end
                                      and age is not None and age<=180]
@@ -192,7 +198,8 @@ def replay(*, source, days=2, asof=None, limit_items=24,
                 for policy, window, kind in POLICIES:
                     if window not in forecasts:
                         forecasts[window] = model.predict_events(key,state,asof=issued,recent_cycles=window)
-                    forecast = template_events if policy.startswith("daily_event_") else forecasts[window]
+                    forecast = (analog_events if policy.startswith("phase_analog_") else
+                                template_events if policy.startswith("daily_event_") else forecasts[window])
                     decision = choose(forecast,issued,age,kind,template,v151)
                     dep = decision["estimated_departure_epoch"]
                     arrival = dep+model.TRAVEL_SECONDS[country] if dep is not None else None

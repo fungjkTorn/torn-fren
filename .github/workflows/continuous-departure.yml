@@ -5,6 +5,8 @@ on:
     paths:
       - 'research/continuous_departure_replay.py'
       - 'research/causal_daily_template.py'
+      - 'research/causal_phase_analogs.py'
+      - 'tests/test_causal_phase_analogs.py'
       - 'research/per_item_readiness.py'
       - 'services/travel_window_policy.py'
       - 'services/travel_read_model.py'
@@ -36,6 +38,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_v163_readonly_event_first_preview.py' -v
           python -m unittest discover -s tests -p 'test_travel_read_model.py' -v
           python -m unittest discover -s tests -p 'test_causal_daily_template.py' -v
+          python -m unittest discover -s tests -p 'test_causal_phase_analogs.py' -v
           python -m unittest discover -s tests -p 'test_travel_decisions_router.py' -v
           python -m unittest discover -s tests -p 'test_per_item_readiness.py' -v
       - name: Check player interface JavaScript
