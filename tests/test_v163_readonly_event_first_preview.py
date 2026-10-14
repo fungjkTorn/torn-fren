@@ -125,6 +125,35 @@ class EventTimelineTests(unittest.TestCase):
         self.assertEqual(result["false_predicted"],1)
         self.assertEqual(result["sum_absolute_timing_error_seconds"],9)
 
+    def test_incremental_phase_replay_exactly_matches_original_v145(self):
+        from research.v145_provider_continuous_phases import provider_continuous_phases
+        from research.v128_full24_earliest_shadow import _gap_index
+        OBS=m.OBS
+        records=[
+            OBS(100,0,"yata"),OBS(200,100,"yata"),
+            OBS(300,80,"prometheus"),OBS(410,0,"prometheus"),
+            OBS(520,0,"yata"),OBS(580,100,"yata"),
+            OBS(700,90,"prometheus"),OBS(800,0,"prometheus"),
+            OBS(900,60,"yata"),OBS(1100,0,"yata"),
+            OBS(1200,75,"yata"),OBS(1250,0,"yata"),
+        ]
+        gaps=[(850,880)]
+        tracker=m._ReplayPhases(_gap_index(gaps,1300))
+        for j,obs in enumerate(records):
+            tracker.add(obs)
+            reference=provider_continuous_phases(records[:j+1],
+                asof=obs.epoch,gaps=[g for g in gaps if g[0]<=obs.epoch])
+            observed=tracker.asof()
+            for key in ("phase","phase_onset","last_observation",
+                        "stocked_durations","depleted_durations"):
+                self.assertEqual(observed[key],reference[key],
+                                 f"incremental mismatch at {j}: {key}")
+        cross,events,ambiguous=m._replay_restock_index(records,gaps,1300)
+        truth,amb=m.confirmed_restocks(records,gaps,start=99,end=1300)
+        self.assertEqual(events,truth)
+        self.assertEqual(len(ambiguous),amb)
+        self.assertTrue(callable(cross))
+
     def test_historical_four_hour_replay_denominator_includes_all_clean_restocks(self):
         from test_v160_prospective_v151_shadow import collector_fixture
         from research.v128_full24_earliest_shadow import exact_roster
