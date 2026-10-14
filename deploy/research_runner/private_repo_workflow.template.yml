@@ -1,0 +1,97 @@
+name: Isolated Torn-Fren 24-item research
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'requests/approved_model_sha.txt'
+      - '.github/workflows/forecast-research.yml'
+  workflow_dispatch:
+  schedule:
+    - cron: '21 */6 * * *'
+permissions:
+  contents: read
+concurrency:
+  group: isolated-research
+  cancel-in-progress: false
+jobs:
+  historical-restock-comparison:
+    runs-on: [self-hosted, Linux, X64, torn-fren-research]
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          path: controls
+      - name: Validate exact model source pin
+        id: approved
+        shell: bash
+        run: |
+          PIN=$(tr -d '\r\n' < controls/requests/approved_model_sha.txt)
+          [[ "$PIN" =~ ^[0-9a-f]{40}$ ]] || { echo 'Invalid pinned commit'; exit 1; }
+          echo "sha=$PIN" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v4
+        with:
+          repository: fungjkTorn/torn-fren
+          ref: ${{ steps.approved.outputs.sha }}
+          persist-credentials: false
+          path: model
+      - name: Confirm VM research sandbox and snapshot health
+        shell: bash
+        run: |
+          set -euo pipefail
+          DATA=/var/lib/torn-fren-research/stock_history_research.db
+          test -r "$DATA"
+          if test -r /opt/torn-fren/data/stock_history.db; then
+            echo 'UNSAFE: runner can read live collector'; exit 1
+          fi
+          test -x /var/lib/torn-fren-research-runner/.venv/bin/python
+          /var/lib/torn-fren-research-runner/.venv/bin/python - <<'PY'
+          import sqlite3,time
+          uri='file:/var/lib/torn-fren-research/stock_history_research.db?mode=ro'
+          con=sqlite3.connect(uri,uri=True)
+          m=dict(con.execute('SELECT key,value FROM research_metadata'))
+          if m.get('sanitized_stock_only')!='true' or m.get('roster_size')!='24':
+              raise SystemExit('Unrecognized research-only dataset')
+          age=time.time()-int(m['source_cutoff_epoch'])
+          if not -120 <= age <= 7200:
+              raise SystemExit('Stale sanitized dataset: '+str(age))
+          print('Sanitized snapshot verified: '+m['row_count']+' rows')
+          PY
+      - name: Read-only restock model tournament
+        shell: bash
+        run: |
+          set -euo pipefail
+          OUT="$RUNNER_TEMP/torn-fren-research"
+          mkdir -p "$OUT"
+          PYTHONPATH="$GITHUB_WORKSPACE/model" \
+            /var/lib/torn-fren-research-runner/.venv/bin/python \
+            "$GITHUB_WORKSPACE/model/deploy/scripts/v163_readonly_event_first_preview.py" \
+            --source /var/lib/torn-fren-research/stock_history_research.db \
+            --historical-replay-days 7 --compare-recent --json \
+            > "$OUT/event_report.json"
+          /var/lib/torn-fren-research-runner/.venv/bin/python - "$OUT/event_report.json" <<'PY'
+          import json,sys
+          a=json.load(open(sys.argv[1],encoding='utf-8'))
+          print('V163 ALL-HISTORY historical 4-hour cohorts:')
+          print('observed',a['actual_observed_restocks'],'forecast',a['predicted_events'],
+                'matched',a['matched_timing'],'recall15s',a['recall_within_15s'],
+                'recall60s',a['recall_within_60s'],'recall10m',a['restock_recall'],
+                'precision10m',a['restock_precision'])
+          for key,v in a['recent_cycle_challengers'].items():
+              print(key,'forecast',v['forecast_restocks'],
+                    'recall15s',v['recall_within_15s'],
+                    'recall60s',v['recall_within_60s'],
+                    'recall10m',v['restock_recall'],'precision',v['restock_precision'])
+          for key in ('uni:Nessie Plushie','jap:Xanax'):
+              row=a['items'][key]
+              print(key,'baseline',row['restock_recall'],
+                    'challengers',row['recent_cycle_challengers'])
+          PY
+      - name: Save private metrics (NOT stock dataset)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: torn-fren-restock-research
+          path: ${{ runner.temp }}/torn-fren-research/event_report.json
+          if-no-files-found: warn
+          retention-days: 14
