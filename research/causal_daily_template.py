@@ -49,7 +49,7 @@ class DailyTemplate:
             if best is None or score>best[0]:
                 best=(score,shift)
         if best is None or best[0][0]<.5:
-            return {"earliest":None,"center":None,"status":"NO_MATCHING_DAILY_TEMPLATE"}
+            return {"earliest":None,"center":None,"first_center":None,"status":"NO_MATCHING_DAILY_TEMPLATE"}
         shift=best[1]
         eligible=[]
         for delay in range(0,HORIZON+1,STEP):
@@ -76,9 +76,10 @@ class DailyTemplate:
         # adjacent 5m support. Count narrow single bins as abstentions.
         credible=[g for g in groups if len(g)>=2 or g[0]==0]
         if not credible:
-            return {"earliest":None,"center":None,"status":"NO_SUSTAINED_TEMPLATE_WINDOW"}
+            return {"earliest":None,"center":None,"first_center":None,"status":"NO_SUSTAINED_TEMPLATE_WINDOW"}
         first=credible[0]
         widest=max(credible,key=lambda g:(len(g),-g[0]))
         return {"earliest":issued+first[0],"center":issued+widest[len(widest)//2],
+                "first_center":issued if first[0]==0 else issued+first[len(first)//2],
                 "fit":round(best[0][0],4),"shift_seconds":shift,
                 "status":"UNCALIBRATED_DAILY_TEMPLATE_CANDIDATE"}

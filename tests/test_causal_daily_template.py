@@ -24,6 +24,7 @@ class TemplateTests(unittest.TestCase):
         result=DailyTemplate([],lambda a,b:False).plan(1791910800,1020)
         self.assertIsNone(result["earliest"])
         self.assertIsNone(result["center"])
+        self.assertIsNone(result["first_center"])
 
 
 if __name__=="__main__":unittest.main()

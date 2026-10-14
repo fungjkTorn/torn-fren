@@ -31,6 +31,7 @@ POLICIES = (("v166_all_history", None, "median"),
             ("quarter_with_current_stock", None, "current_quarter"),
             ("daily_template_earliest", None, "template_earliest"),
             ("daily_template_center", None, "template_center"),
+            ("daily_template_first_window", None, "template_first_center"),
             ("v151_independent_48", None, "v151"))
 MAX_POLLS = 400000
 VERSION = "continuous_departure_replay_v1"
