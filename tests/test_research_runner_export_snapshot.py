@@ -83,7 +83,7 @@ class SnapshotTests(unittest.TestCase):
                                        "source","country","item_name"])
                 self.assertEqual(
                     db.execute("SELECT COUNT(*) FROM stock_history").fetchone()[0],
-                    len(roster_and_extras(roster))*5)
+                    len(json.loads(roster.read_text())["items"])*5)
                 self.assertEqual(
                     db.execute("SELECT COUNT(*) FROM poll_heartbeats").fetchone()[0],2)
                 self.assertEqual(db.execute("PRAGMA integrity_check").fetchone()[0],"ok")
