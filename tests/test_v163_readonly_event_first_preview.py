@@ -209,9 +209,9 @@ class EventTimelineTests(unittest.TestCase):
         self.assertNotEqual(old["restock_events"][0]["predicted_restock_epoch"],
                             short["restock_events"][0]["predicted_restock_epoch"])
         self.assertEqual(short["cycle_window"],8)
-        self.assertNotIn("cycle_window",m.predict_events(
+        self.assertEqual(m.predict_events(
             "mex:Jaguar Plushie",dict(p,phase_onset=ASOF+1),
-            asof=ASOF))
+            asof=ASOF)["cycle_window"],"all")
         with self.assertRaises(ValueError):
             m.predict_events("mex:Jaguar Plushie",p,asof=ASOF,
                              recent_cycles=0)
