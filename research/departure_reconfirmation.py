@@ -8,10 +8,13 @@ from collections import Counter
 
 def evaluate(plans, *, cutoff, flight_seconds, score, cohorts=None):
     counts = Counter()
+    days={}
     for start_index in range(0, len(plans), 12):
         start = plans[start_index][0]
         deadline = start + 28800
         counts['starts'] += 1
+        day=days.setdefault((start-plans[0][0])//86400,Counter())
+        day['starts']+=1
         resolved = False
         for issued, departure, source_age in plans[start_index:]:
             if issued > deadline:
@@ -26,6 +29,9 @@ def evaluate(plans, *, cutoff, flight_seconds, score, cohorts=None):
                 continue
             outcome, _, _ = score(departure+flight_seconds)
             counts[outcome] += 1
+            day[outcome]+=1
+            day['departed']+=1
+            day['wait_seconds_sum']+=departure-start
             counts['departed'] += 1
             counts['wait_seconds_sum'] += departure-start
             if cohorts is not None:
@@ -35,6 +41,7 @@ def evaluate(plans, *, cutoff, flight_seconds, score, cohorts=None):
         if not resolved:
             outcome='ABSTAIN' if cutoff >= deadline+300 else 'PENDING'
             counts[outcome] += 1
+            day[outcome]+=1
             if cohorts is not None:
                 cohorts.append(dict(start=start,outcome=outcome,wait=None))
     scored = counts['SUCCESS'] + counts['FAILURE']
@@ -42,6 +49,12 @@ def evaluate(plans, *, cutoff, flight_seconds, score, cohorts=None):
                 success_fraction=round(counts['SUCCESS']/scored,4) if scored else None,
                 departure_coverage=round(counts['departed']/counts['starts'],4) if counts['starts'] else None,
                 actual_player_execution=False,
+                chronological_start_day_slices=[dict(c,
+                    scored=c['SUCCESS']+c['FAILURE'],
+                    success_fraction=round(c['SUCCESS']/(c['SUCCESS']+c['FAILURE']),4)
+                        if c['SUCCESS']+c['FAILURE'] else None,
+                    departure_coverage=round(c['departed']/c['starts'],4))
+                    for _,c in sorted(days.items())],
                 protocol='Fixed hourly starts; replace plan each 300s issue; expire source at 180s; maximum wait 8h. Correlated historical cohorts.')
 
 

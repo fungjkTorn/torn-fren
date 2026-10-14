@@ -15,6 +15,8 @@ class ReconfirmationTests(unittest.TestCase):
         self.assertEqual(self.arrivals,[1710])
         self.assertEqual(r['SUCCESS'],1)
         self.assertEqual(r['wait_seconds_sum'],610)
+        self.assertEqual(r['chronological_start_day_slices'][0]['SUCCESS'],1)
+        self.assertEqual(r['chronological_start_day_slices'][0]['starts'],1)
 
     def test_expired_source_cannot_execute_and_future_tail_is_pending(self):
         r=self.check([(1000,1100,100),(1300,None,None)],cutoff=1400)

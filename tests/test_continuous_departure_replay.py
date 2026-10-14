@@ -81,7 +81,7 @@ class ContinuousTests(unittest.TestCase):
                 self.assertEqual(sum(c.get(k,0) for k in ("SUCCESS","FAILURE","PENDING","UNKNOWN","ABSTAIN")),288)
                 self.assertEqual(c["proposals"]+c.get("ABSTAIN",0),288)
             item=next(iter(report["items"].values()))
-            self.assertEqual(len(item["matched_zero_replanned_comparisons"]),3)
+            self.assertEqual(len(item["matched_zero_replanned_comparisons"]),len(m.ZERO_COMPARATORS))
             for c in item["matched_zero_replanned_comparisons"].values():
                 self.assertEqual(c["starts"],24)
                 self.assertLessEqual(c.get("matched_resolved",0),24)
@@ -96,7 +96,7 @@ class ContinuousTests(unittest.TestCase):
             other=io.StringIO()
             m.replay(source=db,days=1,limit_items=1,journal=other,model_sha="fixture")
             changed=[json.loads(x) for x in other.getvalue().splitlines()]
-            fields=("issue_id","issued_epoch","departure_epoch","arrival_epoch","forecast_events","status")
+            fields=("issue_id","issued_epoch","departure_epoch","arrival_epoch","forecast_events","status","selected_expert","selector_evidence")
             for a,b in zip(records,changed):
                 if a["issued_epoch"]<=split:
                     self.assertEqual({k:a[k] for k in fields},{k:b[k] for k in fields})
