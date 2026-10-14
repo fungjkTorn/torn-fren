@@ -153,7 +153,10 @@ def valid_starts(ctx,country,item,warmup_days=8,stride=1800):
 
 def recent_target_series(ctx,country,item):
     tl=ctx.timelines[(country,item)];n=len(ctx.grid);te=np.array([x[1] for x in tl.windows],float);td=np.array([x[2] for x in tl.windows],float)
-    tw=np.array([tl.windows[j+1][0]-tl.windows[j][1] for j in range(len(tl.windows)-1)],float);twe=te[:-1]
+    tw=np.array([tl.windows[j+1][0]-tl.windows[j][1] for j in range(len(tl.windows)-1)],float)
+    # A depleted duration becomes known at the NEXT stocked-window onset,
+    # not at the preceding stocked-window end (when depletion only begins).
+    twe=np.array([tl.windows[j+1][0] for j in range(len(tl.windows)-1)],float)
     def recent3(ev,val):
         out=np.full(n,np.nan)
         for j,t in enumerate(ctx.grid):
