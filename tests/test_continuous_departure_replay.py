@@ -66,6 +66,10 @@ class ContinuousTests(unittest.TestCase):
                 self.assertEqual(c["issues"],288)
                 self.assertEqual(sum(c.get(k,0) for k in ("SUCCESS","FAILURE","PENDING","UNKNOWN","ABSTAIN")),288)
                 self.assertEqual(c["proposals"]+c.get("ABSTAIN",0),288)
+            item=next(iter(report["items"].values()))
+            for c in item["matched_v166_comparisons"].values():
+                self.assertLessEqual(c.get("matched_issues",0),288)
+                self.assertLessEqual(c.get("challenger_only_success",0)+c.get("v166_only_success",0),c.get("matched_issues",0))
             # Alter only post-issue truth. The earlier forecast and chosen
             # departure must remain identical while evaluation may change.
             split=T-43200
@@ -89,6 +93,17 @@ class ContinuousTests(unittest.TestCase):
             self.assertTrue(all(c.get("ABSTAIN")==288 for c in report["policies"].values()))
             with self.assertRaises(ValueError):
                 m.replay(source=db,days=1,asof=T+1,limit_items=1)
+
+    def test_known_active_outage_abstains_even_with_global_heartbeat(self):
+        with tempfile.TemporaryDirectory() as td:
+            db=self.fixture(Path(td)); stream=io.StringIO()
+            with sqlite3.connect(db) as cx:
+                cx.execute("INSERT INTO collection_gaps VALUES(?,NULL)",(T-3600,))
+            m.replay(source=db,days=1,limit_items=1,journal=stream)
+            records=[json.loads(r) for r in stream.getvalue().splitlines()]
+            active=[r for r in records if r["issued_epoch"]>=T-3600]
+            self.assertTrue(active)
+            self.assertTrue(all(r["outcome"]=="ABSTAIN" and r["departure_epoch"] is None for r in active))
 
 
 if __name__=="__main__":

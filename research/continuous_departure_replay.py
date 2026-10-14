@@ -21,6 +21,7 @@ from deploy.scripts import v163_readonly_event_first_preview as model
 from services.travel_decision_contract_v166 import build_item_travel_decision
 
 POLICIES = (("v166_all_history", None, "median"),
+            ("quarter_buffer_all_history", None, "quarter"),
             ("midpoint_all_history", None, "midpoint"),
             ("midpoint_recent_8", 8, "midpoint"),
             ("late_onset_all_history", None, "late"))
@@ -80,8 +81,9 @@ def choose(forecast, issued, poll_age, kind):
     for event in decision["forecast_events"]:
         start = event["predicted_restock_epoch"]
         end = event["predicted_stock_below_30_epoch"]
-        target = (start+(end-start)//2 if kind == "midpoint"
-                  else event["restock_late_epoch"])
+        target = (start+(end-start)//2 if kind == "midpoint" else
+                  start+(end-start)//4 if kind == "quarter" else
+                  event["restock_late_epoch"])
         depart = max(issued, target-flight-model.GRACE)
         arrival = depart+flight
         if start <= arrival+model.GRACE < end:
@@ -147,14 +149,19 @@ def replay(*, source, days=2, asof=None, limit_items=24,
             seen = {p:set() for p,_,_ in POLICIES}
             landed_episodes = {p:set() for p,_,_ in POLICIES}
             reasons = {p:Counter() for p,_,_ in POLICIES}
+            chronological = {p:[Counter() for _ in range(days)] for p,_,_ in POLICIES}
+            paired = {p:Counter() for p,_,_ in POLICIES if p!="v166_all_history"}
             for issued in issues:
                 while cursor<len(obs) and obs[cursor].epoch<=issued:
                     phases.add(obs[cursor]); cursor+=1
                 state = phases.asof()
                 pi = bisect.bisect_right(polls,issued)-1
                 age = issued-polls[pi] if pi>=0 else None
+                if crosses(issued,issued):
+                    age = None  # Known collection outage at issuance.
                 baseline = evidence.score(issued+model.TRAVEL_SECONDS[country])
                 forecasts = {}
+                issued_outcomes = {}
                 for policy, window, kind in POLICIES:
                     if window not in forecasts:
                         forecasts[window] = model.predict_events(key,state,asof=issued,recent_cycles=window)
@@ -167,13 +174,19 @@ def replay(*, source, days=2, asof=None, limit_items=24,
                     c = stats[policy]
                     c["issues"]+=1; c["proposals"]+=dep is not None
                     c[outcome]+=1; reasons[policy][reason]+=1
+                    issued_outcomes[policy]=outcome
+                    day_index=min(days-1,(issued-start-1)//86400)
+                    day=chronological[policy][day_index]
+                    day["issues"]+=1; day["proposals"]+=dep is not None
+                    day[outcome]+=1
                     # Nonoverlapping next-tick slices retain a true event
                     # denominator without counting the same future restock
                     # once for every earlier issue in its eight-hour horizon.
                     end = min(issued+300,now)
                     actual = clean[bisect.bisect_right(clean,issued):bisect.bisect_right(clean,end)]
                     predicted = [e["predicted_restock_epoch"] for e in forecast["restock_events"]
-                                 if issued<e["predicted_restock_epoch"]<=end]
+                                 if issued<e["predicted_restock_epoch"]<=end
+                                 and age is not None and age<=180]
                     c["next_tick_observed_restocks"]+=len(actual)
                     c["next_tick_forecast_restocks"]+=len(predicted)
                     for tolerance in (15,60,600):
@@ -202,6 +215,9 @@ def replay(*, source, days=2, asof=None, limit_items=24,
                                 "model_sha":model_sha,"item_key":key,"issued_epoch":issued,
                                 "source_cutoff_epoch":issued,"policy":policy,
                                 "source_poll_age_seconds":age,"issue_phase":state["phase"],
+                                "forecast_status":forecast["status"],
+                                "observed_current_quantity":state["last_observation"].quantity if state["last_observation"] else None,
+                                "modeled_current_stock_window":forecast["current_stock_window"],
                                 "issue_phase_onset":state["phase_onset"],
                                 "status":decision["status"],"departure_epoch":dep,
                                 "arrival_epoch":arrival,"grace_seconds":model.GRACE,
@@ -210,10 +226,19 @@ def replay(*, source, days=2, asof=None, limit_items=24,
                                 "outcome":outcome,"outcome_reason":reason,"evidence":proof,
                                 "leave_now_outcome":baseline[0]}
                         journal.write(json.dumps(record,sort_keys=True)+"\n")
+                incumbent=issued_outcomes["v166_all_history"]
+                for p,c in paired.items():
+                    challenger=issued_outcomes[p]
+                    if incumbent in ("SUCCESS","FAILURE") and challenger in ("SUCCESS","FAILURE"):
+                        c["matched_issues"]+=1
+                        c["challenger_only_success"]+=challenger=="SUCCESS" and incumbent=="FAILURE"
+                        c["v166_only_success"]+=challenger=="FAILURE" and incumbent=="SUCCESS"
             results[key]={"policies":{p:dict(summarize(stats[p]),
                 first_proposal_per_issue_phase=summarize(episode_stats[p]),
                 distinct_observed_stock_episodes_reached=len(landed_episodes[p]),
-                outcome_reasons=dict(reasons[p])) for p,_,_ in POLICIES}}
+                chronological_day_slices=[summarize(c) for c in chronological[p]],
+                outcome_reasons=dict(reasons[p])) for p,_,_ in POLICIES},
+                "matched_v166_comparisons":{p:dict(c) for p,c in paired.items()}}
             for p in totals:
                 totals[p].update(stats[p])
             if progress:
@@ -222,6 +247,7 @@ def replay(*, source, days=2, asof=None, limit_items=24,
             "version":VERSION,"model_sha":model_sha,"asof_epoch":now,"days":days,
             "issue_step_seconds":300,"items_evaluated":len(results),
             "policies":{p:summarize(c) for p,c in totals.items()},"items":results,
+            "chronological_slices_policy":"Equal consecutive 24h issue slices; all policies fixed before replay. Latest day is a diagnostic holdout, not pristine lockbox after inspection.",
             "future_truth_selects_issue_times":False,"genuine_live_issuance":False,
             "source_written":False,"poll_backed_arrival_availability_measured":True,
             "per_country_provider_freshness_verified":False,
