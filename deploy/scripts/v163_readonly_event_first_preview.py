@@ -428,7 +428,7 @@ def _replay_restock_index(observations,gaps,now):
 
 def replay_events(*,source=COLLECTOR,roster=None,asof=None,days=7,
                   tolerance=600,max_changes=MAX_ITEM_CHANGE_ROWS,
-                  limit_items=24,progress=None):
+                  limit_items=24,progress=None,cycle_windows=()):
     """Historical as-of replay only; NEVER a truly issued V160/163 forecast.
 
     One fixed, nonoverlapping 4-hour historical cohort per item; every
@@ -439,7 +439,11 @@ def replay_events(*,source=COLLECTOR,roster=None,asof=None,days=7,
     if (type(days) is not int or not 1<=days<=14
         or type(tolerance) is not int or not 60<=tolerance<=1800
         or type(max_changes) is not int or not 100<=max_changes<=MAX_ITEM_CHANGE_ROWS
-        or type(limit_items) is not int or not 1<=limit_items<=24):
+        or type(limit_items) is not int or not 1<=limit_items<=24
+        or not isinstance(cycle_windows,tuple)
+        or len(cycle_windows)>4
+        or len(cycle_windows)!=len(set(cycle_windows))
+        or any(type(x) is not int or not 4<=x<=128 for x in cycle_windows)):
         raise ValueError("unbounded replay parameters")
     now=int(time.time()) if asof is None else asof
     start=now-days*86400
@@ -480,6 +484,8 @@ def replay_events(*,source=COLLECTOR,roster=None,asof=None,days=7,
             cursor=0
             c=Counter()
             statuses=Counter()
+            challengers={n:Counter() for n in cycle_windows}
+            challenger_statuses={n:Counter() for n in cycle_windows}
             for issue in cutoffs:
                 while cursor<len(observations) and observations[cursor].epoch<=issue:
                     phases.add(observations[cursor])
@@ -492,8 +498,9 @@ def replay_events(*,source=COLLECTOR,roster=None,asof=None,days=7,
                 c["actual_observed_restocks"]+=len(truth)
                 c["ambiguous_threshold_crossings"]+=ambiguous_count
                 c["issued_four_hour_cohorts"]+=1
+                evidence=phases.asof() if cursor else None
                 if cursor:
-                    forecast=predict_events(item,phases.asof(),asof=issue,
+                    forecast=predict_events(item,evidence,asof=issue,
                                             horizon=BACKTEST_WINDOW)
                     proposals=[x["predicted_restock_epoch"]
                                for x in forecast["restock_events"]
@@ -512,6 +519,24 @@ def replay_events(*,source=COLLECTOR,roster=None,asof=None,days=7,
                 for key,value in results.items():
                     c[key]+=value
                 c["predicted_restock_events"]+=len(proposals)
+                for window,stats in challengers.items():
+                    if evidence is None:
+                        alternative=[]
+                        challenger_statuses[window]["NO_PRIOR_STOCK_HISTORY"]+=1
+                    else:
+                        attempt=predict_events(item,evidence,asof=issue,
+                            horizon=BACKTEST_WINDOW,recent_cycles=window)
+                        alternative=[v["predicted_restock_epoch"]
+                            for v in attempt["restock_events"]
+                            if issue<v["predicted_restock_epoch"]<=issue+BACKTEST_WINDOW]
+                        challenger_statuses[window][attempt["status"]]+=1
+                    strict15=match_events(alternative,truth,tolerance=15)
+                    strict60=match_events(alternative,truth,tolerance=60)
+                    broad=match_events(alternative,truth,tolerance=tolerance)
+                    stats["events"]+=len(alternative)
+                    stats["matched15"]+=strict15["matched"]
+                    stats["matched60"]+=strict60["matched"]
+                    stats["matched"]+=broad["matched"]
             all_results[item]={
                 "cohorts":c["issued_four_hour_cohorts"],
                 "observed_restocks":c["actual_observed_restocks"],
@@ -539,6 +564,24 @@ def replay_events(*,source=COLLECTOR,roster=None,asof=None,days=7,
                     if c["matched"] else None),
                 "ambiguous_crossings_excluded":c["ambiguous_threshold_crossings"],
                 "forecast_statuses":dict(statuses),
+                "recent_cycle_challengers":{
+                    f"recent_{window}":{
+                        "forecast_restocks":stats["events"],
+                        "matched_within_15s":stats["matched15"],
+                        "matched_within_60s":stats["matched60"],
+                        "matched_timing":stats["matched"],
+                        "observed_restocks":c["actual_observed_restocks"],
+                        "recall_within_15s":round(stats["matched15"]/
+                            c["actual_observed_restocks"],4) if c["actual_observed_restocks"] else None,
+                        "recall_within_60s":round(stats["matched60"]/
+                            c["actual_observed_restocks"],4) if c["actual_observed_restocks"] else None,
+                        "restock_recall":round(stats["matched"]/
+                            c["actual_observed_restocks"],4) if c["actual_observed_restocks"] else None,
+                        "restock_precision":round(stats["matched"]/
+                            stats["events"],4) if stats["events"] else None,
+                        "forecast_statuses":dict(challenger_statuses[window]),
+                    } for window,stats in challengers.items()
+                },
             }
             if progress is not None:
                 progress(item,len(all_results),limit_items)
@@ -547,6 +590,23 @@ def replay_events(*,source=COLLECTOR,roster=None,asof=None,days=7,
     projected=sum(v["forecast_restocks"] for v in all_results.values())
     hits15=sum(v["matched_within_15s"] for v in all_results.values())
     hits60=sum(v["matched_within_60s"] for v in all_results.values())
+    variant_totals={}
+    for window in cycle_windows:
+        sub=[v["recent_cycle_challengers"][f"recent_{window}"]
+             for v in all_results.values()]
+        match15=sum(v["matched_within_15s"] for v in sub)
+        match60=sum(v["matched_within_60s"] for v in sub)
+        match=sum(v["matched_timing"] for v in sub)
+        forecasted=sum(v["forecast_restocks"] for v in sub)
+        variant_totals[f"recent_{window}"]={
+            "observed_restocks":actual,"forecast_restocks":forecasted,
+            "matched_within_15s":match15,"matched_within_60s":match60,
+            "matched_timing":match,
+            "recall_within_15s":round(match15/actual,4) if actual else None,
+            "recall_within_60s":round(match60/actual,4) if actual else None,
+            "restock_recall":round(match/actual,4) if actual else None,
+            "restock_precision":round(match/forecasted,4) if forecasted else None,
+        }
     return {
         "status":"V163_HISTORICAL_ASOF_EVENT_REPLAY_NOT_GENUINE_LIVE_ISSUANCE",
         "asof_epoch":now,"window_days":days,
@@ -560,6 +620,8 @@ def replay_events(*,source=COLLECTOR,roster=None,asof=None,days=7,
         "recall_within_60s":round(hits60/actual,4) if actual else None,
         "restock_recall":round(matched/actual,4) if actual else None,
         "restock_precision":round(matched/projected,4) if projected else None,
+        "recent_cycle_challengers":variant_totals,
+        "recent_cycle_windows_tested":list(cycle_windows),
         "not_live_forward_validation":True,
         "not_five_minute_replanning":True,
         "lookahead_used_in_prediction":False,
