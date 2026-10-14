@@ -64,3 +64,27 @@ Evaluate and optimize all 24 items on:
 Original V2 graph and experimental board preserved. The localhost beta is a research preview. Deployed `web/app.py` and HTML drift from repository; read/compare actual deployed version before additive public feature-flag integration and tested rollback. Never publish the unvalidated event model as confident departure permission.
 
 **Latest refinement:** V163 fixed-window historical replay now reports ALL-event recall within 15 seconds, 60 seconds, and ±10 minutes, plus predicted-event precision; report each separately rather than claiming a broad 10-minute result meets the user's 90% high-precision ambition. JavaScript beta event cards now have live restock and leave countdowns and display all bounded future events. Remember the replay issues every four hours, whereas the user's live target is five-minute replans: do not conflate them.
+
+
+## Oct 13 ~20:01 local: real beta success; event replay failed before any output
+
+The user's COMPLETE Windows PowerShell output confirmed the isolated V163 beta was successfully installed: 24/24 fresh V160 issue rows, Jaguar V163 `EVENT_TIMELINE_FORECAST_AVAILABLE` with **11 future Jaguar event estimates**, `V163 EVENT ENGINE PREFLIGHT PASS`, then private website HTTP readiness `attempts=3, http=200, records=24, source_healthy=true, status=V160_BETA_HTTP_READY` and `SUCCESS: live private beta updated`. Both original web views, collector, and V160 recorder untouched. There is **no live or historical V163 event recall percentage** in this log.
+
+The script preceding the upgrade emitted only `WARNING: Historical replay did not complete`, no table or exception. Possible 150-second timeout; actual remote exit code not supplied. Original replay rescanned all observed rows and recomputed completed phases **at every one of ~42 four-hour issue points per item**, multiplying work across 24 items. This is inefficient.
+
+**Optimization committed to `deploy/scripts/v163_readonly_event_first_preview.py`**: one incremental causal `_ReplayPhases` scan per item, indexed one-time observed threshold crossings, binary-search cohort restock events, and line-buffered per-item progress so next failure localizes the bottleneck. A regression compares all phase fields and durations with `provider_continuous_phases` on mixed-provider changes and an interrupted collection gap, and confirms indexed actual restock truth parity. V85 CI [38489081511](https://github.com/fungjkTorn/torn-fren/actions/runs/38489081511) passed. **This optimization only changes historical replay on the research branch, not the working VM beta.**
+
+For the next historical test, use the passing source commit `f92d7c0b564eea2eb9ab00aed07d15e3de9b2d02`, 180-second upper bound, stderr per-item progress, and show remote exit code. **Do not rerun the beta installer: it succeeded.** Await genuine timing recall / precision output before claiming any forecast accuracy or changing production.
+
+```powershell
+$key = "C:\Users\fungb\Desktop\.ssh\torn-fren.key"
+$remote = "ubuntu@150.136.108.146"
+$branch = "research/v38-full-roster-live-prep-20261009"
+$pin = "f92d7c0b564eea2eb9ab00aed07d15e3de9b2d02"
+if (-not (Test-Path -LiteralPath $key)) { throw "SSH key missing" }
+$cmd = "cd /home/ubuntu/torn-fren-v38-probe && git fetch -q origin $branch && git show " + $pin + ":deploy/scripts/v163_readonly_event_first_preview.py | timeout 180s nice -n 19 .venv/bin/python - --historical-replay-days 7"
+& ssh -i $key $remote $cmd
+Write-Host "V163 replay exit code: $LASTEXITCODE"
+```
+
+A remote exit code of 124 means timeout; other failures require the new stderr output. When the replay completes, evaluate all 24 items against **recall ±15 seconds / ±60 seconds / ±10 minutes**, precision, missed and extra forecast events. Historical four-hour replay accuracy does not equal the desired every-five-minute live forecast coverage.
