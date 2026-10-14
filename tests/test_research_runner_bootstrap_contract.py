@@ -9,7 +9,7 @@ ROOT=Path(__file__).resolve().parents[1]/"deploy"/"research_runner"
 
 class ResearchRunnerContracts(unittest.TestCase):
     def test_shell_scripts_syntax_and_never_target_production(self):
-        for name in ("install_snapshot_exporter.sh","harden_private_runner.sh","diagnose_isolation.sh","complete_isolation_acl.sh","prepare_private_runner_user.sh"):
+        for name in ("install_snapshot_exporter.sh","harden_private_runner.sh","diagnose_isolation.sh","complete_isolation_acl.sh","prepare_private_runner_user.sh","install_and_harden_registered_runner.sh"):
             file=ROOT/name
             cmd=subprocess.run(["bash","-n",str(file)],capture_output=True,text=True)
             self.assertEqual(cmd.returncode,0,cmd.stderr)
@@ -36,6 +36,17 @@ class ResearchRunnerContracts(unittest.TestCase):
         self.assertIn("numpy==1.26.4",environment)
         self.assertIn("snapshot refresh timer inactive",environment)
         self.assertNotIn("systemctl restart torn-fren",environment)
+        installer=(ROOT/"install_and_harden_registered_runner.sh").read_text()
+        self.assertIn('sudo -n test -f "$RUNNER/.runner"',installer)
+        self.assertIn('sudo -n test -f "$RUNNER/.service"',installer)
+        self.assertIn('./svc.sh install tornresearch',installer)
+        self.assertIn('sudo -n bash "$TEMP" "$UNIT"',installer)
+        self.assertIn("Runner intentionally NOT STARTED",installer)
+        self.assertIn('systemctl is-active --quiet "$UNIT"',installer)
+        self.assertIn('torn-fren-research-snapshot.timer',installer)
+        self.assertNotIn('./svc.sh start',installer)
+        self.assertNotIn('./run.sh',installer)
+        self.assertNotIn("chmod 755",installer)
         diagnostic=(ROOT/"diagnose_isolation.sh").read_text()
         self.assertIn("DIAGNOSIS COMPLETE: NO WRITES",diagnostic)
         self.assertNotIn("setfacl -m",diagnostic)
