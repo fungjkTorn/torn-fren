@@ -343,6 +343,61 @@ def match_events(predicted,actual,*,tolerance=600):
     }
 
 
+
+class _ReplayPhases:
+    """Incremental causal equivalent of the V145 completed-phase tracker."""
+    def __init__(self,crosses):
+        self.crosses=crosses
+        self.last=None
+        self.current=None
+        self.onset=None
+        self.high=[]
+        self.low=[]
+
+    def add(self,obs):
+        high=obs.quantity>=MIN_QTY
+        prev=self.last
+        if prev is None:
+            self.current,self.onset=high,None
+        else:
+            gap=(obs.epoch<=prev.epoch or
+                 self.crosses(prev.epoch,obs.epoch))
+            if gap or (obs.source!=prev.source and high!=self.current):
+                self.current,self.onset=high,None
+            elif high!=self.current:
+                if self.onset is not None and obs.epoch>self.onset:
+                    (self.high if self.current else self.low).append(
+                        obs.epoch-self.onset)
+                self.current,self.onset=high,obs.epoch
+        self.last=obs
+
+    def asof(self):
+        return {
+            "phase":"HIGH" if self.current is True else
+                    "LOW" if self.current is False else "UNKNOWN",
+            "phase_onset":self.onset,
+            "last_observation":self.last,
+            "stocked_durations":self.high.copy(),
+            "depleted_durations":self.low.copy(),
+        }
+
+
+def _replay_restock_index(observations,gaps,now):
+    crosses=_gap_index(gaps,now)
+    clean=[]
+    ambiguous=[]
+    prev=None
+    for obs in observations:
+        if prev is not None and prev.quantity<MIN_QTY<=obs.quantity:
+            if obs.source!=prev.source or crosses(prev.epoch,obs.epoch):
+                ambiguous.append(obs.epoch)
+            else:
+                clean.append(obs.epoch)
+        prev=obs
+    return crosses,clean,ambiguous
+
+
+
 def replay_events(*,source=COLLECTOR,roster=None,asof=None,days=7,
                   tolerance=600,max_changes=MAX_ITEM_CHANGE_ROWS,
                   limit_items=24):
