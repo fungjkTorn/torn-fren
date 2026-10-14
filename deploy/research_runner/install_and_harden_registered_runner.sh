@@ -12,7 +12,7 @@ WORK=/home/ubuntu/torn-fren-v38-probe
 LIVE=/opt/torn-fren/data/stock_history.db
 SNAP=/var/lib/torn-fren-research/stock_history_research.db
 ROSTER=/home/ubuntu/torn-fren-private-models/v160_stage/pinned/research/v38_roster.json
-PIN=033189252b76dce62b828a278780b4e95560db17
+PIN=50b3b302496ebc069e05e0e95b8d2de8f5a9f70b
 PRIVATE_REPO=https://github.com/fungjktorn/torn-fren-research-private
 
 echo "===== VERIFY REGISTERED RUNNER AND ISOLATION ====="
@@ -32,7 +32,7 @@ test "$(stat -c %U -- "$RUNNER")" = tornresearch || {
 sudo -n python3 - "$RUNNER/.runner" "$PRIVATE_REPO" <<'VERIFY_SCOPE'
 import json,sys
 from pathlib import Path
-data=json.loads(Path(sys.argv[1]).read_text(encoding="utf8"))
+data=json.loads(Path(sys.argv[1]).read_text(encoding="utf-8-sig"))
 actual=str(data.get("gitHubUrl","")).rstrip("/").lower()
 if actual != sys.argv[2]:
     raise SystemExit("STOP: runner is not registered to exact PRIVATE repository")
