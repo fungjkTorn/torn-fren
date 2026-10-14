@@ -131,7 +131,7 @@ class EventTimelineTests(unittest.TestCase):
             }
             for name,content in modules.items():
                 dest=stage/name
-                dest.write_text(content.replace("\\\n","\n"),encoding="utf8")
+                dest.write_text(content,encoding="utf8")
             outside=root/"outside"
             outside.mkdir()
             env=os.environ.copy()
