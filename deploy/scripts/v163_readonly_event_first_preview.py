@@ -19,6 +19,23 @@ from collections import Counter,namedtuple
 from contextlib import closing
 from pathlib import Path
 
+# The VM keeps V128/V145 and dependencies in an immutable staged research
+# directory. A source file streamed to `python -` is not guaranteed to
+# inherit that research package path from the mutable checkout. The live
+# one-item recheck explicitly pins research.__path__; the standalone CLI
+# must do the same. When the stage does not exist (e.g., GitHub CI), normal
+# checked-out research modules remain in use.
+PINNED_RESEARCH_STAGE=Path(
+    "/home/ubuntu/torn-fren-private-models/v160_stage/pinned/research"
+)
+if PINNED_RESEARCH_STAGE.is_dir():
+    WORK=Path("/home/ubuntu/torn-fren-v38-probe")
+    if not WORK.is_dir():
+        raise RuntimeError("pinned replay research checkout missing")
+    sys.path.insert(0,str(WORK))
+    import research
+    research.__path__=[str(PINNED_RESEARCH_STAGE)]
+
 from research.plushie_champions.common import TRAVEL_SECONDS
 from research.v128_full24_earliest_shadow import _gap_index,_read_item,exact_roster
 from research.v145_provider_continuous_phases import provider_continuous_phases
