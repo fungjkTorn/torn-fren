@@ -15,6 +15,7 @@ from pathlib import Path
 
 from deploy.scripts import v163_readonly_event_first_preview as model
 from research.causal_phase_analogs import PhaseAnalogs
+from research.true_zero_cycles import ZeroCycles
 from services.travel_read_model import MAX_BYTES, build_board
 from services.travel_window_policy import POLICIES
 
@@ -31,7 +32,7 @@ def prepare(source, *, model_sha, assignments=None, now=None):
         raise ValueError('assignment outside verified roster')
     for config in assignments.values():
         if (not isinstance(config,dict) or config.get('event_history') not in
-            ('all_history','recent_8','phase_analogs_18') or config.get('flight_adapter') not in POLICIES):
+            ('all_history','recent_8','phase_analogs_18','true_zero_all') or config.get('flight_adapter') not in POLICIES):
             raise ValueError('invalid explicit model assignment')
     path = Path(source).resolve(strict=True)
     with closing(sqlite3.connect(path.as_uri()+'?mode=ro',uri=True,timeout=12)) as db:
@@ -57,13 +58,16 @@ def prepare(source, *, model_sha, assignments=None, now=None):
             phase=model._ReplayPhases(crosses)
             config=assignments.get(key,{'event_history':'all_history','flight_adapter':'median'})
             analog=PhaseAnalogs(crosses) if config['event_history']=='phase_analogs_18' else None
+            zero=ZeroCycles(crosses) if config['event_history']=='true_zero_all' else None
             for t,q,s in raw:
                 if type(t) is not int or type(q) is not int or q<0 or not s:
                     raise ValueError('invalid stock history')
                 obs=model.OBS(t,q,s); phase.add(obs)
                 if analog is not None: analog.add(obs)
+                if zero is not None: zero.add(obs)
             state=phase.asof()
-            forecast=(analog.forecast(key,state,asof=clock) if analog is not None else
+            forecast=(zero.forecast(key,asof=clock) if zero is not None else
+                      analog.forecast(key,state,asof=clock) if analog is not None else
                       model.predict_events(key,state,asof=clock,recent_cycles=8 if config['event_history']=='recent_8' else None))
             items[key]=forecast; policies[key]=config['flight_adapter']
     snapshot={'asof_epoch':clock,'source_heartbeat_age_seconds':age,
