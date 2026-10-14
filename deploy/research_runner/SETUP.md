@@ -41,7 +41,7 @@ If `python3 -m venv` reports the `python3-venv` package is missing, stop and ask
 
 ## 4. Register a runner to the PRIVATE repository only
 
-GitHub private repository → **Settings → Actions → Runners → New self-hosted runner → Linux x64**. Follow the GitHub-supplied, current download **and checksum verification** steps. Open a research-user shell with `sudo -H -u tornresearch bash`, and work directly in `/var/lib/torn-fren-research-runner` (do NOT create a nested `actions-runner` directory). Configure the runner against **only** `https://github.com/fungjkTorn/torn-fren-research-private`, with runner label `torn-fren-research`, and a unique runner name.
+GitHub private repository → **Settings → Actions → Runners → New self-hosted runner → Linux (select x64 or ARM64 to match the VM; check `uname -m`)**. Follow the GitHub-supplied, current download **and checksum verification** steps. Open a research-user shell with `sudo -H -u tornresearch bash`, and work directly in `/var/lib/torn-fren-research-runner` (do NOT create a nested `actions-runner` directory). Configure the runner against **only** `https://github.com/fungjkTorn/torn-fren-research-private`, with runner label `torn-fren-research`, and a unique runner name.
 
 The GitHub registration token is short-lived and entered on the VM, **never sent to ChatGPT**. Do not run the runner directly with `./run.sh` and do not register it with the public repository.
 
