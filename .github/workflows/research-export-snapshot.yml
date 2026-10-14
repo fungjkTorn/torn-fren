@@ -1,0 +1,22 @@
+name: Research snapshot export safety
+on:
+  push:
+    branches: [research/v38-full-roster-live-prep-20261009]
+    paths:
+      - 'deploy/research_runner/**'
+      - 'tests/test_research_runner_export_snapshot.py'
+      - '.github/workflows/research-export-snapshot.yml'
+  workflow_dispatch:
+jobs:
+  export-snapshot-safety:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify no-secret bounded research snapshot
+        run: python -m unittest discover -s tests -p 'test_research_runner_export_snapshot.py' -v
