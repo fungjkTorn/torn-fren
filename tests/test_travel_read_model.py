@@ -65,10 +65,14 @@ class BoardTests(unittest.TestCase):
     def test_default_flight_results_never_borrowed_for_custom_flight_or_new_model(self):
         data=snapshot();data['model_sha']='source-a'
         data['item_evidence']={'mex:Jaguar Plushie':{'successes':85,'resolved_arrivals':100,
-            'policy':'median','player_flight_seconds':1020,'model_sha':'source-a'}}
+            'policy':'median','player_flight_seconds':1020,'model_sha':'source-a',
+            'forecast_model':'v163','cycle_window':'all'}}
         self.assertTrue(build_board(data,now=T)['rows'][0]['evidence']['applies_to_selected_trip'])
         override=build_board(data,now=T,flight_overrides={'mex':1500})
         self.assertFalse(override['rows'][0]['evidence']['applies_to_selected_trip'])
+        data['items']['mex:Jaguar Plushie']['cycle_window']=8
+        self.assertFalse(build_board(data,now=T)['rows'][0]['evidence']['applies_to_selected_trip'])
+        data['items']['mex:Jaguar Plushie']['cycle_window']='all'
         data['model_sha']='source-b'
         self.assertFalse(build_board(data,now=T)['rows'][0]['evidence']['applies_to_selected_trip'])
 

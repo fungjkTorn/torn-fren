@@ -52,7 +52,10 @@ def build_board(snapshot,*,now,flight_overrides=None):
                        "policy":record.get("policy"),
                        "matches_selected_policy":record.get("policy")==policy,
                        "matches_selected_flight":record.get("player_flight_seconds")==decision['player_flight_seconds'],
-                       "matches_selected_model":bool(snapshot.get('model_sha')) and record.get('model_sha')==snapshot.get('model_sha'),
+                       "matches_selected_model":bool(snapshot.get('model_sha'))
+                           and record.get('model_sha')==snapshot.get('model_sha')
+                           and record.get('forecast_model')==forecast.get('model_name','v163')
+                           and record.get('cycle_window')==forecast.get('cycle_window','all'),
                        "prospective_certified":False}
                 study['applies_to_selected_trip']=(study['matches_selected_policy']
                     and study['matches_selected_flight'] and study['matches_selected_model'])
@@ -62,7 +65,7 @@ def build_board(snapshot,*,now,flight_overrides=None):
                      "item_name":name,"category":category(name),
                      "observed_quantity":forecast.get("observed_current_quantity"),
                      "last_quantity_change_epoch":forecast.get("last_quantity_change_epoch"),
-                     "model_name":snapshot.get("model_version","V163 event forecast"),
+                     "model_name":forecast.get('model_name',snapshot.get("model_version","V163 event forecast")),
                      "policy":policy,"evidence":study,"decision":decision,
                      "departure_epoch":depart,"arrival_epoch":landing,
                      "departure_deadline_epoch":decision["estimated_departure_deadline_epoch"],
