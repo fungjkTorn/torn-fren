@@ -7,6 +7,15 @@ UNIT="$1"
  echo "STOP: specify a GitHub Actions runner unit"; exit 1; }
 WORK=/var/lib/torn-fren-research-runner
 DATA=/var/lib/torn-fren-research/stock_history_research.db
+# Never allow this privileged runner service to belong to the public repo.
+python3 - "$WORK/.runner" <<'CHECK_SCOPE'
+import json,sys
+from pathlib import Path
+config=json.loads(Path(sys.argv[1]).read_text(encoding="utf8"))
+actual=str(config.get("gitHubUrl","")).rstrip("/").lower()
+assert actual=="https://github.com/fungjktorn/torn-fren-research-private", (
+    "STOP: runner must be associated with the expected PRIVATE research repository")
+CHECK_SCOPE
 [[ -d "$WORK" && -r "$DATA" ]] || {
  echo "STOP: separate runner home or sanitized snapshot missing"; exit 1; }
 systemctl cat "$UNIT" >/dev/null || {
