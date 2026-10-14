@@ -7,6 +7,8 @@ on:
       - 'research/causal_daily_template.py'
       - 'research/causal_phase_analogs.py'
       - 'research/product_runtime_audit.py'
+      - 'research/departure_reconfirmation.py'
+      - 'tests/test_departure_reconfirmation.py'
       - 'tests/test_product_runtime_audit.py'
       - 'tests/test_causal_phase_analogs.py'
       - 'research/per_item_readiness.py'
@@ -42,6 +44,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_causal_daily_template.py' -v
           python -m unittest discover -s tests -p 'test_causal_phase_analogs.py' -v
           python -m unittest discover -s tests -p 'test_product_runtime_audit.py' -v
+          python -m unittest discover -s tests -p 'test_departure_reconfirmation.py' -v
           python -m unittest discover -s tests -p 'test_travel_decisions_router.py' -v
           python -m unittest discover -s tests -p 'test_per_item_readiness.py' -v
       - name: Check player interface JavaScript

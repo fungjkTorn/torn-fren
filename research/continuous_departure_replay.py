@@ -21,6 +21,7 @@ from deploy.scripts import v163_readonly_event_first_preview as model
 from services.travel_decision_contract_v166 import build_item_travel_decision
 from research.causal_daily_template import DailyTemplate
 from research.causal_phase_analogs import PhaseAnalogs
+from research.departure_reconfirmation import evaluate as evaluate_reconfirmation
 from services.travel_window_policy import project_policy
 from research.v151_stable_earliest_departure import stable_earliest_departure
 
@@ -159,6 +160,7 @@ def replay(*, source, days=2, asof=None, limit_items=24,
             phases = model._ReplayPhases(crosses)
             analogs = PhaseAnalogs(crosses)
             cursor = 0
+            plans = {p:[] for p,_,_ in POLICIES}
             stats = {p:Counter() for p,_,_ in POLICIES}
             episode_stats = {p:Counter() for p,_,_ in POLICIES}
             seen = {p:set() for p,_,_ in POLICIES}
@@ -202,6 +204,7 @@ def replay(*, source, days=2, asof=None, limit_items=24,
                                 template_events if policy.startswith("daily_event_") else forecasts[window])
                     decision = choose(forecast,issued,age,kind,template,v151)
                     dep = decision["estimated_departure_epoch"]
+                    plans[policy].append((issued, dep, age))
                     arrival = dep+model.TRAVEL_SECONDS[country] if dep is not None else None
                     # Freeze the decision before consulting any outcome evidence.
                     outcome, reason, proof = evidence.score(arrival) if arrival is not None else ("ABSTAIN",decision["status"],None)
@@ -272,6 +275,8 @@ def replay(*, source, days=2, asof=None, limit_items=24,
                         c["v166_only_success"]+=challenger=="FAILURE" and incumbent=="SUCCESS"
             results[key]={"player_flight_seconds":model.TRAVEL_SECONDS[country],"policies":{p:dict(summarize(stats[p]),
                 first_proposal_per_issue_phase=summarize(episode_stats[p]),
+                replanned_hourly_starts=evaluate_reconfirmation(plans[p],cutoff=now,
+                    flight_seconds=model.TRAVEL_SECONDS[country],score=evidence.score),
                 distinct_observed_stock_episodes_reached=len(landed_episodes[p]),
                 chronological_day_slices=[summarize(c) for c in chronological[p]],
                 outcome_reasons=dict(reasons[p])) for p,_,_ in POLICIES},
