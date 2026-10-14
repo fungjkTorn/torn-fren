@@ -20,7 +20,7 @@ from services.travel_read_model import MAX_BYTES, build_board
 from services.travel_window_policy import POLICIES
 
 
-def prepare(source, *, model_sha, assignments=None, now=None):
+def prepare(source, *, model_sha, assignments=None, now=None, allow_legacy_availability_baselines=False):
     if not re.fullmatch('[0-9a-f]{40}', model_sha):
         raise ValueError('exact source SHA required')
     clock = int(time.time()) if now is None else now
@@ -34,6 +34,8 @@ def prepare(source, *, model_sha, assignments=None, now=None):
         if (not isinstance(config,dict) or config.get('event_history') not in
             ('all_history','recent_8','phase_analogs_18','true_zero_all') or config.get('flight_adapter') not in POLICIES):
             raise ValueError('invalid explicit model assignment')
+        if config['event_history']!='true_zero_all' and not allow_legacy_availability_baselines:
+            raise ValueError('legacy availability clocks require explicit research-only opt-in')
     path = Path(source).resolve(strict=True)
     with closing(sqlite3.connect(path.as_uri()+'?mode=ro',uri=True,timeout=12)) as db:
         db.execute('PRAGMA query_only=ON'); db.execute('BEGIN')
@@ -56,7 +58,7 @@ def prepare(source, *, model_sha, assignments=None, now=None):
             if len(raw)>model.MAX_ITEM_CHANGE_ROWS:
                 raise ValueError('stock history cap exceeded')
             phase=model._ReplayPhases(crosses)
-            config=assignments.get(key,{'event_history':'all_history','flight_adapter':'median'})
+            config=assignments.get(key,{'event_history':'true_zero_all','flight_adapter':'median'})
             analog=PhaseAnalogs(crosses) if config['event_history']=='phase_analogs_18' else None
             zero=ZeroCycles(crosses) if config['event_history']=='true_zero_all' else None
             for t,q,s in raw:
@@ -100,9 +102,11 @@ if __name__=='__main__':
     parser.add_argument('--model-sha',required=True)
     parser.add_argument('--assignments',type=Path)
     parser.add_argument('--output',type=Path,required=True)
+    parser.add_argument('--allow-legacy-availability-baselines',action='store_true',help='Research-only comparison; default snapshots use physical zero clocks')
     args=parser.parse_args()
     assignments=json.loads(args.assignments.read_text()) if args.assignments else None
-    snapshot=prepare(args.source,model_sha=args.model_sha,assignments=assignments)
+    snapshot=prepare(args.source,model_sha=args.model_sha,assignments=assignments,
+                     allow_legacy_availability_baselines=args.allow_legacy_availability_baselines)
     publish(snapshot,args.output,source=args.source)
     print(json.dumps({'status':'RESEARCH_EVENT_SNAPSHOT_PREPARED','item_count':len(snapshot['items']),
                       'asof_epoch':snapshot['asof_epoch'],'deployment_performed':False}))

@@ -67,13 +67,13 @@ Research candidate policies use the existing readiness gate. Starred weak items 
 | uni:Xanax | phase_analog_quarter | 10/24; 41.7% | 4/24; 14.3% | 1 / 1 / 20 |
 
 ## Weak-item work completed
-- Added independent depletion event scoring at15s,60s,600s, with false-prediction counts, current-stock windows and provider/gap exclusions; shared identical cohorts with restock scoring.
+- Added independent below-30 availability-loss event scoring at15s,60s,600s, with false-prediction counts, current-stock windows and provider/gap exclusions; shared identical cohorts with restock scoring.
 - Compared512-phase versus64-phase item-local histories, keeping18 neighbors and three flight policies. Chamois recent64 current-quarter resolved-arrival111/151=73.51%, versus baseline100/156=64.10%; Japan recent64 midpoint38/151=25.17%, versus baseline55/149=36.91%. These have different resolution sets and are not matched improvement claims. No global replacement or promotion.
 - Archived specialist research feature fix at `8d72a4c1071ffe784f94c176aa3d68204ced4d1b`: low-phase durations previously became eligible at depletion START, before their ending restock. Eligibility now starts at the next observed restock, with two regressions. Historical bounce cleaning and whole-dataset feature imputation/scaling still need separate causal reproduction; this single fix does not certify specialist parity.
 - All57 relevant unit tests, Chromium interactions and compatibility workflows passed at that fix source. The numerical rates above are from the earlier explicit experiment SHA, whose forecasters do not use the corrected archived feature.
 
 ## What the diagnostics suggest next
-Monkey stocked median1534s long-run versus1017s recent8; Panda1869s versus1136s; Chamois1595s versus1049s; Nessie1654s versus1141s. Depleted medians are much steadier, roughly15–16min for these plushies. Longer flights span multiple cycles; projected stock-lifetime errors can compound. Test quantity/consumption-rate lifetime prediction and distinguish true-zero onset from the<30 availability threshold, then reproduce the existing global-regime/ML selectors causally. These are hypotheses, not verified improvements.
+Monkey stocked median1534s long-run versus1017s recent8; Panda1869s versus1136s; Chamois1595s versus1049s; Nessie1654s versus1141s. Below-30 availability intervals are much steadier, roughly15–16min for these plushies. Longer flights span multiple cycles; projected stock-lifetime errors can compound. Test quantity/consumption-rate lifetime prediction and distinguish true-zero onset from the<30 availability threshold, then reproduce the existing global-regime/ML selectors causally. These are hypotheses, not verified improvements.
 
 The broader gate remains12 historical-target candidates,4 promising and8 requiring research. A100% finite sample is not a guarantee. Fresh forward validation, stock-provider freshness, waiting costs, calibration, and safe product integration remain outstanding. Original V2 and experimental pages were preserved; no live deployment occurred.
 

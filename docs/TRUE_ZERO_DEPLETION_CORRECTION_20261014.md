@@ -41,3 +41,7 @@ endpoints, provider/gap rejection and no future observation leakage.
 This is isolated research source. Corrected true-zero numerical results require
 the private replay after public CI passes. No website, collector, or deployed
 incumbent has been changed.
+
+The batch publisher defaults to true_zero_all. Legacy availability-clock
+assignments require an explicit research-only opt-in; they are retained solely
+for comparison. This source default does not change any existing live service.

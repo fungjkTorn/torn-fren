@@ -14,10 +14,12 @@ class PublisherTests(unittest.TestCase):
             snapshot=prepare(db,model_sha='a'*40,now=T,assignments={
                 'mex:Jaguar Plushie':{'event_history':'phase_analogs_18','flight_adapter':'current_quarter'},
                 'can:Wolverine Plushie':{'event_history':'recent_8','flight_adapter':'midpoint'},
-                'chi:Peony':{'event_history':'true_zero_all','flight_adapter':'current_quarter'}})
+                'chi:Peony':{'event_history':'true_zero_all','flight_adapter':'current_quarter'}},
+                allow_legacy_availability_baselines=True)
             self.assertEqual(len(snapshot['items']),24)
             self.assertEqual(snapshot['items']['chi:Peony']['depletion_stock_quantity'],0)
             self.assertEqual(snapshot['items']['chi:Peony']['cycle_window'],'true_zero_all')
+            self.assertEqual(snapshot['items']['arg:Monkey Plushie']['depletion_stock_quantity'],0)
             self.assertEqual(snapshot['items']['mex:Jaguar Plushie']['model_name'],'causal_item_phase_analogs_v1')
             self.assertEqual(snapshot['items']['can:Wolverine Plushie']['cycle_window'],8)
             self.assertEqual(snapshot['item_policies']['mex:Jaguar Plushie'],'current_quarter')
@@ -29,6 +31,7 @@ class PublisherTests(unittest.TestCase):
 
     def test_unverified_assignments_and_source_revision_rejected(self):
         with self.assertRaises(ValueError):prepare('unused',model_sha='latest')
+        with self.assertRaises(ValueError):prepare('unused',model_sha='a'*40,assignments={'jap:Xanax':{'event_history':'all_history','flight_adapter':'median'}})
         with self.assertRaises(ValueError):prepare('unused',model_sha='a'*40,assignments={'invented:Item':{}})
         with self.assertRaises(ValueError):prepare('unused',model_sha='a'*40,assignments={'jap:Xanax':{'event_history':'automatic_winner','flight_adapter':'median'}})
 
