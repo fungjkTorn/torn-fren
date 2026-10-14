@@ -1,0 +1,26 @@
+name: Continuous departure replay causality and arrival evidence
+on:
+  push:
+    branches: [research/v38-full-roster-live-prep-20261009]
+    paths:
+      - 'research/continuous_departure_replay.py'
+      - 'tests/test_continuous_departure_replay.py'
+      - '.github/workflows/continuous-departure.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  causal-replay:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install numpy==1.26.4
+      - name: Verify all-issued policy and stock evidence
+        run: |
+          python -m unittest discover -s tests -p 'test_continuous_departure_replay.py' -v
+          python -m unittest discover -s tests -p 'test_travel_decision_contract_v166.py' -v
+          python -m unittest discover -s tests -p 'test_v163_readonly_event_first_preview.py' -v

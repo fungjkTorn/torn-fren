@@ -1,0 +1,95 @@
+import io
+import json
+import sqlite3
+import tempfile
+import unittest
+from pathlib import Path
+from unittest.mock import patch
+
+from research import continuous_departure_replay as m
+
+T=1791910800
+
+
+class EvidenceTests(unittest.TestCase):
+    def evidence(self, rows, polls=(990,1020), gaps=(), cutoff=2000):
+        return m.ArrivalEvidence([m.model.OBS(*r) for r in rows],list(polls),gaps,cutoff)
+
+    def test_unchanged_delta_stock_is_valid_and_missing_polls_unknown(self):
+        e=self.evidence([(100,200,"yata")])
+        self.assertEqual(e.score(1000)[0],"SUCCESS")
+        self.assertEqual(self.evidence([(100,0,"yata")]).score(1000)[0],"FAILURE")
+        self.assertEqual(self.evidence([(100,200,"yata")],polls=()).score(1000)[0],"UNKNOWN")
+        self.assertEqual(self.evidence([(100,200,"yata")],cutoff=1100).score(1000)[0],"PENDING")
+
+    def test_hidden_sellout_restock_and_provider_switch_are_unknown(self):
+        rows=[(100,200,"yata"),(1001,0,"yata"),(1009,200,"yata")]
+        self.assertEqual(self.evidence(rows).score(1000)[1],"THRESHOLD_TRANSITION_IN_BRACKET")
+        self.assertEqual(self.evidence([(100,200,"yata"),(1001,200,"other")]).score(1000)[1],"ITEM_PROVIDER_SWITCH")
+        self.assertEqual(self.evidence([(100,200,"yata")],gaps=[(1001,1002)]).score(1000)[1],"COLLECTION_GAP")
+
+
+class ContinuousTests(unittest.TestCase):
+    def fixture(self, directory):
+        from test_v160_prospective_v151_shadow import collector_fixture
+        db=collector_fixture(directory,issued=T)
+        with sqlite3.connect(db) as cx:
+            cx.execute("DELETE FROM stock_history")
+            cx.execute("DELETE FROM poll_heartbeats")
+            cx.execute("CREATE TABLE research_metadata(key TEXT PRIMARY KEY,value TEXT)")
+            cx.execute("INSERT INTO research_metadata VALUES('source_cutoff_epoch',?)",(str(T),))
+            start=T-3*86400
+            for key in m.model.exact_roster():
+                country,name=key.split(":",1)
+                cx.executemany("INSERT INTO stock_history(timestamp,quantity,source,country,item_name) VALUES(?,?,?,?,?)",
+                    [(start+i*1200+offset,q,"yata",country,name) for i in range(216)
+                     for offset,q in ((0,0),(600,200),(900,0))])
+            cx.executemany("INSERT INTO poll_heartbeats(timestamp,mode,success) VALUES(?,'poll-cycle',1)",
+                           [(p,) for p in range(start,T+1,30)])
+        return db
+
+    def test_all_issues_readonly_frozen_decisions_and_denominators(self):
+        with tempfile.TemporaryDirectory() as td:
+            db=self.fixture(Path(td)); before=db.read_bytes(); journal=io.StringIO()
+            real=m.model.predict_events
+            def causal(key,phase,*,asof,**kw):
+                self.assertLessEqual(phase["last_observation"].epoch,asof)
+                return real(key,phase,asof=asof,**kw)
+            with patch.object(m.model,"predict_events",side_effect=causal):
+                report=m.replay(source=db,days=1,limit_items=1,journal=journal,model_sha="fixture")
+            self.assertEqual(before,db.read_bytes())
+            records=[json.loads(x) for x in journal.getvalue().splitlines()]
+            self.assertEqual(len(records),288*len(m.POLICIES))
+            self.assertEqual(len({r["issue_id"] for r in records}),len(records))
+            self.assertFalse(report["future_truth_selects_issue_times"])
+            for policy,c in report["policies"].items():
+                self.assertEqual(c["issues"],288)
+                self.assertEqual(sum(c.get(k,0) for k in ("SUCCESS","FAILURE","PENDING","UNKNOWN","ABSTAIN")),288)
+                self.assertEqual(c["proposals"]+c.get("ABSTAIN",0),288)
+            # Alter only post-issue truth. The earlier forecast and chosen
+            # departure must remain identical while evaluation may change.
+            split=T-43200
+            with sqlite3.connect(db) as cx:
+                cx.execute("UPDATE stock_history SET quantity=0 WHERE timestamp>?",(split,))
+            other=io.StringIO()
+            m.replay(source=db,days=1,limit_items=1,journal=other,model_sha="fixture")
+            changed=[json.loads(x) for x in other.getvalue().splitlines()]
+            fields=("issue_id","issued_epoch","departure_epoch","arrival_epoch","forecast_events","status")
+            for a,b in zip(records,changed):
+                if a["issued_epoch"]<=split:
+                    self.assertEqual({k:a[k] for k in fields},{k:b[k] for k in fields})
+
+    def test_missing_heartbeat_abstains_and_cutoff_is_snapshot_not_wallclock(self):
+        with tempfile.TemporaryDirectory() as td:
+            db=self.fixture(Path(td))
+            with sqlite3.connect(db) as cx:
+                cx.execute("DELETE FROM poll_heartbeats")
+            report=m.replay(source=db,days=1,limit_items=1)
+            self.assertEqual(report["asof_epoch"],T)
+            self.assertTrue(all(c.get("ABSTAIN")==288 for c in report["policies"].values()))
+            with self.assertRaises(ValueError):
+                m.replay(source=db,days=1,asof=T+1,limit_items=1)
+
+
+if __name__=="__main__":
+    unittest.main()
