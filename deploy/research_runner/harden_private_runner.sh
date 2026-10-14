@@ -11,7 +11,7 @@ DATA=/var/lib/torn-fren-research/stock_history_research.db
 python3 - "$WORK/.runner" <<'CHECK_SCOPE'
 import json,sys
 from pathlib import Path
-config=json.loads(Path(sys.argv[1]).read_text(encoding="utf8"))
+config=json.loads(Path(sys.argv[1]).read_text(encoding="utf-8-sig"))
 actual=str(config.get("gitHubUrl","")).rstrip("/").lower()
 assert actual=="https://github.com/fungjktorn/torn-fren-research-private", (
     "STOP: runner must be associated with the expected PRIVATE research repository")
