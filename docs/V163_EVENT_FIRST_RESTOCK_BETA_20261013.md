@@ -88,3 +88,9 @@ Write-Host "V163 replay exit code: $LASTEXITCODE"
 ```
 
 A remote exit code of 124 means timeout; other failures require the new stderr output. When the replay completes, evaluate all 24 items against **recall ±15 seconds / ±60 seconds / ±10 minutes**, precision, missed and extra forecast events. Historical four-hour replay accuracy does not equal the desired every-five-minute live forecast coverage.
+
+## V164 challenger after first real replay
+
+The user's V163 7-day/4-hour as-of event replay completed (exit 0). Key 10m results: Nessie 74/179 recall 41.34%, precision 74/188 39.36%; Japan Xanax 42/74 recall 56.76%, precision 42/73 57.53%; Jaguar 104/185 recall 56.22%, precision 104/208 50%; Crocus 6/24=25% recall and Banana Orchid 4/26=15.38%. ±15s and ±60s global figures were not included; only 22 rows were pasted.
+
+New opt-in **all-history vs most-recent 8, 16, and 32 completed cycles** apples-to-apples historical tournament, same 4h issues, same clean restock truth, counts timing errors at 15s, 60s, 10m plus false predicted events, no writes, existing V163 beta unchanged. Pinned source `f47656bdd9290196b010b5ee1e5f6ed3c7381cbc`, V85 passing [38491004953](https://github.com/fungjkTorn/torn-fren/actions/runs/38491004953). Not yet benchmarked against VM data; the winner must not be assumed. To run the research tournament, use existing VM SSH and `git show f47656bdd9290196b010b5ee1e5f6ed3c7381cbc:deploy/scripts/v163_readonly_event_first_preview.py | timeout 300s nice -n 19 .venv/bin/python - --historical-replay-days 7 --compare-recent` from `/home/ubuntu/torn-fren-v38-probe`; pipeline sends source only, VM V163 beta is not modified. We still need five-minute dynamically issued event forecasts and holdout-prospective restock/arrival scoring.
