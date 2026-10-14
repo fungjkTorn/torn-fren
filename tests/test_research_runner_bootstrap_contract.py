@@ -72,7 +72,7 @@ class ResearchRunnerContracts(unittest.TestCase):
         expected="https://github.com/fungjktorn/torn-fren-research-private"
         for filename,label,extra_arg in validators:
             src=(ROOT/filename).read_text(encoding="utf8")
-            pattern=r"<<'"+label+r"'\\n(.*?)\\n"+label
+            pattern=r"<<'"+label+r"'\n(.*?)\n"+label
             match=re.search(pattern,src,re.DOTALL)
             self.assertIsNotNone(match, filename+" missing parser body")
             snippet=match.group(1)
@@ -80,7 +80,7 @@ class ResearchRunnerContracts(unittest.TestCase):
                 config=Path(tmp)/".runner"
                 for bom in (False,True):
                     config.write_bytes(
-                        ("\\ufeff" if bom else "").encode("utf8")+
+                        ("\ufeff" if bom else "").encode("utf8")+
                         json.dumps({"gitHubUrl":
                             "https://github.com/fungjkTorn/torn-fren-research-private"}).encode("utf8"))
                     args=[sys.executable,"-",str(config)]
@@ -90,7 +90,7 @@ class ResearchRunnerContracts(unittest.TestCase):
                                         capture_output=True,timeout=8)
                     self.assertEqual(proc.returncode,0,
                         f"{filename} bom={bom}: {proc.stderr} {proc.stdout}")
-                config.write_bytes(("\\ufeff"+json.dumps(
+                config.write_bytes(("\ufeff"+json.dumps(
                     {"gitHubUrl":"https://github.com/fungjkTorn/torn-fren"}
                 )).encode("utf8"))
                 args=[sys.executable,"-",str(config)]
