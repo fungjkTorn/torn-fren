@@ -122,16 +122,16 @@ class EventTimelineTests(unittest.TestCase):
             champions=stage/"plushie_champions"
             champions.mkdir(parents=True)
             modules={
-                "plushie_champions/common.py":"TRAVEL_SECONDS={'mex':1020}\\n",
+                "plushie_champions/common.py":"TRAVEL_SECONDS={'mex':1020}\n",
                 "v128_full24_earliest_shadow.py":
-                    "_gap_index=None\\n_read_item=None\\nexact_roster=None\\n",
+                    "_gap_index=None\n_read_item=None\nexact_roster=None\n",
                 "v145_provider_continuous_phases.py":
-                    "provider_continuous_phases=None\\n",
-                "v60_private_snapshot_probe.py":"read_heartbeat=None\\n",
+                    "provider_continuous_phases=None\n",
+                "v60_private_snapshot_probe.py":"read_heartbeat=None\n",
             }
             for name,content in modules.items():
                 dest=stage/name
-                dest.write_text(content.replace("\\\\n","\\n"),encoding="utf8")
+                dest.write_text(content.replace("\\\n","\n"),encoding="utf8")
             outside=root/"outside"
             outside.mkdir()
             env=os.environ.copy()
