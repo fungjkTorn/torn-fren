@@ -55,10 +55,19 @@ class ZeroCycles:
         self.availability.add(obs)
         self.last=obs
 
+    def _physical_state(self,asof):
+        return self.physical.asof()
+
+    def _available_history(self):
+        return self.available_durations
+
+    def _current_available(self,asof,availability):
+        return model.phase_quantiles(self._available_history(),age=asof-availability["phase_onset"])
+
     def forecast(self,key,*,asof):
         if self.last is not None and self.last.epoch>asof:
             raise ValueError('future physical stock observation')
-        state=self.physical.asof()
+        state=self._physical_state(asof)
         state['last_observation']=self.last
         result=model.predict_events(key,state,asof=asof)
         result.update(model_name='true_zero_anchored_cycles_v1',cycle_window='true_zero_all',
@@ -98,10 +107,10 @@ class ZeroCycles:
         if result.get('median_observed_restock_quantity',0)<30:
             result['status']='RESTOCK_QUANTITY_TARGET_UNSUPPORTED'
             return result
-        if len(self.available_durations)<model.MIN_BOUNDED:
+        if len(self._available_history())<model.MIN_BOUNDED:
             result['status']='INSUFFICIENT_SEPARATE_30_ITEM_AVAILABILITY_HISTORY'
             return result
-        available=model.phase_quantiles(self.available_durations)
+        available=model.phase_quantiles(self._available_history())
         for event in raw_events:
             start=event['predicted_restock_epoch']
             zero=event['predicted_stock_below_30_epoch']
@@ -114,7 +123,7 @@ class ZeroCycles:
         # Residual 1..29 stock never creates a current >=30 opportunity.
         a=self.availability.asof()
         if self.last is not None and self.last.quantity>=30 and a['phase_onset'] is not None:
-            remaining=model.phase_quantiles(self.available_durations,age=asof-a['phase_onset'])
+            remaining=self._current_available(asof,a)
             if remaining and physical_current:
                 zero=physical_current['predicted_stock_below_30_epoch']
                 duration=min(remaining['middle'],zero-asof)

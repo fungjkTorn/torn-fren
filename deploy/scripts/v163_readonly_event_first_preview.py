@@ -167,7 +167,7 @@ def predict_events(item,phases,*,asof,horizon=MAX_HORIZON,
     if active is None:
         return dict(common,status="CURRENT_PHASE_OVERRAN_HISTORICAL_SURVIVORS",
                     phase_age_seconds=age)
-    hi=phase_quantiles(high)
+    hi=phase_quantiles(phases.get("future_stocked_durations",high))
     lo=phase_quantiles(low)
     if hi is None or lo is None:
         return common

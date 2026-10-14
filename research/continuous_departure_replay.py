@@ -21,10 +21,11 @@ from deploy.scripts import v163_readonly_event_first_preview as model
 from services.travel_decision_contract_v166 import build_item_travel_decision
 from research.causal_daily_template import DailyTemplate
 from research.causal_phase_analogs import PhaseAnalogs
-from research.departure_reconfirmation import evaluate as evaluate_reconfirmation
+from research.departure_reconfirmation import evaluate as evaluate_reconfirmation, compare as compare_reconfirmation
 from research.depletion_timing_audit import (observed_depletions, predicted_depletions, observed_restocks,
     observed_availability_losses, predicted_availability_losses, count_events)
 from research.true_zero_cycles import ZeroCycles
+from research.quantity_rate_cycles import QuantityRateCycles
 from services.travel_window_policy import project_policy
 from research.v151_stable_earliest_departure import stable_earliest_departure
 
@@ -48,7 +49,10 @@ POLICIES = (("v166_all_history", None, "median"),
             ("phase_recent64_current_quarter", None, "current_quarter"),
             ("zero_anchored_quarter", None, "quarter"),
             ("zero_anchored_midpoint", None, "midpoint"),
-            ("zero_anchored_current_quarter", None, "current_quarter"))
+            ("zero_anchored_current_quarter", None, "current_quarter"),
+            ("zero_rate_quarter", None, "quarter"),
+            ("zero_rate_midpoint", None, "midpoint"),
+            ("zero_rate_current_quarter", None, "current_quarter"))
 MAX_POLLS = 400000
 VERSION = "continuous_departure_replay_v1"
 
@@ -139,9 +143,9 @@ def replay(*, source, days=2, asof=None, limit_items=24,
     path = Path(source).resolve(strict=True)
     results = {}
     totals = {p:Counter() for p,_,_ in POLICIES}
-    depletion_totals={p:Counter() for p in ('v163','daily_template','phase_analogs','phase_recent64','zero_anchored')}
+    depletion_totals={p:Counter() for p in ('v163','daily_template','phase_analogs','phase_recent64','zero_anchored','zero_rate')}
     availability_totals={p:Counter() for p in depletion_totals}
-    event_totals={p:Counter() for p in ('v163','daily_template','phase_analogs','phase_recent64','zero_anchored')}
+    event_totals={p:Counter() for p in ('v163','daily_template','phase_analogs','phase_recent64','zero_anchored','zero_rate')}
     with closing(sqlite3.connect(path.as_uri()+"?mode=ro", uri=True)) as db:
         db.execute("PRAGMA query_only=ON")
         db.execute("BEGIN")
@@ -175,6 +179,7 @@ def replay(*, source, days=2, asof=None, limit_items=24,
             analogs = PhaseAnalogs(crosses)
             recent_analogs = PhaseAnalogs(crosses,capacity=64)
             zero_cycles = ZeroCycles(crosses)
+            rate_cycles = QuantityRateCycles(crosses)
             cursor = 0
             plans = {p:[] for p,_,_ in POLICIES}
             stats = {p:Counter() for p,_,_ in POLICIES}
@@ -183,17 +188,19 @@ def replay(*, source, days=2, asof=None, limit_items=24,
             landed_episodes = {p:set() for p,_,_ in POLICIES}
             reasons = {p:Counter() for p,_,_ in POLICIES}
             chronological = {p:[Counter() for _ in range(days)] for p,_,_ in POLICIES}
+            zero_paired = {p:Counter() for p,_,_ in POLICIES if p.startswith("zero_rate_")}
             paired = {p:Counter() for p,_,_ in POLICIES if p!="v166_all_history"}
             event_stats={p:Counter() for p in event_totals}
             depletion_stats={p:Counter() for p in depletion_totals}
             availability_stats={p:Counter() for p in availability_totals}
             for issued in issues:
                 while cursor<len(obs) and obs[cursor].epoch<=issued:
-                    phases.add(obs[cursor]); analogs.add(obs[cursor]); recent_analogs.add(obs[cursor]); zero_cycles.add(obs[cursor]); cursor+=1
+                    phases.add(obs[cursor]); analogs.add(obs[cursor]); recent_analogs.add(obs[cursor]); zero_cycles.add(obs[cursor]); rate_cycles.add(obs[cursor]); cursor+=1
                 state = phases.asof()
                 analog_events = analogs.forecast(key, state, asof=issued)
                 recent_events = recent_analogs.forecast(key, state, asof=issued)
                 zero_events = zero_cycles.forecast(key,asof=issued)
+                rate_events = rate_cycles.forecast(key,asof=issued)
                 pi = bisect.bisect_right(polls,issued)-1
                 age = issued-polls[pi] if pi>=0 else None
                 if crosses(issued,issued):
@@ -209,7 +216,7 @@ def replay(*, source, days=2, asof=None, limit_items=24,
                     forecasts[None]=model.predict_events(key,state,asof=issued)
                     end=min(issued+4*3600,now)
                     truths=true_restocks[bisect.bisect_right(true_restocks,issued):bisect.bisect_right(true_restocks,end)]
-                    for family,stream in (('v163',forecasts[None]),('daily_template',template_events),('phase_analogs',analog_events),('phase_recent64',recent_events),('zero_anchored',zero_events)):
+                    for family,stream in (('v163',forecasts[None]),('daily_template',template_events),('phase_analogs',analog_events),('phase_recent64',recent_events),('zero_anchored',zero_events),('zero_rate',rate_events)):
                         predictions=[e['predicted_restock_epoch'] for e in stream.get('true_restock_events',stream['restock_events'])
                                      if issued<e['predicted_restock_epoch']<=end
                                      and age is not None and age<=180]
@@ -226,7 +233,8 @@ def replay(*, source, days=2, asof=None, limit_items=24,
                 for policy, window, kind in POLICIES:
                     if window not in forecasts:
                         forecasts[window] = model.predict_events(key,state,asof=issued,recent_cycles=window)
-                    forecast = (zero_events if policy.startswith("zero_anchored_") else
+                    forecast = (rate_events if policy.startswith("zero_rate_") else
+                                zero_events if policy.startswith("zero_anchored_") else
                                 recent_events if policy.startswith("phase_recent64_") else
                                 analog_events if policy.startswith("phase_analog_") else
                                 template_events if policy.startswith("daily_event_") else forecasts[window])
@@ -266,7 +274,7 @@ def replay(*, source, days=2, asof=None, limit_items=24,
                             c["leave_now_only_success"]+=outcome=="FAILURE" and baseline[0]=="SUCCESS"
                         # First proposal per known ISSUE phase, not per winning outcome.
                         anchor = ((forecast.get("physical_inventory_phase"),forecast.get("physical_phase_onset_epoch"))
-                                  if policy.startswith("zero_anchored_") else (state["phase"],state["phase_onset"]))
+                                  if policy.startswith(("zero_anchored_","zero_rate_")) else (state["phase"],state["phase_onset"]))
                         if anchor[1] is not None and anchor not in seen[policy]:
                             seen[policy].add(anchor)
                             ec=episode_stats[policy]
@@ -300,6 +308,13 @@ def replay(*, source, days=2, asof=None, limit_items=24,
                                 "outcome":outcome,"outcome_reason":reason,"evidence":proof,
                                 "leave_now_outcome":baseline[0]}
                         journal.write(json.dumps(record,sort_keys=True)+"\n")
+                for p,c in zero_paired.items():
+                    base=issued_outcomes[p.replace("zero_rate_","zero_anchored_")]
+                    challenger=issued_outcomes[p]
+                    if base in ("SUCCESS","FAILURE") and challenger in ("SUCCESS","FAILURE"):
+                        c["matched_issues"]+=1
+                        c["challenger_only_success"]+=challenger=="SUCCESS" and base=="FAILURE"
+                        c["zero_baseline_only_success"]+=challenger=="FAILURE" and base=="SUCCESS"
                 incumbent=issued_outcomes["v166_all_history"]
                 for p,c in paired.items():
                     challenger=issued_outcomes[p]
@@ -314,14 +329,19 @@ def replay(*, source, days=2, asof=None, limit_items=24,
                 distinct_observed_stock_episodes_reached=len(landed_episodes[p]),
                 chronological_day_slices=[summarize(c) for c in chronological[p]],
                 outcome_reasons=dict(reasons[p])) for p,_,_ in POLICIES},
+                "matched_zero_replanned_comparisons":{p:compare_reconfirmation(
+                    plans[p.replace("zero_rate_","zero_anchored_")],plans[p],
+                    cutoff=now,flight_seconds=model.TRAVEL_SECONDS[country],score=evidence.score)
+                    for p in zero_paired},
+                "matched_zero_baseline_comparisons":{p:dict(c) for p,c in zero_paired.items()},
                 "matched_v166_comparisons":{p:dict(c) for p,c in paired.items()}}
             results[key]['event_models_fixed_four_hour']= {p:dict(c,
                 recall_10m=rate(c['matched_600s'],c['observed']),
                 precision_10m=rate(c['matched_600s'],c['forecast'])) for p,c in event_stats.items()}
             results[key]['depletion_models_fixed_four_hour']={p:dict(c,
-                prediction_supported=p=='zero_anchored',
-                recall_10m=rate(c['matched_600s'],c['observed']) if p=='zero_anchored' else None,
-                precision_10m=rate(c['matched_600s'],c['forecast']) if p=='zero_anchored' else None) for p,c in depletion_stats.items()}
+                prediction_supported=p in ('zero_anchored','zero_rate'),
+                recall_10m=rate(c['matched_600s'],c['observed']) if p in ('zero_anchored','zero_rate') else None,
+                precision_10m=rate(c['matched_600s'],c['forecast']) if p in ('zero_anchored','zero_rate') else None) for p,c in depletion_stats.items()}
             results[key]['availability_loss_models_fixed_four_hour']={p:dict(c,
                 recall_10m=rate(c['matched_600s'],c['observed']),
                 precision_10m=rate(c['matched_600s'],c['forecast'])) for p,c in availability_stats.items()}
@@ -350,9 +370,9 @@ def replay(*, source, days=2, asof=None, limit_items=24,
                 recall_10m=rate(c['matched_600s'],c['observed']),
                 precision_10m=rate(c['matched_600s'],c['forecast'])) for p,c in event_totals.items()},
             "depletion_models_fixed_four_hour":{p:dict(c,
-                prediction_supported=p=='zero_anchored',
-                recall_10m=rate(c['matched_600s'],c['observed']) if p=='zero_anchored' else None,
-                precision_10m=rate(c['matched_600s'],c['forecast']) if p=='zero_anchored' else None) for p,c in depletion_totals.items()},
+                prediction_supported=p in ('zero_anchored','zero_rate'),
+                recall_10m=rate(c['matched_600s'],c['observed']) if p in ('zero_anchored','zero_rate') else None,
+                precision_10m=rate(c['matched_600s'],c['forecast']) if p in ('zero_anchored','zero_rate') else None) for p,c in depletion_totals.items()},
             "availability_loss_models_fixed_four_hour":{p:dict(c,
                 recall_10m=rate(c['matched_600s'],c['observed']),
                 precision_10m=rate(c['matched_600s'],c['forecast'])) for p,c in availability_totals.items()},

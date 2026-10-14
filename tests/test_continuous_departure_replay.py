@@ -69,6 +69,7 @@ class ContinuousTests(unittest.TestCase):
             self.assertGreater(depleted['v163']['observed'],0)
             self.assertEqual(len({v['observed'] for v in depleted.values()}),1)
             self.assertTrue(depleted['zero_anchored']['prediction_supported'])
+            self.assertTrue(depleted['zero_rate']['prediction_supported'])
             self.assertIsNone(depleted['v163']['recall_10m'])
             self.assertIn('availability_loss_models_fixed_four_hour',report)
             self.assertTrue(all(v['matched_600s']<=min(v['observed'],v['forecast']) for v in depleted.values()))
@@ -80,6 +81,10 @@ class ContinuousTests(unittest.TestCase):
                 self.assertEqual(sum(c.get(k,0) for k in ("SUCCESS","FAILURE","PENDING","UNKNOWN","ABSTAIN")),288)
                 self.assertEqual(c["proposals"]+c.get("ABSTAIN",0),288)
             item=next(iter(report["items"].values()))
+            self.assertEqual(len(item["matched_zero_replanned_comparisons"]),3)
+            for c in item["matched_zero_replanned_comparisons"].values():
+                self.assertEqual(c["starts"],24)
+                self.assertLessEqual(c.get("matched_resolved",0),24)
             for c in item["matched_v166_comparisons"].values():
                 self.assertLessEqual(c.get("matched_issues",0),288)
                 self.assertLessEqual(c.get("challenger_only_success",0)+c.get("v166_only_success",0),c.get("matched_issues",0))
