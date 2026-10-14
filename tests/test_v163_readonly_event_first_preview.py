@@ -107,6 +107,17 @@ class EventTimelineTests(unittest.TestCase):
         self.assertGreater(widths[-1],widths[0])
         self.assertTrue(all(e["predicted_restock_epoch"]<=ASOF+28800 for e in events))
 
+    def test_nearby_overlapping_restock_events_use_optimal_not_greedy_matching(self):
+        # Greedy chooses 11 (distance 1) for forecast 10, then cannot
+        # match forecast 15. Optimal pairs 10->8, 15->11 (2 matches).
+        matched=m.match_events([10,15],[8,11],tolerance=4)
+        self.assertEqual(matched["matched"],2)
+        self.assertEqual(matched["missed_actual"],0)
+        self.assertEqual(matched["false_predicted"],0)
+        self.assertEqual(matched["sum_absolute_timing_error_seconds"],6)
+        reversed_order=m.match_events([15,10],[11,8],tolerance=4)
+        self.assertEqual(reversed_order,matched)
+
     def test_event_matching_is_one_to_one_and_penalizes_missed_and_extra(self):
         result=m.match_events([100,150,300],[103,306,500],tolerance=10)
         self.assertEqual(result["matched"],2)
