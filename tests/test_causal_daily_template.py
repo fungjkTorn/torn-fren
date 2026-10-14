@@ -32,5 +32,15 @@ class TemplateTests(unittest.TestCase):
         self.assertIsNone(result["center"])
         self.assertIsNone(result["first_center"])
 
+    def test_benign_provider_change_preserves_bounded_stock_phase(self):
+        rows=[OBS(100,0,'a'),OBS(200,100,'a'),OBS(300,90,'b'),OBS(500,0,'b')]
+        self.assertEqual(DailyTemplate(rows,lambda a,b:False).windows,[(200,500)])
+
+    def test_provider_switch_at_threshold_or_known_gap_is_not_invented_cycle(self):
+        rows=[OBS(100,0,'a'),OBS(200,100,'b'),OBS(500,0,'b')]
+        self.assertEqual(DailyTemplate(rows,lambda a,b:False).windows,[])
+        rows=[OBS(100,0,'a'),OBS(200,100,'a'),OBS(300,90,'a'),OBS(500,0,'a')]
+        self.assertEqual(DailyTemplate(rows,lambda a,b:a<=350<=b).windows,[])
+
 
 if __name__=="__main__":unittest.main()

@@ -19,16 +19,21 @@ class DailyTemplate:
         self.crosses=crosses
         self.match=None
         self.windows=[]
-        start=None;provider=None;previous=None
+        start=None;previous=None
         for row in observations:
             if previous is not None:
-                clean=(row.source==previous.source and not crosses(previous.epoch,row.epoch))
-                if not clean:
+                # Match V145: a benign provider change inside the SAME
+                # stock phase does not erase an already bounded episode.
+                # A provider change AT a threshold crossing is ambiguous.
+                invalid=(row.epoch<=previous.epoch or crosses(previous.epoch,row.epoch)
+                         or (row.source!=previous.source and
+                             (row.quantity>=30)!=(previous.quantity>=30)))
+                if invalid:
                     start=None
                 elif previous.quantity<30<=row.quantity:
-                    start=row.epoch;provider=row.source
+                    start=row.epoch
                 elif previous.quantity>=30>row.quantity and start is not None:
-                    if provider==row.source and not crosses(start,row.epoch):
+                    if not crosses(start,row.epoch):
                         self.windows.append((start,row.epoch))
                     start=None
             previous=row
