@@ -138,6 +138,8 @@ def predict_events(item,phases,*,asof,horizon=MAX_HORIZON,
         "currently_supported_departures":0,
         "unreachable_restock_events":0,
         "current_phase":phases.get("phase"),
+        "observed_current_quantity":getattr(phases.get("last_observation"),"quantity",None),
+        "last_quantity_change_epoch":getattr(phases.get("last_observation"),"epoch",None),
         "phase_age_seconds":None,
         "history_stocked_phases":len(phases.get("stocked_durations") or []),
         "history_depleted_phases":len(phases.get("depleted_durations") or []),
@@ -244,6 +246,8 @@ def forecast_all(*,source=COLLECTOR,asof=None,roster=None,
                 rows,error=_read_item(db,item,now)
                 if error or not rows:
                     all_items[item]={
+                        "item_key":item,"asof_epoch":now,
+                        "flight_seconds":TRAVEL_SECONDS[item.split(":",1)[0]],
                         "status":"NO_VALID_ITEM_STOCK_HISTORY",
                         "restock_events":[],"forecast_event_count":0,
                         "current_stock_window":None}

@@ -19,12 +19,19 @@ from pathlib import Path
 
 from deploy.scripts import v163_readonly_event_first_preview as model
 from services.travel_decision_contract_v166 import build_item_travel_decision
+from research.causal_daily_template import DailyTemplate
+from services.travel_window_policy import project_policy
+from research.v151_stable_earliest_departure import stable_earliest_departure
 
 POLICIES = (("v166_all_history", None, "median"),
             ("quarter_buffer_all_history", None, "quarter"),
             ("midpoint_all_history", None, "midpoint"),
             ("midpoint_recent_8", 8, "midpoint"),
-            ("late_onset_all_history", None, "late"))
+            ("late_onset_all_history", None, "late"),
+            ("quarter_with_current_stock", None, "current_quarter"),
+            ("daily_template_earliest", None, "template_earliest"),
+            ("daily_template_center", None, "template_center"),
+            ("v151_independent_48", None, "v151"))
 MAX_POLLS = 400000
 VERSION = "continuous_departure_replay_v1"
 
@@ -71,30 +78,28 @@ class ArrivalEvidence:
         }
 
 
-def choose(forecast, issued, poll_age, kind):
+def choose(forecast, issued, poll_age, kind, template=None, v151=None):
     """Choose using issued events only; no truth or future stock argument."""
     decision = build_item_travel_decision(
         forecast, now=issued, poll_age_seconds=poll_age)
-    if decision["estimated_departure_epoch"] is None or kind == "median":
-        return decision
-    flight = decision["player_flight_seconds"]
-    for event in decision["forecast_events"]:
-        start = event["predicted_restock_epoch"]
-        end = event["predicted_stock_below_30_epoch"]
-        target = (start+(end-start)//2 if kind == "midpoint" else
-                  start+(end-start)//4 if kind == "quarter" else
-                  event["restock_late_epoch"])
-        depart = max(issued, target-flight-model.GRACE)
-        arrival = depart+flight
-        if start <= arrival+model.GRACE < end:
-            return dict(decision, estimated_departure_epoch=depart,
-                        estimated_arrival_epoch=arrival+model.GRACE,
-                        selected_restock_event_index=event["index"],
-                        status="ESTIMATED_DEPARTURE_WINDOW_OPEN" if depart==issued
-                        else "WAIT_FOR_ESTIMATED_DEPARTURE")
-    return dict(decision, estimated_departure_epoch=None,
-                estimated_arrival_epoch=None, selected_restock_event_index=None,
-                status="NO_REACHABLE_BUFFERED_WINDOW")
+    healthy=poll_age is not None and 0<=poll_age<=180
+    flight=decision["player_flight_seconds"]
+    if kind=="v151":
+        candidate=v151.get("first_reachable") if v151 and healthy else None
+        departure=candidate.get("departure_epoch") if candidate else None
+        return dict(decision,estimated_departure_epoch=departure,
+                    estimated_arrival_epoch=departure+flight+model.GRACE if departure is not None else None,
+                    selected_restock_event_index=None,
+                    status=v151["status"] if v151 and healthy else "STALE_DATA",
+                    scenario_support=candidate.get("scenario_stock_fraction") if candidate else None)
+    if kind.startswith("template_"):
+        departure=template.get(kind.split("_",1)[1]) if template and healthy else None
+        return dict(decision,estimated_departure_epoch=departure,
+                    estimated_arrival_epoch=departure+flight+model.GRACE if departure is not None else None,
+                    selected_restock_event_index=None,
+                    status=template["status"] if template and healthy else "STALE_DATA",
+                    template_evidence=template)
+    return project_policy(forecast,now=issued,poll_age_seconds=poll_age,kind=kind)
 
 
 def rate(n, d):
@@ -142,6 +147,7 @@ def replay(*, source, days=2, asof=None, limit_items=24,
             obs = [model.OBS(t,q,s) for t,q,s in raw]
             crosses, clean, _ = model._replay_restock_index(obs,gaps,now)
             evidence = ArrivalEvidence(obs,polls,gaps,now)
+            template_model=DailyTemplate(obs,crosses)
             phases = model._ReplayPhases(crosses)
             cursor = 0
             stats = {p:Counter() for p,_,_ in POLICIES}
@@ -161,12 +167,14 @@ def replay(*, source, days=2, asof=None, limit_items=24,
                     age = None  # Known collection outage at issuance.
                 baseline = evidence.score(issued+model.TRAVEL_SECONDS[country])
                 forecasts = {}
+                template=template_model.plan(issued,model.TRAVEL_SECONDS[country]) if age is not None and age<=180 else None
+                v151=stable_earliest_departure(key,state,asof=issued,scenarios=48) if age is not None and age<=180 else None
                 issued_outcomes = {}
                 for policy, window, kind in POLICIES:
                     if window not in forecasts:
                         forecasts[window] = model.predict_events(key,state,asof=issued,recent_cycles=window)
                     forecast = forecasts[window]
-                    decision = choose(forecast,issued,age,kind)
+                    decision = choose(forecast,issued,age,kind,template,v151)
                     dep = decision["estimated_departure_epoch"]
                     arrival = dep+model.TRAVEL_SECONDS[country] if dep is not None else None
                     # Freeze the decision before consulting any outcome evidence.
@@ -220,6 +228,8 @@ def replay(*, source, days=2, asof=None, limit_items=24,
                                 "modeled_current_stock_window":forecast["current_stock_window"],
                                 "issue_phase_onset":state["phase_onset"],
                                 "status":decision["status"],"departure_epoch":dep,
+                                "template_evidence":decision.get("template_evidence"),
+                                "uncalibrated_scenario_support":decision.get("scenario_support"),
                                 "arrival_epoch":arrival,"grace_seconds":model.GRACE,
                                 "selected_event_index":decision["selected_restock_event_index"],
                                 "forecast_events":[dict(e,event_id=f"{identity}:{e['index']}") for e in decision["forecast_events"]],
@@ -252,7 +262,7 @@ def replay(*, source, days=2, asof=None, limit_items=24,
             "source_written":False,"poll_backed_arrival_availability_measured":True,
             "per_country_provider_freshness_verified":False,
             "actual_player_flights_measured":False,
-            "warning":"Historical reconstructed issues; frozen planned trips, not re-confirmed WATCH execution. Global heartbeats and change-only stock are sampled availability evidence, not exact-second or purchase certification. Repeated issues are correlated. Incumbent specialist and V151 comparisons remain pending."}
+            "warning":"Historical reconstructed issues; frozen planned trips, not re-confirmed WATCH execution. Global heartbeats and change-only stock are sampled availability evidence, not exact-second or purchase certification. Repeated issues are correlated. V151 independent is included; daily-template adaptation is a challenger, not certified archived-specialist parity."}
 
 
 def main():

@@ -4,6 +4,14 @@ on:
     branches: [research/v38-full-roster-live-prep-20261009]
     paths:
       - 'research/continuous_departure_replay.py'
+      - 'research/causal_daily_template.py'
+      - 'services/travel_window_policy.py'
+      - 'services/travel_read_model.py'
+      - 'web/travel_decisions*'
+      - 'tests/test_travel_read_model.py'
+      - 'tests/test_causal_daily_template.py'
+      - 'tests/test_travel_decisions_router.py'
+      - 'tests/travel_decisions*'
       - 'tests/test_continuous_departure_replay.py'
       - '.github/workflows/continuous-departure.yml'
   workflow_dispatch:
@@ -18,9 +26,40 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - run: pip install numpy==1.26.4
+      - run: pip install numpy==1.26.4 fastapi httpx
       - name: Verify all-issued policy and stock evidence
         run: |
           python -m unittest discover -s tests -p 'test_continuous_departure_replay.py' -v
           python -m unittest discover -s tests -p 'test_travel_decision_contract_v166.py' -v
           python -m unittest discover -s tests -p 'test_v163_readonly_event_first_preview.py' -v
+          python -m unittest discover -s tests -p 'test_travel_read_model.py' -v
+          python -m unittest discover -s tests -p 'test_causal_daily_template.py' -v
+          python -m unittest discover -s tests -p 'test_travel_decisions_router.py' -v
+      - name: Check player interface JavaScript
+        run: |
+          python - <<'PY'
+          import pathlib,re
+          html=pathlib.Path('web/travel_decisions.html').read_text()
+          pathlib.Path('/tmp/travel-decisions.js').write_text(re.search(r'<script>(.*?)</script>',html,re.S).group(1))
+          PY
+          node --check /tmp/travel-decisions.js
+  browser-interface:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-save playwright@1.56.1
+      - run: npx playwright install --with-deps chromium
+      - run: node tests/travel_decisions_browser.cjs
+      - name: Save synthetic UI screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: travel-decisions-synthetic-ui
+          path: test-output/*.png

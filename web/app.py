@@ -470,4 +470,8 @@ def admin_page():
 app.add_api_route("/api/research/champion-shadow", champion_shadow,
                   methods=["GET"], include_in_schema=False)
 
+# Additive research-only discovery routes. No changes to either legacy view.
+from web.travel_decisions_router import router as travel_decisions_router
+app.include_router(travel_decisions_router)
+
 app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="static")
