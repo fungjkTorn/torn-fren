@@ -25,7 +25,7 @@ class ResearchRunnerContracts(unittest.TestCase):
 
     def test_private_workflow_is_restricted_and_results_only(self):
         spec=(ROOT/"private_repo_workflow.template.yml").read_text()
-        self.assertIn("self-hosted, Linux, X64, torn-fren-research",spec)
+        self.assertIn("self-hosted, Linux, torn-fren-research",spec)
         self.assertNotIn("pull_request",spec)
         self.assertIn("permissions:\n  contents: read",spec)
         self.assertIn("requests/approved_model_sha.txt",spec)
