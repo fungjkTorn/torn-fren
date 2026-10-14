@@ -9,7 +9,7 @@ ROOT=Path(__file__).resolve().parents[1]/"deploy"/"research_runner"
 
 class ResearchRunnerContracts(unittest.TestCase):
     def test_shell_scripts_syntax_and_never_target_production(self):
-        for name in ("install_snapshot_exporter.sh","harden_private_runner.sh","diagnose_isolation.sh","complete_isolation_acl.sh"):
+        for name in ("install_snapshot_exporter.sh","harden_private_runner.sh","diagnose_isolation.sh","complete_isolation_acl.sh","prepare_private_runner_user.sh"):
             file=ROOT/name
             cmd=subprocess.run(["bash","-n",str(file)],capture_output=True,text=True)
             self.assertEqual(cmd.returncode,0,cmd.stderr)
@@ -29,6 +29,13 @@ class ResearchRunnerContracts(unittest.TestCase):
         self.assertNotIn("chmod 640",acl)
         self.assertNotIn("chown -R",acl)
         self.assertNotIn("setfacl -R",acl)
+        environment=(ROOT/"prepare_private_runner_user.sh").read_text()
+        self.assertIn("tornresearch",environment)
+        self.assertIn("sudo -n -u tornresearch test -r \"$SNAP\"",environment)
+        self.assertIn("if sudo -n -u tornresearch test -r \"$SRC\"",environment)
+        self.assertIn("numpy==1.26.4",environment)
+        self.assertIn("snapshot refresh timer inactive",environment)
+        self.assertNotIn("systemctl restart torn-fren",environment)
         diagnostic=(ROOT/"diagnose_isolation.sh").read_text()
         self.assertIn("DIAGNOSIS COMPLETE: NO WRITES",diagnostic)
         self.assertNotIn("setfacl -m",diagnostic)
