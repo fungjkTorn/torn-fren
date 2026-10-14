@@ -4,10 +4,12 @@ const fs=require('fs'),cp=require('child_process'),assert=require('assert');
 (async()=>{
  const browser=await chromium.launch({headless:true});
  const page=await browser.newPage({viewport:{width:1440,height:1050}});
+ let failApi=false;
  const errors=[];page.on('pageerror',e=>errors.push(e.message));
  await page.route('http://travel-preview.test/**',async route=>{
   const u=new URL(route.request().url());
   if(u.pathname==='/api/travel-decisions'){
+   if(failApi)return route.fulfill({status:503,contentType:'application/json',body:'{}'});
    const args=['tests/travel_decisions_fixture.py'];
    if(u.searchParams.has('country'))args.push(u.searchParams.get('country'),u.searchParams.get('flight_seconds'));
    const body=cp.execFileSync('python',args,{env:{...process.env,PYTHONPATH:process.cwd()}}).toString();
@@ -45,6 +47,11 @@ const fs=require('fs'),cp=require('child_process'),assert=require('assert');
  await page.setViewportSize({width:390,height:844});
  await page.screenshot({path:'test-output/travel-decisions-mobile.png',fullPage:true});
  assert(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth));
+ await page.getByRole('spinbutton',{name:'Your outbound flight duration in minutes'}).focus();
+ failApi=true;
+ await page.evaluate(()=>document.getElementById('refresh').click());
+ await page.waitForFunction(()=>!document.getElementById('tripClock'));
+ assert((await page.locator('#trip').textContent()).includes('Forecast unavailable'));
  assert.deepEqual(errors,[]);
  await browser.close();console.log('Travel UI: search, category, watchlist persistence, personalized flight, graph link, desktop/mobile passed.');
 })().catch(e=>{console.error(e);process.exit(1)});
