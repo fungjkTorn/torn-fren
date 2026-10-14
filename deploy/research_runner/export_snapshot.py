@@ -157,7 +157,7 @@ def export(source,roster,output,*,asof=None,days=45,
                         """SELECT start_timestamp,end_timestamp FROM collection_gaps
                            WHERE start_timestamp<=?
                              AND COALESCE(end_timestamp,9223372036854775807)>=?
-                           ORDER BY start_timestamp""",(clock,start)))
+                           ORDER BY start_timestamp""",(clock,start))
                 )
                 dest.executemany(
                     "INSERT INTO poll_heartbeats VALUES(?,?,?)",
@@ -165,7 +165,7 @@ def export(source,roster,output,*,asof=None,days=45,
                         """SELECT timestamp,mode,success FROM poll_heartbeats
                            WHERE timestamp BETWEEN ? AND ?
                              AND mode='poll-cycle' AND success=1
-                           ORDER BY timestamp""",(start,clock)))
+                           ORDER BY timestamp""",(start,clock))
                 )
                 metadata={
                     "schema":"torn-fren-research-stock-v1",
