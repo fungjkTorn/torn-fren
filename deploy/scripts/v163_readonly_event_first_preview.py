@@ -13,13 +13,14 @@ import bisect
 import json
 import math
 import sqlite3
+import sys
 import time
 from collections import Counter,namedtuple
 from contextlib import closing
 from pathlib import Path
 
 from research.plushie_champions.common import TRAVEL_SECONDS
-from research.v128_full24_earliest_shadow import _read_item,exact_roster
+from research.v128_full24_earliest_shadow import _gap_index,_read_item,exact_roster
 from research.v145_provider_continuous_phases import provider_continuous_phases
 from research.v60_private_snapshot_probe import read_heartbeat
 
