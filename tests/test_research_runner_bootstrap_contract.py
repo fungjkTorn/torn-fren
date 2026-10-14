@@ -9,7 +9,7 @@ ROOT=Path(__file__).resolve().parents[1]/"deploy"/"research_runner"
 
 class ResearchRunnerContracts(unittest.TestCase):
     def test_shell_scripts_syntax_and_never_target_production(self):
-        for name in ("install_snapshot_exporter.sh","harden_private_runner.sh"):
+        for name in ("install_snapshot_exporter.sh","harden_private_runner.sh","diagnose_isolation.sh"):
             file=ROOT/name
             cmd=subprocess.run(["bash","-n",str(file)],capture_output=True,text=True)
             self.assertEqual(cmd.returncode,0,cmd.stderr)
@@ -18,6 +18,9 @@ class ResearchRunnerContracts(unittest.TestCase):
             self.assertNotIn("systemctl stop torn-fren-v160",script)
             self.assertNotIn("systemctl restart torn-fren-v160",script)
             self.assertNotIn("systemctl restart torn-fren-v38",script)
+        diagnostic=(ROOT/"diagnose_isolation.sh").read_text()
+        self.assertIn("DIAGNOSIS COMPLETE: NO WRITES",diagnostic)
+        self.assertNotIn("setfacl -m",diagnostic)
         self.assertIn("NoNewPrivileges=yes",
                       (ROOT/"harden_private_runner.sh").read_text())
         self.assertIn("InaccessiblePaths=/opt/torn-fren/data",
