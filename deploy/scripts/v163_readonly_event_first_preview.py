@@ -400,7 +400,7 @@ def _replay_restock_index(observations,gaps,now):
 
 def replay_events(*,source=COLLECTOR,roster=None,asof=None,days=7,
                   tolerance=600,max_changes=MAX_ITEM_CHANGE_ROWS,
-                  limit_items=24):
+                  limit_items=24,progress=None):
     """Historical as-of replay only; NEVER a truly issued V160/163 forecast.
 
     One fixed, nonoverlapping 4-hour historical cohort per item; every
@@ -446,21 +446,26 @@ def replay_events(*,source=COLLECTOR,roster=None,asof=None,days=7,
                           for t,q,provider in raw if
                           t is not None and q is not None and provider
                           and int(q)>=0]
-            times=[row.epoch for row in observations]
+            crosses,restocks,ambiguous=_replay_restock_index(
+                observations,gaps,now)
+            phases=_ReplayPhases(crosses)
+            cursor=0
             c=Counter()
             statuses=Counter()
             for issue in cutoffs:
-                prefix=observations[:bisect.bisect_right(times,issue)]
-                truth,ambiguity=confirmed_restocks(
-                    observations,gaps,start=issue,end=issue+BACKTEST_WINDOW)
+                while cursor<len(observations) and observations[cursor].epoch<=issue:
+                    phases.add(observations[cursor])
+                    cursor+=1
+                first=bisect.bisect_right(restocks,issue)
+                last=bisect.bisect_right(restocks,issue+BACKTEST_WINDOW)
+                truth=restocks[first:last]
+                ambiguous_count=(bisect.bisect_right(ambiguous,issue+BACKTEST_WINDOW)-
+                                 bisect.bisect_right(ambiguous,issue))
                 c["actual_observed_restocks"]+=len(truth)
-                c["ambiguous_threshold_crossings"]+=ambiguity
+                c["ambiguous_threshold_crossings"]+=ambiguous_count
                 c["issued_four_hour_cohorts"]+=1
-                if prefix:
-                    evidence=provider_continuous_phases(
-                        prefix,asof=issue,
-                        gaps=[g for g in gaps if g[0]<=issue])
-                    forecast=predict_events(item,evidence,asof=issue,
+                if cursor:
+                    forecast=predict_events(item,phases.asof(),asof=issue,
                                             horizon=BACKTEST_WINDOW)
                     proposals=[x["predicted_restock_epoch"]
                                for x in forecast["restock_events"]
