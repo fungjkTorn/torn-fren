@@ -108,7 +108,8 @@ def _window(item,asof,start,stocked_duration,early_start,late_start,early_lifeti
 
 
 def predict_events(item,phases,*,asof,horizon=MAX_HORIZON,
-                   max_events=MAX_EVENTS,min_bounded=MIN_BOUNDED):
+                   max_events=MAX_EVENTS,min_bounded=MIN_BOUNDED,
+                   recent_cycles=None):
     """All modeled replenishments up to horizon, not just selected flights.
 
     Causal input: phase evidence closed at or before asof, plus the
@@ -120,7 +121,9 @@ def predict_events(item,phases,*,asof,horizon=MAX_HORIZON,
         or not 1<=max_events<=MAX_EVENTS or
         type(min_bounded) is not int or not 1<=min_bounded<=20 or
         not isinstance(item,str) or item.count(":")!=1 or
-        item.split(":",1)[0] not in TRAVEL_SECONDS):
+        item.split(":",1)[0] not in TRAVEL_SECONDS or
+        (recent_cycles is not None and (
+            type(recent_cycles) is not int or not 4<=recent_cycles<=128))):
         raise ValueError("invalid event forecast policy")
     common={
         "item_key":item,"asof_epoch":asof,
@@ -144,6 +147,11 @@ def predict_events(item,phases,*,asof,horizon=MAX_HORIZON,
     if (not isinstance(high,list) or not isinstance(low,list)
         or min(len(high),len(low))<min_bounded):
         return common
+    # Optional research challenger: recent completed cycles, never future data.
+    if recent_cycles is not None:
+        high=high[-recent_cycles:]
+        low=low[-recent_cycles:]
+    common["cycle_window"]=recent_cycles if recent_cycles is not None else "all"
     onset=phases.get("phase_onset")
     phase=phases.get("phase")
     last=phases.get("last_observation")
