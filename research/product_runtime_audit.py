@@ -7,7 +7,7 @@ import hashlib
 import json
 from collections import Counter
 from urllib.error import HTTPError, URLError
-from urllib.request import HTTPRedirectHandler, build_opener
+from urllib.request import HTTPRedirectHandler, ProxyHandler, build_opener
 
 from deploy.scripts.v163_readonly_event_first_preview import exact_roster
 
@@ -41,7 +41,7 @@ def summarize(path, status, content, expected):
                missing_configured_items=sorted(expected-known),
                unexpected_item_count=len(known-expected),
                duplicate_item_keys=sorted(k for k, n in Counter(k for k in keys if isinstance(k,str)).items() if n>1),
-               status_counts=dict(Counter(str(r.get('status', r.get('decision',{}).get('status','UNKNOWN')))
+               status_counts=dict(Counter(str(r.get('status') or ((r.get('decision') or {}).get('status','UNKNOWN') if isinstance(r.get('decision'),dict) else 'UNKNOWN'))
                                           for r in rows if isinstance(r,dict))))
     return out
 
@@ -51,7 +51,7 @@ def audit(*, fetch=None, requested_count=28):
     if type(requested_count) is not int or not len(expected) <= requested_count <= 250:
         raise ValueError('invalid requested item count')
     if fetch is None:
-        opener = build_opener(NoRedirect)
+        opener = build_opener(ProxyHandler({}), NoRedirect)
         def fetch(path):
             with opener.open('http://127.0.0.1:8000'+path, timeout=4) as response:
                 return response.status, response.read(MAX_BYTES+1)
