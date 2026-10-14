@@ -17,6 +17,21 @@ class DailyTemplate:
         self.rows=observations
         self.times=[r.epoch for r in observations]
         self.crosses=crosses
+        self.match=None
+        self.windows=[]
+        start=None;provider=None;previous=None
+        for row in observations:
+            if previous is not None:
+                clean=(row.source==previous.source and not crosses(previous.epoch,row.epoch))
+                if not clean:
+                    start=None
+                elif previous.quantity<30<=row.quantity:
+                    start=row.epoch;provider=row.source
+                elif previous.quantity>=30>row.quantity and start is not None:
+                    if provider==row.source and not crosses(start,row.epoch):
+                        self.windows.append((start,row.epoch))
+                    start=None
+            previous=row
 
     def state(self, clock, issued):
         if clock>issued:
@@ -33,6 +48,7 @@ class DailyTemplate:
         points=list(range(issued-7200,issued+1,STEP))
         current=[self.state(t,issued) for t in points]
         best=None
+        alignments=[]
         for shift in range(-3600,3601,STEP):
             reference=[self.state(t-DAY-shift,issued) for t in points]
             pairs=[(a,b) for a,b in zip(current,reference) if a is not None and b is not None]
@@ -46,11 +62,15 @@ class DailyTemplate:
             fit=sum(balances)/len(balances)
             raw=sum(a==b for a,b in pairs)/len(pairs)
             score=(fit,raw,-abs(shift),-shift)
+            alignments.append((fit,shift))
             if best is None or score>best[0]:
                 best=(score,shift)
         if best is None or best[0][0]<.5:
+            self.match=None
             return {"earliest":None,"center":None,"first_center":None,"status":"NO_MATCHING_DAILY_TEMPLATE"}
         shift=best[1]
+        supported=[s for fit,s in alignments if fit>=best[0][0]-.02]
+        self.match=(issued,shift,min(supported),max(supported),best[0][0])
         eligible=[]
         for delay in range(0,HORIZON+1,STEP):
             historical_arrival=issued+delay+flight-DAY-shift
@@ -83,3 +103,41 @@ class DailyTemplate:
                 "first_center":issued if first[0]==0 else issued+first[len(first)//2],
                 "fit":round(best[0][0],4),"shift_seconds":shift,
                 "status":"UNCALIBRATED_DAILY_TEMPLATE_CANDIDATE"}
+
+    def event_forecast(self, issued, item_key, flight):
+        """Project every fully resolved historical stock window, not one trip.
+
+        Event bands describe near-optimal template ALIGNMENTS; they are
+        not calibrated confidence intervals. Future stock is never read.
+        """
+        result={"item_key":item_key,"asof_epoch":issued,"flight_seconds":flight,
+                "status":"NO_MATCHING_DAILY_TEMPLATE","restock_events":[],
+                "current_stock_window":None,"arrival_stock_threshold":30,
+                "model_name":"daily_phase_template_events",
+                "uncertainty_kind":"UNCALIBRATED_ALIGNMENT_RANGE"}
+        j=bisect.bisect_right(self.times,issued)-1
+        current=self.rows[j] if j>=0 else None
+        result.update(observed_current_quantity=current.quantity if current else None,
+                      last_quantity_change_epoch=current.epoch if current else None)
+        if self.match is None or self.match[0]!=issued:
+            return result
+        _,shift,early_shift,late_shift,fit=self.match
+        offset=DAY+shift
+        for start,end in self.windows:
+            if end>issued:
+                break  # Only fully observed historical stocked episodes.
+            projected=start+offset;stock_end=end+offset
+            if current and current.quantity>=30 and projected<=issued<stock_end:
+                result["current_stock_window"]={"predicted_stock_below_30_epoch":stock_end}
+            if issued<projected<=issued+HORIZON:
+                result["restock_events"].append({
+                    "predicted_restock_epoch":projected,
+                    "restock_early_epoch":start+DAY+early_shift,
+                    "restock_late_epoch":start+DAY+late_shift,
+                    "predicted_stock_below_30_epoch":stock_end,
+                    "historical_template_restock_epoch":start,
+                    "historical_template_depletion_epoch":end})
+        result["restock_events"]=result["restock_events"][:64]
+        result["status"]="EVENT_TIMELINE_FORECAST_AVAILABLE"
+        result["template_fit_not_success_probability"]=fit
+        return result

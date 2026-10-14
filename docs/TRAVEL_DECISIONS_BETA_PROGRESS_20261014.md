@@ -44,4 +44,12 @@ Examples of item-specific behavior: Nessie widest-center 74.20% vs median64.40%;
 
 ## Next
 
+### Longer study and next event-stream experiment
+
+Private seven-day run [38506550948](https://github.com/fungjkTorn/torn-fren-research-private/actions/runs/38506550948) passed at source `4e9223378ebbf99d9449d001092b1653370d3075`: 48,384 issues per policy. Quarter-buffer aggregate 29,434/38,380=76.69%, median26,960/38,381=70.24%; first useful template window33,730/44,391=75.98%, 98.31% proposals, mean planned wait about27min versus224min for the widest-template center. These differ in resolution sets and coverage; no blanket winner.
+
+The longer Nessie study **does not confirm the earlier two-day gain**: median69.74%, widest-template center68.62%, first-window center68.70%. The latest day favors first-window center71.43% over median66.06%, showing regime variability rather than a universal champion. Jaguar midpoint88.74% over7d vs median67.00%; Japan median41.64%, first-window template24.02%. Japan remains unsuitable for a supported beta recommendation.
+
+Added a causal **daily-template restock event stream**: map all fully resolved historical stocked windows through the selected past-only daily alignment, retaining every upcoming restock, depleted boundary and current-stock window. Alignment ranges provide explicitly uncalibrated bands. This extends the new family from one departure target into the shared event/flight representation. The evaluator compares V163 and daily-event streams at identical nonoverlapping four-hour issue cohorts, measuring all clean observed restocks, one-to-one matches and precision at15s/60s/10m separately from arrival outcomes. Future changes cannot alter earlier issued events. Actual empirical event-family results remain pending until the newly pinned experiment completes.
+
 Run longer chronological comparisons including the first useful template window, then select per-item research candidates with matched evidence, bounded waits, useful coverage and sufficient independent episodes. Prioritize weak Japan, Monkey, Panda, Lion, Camel, Chamois, Nessie and Red Fox families. Keep V2 and experimental intact; introduce this shared read-model additively after reconciliation. No repeated runner installation or manual historical VM command is needed.

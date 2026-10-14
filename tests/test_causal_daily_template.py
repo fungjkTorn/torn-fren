@@ -14,8 +14,14 @@ class TemplateTests(unittest.TestCase):
             return real(clock,issued)
         model.state=traced
         before=model.plan(t-43200,1020)
+        events=model.event_forecast(t-43200,'mex:Jaguar Plushie',1020)
         changed=DailyTemplate([r if r.epoch<=t-43200 else OBS(r.epoch,0,r.source) for r in rows],lambda a,b:False)
         self.assertEqual(before,changed.plan(t-43200,1020))
+        self.assertEqual(events,changed.event_forecast(t-43200,'mex:Jaguar Plushie',1020))
+        self.assertTrue(events['restock_events'])
+        for event in events['restock_events']:
+            self.assertLessEqual(event['historical_template_depletion_epoch'],t-43200)
+            self.assertGreater(event['predicted_restock_epoch'],t-43200)
         self.assertTrue(queries)
         with self.assertRaises(ValueError):
             real(t+1,t)

@@ -32,6 +32,8 @@ POLICIES = (("v166_all_history", None, "median"),
             ("daily_template_earliest", None, "template_earliest"),
             ("daily_template_center", None, "template_center"),
             ("daily_template_first_window", None, "template_first_center"),
+            ("daily_event_quarter", None, "quarter"),
+            ("daily_event_current_quarter", None, "current_quarter"),
             ("v151_independent_48", None, "v151"))
 MAX_POLLS = 400000
 VERSION = "continuous_departure_replay_v1"
@@ -123,6 +125,7 @@ def replay(*, source, days=2, asof=None, limit_items=24,
     path = Path(source).resolve(strict=True)
     results = {}
     totals = {p:Counter() for p,_,_ in POLICIES}
+    event_totals={p:Counter() for p in ('v163','daily_template')}
     with closing(sqlite3.connect(path.as_uri()+"?mode=ro", uri=True)) as db:
         db.execute("PRAGMA query_only=ON")
         db.execute("BEGIN")
@@ -158,6 +161,7 @@ def replay(*, source, days=2, asof=None, limit_items=24,
             reasons = {p:Counter() for p,_,_ in POLICIES}
             chronological = {p:[Counter() for _ in range(days)] for p,_,_ in POLICIES}
             paired = {p:Counter() for p,_,_ in POLICIES if p!="v166_all_history"}
+            event_stats={p:Counter() for p in event_totals}
             for issued in issues:
                 while cursor<len(obs) and obs[cursor].epoch<=issued:
                     phases.add(obs[cursor]); cursor+=1
@@ -169,12 +173,26 @@ def replay(*, source, days=2, asof=None, limit_items=24,
                 baseline = evidence.score(issued+model.TRAVEL_SECONDS[country])
                 forecasts = {}
                 template=template_model.plan(issued,model.TRAVEL_SECONDS[country]) if age is not None and age<=180 else None
+                template_events=template_model.event_forecast(issued,key,model.TRAVEL_SECONDS[country])
                 v151=stable_earliest_departure(key,state,asof=issued,scenarios=48) if age is not None and age<=180 else None
+                if (issued-issues.start)%(4*3600)==0:
+                    # Comparable, nonoverlapping four-hour EVENT studies,
+                    # independently of whether a departure is proposed.
+                    forecasts[None]=model.predict_events(key,state,asof=issued)
+                    end=min(issued+4*3600,now)
+                    truths=clean[bisect.bisect_right(clean,issued):bisect.bisect_right(clean,end)]
+                    for family,stream in (('v163',forecasts[None]),('daily_template',template_events)):
+                        predictions=[e['predicted_restock_epoch'] for e in stream['restock_events']
+                                     if issued<e['predicted_restock_epoch']<=end
+                                     and age is not None and age<=180]
+                        ec=event_stats[family];ec['observed']+=len(truths);ec['forecast']+=len(predictions)
+                        for tol in (15,60,600):
+                            ec[f'matched_{tol}s']+=model.match_events(predictions,truths,tolerance=tol)['matched']
                 issued_outcomes = {}
                 for policy, window, kind in POLICIES:
                     if window not in forecasts:
                         forecasts[window] = model.predict_events(key,state,asof=issued,recent_cycles=window)
-                    forecast = forecasts[window]
+                    forecast = template_events if policy.startswith("daily_event_") else forecasts[window]
                     decision = choose(forecast,issued,age,kind,template,v151)
                     dep = decision["estimated_departure_epoch"]
                     arrival = dep+model.TRAVEL_SECONDS[country] if dep is not None else None
@@ -225,6 +243,7 @@ def replay(*, source, days=2, asof=None, limit_items=24,
                                 "source_cutoff_epoch":issued,"policy":policy,
                                 "source_poll_age_seconds":age,"issue_phase":state["phase"],
                                 "forecast_status":forecast["status"],
+                                "event_model_name":forecast.get("model_name","v163"),
                                 "observed_current_quantity":state["last_observation"].quantity if state["last_observation"] else None,
                                 "modeled_current_stock_window":forecast["current_stock_window"],
                                 "issue_phase_onset":state["phase_onset"],
@@ -250,6 +269,10 @@ def replay(*, source, days=2, asof=None, limit_items=24,
                 chronological_day_slices=[summarize(c) for c in chronological[p]],
                 outcome_reasons=dict(reasons[p])) for p,_,_ in POLICIES},
                 "matched_v166_comparisons":{p:dict(c) for p,c in paired.items()}}
+            results[key]['event_models_fixed_four_hour']= {p:dict(c,
+                recall_10m=rate(c['matched_600s'],c['observed']),
+                precision_10m=rate(c['matched_600s'],c['forecast'])) for p,c in event_stats.items()}
+            for p,c in event_stats.items():event_totals[p].update(c)
             for p in totals:
                 totals[p].update(stats[p])
             if progress:
@@ -258,6 +281,9 @@ def replay(*, source, days=2, asof=None, limit_items=24,
             "version":VERSION,"model_sha":model_sha,"asof_epoch":now,"days":days,
             "issue_step_seconds":300,"items_evaluated":len(results),
             "policies":{p:summarize(c) for p,c in totals.items()},"items":results,
+            "event_models_fixed_four_hour":{p:dict(c,
+                recall_10m=rate(c['matched_600s'],c['observed']),
+                precision_10m=rate(c['matched_600s'],c['forecast'])) for p,c in event_totals.items()},
             "chronological_slices_policy":"Equal consecutive 24h issue slices; all policies fixed before replay. Latest day is a diagnostic holdout, not pristine lockbox after inspection.",
             "future_truth_selects_issue_times":False,"genuine_live_issuance":False,
             "source_written":False,"poll_backed_arrival_availability_measured":True,

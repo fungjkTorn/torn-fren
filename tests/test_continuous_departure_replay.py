@@ -62,6 +62,9 @@ class ContinuousTests(unittest.TestCase):
             self.assertEqual(len(records),288*len(m.POLICIES))
             self.assertEqual(len({r["issue_id"] for r in records}),len(records))
             self.assertFalse(report["future_truth_selects_issue_times"])
+            families=report['event_models_fixed_four_hour']
+            self.assertGreater(families['v163']['observed'],0)
+            self.assertEqual(families['v163']['observed'],families['daily_template']['observed'])
             for policy,c in report["policies"].items():
                 self.assertEqual(c["issues"],288)
                 self.assertEqual(sum(c.get(k,0) for k in ("SUCCESS","FAILURE","PENDING","UNKNOWN","ABSTAIN")),288)
