@@ -158,6 +158,9 @@ def score_flight_lead(*,source=SOURCE,roster=None,asof=None,days=7,
                         "observed_clean_restocks":v["observed_clean_restocks"],
                         "candidate_coverage":_rate(v["candidate_available"],len(truths)),
                         "candidate_count":v["candidate_available"],
+                        "matched_at_15s":v["matches_15s"],
+                        "matched_at_60s":v["matches_60s"],
+                        "matched_at_10m":v["matches_10m"],
                         "recall_at_15s":_rate(v["matches_15s"],len(truths)),
                         "recall_at_60s":_rate(v["matches_60s"],len(truths)),
                         "recall_at_10m":_rate(v["matches_10m"],len(truths)),
@@ -178,15 +181,19 @@ def score_flight_lead(*,source=SOURCE,roster=None,asof=None,days=7,
             n=r["observed_clean_restocks"]
             v["observed"]+=n
             v["candidate"]+=r["candidate_count"]
-            # Reconstruct exact matches from displayed per-item rounded rates
-            # is lossy; preserve internal counts below instead.
+            v["matches_15s"]+=r["matched_at_15s"]
+            v["matches_60s"]+=r["matched_at_60s"]
+            v["matches_10m"]+=r["matched_at_10m"]
         totals[policy]={
             "observed_restocks":v["observed"],
             "candidate_count":v["candidate"],
             "candidate_coverage":_rate(v["candidate"],v["observed"]),
-            "recall_15s":None,
-            "recall_60s":None,
-            "recall_10m":None,
+            "matched_at_15s":v["matches_15s"],
+            "matched_at_60s":v["matches_60s"],
+            "matched_at_10m":v["matches_10m"],
+            "recall_15s":_rate(v["matches_15s"],v["observed"]),
+            "recall_60s":_rate(v["matches_60s"],v["observed"]),
+            "recall_10m":_rate(v["matches_10m"],v["observed"]),
         }
     return {
         "status":"V165_HISTORICAL_RESTOCK_CONDITIONED_FLIGHT_LEAD_REPLAY",
