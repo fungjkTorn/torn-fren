@@ -12,6 +12,7 @@ import argparse
 import bisect
 import json
 import math
+import os
 import sqlite3
 import sys
 import time
@@ -25,11 +26,13 @@ from pathlib import Path
 # one-item recheck explicitly pins research.__path__; the standalone CLI
 # must do the same. When the stage does not exist (e.g., GitHub CI), normal
 # checked-out research modules remain in use.
-PINNED_RESEARCH_STAGE=Path(
+PINNED_RESEARCH_STAGE=Path(os.environ.get(
+    "TORNFREN_REPLAY_PINNED_RESEARCH",
     "/home/ubuntu/torn-fren-private-models/v160_stage/pinned/research"
-)
+))
 if PINNED_RESEARCH_STAGE.is_dir():
-    WORK=Path("/home/ubuntu/torn-fren-v38-probe")
+    WORK=Path(os.environ.get(
+        "TORNFREN_REPLAY_WORK","/home/ubuntu/torn-fren-v38-probe"))
     if not WORK.is_dir():
         raise RuntimeError("pinned replay research checkout missing")
     sys.path.insert(0,str(WORK))
