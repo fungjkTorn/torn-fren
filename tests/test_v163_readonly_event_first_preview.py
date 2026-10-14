@@ -3,7 +3,10 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import sqlite3
+import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -106,6 +109,48 @@ class EventTimelineTests(unittest.TestCase):
         self.assertEqual(widths,sorted(widths))
         self.assertGreater(widths[-1],widths[0])
         self.assertTrue(all(e["predicted_restock_epoch"]<=ASOF+28800 for e in events))
+
+    def test_source_streamed_to_python_stdin_pins_research_on_foreign_cwd(self):
+        # Reproduce the real VM failure: git show | python -, where the
+        # checked-out worktree does not necessarily contain V128 and imports
+        # have to resolve from the separately staged pinned research tree.
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp)
+            work=root/"checkout"
+            (work/"research").mkdir(parents=True)
+            stage=root/"pinned"/"research"
+            champions=stage/"plushie_champions"
+            champions.mkdir(parents=True)
+            modules={
+                "plushie_champions/common.py":"TRAVEL_SECONDS={'mex':1020}\\n",
+                "v128_full24_earliest_shadow.py":
+                    "_gap_index=None\\n_read_item=None\\nexact_roster=None\\n",
+                "v145_provider_continuous_phases.py":
+                    "provider_continuous_phases=None\\n",
+                "v60_private_snapshot_probe.py":"read_heartbeat=None\\n",
+            }
+            for name,content in modules.items():
+                dest=stage/name
+                dest.write_text(content.replace("\\\\n","\\n"),encoding="utf8")
+            outside=root/"outside"
+            outside.mkdir()
+            env=os.environ.copy()
+            env.update(TORNFREN_REPLAY_PINNED_RESEARCH=str(stage),
+                       TORNFREN_REPLAY_WORK=str(work),PYTHONPATH="",
+                       PYTHONDONTWRITEBYTECODE="1")
+            run=subprocess.run([sys.executable,"-","--help"],
+                input=FILE.read_text(encoding="utf8"),text=True,
+                cwd=outside,env=env,capture_output=True,timeout=20)
+            self.assertEqual(run.returncode,0,run.stderr)
+            self.assertIn("--historical-replay-days",run.stdout)
+            # Removing one pinned dependency must FAIL, not silently import
+            # a similarly named version from the mutable checkout.
+            (stage/"v128_full24_earliest_shadow.py").unlink()
+            fail=subprocess.run([sys.executable,"-","--help"],
+                input=FILE.read_text(encoding="utf8"),text=True,
+                cwd=outside,env=env,capture_output=True,timeout=20)
+            self.assertNotEqual(fail.returncode,0)
+            self.assertIn("v128_full24_earliest_shadow",fail.stderr)
 
     def test_nearby_overlapping_restock_events_use_optimal_not_greedy_matching(self):
         # Greedy chooses 11 (distance 1) for forecast 10, then cannot
