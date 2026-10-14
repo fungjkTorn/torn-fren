@@ -76,12 +76,19 @@ class ZeroCycles:
         raw_events=result['restock_events']
         physical_current=result['current_stock_window']
         result['restock_events']=[];result['current_stock_window']=None
+        result['forecast_event_count']=0
+        result['physical_restock_event_count']=len(raw_events)
+        result['currently_supported_departures']=0
+        result['unreachable_restock_events']=0
         if physical_current:
             result['true_depletion_events'].append({
                 'predicted_true_depletion_epoch':physical_current['predicted_stock_below_30_epoch']})
         for event in raw_events:
             result['true_restock_events'].append({
-                'predicted_restock_epoch':event['predicted_restock_epoch']})
+                'predicted_restock_epoch':event['predicted_restock_epoch'],
+                'restock_early_epoch':event['restock_early_epoch'],
+                'restock_late_epoch':event['restock_late_epoch'],
+                'predicted_true_depletion_epoch':event['predicted_stock_below_30_epoch']})
             result['true_depletion_events'].append({
                 'predicted_true_depletion_epoch':event['predicted_stock_below_30_epoch']})
         if result['status']!='EVENT_TIMELINE_FORECAST_AVAILABLE':
@@ -115,4 +122,6 @@ class ZeroCycles:
                     asof,asof,min(remaining['early'],duration))
                 result['current_stock_window']['predicted_true_depletion_epoch']=zero
         result['forecast_event_count']=len(result['restock_events'])
+        result['currently_supported_departures']=sum(w['expected_departure_epoch'] is not None for w in result['restock_events'])
+        result['unreachable_restock_events']=sum(w['expected_departure_epoch'] is None for w in result['restock_events'])
         return result

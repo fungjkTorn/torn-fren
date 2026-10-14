@@ -50,6 +50,19 @@ class ZeroClockTests(unittest.TestCase):
         self.assertEqual(decision['forecast_events'][0]['predicted_true_depletion_epoch'],s+600)
         with self.assertRaises(ValueError):z.forecast('mex:Jaguar Plushie',asof=s)
 
+    def test_physical_restock_does_not_invent_30_unit_availability(self):
+        z=ZeroCycles(lambda a,b:False);z.add(model.OBS(T,0,'a'))
+        for i in range(10):
+            z.add(model.OBS(T+i*300+100,10,'a'))
+            z.add(model.OBS(T+i*300+300,0,'a'))
+        f=z.forecast('mex:Jaguar Plushie',asof=T+3020)
+        self.assertEqual(f['status'],'RESTOCK_QUANTITY_TARGET_UNSUPPORTED')
+        self.assertEqual(f['forecast_event_count'],0)
+        self.assertEqual(f['currently_supported_departures'],0)
+        self.assertGreater(f['physical_restock_event_count'],0)
+        self.assertTrue(f['true_restock_events'])
+        self.assertIsNone(project_policy(f,now=T+3020,poll_age_seconds=0)['estimated_departure_epoch'])
+
     def test_provider_crossing_or_gap_cannot_invent_zero_anchor(self):
         z=ZeroCycles(lambda a,b:a<=T+150<=b)
         z.add(model.OBS(T,100,'a'));z.add(model.OBS(T+100,20,'a'))
