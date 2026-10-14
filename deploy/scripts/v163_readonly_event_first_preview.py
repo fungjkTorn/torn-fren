@@ -512,6 +512,8 @@ def replay_events(*,source=COLLECTOR,roster=None,asof=None,days=7,
                 "ambiguous_crossings_excluded":c["ambiguous_threshold_crossings"],
                 "forecast_statuses":dict(statuses),
             }
+            if progress is not None:
+                progress(item,len(all_results),limit_items)
     matched=sum(v["matched_timing"] for v in all_results.values())
     actual=sum(v["observed_restocks"] for v in all_results.values())
     projected=sum(v["forecast_restocks"] for v in all_results.values())
@@ -579,8 +581,11 @@ def main():
     if not 1<=args.hours<=8:
         parser.error("horizon must be 1-8 hours")
     if args.historical_replay_days is not None:
+        def progress(item,done,total):
+            print(f"V163 replay processed {done}/{total} items: {item}",
+                  file=sys.stderr,flush=True)
         result=replay_events(days=args.historical_replay_days,
-                             limit_items=args.limit_items)
+                             limit_items=args.limit_items,progress=progress)
         print(json.dumps(result,sort_keys=True) if args.json else
               format_replay(result))
     else:
