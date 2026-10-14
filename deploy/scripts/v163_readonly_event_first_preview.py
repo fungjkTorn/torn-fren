@@ -303,22 +303,42 @@ def confirmed_restocks(rows,gaps,*,start,end):
 
 
 def match_events(predicted,actual,*,tolerance=600):
-    """One-to-one event timing matches, counting ALL extra predicted events."""
+    """Optimal one-to-one, ORDER-PRESERVING event matching.
+
+    Maximize number of restocks matched before minimizing the summed
+    absolute timing error. A greedy nearest-neighbor can undercount real
+    successful forecast events when adjacent restock windows overlap.
+    The optimal matching for sorted one-dimensional absolute distances
+    admits noncrossing assignments, so dynamic programming is exact.
+    """
     if type(tolerance) is not int or tolerance<0:
         raise ValueError("invalid event timing tolerance")
-    available=set(range(len(actual)))
-    errors=[]
-    for prediction in sorted(predicted):
-        eligible=[k for k in available if abs(actual[k]-prediction)<=tolerance]
-        if eligible:
-            idx=min(eligible,key=lambda k:(abs(actual[k]-prediction),actual[k]))
-            available.remove(idx)
-            errors.append(abs(actual[idx]-prediction))
+    if (len(predicted)>MAX_EVENTS or len(actual)>MAX_ITEM_CHANGE_ROWS or
+        any(type(t) is not int for t in predicted+actual)):
+        raise ValueError("invalid or unbounded event lists")
+    p=sorted(predicted)
+    a=sorted(actual)
+    # Score (number matched, negative absolute error): lexicographic max.
+    # Use rolling rows: O(predicted * actual) time, O(actual) memory.
+    old=[(0,0)]*(len(a)+1)
+    for issue in p:
+        new=[(0,0)]
+        for j,event in enumerate(a,1):
+            skip_prediction=old[j]
+            skip_observed=new[j-1]
+            best=max(skip_prediction,skip_observed)
+            delta=abs(issue-event)
+            if delta<=tolerance:
+                matched,error_score=old[j-1]
+                best=max(best,(matched+1,error_score-delta))
+            new.append(best)
+        old=new
+    matched,negative_error=old[-1]
     return {
-        "matched":len(errors),
-        "missed_actual":len(available),
-        "false_predicted":len(predicted)-len(errors),
-        "sum_absolute_timing_error_seconds":sum(errors),
+        "matched":matched,
+        "missed_actual":len(a)-matched,
+        "false_predicted":len(p)-matched,
+        "sum_absolute_timing_error_seconds":-negative_error,
     }
 
 
