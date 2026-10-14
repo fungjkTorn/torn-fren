@@ -694,6 +694,8 @@ def format_replay(result):
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--hours",type=int,default=8)
+    parser.add_argument("--source",type=Path,default=COLLECTOR,
+                        help="Existing SQLite stock history or sanitized research snapshot")
     parser.add_argument("--json",action="store_true")
     parser.add_argument("--historical-replay-days",type=int,default=None)
     parser.add_argument("--limit-items",type=int,default=24)
@@ -706,13 +708,13 @@ def main():
         def progress(item,done,total):
             print(f"V163 replay processed {done}/{total} items: {item}",
                   file=sys.stderr,flush=True)
-        result=replay_events(days=args.historical_replay_days,
+        result=replay_events(source=args.source,days=args.historical_replay_days,
                              limit_items=args.limit_items,progress=progress,
                              cycle_windows=(8,16,32) if args.compare_recent else ())
         print(json.dumps(result,sort_keys=True) if args.json else
               format_replay(result))
     else:
-        result=forecast_all(horizon=args.hours*3600)
+        result=forecast_all(source=args.source,horizon=args.hours*3600)
         print(json.dumps(result,sort_keys=True) if args.json else format_report(result))
 
 
