@@ -263,7 +263,7 @@ def replay(*, source, days=2, asof=None, limit_items=24,
                         c["matched_issues"]+=1
                         c["challenger_only_success"]+=challenger=="SUCCESS" and incumbent=="FAILURE"
                         c["v166_only_success"]+=challenger=="FAILURE" and incumbent=="SUCCESS"
-            results[key]={"policies":{p:dict(summarize(stats[p]),
+            results[key]={"player_flight_seconds":model.TRAVEL_SECONDS[country],"policies":{p:dict(summarize(stats[p]),
                 first_proposal_per_issue_phase=summarize(episode_stats[p]),
                 distinct_observed_stock_episodes_reached=len(landed_episodes[p]),
                 chronological_day_slices=[summarize(c) for c in chronological[p]],

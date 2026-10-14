@@ -5,11 +5,13 @@ on:
     paths:
       - 'research/continuous_departure_replay.py'
       - 'research/causal_daily_template.py'
+      - 'research/per_item_readiness.py'
       - 'services/travel_window_policy.py'
       - 'services/travel_read_model.py'
       - 'web/travel_decisions*'
       - 'tests/test_travel_read_model.py'
       - 'tests/test_causal_daily_template.py'
+      - 'tests/test_per_item_readiness.py'
       - 'tests/test_travel_decisions_router.py'
       - 'tests/travel_decisions*'
       - 'tests/test_continuous_departure_replay.py'
@@ -35,6 +37,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_travel_read_model.py' -v
           python -m unittest discover -s tests -p 'test_causal_daily_template.py' -v
           python -m unittest discover -s tests -p 'test_travel_decisions_router.py' -v
+          python -m unittest discover -s tests -p 'test_per_item_readiness.py' -v
       - name: Check player interface JavaScript
         run: |
           python - <<'PY'

@@ -49,8 +49,13 @@ def build_board(snapshot,*,now,flight_overrides=None):
             if type(hits) is int and type(n) is int and 0<=hits<=n and n>0:
                 study={"successes":hits,"resolved_arrivals":n,"historical_fraction":hits/n,
                        "label":"Historical sampled-arrival study",
-                       "policy":record.get("policy"),"matches_selected_policy":record.get("policy")==policy,
+                       "policy":record.get("policy"),
+                       "matches_selected_policy":record.get("policy")==policy,
+                       "matches_selected_flight":record.get("player_flight_seconds")==decision['player_flight_seconds'],
+                       "matches_selected_model":bool(snapshot.get('model_sha')) and record.get('model_sha')==snapshot.get('model_sha'),
                        "prospective_certified":False}
+                study['applies_to_selected_trip']=(study['matches_selected_policy']
+                    and study['matches_selected_flight'] and study['matches_selected_model'])
         depart=decision["estimated_departure_epoch"]
         landing=depart+decision["player_flight_seconds"] if depart is not None else None
         rows.append({"item_key":key,"country":country,"country_name":COUNTRIES.get(country,country),

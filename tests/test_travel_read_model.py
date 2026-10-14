@@ -62,5 +62,15 @@ class BoardTests(unittest.TestCase):
         with self.assertRaises(ValueError):build_board(data,now=T)
         with self.assertRaises(ValueError):build_board({"asof_epoch":T,"items":dict.fromkeys(range(251),{})},now=T)
 
+    def test_default_flight_results_never_borrowed_for_custom_flight_or_new_model(self):
+        data=snapshot();data['model_sha']='source-a'
+        data['item_evidence']={'mex:Jaguar Plushie':{'successes':85,'resolved_arrivals':100,
+            'policy':'median','player_flight_seconds':1020,'model_sha':'source-a'}}
+        self.assertTrue(build_board(data,now=T)['rows'][0]['evidence']['applies_to_selected_trip'])
+        override=build_board(data,now=T,flight_overrides={'mex':1500})
+        self.assertFalse(override['rows'][0]['evidence']['applies_to_selected_trip'])
+        data['model_sha']='source-b'
+        self.assertFalse(build_board(data,now=T)['rows'][0]['evidence']['applies_to_selected_trip'])
+
 
 if __name__=="__main__":unittest.main()
