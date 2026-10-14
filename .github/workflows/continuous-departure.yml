@@ -7,6 +7,8 @@ on:
       - 'research/causal_daily_template.py'
       - 'research/causal_phase_analogs.py'
       - 'research/depletion_timing_audit.py'
+      - 'research/true_zero_cycles.py'
+      - 'tests/test_true_zero_cycles.py'
       - 'research/plushie_champions/common.py'
       - 'tests/test_specialist_resolved_features.py'
       - 'tests/test_depletion_timing_audit.py'
@@ -50,6 +52,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_causal_daily_template.py' -v
           python -m unittest discover -s tests -p 'test_causal_phase_analogs.py' -v
           python -m unittest discover -s tests -p 'test_depletion_timing_audit.py' -v
+          python -m unittest discover -s tests -p 'test_true_zero_cycles.py' -v
           python -m unittest discover -s tests -p 'test_specialist_resolved_features.py' -v
           python -m unittest discover -s tests -p 'test_product_runtime_audit.py' -v
           python -m unittest discover -s tests -p 'test_departure_reconfirmation.py' -v

@@ -110,6 +110,12 @@ def build_item_travel_decision(
             "reason":("ESTIMATED_STOCKED_PHASE_REACHABLE" if reachable
                       else "NOT_REACHABLE_WITH_PLAYER_FLIGHT"),
         }
+        true_zero=record.get('predicted_true_depletion_epoch')
+        if true_zero is not None:
+            _epoch(true_zero,'true zero depletion')
+            if true_zero<stock_end:
+                raise ValueError('zero depletion precedes availability loss')
+        event['predicted_true_depletion_epoch']=true_zero
         events.append(event)
         if reachable and candidate is None:
             candidate=event
@@ -148,6 +154,8 @@ def build_item_travel_decision(
         "source_poll_age_seconds":poll_age_seconds,
         "player_flight_seconds":flight,
         "target_quantity":target_qty,
+        "depletion_stock_quantity":forecast.get("depletion_stock_quantity"),
+        "restock_timer_anchor":forecast.get("restock_timer_anchor"),
         "arrival_grace_seconds":grace_seconds,
         "status":status,
         "reason":reason,

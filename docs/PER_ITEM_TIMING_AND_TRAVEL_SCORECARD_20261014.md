@@ -4,11 +4,13 @@ Source: private [run38612854929](https://github.com/fungjkTorn/torn-fren-researc
 
 **These are historical sampled-stock measurements, not prospective live player-flight performance. All prospective rates remain unverified in this report.** Existing prospective V160 records are separate and were not accessed by the isolated worker.
 
-Timing columns show one-to-one event recall (matched / clean observed events) in nonoverlapping four-hour forecast cohorts. They do not show forecast precision. Depletion means crossing from>=30 to<30, not literal zero inventory. Departure success means observed stock>=30 at simulated arrival under five-minute replanning; it does not prove the earliest possible departure was selected. Unknowns and pending arrivals are excluded from the resolved denominator and remain separate in the evidence below.
+**Correction:** True depletion is exactly zero stock. The below-30 columns in this historical report measure availability loss and must not be presented as true-depletion accuracy. A separate zero-anchored model and true-zero audit supersede that interpretation; their results require a fresh run.
+
+Timing columns show one-to-one event recall (matched / clean observed events) in nonoverlapping four-hour forecast cohorts. They do not show forecast precision. Availability loss means crossing from>=30 to<30; it never starts the physical depletion/restock timer. Departure success means observed stock>=30 at simulated arrival under five-minute replanning; it does not prove the earliest possible departure was selected. Unknowns and pending arrivals are excluded from the resolved denominator and remain separate in the evidence below.
 
 Research candidate policies use the existing readiness gate. Starred weak items have no qualifying candidate, so their displayed rates use the explicitly identified V166 all-history median baseline; these are not claimed to be their best possible specialist results. Archived specialists still require causal parity comparison. No production policy changed.
 
-| Country · item | Restock ±1m / ±10m | Depletion ±1m / ±10m | Stock at arrival |
+| Country · item | Restock ±1m / ±10m | Availability loss (<30) ±1m / ±10m | Stock at arrival |
 |---|---:|---:|---:|
 | Argentina · Ceibo Flower | 7.4% / 44.4% | 0.0% / 6.9% | 95.9% (141/147) |
 | Argentina · Monkey Plushie * | 7.2% / 45.1% | 6.1% / 38.7% | 66.5% (103/155) |
@@ -37,7 +39,7 @@ Research candidate policies use the existing readiness gate. Starred weak items 
 
 ## Policy identity, timing precision and excluded arrival outcomes
 
-| Item key | Policy | Restock matched/observed; precision ±10m | Depletion matched/observed; precision ±10m | Arrival unknown / pending / no departure |
+| Item key | Policy | Restock matched/observed; precision ±10m | Availability loss matched/observed; precision ±10m | Arrival unknown / pending / no departure |
 |---|---|---|---|---|
 | arg:Ceibo Flower | phase_analog_current_quarter | 12/27; 41.4% | 2/29; 6.9% | 17 / 4 / 0 |
 | arg:Monkey Plushie | v166_all_history | 88/195; 42.9% | 82/212; 40.4% | 11 / 2 / 0 |
@@ -74,3 +76,4 @@ Research candidate policies use the existing readiness gate. Starred weak items 
 Monkey stocked median1534s long-run versus1017s recent8; Panda1869s versus1136s; Chamois1595s versus1049s; Nessie1654s versus1141s. Depleted medians are much steadier, roughly15–16min for these plushies. Longer flights span multiple cycles; projected stock-lifetime errors can compound. Test quantity/consumption-rate lifetime prediction and distinguish true-zero onset from the<30 availability threshold, then reproduce the existing global-regime/ML selectors causally. These are hypotheses, not verified improvements.
 
 The broader gate remains12 historical-target candidates,4 promising and8 requiring research. A100% finite sample is not a guarantee. Fresh forward validation, stock-provider freshness, waiting costs, calibration, and safe product integration remain outstanding. Original V2 and experimental pages were preserved; no live deployment occurred.
+
