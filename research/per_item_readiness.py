@@ -26,9 +26,14 @@ def readiness(report):
             slices=v.get('chronological_day_slices') or []
             latest=slices[-1].get('success_fraction') if slices else None
             coverage=v.get('proposal_fraction');proposals=v.get('proposals',0)
+            executed=v.get('replanned_hourly_starts') or {}
+            executed_rate=executed.get('success_fraction')
+            executed_coverage=executed.get('departure_coverage')
             if (type(n) is not int or type(hits) is not int or not 0<=hits<=n
                 or n<500 or phase.get('scored',0)<20 or coverage is None or coverage<.6
-                or latest is None or proposals<=0):
+                or latest is None or proposals<=0
+                or executed.get('scored',0)<100 or executed_rate is None
+                or executed_coverage is None or executed_coverage<.6):
                 continue
             comparison=item.get('matched_v166_comparisons',{}).get(policy,{})
             if policy!='v166_all_history' and (
@@ -40,9 +45,12 @@ def readiness(report):
                 'successes':hits,'resolved_arrivals':n,'historical_fraction':hits/n,
                 'latest_day_fraction':latest,'proposal_coverage':coverage,
                 'scored_issue_phase_proposals':phase['scored'],
+                'replanned_historical_fraction':executed_rate,
+                'replanned_departure_coverage':executed_coverage,
+                'replanned_scored_arrivals':executed['scored'],
                 'mean_planned_wait_seconds':v.get('wait_seconds_sum',0)/proposals}
-            if hits/n>=.9 and latest>=.9:qualified.append(candidate)
-            elif hits/n>=.8 and latest>=.8:promising.append(candidate)
+            if hits/n>=.9 and latest>=.9 and executed_rate>=.9:qualified.append(candidate)
+            elif hits/n>=.8 and latest>=.8 and executed_rate>=.8:promising.append(candidate)
         eligible=qualified or promising
         # Earliest useful travel is an objective. Prefer the smaller
         # observed waiting cost among candidates clearing the same gate.
@@ -55,6 +63,7 @@ def readiness(report):
     return {'status':'PER_ITEM_RESEARCH_READINESS','model_sha':report.get('model_sha'),
             'asof_epoch':report.get('asof_epoch'),'days':report.get('days'),
             'target_arrival_success_fraction':.9,'minimum_proposal_coverage':.6,
+            'minimum_replanned_scored_arrivals':100,'minimum_replanned_departure_coverage':.6,
             'minimum_resolved_arrivals':500,'minimum_scored_issue_phase_proposals':20,
             'rows':rows,'automatic_model_promotion':False,
             'genuine_prospective_validation':False,
