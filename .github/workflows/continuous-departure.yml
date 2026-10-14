@@ -6,6 +6,8 @@ on:
       - 'research/continuous_departure_replay.py'
       - 'research/causal_daily_template.py'
       - 'research/causal_phase_analogs.py'
+      - 'research/depletion_timing_audit.py'
+      - 'tests/test_depletion_timing_audit.py'
       - 'research/product_runtime_audit.py'
       - 'research/departure_reconfirmation.py'
       - 'research/build_travel_event_snapshot.py'
@@ -45,6 +47,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_travel_read_model.py' -v
           python -m unittest discover -s tests -p 'test_causal_daily_template.py' -v
           python -m unittest discover -s tests -p 'test_causal_phase_analogs.py' -v
+          python -m unittest discover -s tests -p 'test_depletion_timing_audit.py' -v
           python -m unittest discover -s tests -p 'test_product_runtime_audit.py' -v
           python -m unittest discover -s tests -p 'test_departure_reconfirmation.py' -v
           python -m unittest discover -s tests -p 'test_build_travel_event_snapshot.py' -v

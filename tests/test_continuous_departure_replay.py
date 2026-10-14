@@ -65,6 +65,10 @@ class ContinuousTests(unittest.TestCase):
             families=report['event_models_fixed_four_hour']
             self.assertGreater(families['v163']['observed'],0)
             self.assertEqual(families['v163']['observed'],families['daily_template']['observed'])
+            depleted=report['depletion_models_fixed_four_hour']
+            self.assertGreater(depleted['v163']['observed'],0)
+            self.assertEqual(len({v['observed'] for v in depleted.values()}),1)
+            self.assertTrue(all(v['matched_600s']<=min(v['observed'],v['forecast']) for v in depleted.values()))
             for policy,c in report["policies"].items():
                 self.assertEqual(c["issues"],288)
                 rc=report["items"][next(iter(report["items"]))]["policies"][policy]["replanned_hourly_starts"]

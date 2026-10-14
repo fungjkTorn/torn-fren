@@ -18,6 +18,7 @@ class PhaseAnalogs:
             raise ValueError('invalid history capacity')
         self.crosses = crosses
         self.neighbors = neighbors
+        self.capacity = capacity
         self.records = {True: deque(maxlen=capacity), False: deque(maxlen=capacity)}
         self.last = None
         self.phase = self.onset = self.features = None
@@ -72,5 +73,5 @@ class PhaseAnalogs:
         forecast = model.predict_events(key, dict(state, **selected), asof=asof)
         forecast.update(model_name='causal_item_phase_analogs_v1',
                         analog_neighbors=self.neighbors, analog_history_counts=counts,
-                        cycle_window='phase_analogs_18', calibration_state='UNCALIBRATED')
+                        cycle_window=f'phase_analogs_{self.neighbors}'+(f'_recent{self.capacity}' if self.capacity!=512 else ''), calibration_state='UNCALIBRATED')
         return forecast

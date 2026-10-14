@@ -22,6 +22,7 @@ from services.travel_decision_contract_v166 import build_item_travel_decision
 from research.causal_daily_template import DailyTemplate
 from research.causal_phase_analogs import PhaseAnalogs
 from research.departure_reconfirmation import evaluate as evaluate_reconfirmation
+from research.depletion_timing_audit import observed_depletions, predicted_depletions, count_events
 from services.travel_window_policy import project_policy
 from research.v151_stable_earliest_departure import stable_earliest_departure
 
@@ -39,7 +40,10 @@ POLICIES = (("v166_all_history", None, "median"),
             ("v151_independent_48", None, "v151"),
             ("phase_analog_quarter", None, "quarter"),
             ("phase_analog_midpoint", None, "midpoint"),
-            ("phase_analog_current_quarter", None, "current_quarter"))
+            ("phase_analog_current_quarter", None, "current_quarter"),
+            ("phase_recent64_quarter", None, "quarter"),
+            ("phase_recent64_midpoint", None, "midpoint"),
+            ("phase_recent64_current_quarter", None, "current_quarter"))
 MAX_POLLS = 400000
 VERSION = "continuous_departure_replay_v1"
 
@@ -130,7 +134,8 @@ def replay(*, source, days=2, asof=None, limit_items=24,
     path = Path(source).resolve(strict=True)
     results = {}
     totals = {p:Counter() for p,_,_ in POLICIES}
-    event_totals={p:Counter() for p in ('v163','daily_template','phase_analogs')}
+    depletion_totals={p:Counter() for p in ('v163','daily_template','phase_analogs','phase_recent64')}
+    event_totals={p:Counter() for p in ('v163','daily_template','phase_analogs','phase_recent64')}
     with closing(sqlite3.connect(path.as_uri()+"?mode=ro", uri=True)) as db:
         db.execute("PRAGMA query_only=ON")
         db.execute("BEGIN")
@@ -155,10 +160,12 @@ def replay(*, source, days=2, asof=None, limit_items=24,
                 raise ValueError("invalid stock row")
             obs = [model.OBS(t,q,s) for t,q,s in raw]
             crosses, clean, _ = model._replay_restock_index(obs,gaps,now)
+            depleted = observed_depletions(obs,crosses)
             evidence = ArrivalEvidence(obs,polls,gaps,now)
             template_model=DailyTemplate(obs,crosses)
             phases = model._ReplayPhases(crosses)
             analogs = PhaseAnalogs(crosses)
+            recent_analogs = PhaseAnalogs(crosses,capacity=64)
             cursor = 0
             plans = {p:[] for p,_,_ in POLICIES}
             stats = {p:Counter() for p,_,_ in POLICIES}
@@ -169,11 +176,13 @@ def replay(*, source, days=2, asof=None, limit_items=24,
             chronological = {p:[Counter() for _ in range(days)] for p,_,_ in POLICIES}
             paired = {p:Counter() for p,_,_ in POLICIES if p!="v166_all_history"}
             event_stats={p:Counter() for p in event_totals}
+            depletion_stats={p:Counter() for p in depletion_totals}
             for issued in issues:
                 while cursor<len(obs) and obs[cursor].epoch<=issued:
-                    phases.add(obs[cursor]); analogs.add(obs[cursor]); cursor+=1
+                    phases.add(obs[cursor]); analogs.add(obs[cursor]); recent_analogs.add(obs[cursor]); cursor+=1
                 state = phases.asof()
                 analog_events = analogs.forecast(key, state, asof=issued)
+                recent_events = recent_analogs.forecast(key, state, asof=issued)
                 pi = bisect.bisect_right(polls,issued)-1
                 age = issued-polls[pi] if pi>=0 else None
                 if crosses(issued,issued):
@@ -189,18 +198,21 @@ def replay(*, source, days=2, asof=None, limit_items=24,
                     forecasts[None]=model.predict_events(key,state,asof=issued)
                     end=min(issued+4*3600,now)
                     truths=clean[bisect.bisect_right(clean,issued):bisect.bisect_right(clean,end)]
-                    for family,stream in (('v163',forecasts[None]),('daily_template',template_events),('phase_analogs',analog_events)):
+                    for family,stream in (('v163',forecasts[None]),('daily_template',template_events),('phase_analogs',analog_events),('phase_recent64',recent_events)):
                         predictions=[e['predicted_restock_epoch'] for e in stream['restock_events']
                                      if issued<e['predicted_restock_epoch']<=end
                                      and age is not None and age<=180]
-                        ec=event_stats[family];ec['observed']+=len(truths);ec['forecast']+=len(predictions)
-                        for tol in (15,60,600):
-                            ec[f'matched_{tol}s']+=model.match_events(predictions,truths,tolerance=tol)['matched']
+                        count_events(event_stats[family],predictions,truths)
+                        depletion_truth=depleted[bisect.bisect_right(depleted,issued):bisect.bisect_right(depleted,end)]
+                        depletion_predictions=(predicted_depletions(stream,start=issued,end=end)
+                            if age is not None and age<=180 else [])
+                        count_events(depletion_stats[family],depletion_predictions,depletion_truth)
                 issued_outcomes = {}
                 for policy, window, kind in POLICIES:
                     if window not in forecasts:
                         forecasts[window] = model.predict_events(key,state,asof=issued,recent_cycles=window)
-                    forecast = (analog_events if policy.startswith("phase_analog_") else
+                    forecast = (recent_events if policy.startswith("phase_recent64_") else
+                                analog_events if policy.startswith("phase_analog_") else
                                 template_events if policy.startswith("daily_event_") else forecasts[window])
                     decision = choose(forecast,issued,age,kind,template,v151)
                     dep = decision["estimated_departure_epoch"]
@@ -284,6 +296,14 @@ def replay(*, source, days=2, asof=None, limit_items=24,
             results[key]['event_models_fixed_four_hour']= {p:dict(c,
                 recall_10m=rate(c['matched_600s'],c['observed']),
                 precision_10m=rate(c['matched_600s'],c['forecast'])) for p,c in event_stats.items()}
+            results[key]['depletion_models_fixed_four_hour']={p:dict(c,
+                recall_10m=rate(c['matched_600s'],c['observed']),
+                precision_10m=rate(c['matched_600s'],c['forecast'])) for p,c in depletion_stats.items()}
+            results[key]['completed_phase_diagnostics']={
+                field:{'count':len(state[field]),'all_median_seconds':model.quantile(state[field],.5) if state[field] else None,
+                       'recent8_median_seconds':model.quantile(state[field][-8:],.5) if state[field] else None}
+                for field in ('stocked_durations','depleted_durations')}
+            for p,c in depletion_stats.items():depletion_totals[p].update(c)
             for p,c in event_stats.items():event_totals[p].update(c)
             for p in totals:
                 totals[p].update(stats[p])
@@ -296,6 +316,10 @@ def replay(*, source, days=2, asof=None, limit_items=24,
             "event_models_fixed_four_hour":{p:dict(c,
                 recall_10m=rate(c['matched_600s'],c['observed']),
                 precision_10m=rate(c['matched_600s'],c['forecast'])) for p,c in event_totals.items()},
+            "depletion_models_fixed_four_hour":{p:dict(c,
+                recall_10m=rate(c['matched_600s'],c['observed']),
+                precision_10m=rate(c['matched_600s'],c['forecast'])) for p,c in depletion_totals.items()},
+            "depletion_definition":"Observed >=30 to <30 crossing; not necessarily zero stock",
             "chronological_slices_policy":"Equal consecutive 24h issue slices; all policies fixed before replay. Latest day is a diagnostic holdout, not pristine lockbox after inspection.",
             "future_truth_selects_issue_times":False,"genuine_live_issuance":False,
             "source_written":False,"poll_backed_arrival_availability_measured":True,
