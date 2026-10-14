@@ -5,6 +5,7 @@ on:
     paths:
       - 'deploy/research_runner/**'
       - 'tests/test_research_runner_export_snapshot.py'
+      - 'tests/test_research_runner_bootstrap_contract.py'
       - '.github/workflows/research-export-snapshot.yml'
   workflow_dispatch:
 jobs:
@@ -19,4 +20,6 @@ jobs:
         with:
           python-version: '3.12'
       - name: Verify no-secret bounded research snapshot
-        run: python -m unittest discover -s tests -p 'test_research_runner_export_snapshot.py' -v
+        run: |
+          python -m unittest discover -s tests -p 'test_research_runner_export_snapshot.py' -v
+          python -m unittest discover -s tests -p 'test_research_runner_bootstrap_contract.py' -v
