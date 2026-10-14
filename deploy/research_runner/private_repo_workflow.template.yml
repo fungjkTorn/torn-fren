@@ -15,7 +15,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   historical-restock-comparison:
-    runs-on: [self-hosted, Linux, X64, torn-fren-research]
+    runs-on: [self-hosted, Linux, torn-fren-research]
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
