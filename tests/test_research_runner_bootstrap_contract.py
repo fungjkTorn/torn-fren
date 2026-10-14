@@ -2,6 +2,9 @@
 from pathlib import Path
 import re
 import subprocess
+import sys
+import tempfile
+import json
 import unittest
 
 ROOT=Path(__file__).resolve().parents[1]/"deploy"/"research_runner"
@@ -54,6 +57,49 @@ class ResearchRunnerContracts(unittest.TestCase):
                       (ROOT/"harden_private_runner.sh").read_text())
         self.assertIn("InaccessiblePaths=/opt/torn-fren/data",
                       (ROOT/"harden_private_runner.sh").read_text())
+
+    def test_real_runner_registration_parsers_accept_utf8_bom(self):
+        """GitHub config.sh writes .runner as UTF-8 BOM JSON on ARM64.
+
+        Execute both EXACT embedded Python preflight snippets on a fixture,
+        not just a source substring assertion, so the previous VM error
+        cannot recur before systemd service installation.
+        """
+        validators=[
+            ("install_and_harden_registered_runner.sh", "VERIFY_SCOPE", True),
+            ("harden_private_runner.sh", "CHECK_SCOPE", False),
+        ]
+        expected="https://github.com/fungjktorn/torn-fren-research-private"
+        for filename,label,extra_arg in validators:
+            src=(ROOT/filename).read_text(encoding="utf8")
+            pattern=r"<<'"+label+r"'\\n(.*?)\\n"+label
+            match=re.search(pattern,src,re.DOTALL)
+            self.assertIsNotNone(match, filename+" missing parser body")
+            snippet=match.group(1)
+            with tempfile.TemporaryDirectory() as tmp:
+                config=Path(tmp)/".runner"
+                for bom in (False,True):
+                    config.write_bytes(
+                        ("\\ufeff" if bom else "").encode("utf8")+
+                        json.dumps({"gitHubUrl":
+                            "https://github.com/fungjkTorn/torn-fren-research-private"}).encode("utf8"))
+                    args=[sys.executable,"-",str(config)]
+                    if extra_arg:
+                        args.append(expected)
+                    proc=subprocess.run(args,input=snippet,text=True,
+                                        capture_output=True,timeout=8)
+                    self.assertEqual(proc.returncode,0,
+                        f"{filename} bom={bom}: {proc.stderr} {proc.stdout}")
+                config.write_bytes(("\\ufeff"+json.dumps(
+                    {"gitHubUrl":"https://github.com/fungjkTorn/torn-fren"}
+                )).encode("utf8"))
+                args=[sys.executable,"-",str(config)]
+                if extra_arg:
+                    args.append(expected)
+                bad=subprocess.run(args,input=snippet,text=True,
+                                   capture_output=True,timeout=8)
+                self.assertNotEqual(bad.returncode,0,
+                    "public GitHub repo must always be rejected")
 
     def test_private_workflow_is_restricted_and_results_only(self):
         spec=(ROOT/"private_repo_workflow.template.yml").read_text()
