@@ -15,7 +15,7 @@ RUNNER_HOME=/var/lib/torn-fren-research-runner
 ENGINE=/usr/local/lib/torn-fren-research/export_snapshot.py
 GROUP=tornfren-research
 USER=tornresearch
-PIN=8428b6a36e67cc4a0fc9f49b1820ef88f94b34af
+PIN=1fa46158211edbcc137134384a2c3de2e95b9f41
 UNIT=torn-fren-research-snapshot.service
 TIMER=torn-fren-research-snapshot.timer
 
