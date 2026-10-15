@@ -7,7 +7,7 @@ do not establish arrival success, so this experiment tests the translation
 to departures rather than promoting the cycle model.
 
 Four fixed research policies combine two timing families (ridge and recent
-median) with either a0.70 agreement gate or a diagnostic peak gate. Both
+median) with either a 0.70 agreement gate or a diagnostic peak gate. Both
 families run on every item; no whole-evaluation-period signal flag chooses a
 family at an earlier issue. The new scenarios remain departure-only and do
 not inherit event-timing accuracy from another forecaster.
@@ -30,10 +30,10 @@ requiring invented future batch sizes or recursively treating predictions as
 new training data. Each historical path must mature through the entire
 eight-hour wait plus flight plus grid/evidence allowance BEFORE issuance.
 
-Use the last64 mature cases before matching. Require at least24 cases,16
-matched scenarios,12 known labels and80% known mass. The strict policy takes
+Use the last 64 mature cases before matching. Require at least 24 cases, 16
+matched scenarios, 12 known labels and 80% known mass. The strict policy takes
 the first minute with >=0.70 smoothed agreement; the peak diagnostic takes
-the first within0.03 of the supported peak with a0.15 floor. All scores are
+the first within 0.03 of the supported peak with a 0.15 floor. All scores are
 uncalibrated. Thresholds and support rules are fixed before this replay.
 
 When the current cycle becomes ambiguous after a gap or conflicting provider
