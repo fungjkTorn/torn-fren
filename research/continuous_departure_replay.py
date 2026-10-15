@@ -224,8 +224,10 @@ def replay(*, source, days=2, asof=None, limit_items=24,
                     for hybrid in hybrids.values():hybrid.add(obs[cursor])
                     cursor+=1
                 state = phases.asof()
-                analog_events = analogs.forecast(key, state, asof=issued)
-                recent_events = recent_analogs.forecast(key, state, asof=issued)
+                event_cohort=(issued-issues.start)%(4*3600)==0
+                legacy_needed=not focused_zero or event_cohort
+                analog_events = analogs.forecast(key,state,asof=issued) if legacy_needed else None
+                recent_events = recent_analogs.forecast(key,state,asof=issued) if legacy_needed else None
                 zero_events = zero_cycles.forecast(key,asof=issued)
                 rate_events = rate_cycles.forecast(key,asof=issued)
                 hybrid_events={family:hybrid.forecast(key,asof=issued) for family,hybrid in hybrids.items()}
@@ -236,10 +238,10 @@ def replay(*, source, days=2, asof=None, limit_items=24,
                 path_plans=path_model.plans(issued,zero_cycles,poll_age=age)
                 baseline = evidence.score(issued+model.TRAVEL_SECONDS[country])
                 forecasts = {}
-                template=template_model.plan(issued,model.TRAVEL_SECONDS[country]) if needs_template and age is not None and age<=180 else None
-                template_events=template_model.event_forecast(issued,key,model.TRAVEL_SECONDS[country])
+                template=template_model.plan(issued,model.TRAVEL_SECONDS[country]) if (needs_template or event_cohort) and age is not None and age<=180 else None
+                template_events=template_model.event_forecast(issued,key,model.TRAVEL_SECONDS[country]) if legacy_needed else None
                 v151=stable_earliest_departure(key,state,asof=issued,scenarios=48) if needs_v151 and age is not None and age<=180 else None
-                if (issued-issues.start)%(4*3600)==0:
+                if event_cohort:
                     # Comparable, nonoverlapping four-hour EVENT studies,
                     # independently of whether a departure is proposed.
                     forecasts[None]=model.predict_events(key,state,asof=issued)

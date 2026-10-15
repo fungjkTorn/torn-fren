@@ -90,9 +90,11 @@ class ContinuousTests(unittest.TestCase):
             for c in item["matched_v166_comparisons"].values():
                 self.assertLessEqual(c.get("matched_issues",0),288)
                 self.assertLessEqual(c.get("challenger_only_success",0)+c.get("v166_only_success",0),c.get("matched_issues",0))
-            with patch.object(m,"stable_earliest_departure",side_effect=AssertionError("unused V151")), patch.object(m.DailyTemplate,"plan",side_effect=AssertionError("unused template")):
+            with patch.object(m,"stable_earliest_departure",side_effect=AssertionError("unused V151")):
                 focused=m.replay(source=db,days=1,limit_items=1,model_sha="fixture",focused_zero=True)
             self.assertNotIn("v151_independent_48",focused["policies"])
+            for section in ("event_models_fixed_four_hour","depletion_models_fixed_four_hour","availability_loss_models_fixed_four_hour"):
+                self.assertEqual(focused[section],report[section])
             for policy,value in focused["items"][next(iter(focused["items"]))]["policies"].items():
                 self.assertEqual(value,item["policies"][policy])
             # Alter only post-issue truth. The earlier forecast and chosen
