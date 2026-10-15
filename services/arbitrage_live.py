@@ -169,6 +169,8 @@ _snapshot_cache = {
 _refresh_thread: Optional[threading.Thread] = None
 _refresh_thread_lock = threading.Lock()
 _last_forced_refresh_started = 0.0
+_periodic_refresh_thread: Optional[threading.Thread] = None
+_periodic_refresh_lock = threading.Lock()
 
 
 def _snapshot_copy(*, refreshing: bool = False) -> dict:
@@ -289,6 +291,32 @@ def _start_background_refresh(*, force: bool = False) -> bool:
         _refresh_thread.start()
         return True
 
+
+
+def _periodic_refresh_worker() -> None:
+    """Keep the complete arbitrage snapshot warm even when nobody has the page open."""
+    # Start immediately after service startup, then periodically re-check.
+    while True:
+        try:
+            _start_background_refresh(force=False)
+        except Exception:
+            pass
+        time.sleep(max(60, DEFAULT_CACHE_SECONDS))
+
+
+def start_periodic_arbitrage_refresh() -> bool:
+    """Start one daemon scheduler per web process. Safe to call repeatedly."""
+    global _periodic_refresh_thread
+    with _periodic_refresh_lock:
+        if _periodic_refresh_thread is not None and _periodic_refresh_thread.is_alive():
+            return False
+        _periodic_refresh_thread = threading.Thread(
+            target=_periodic_refresh_worker,
+            name="arbitrage-periodic-refresh",
+            daemon=True,
+        )
+        _periodic_refresh_thread.start()
+        return True
 
 def _session() -> requests.Session:
     s = requests.Session()
