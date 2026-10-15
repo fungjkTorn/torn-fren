@@ -81,6 +81,8 @@ class ContinuousTests(unittest.TestCase):
                 self.assertEqual(sum(c.get(k,0) for k in ("SUCCESS","FAILURE","PENDING","UNKNOWN","ABSTAIN")),288)
                 self.assertEqual(c["proposals"]+c.get("ABSTAIN",0),288)
             item=next(iter(report["items"].values()))
+            self.assertEqual(len(item["path_established_reference_comparisons"]),3)
+            self.assertTrue(all(v["starts"]==24 for refs in item["path_established_reference_comparisons"].values() for v in refs.values()))
             self.assertEqual(len(item["matched_zero_replanned_comparisons"]),len(m.ZERO_COMPARATORS))
             for c in item["matched_zero_replanned_comparisons"].values():
                 self.assertEqual(c["starts"],24)
@@ -88,6 +90,11 @@ class ContinuousTests(unittest.TestCase):
             for c in item["matched_v166_comparisons"].values():
                 self.assertLessEqual(c.get("matched_issues",0),288)
                 self.assertLessEqual(c.get("challenger_only_success",0)+c.get("v166_only_success",0),c.get("matched_issues",0))
+            with patch.object(m,"stable_earliest_departure",side_effect=AssertionError("unused V151")), patch.object(m.DailyTemplate,"plan",side_effect=AssertionError("unused template")):
+                focused=m.replay(source=db,days=1,limit_items=1,model_sha="fixture",focused_zero=True)
+            self.assertNotIn("v151_independent_48",focused["policies"])
+            for policy,value in focused["items"][next(iter(focused["items"]))]["policies"].items():
+                self.assertEqual(value,item["policies"][policy])
             # Alter only post-issue truth. The earlier forecast and chosen
             # departure must remain identical while evaluation may change.
             split=T-43200
@@ -96,7 +103,7 @@ class ContinuousTests(unittest.TestCase):
             other=io.StringIO()
             m.replay(source=db,days=1,limit_items=1,journal=other,model_sha="fixture")
             changed=[json.loads(x) for x in other.getvalue().splitlines()]
-            fields=("issue_id","issued_epoch","departure_epoch","arrival_epoch","forecast_events","status","selected_expert","selector_evidence")
+            fields=("issue_id","issued_epoch","departure_epoch","arrival_epoch","forecast_events","status","selected_expert","selector_evidence","path_evidence")
             for a,b in zip(records,changed):
                 if a["issued_epoch"]<=split:
                     self.assertEqual({k:a[k] for k in fields},{k:b[k] for k in fields})

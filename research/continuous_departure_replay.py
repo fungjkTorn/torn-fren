@@ -28,6 +28,7 @@ from research.true_zero_cycles import ZeroCycles
 from research.quantity_rate_cycles import QuantityRateCycles
 from research.zero_component_hybrids import ComponentHybrid
 from research.causal_policy_selector import CausalPolicySelector
+from research.causal_stock_paths import CausalStockPaths
 from services.travel_window_policy import project_policy
 from research.v151_stable_earliest_departure import stable_earliest_departure
 
@@ -63,10 +64,11 @@ SELECTOR_EXPERTS=("zero_anchored_current_quarter","zero_anchored_midpoint",
                   family+"_"+kind for family in HYBRID_FAMILIES
                   for kind in ("midpoint","current_quarter"))
 POLICIES += (("zero_adaptive_selector",None,"selector"),)
+POLICIES += tuple(("zero_path_"+mode,None,"path_"+mode) for mode in CausalStockPaths.MODES)
 ZERO_COMPARATORS={p:("zero_anchored_midpoint" if p.endswith("_midpoint") else
                     "zero_anchored_quarter" if p.endswith("_quarter") and not p.endswith("_current_quarter") else
                     "zero_anchored_current_quarter")
-                  for p,_,_ in POLICIES if p.startswith(("zero_rate_","zero_hybrid_","zero_adaptive_"))}
+                  for p,_,_ in POLICIES if p.startswith(("zero_rate_","zero_hybrid_","zero_adaptive_","zero_path_"))}
 ZERO_FAMILIES=("zero_anchored","zero_rate")+HYBRID_FAMILIES
 MAX_POLLS = 400000
 VERSION = "continuous_departure_replay_v1"
@@ -150,14 +152,17 @@ def summarize(counts):
 
 
 def replay(*, source, days=2, asof=None, limit_items=24,
-           journal=None, model_sha="unversioned", progress=None):
+           journal=None, model_sha="unversioned", progress=None, focused_zero=False):
+    policies=tuple(row for row in POLICIES if not focused_zero or row[0]=="v166_all_history" or row[0].startswith("zero_"))
+    needs_template=any(kind.startswith("template_") for _,_,kind in policies)
+    needs_v151=any(kind=="v151" for _,_,kind in policies)
     if type(days) is not int or not 1<=days<=7:
         raise ValueError("days must be 1..7")
     if type(limit_items) is not int or not 1<=limit_items<=24:
         raise ValueError("invalid roster limit")
     path = Path(source).resolve(strict=True)
     results = {}
-    totals = {p:Counter() for p,_,_ in POLICIES}
+    totals = {p:Counter() for p,_,_ in policies}
     depletion_totals={p:Counter() for p in ('v163','daily_template','phase_analogs','phase_recent64')+ZERO_FAMILIES}
     availability_totals={p:Counter() for p in depletion_totals}
     event_totals={p:Counter() for p in ('v163','daily_template','phase_analogs','phase_recent64')+ZERO_FAMILIES}
@@ -189,6 +194,8 @@ def replay(*, source, days=2, asof=None, limit_items=24,
             true_restocks = observed_restocks(obs,crosses)
             unavailable = observed_availability_losses(obs,crosses)
             evidence = ArrivalEvidence(obs,polls,gaps,now)
+            path_model=CausalStockPaths(obs,polls,crosses,cutoff=now,
+                                       flight_seconds=model.TRAVEL_SECONDS[country],score=evidence.score)
             template_model=DailyTemplate(obs,crosses)
             phases = model._ReplayPhases(crosses)
             analogs = PhaseAnalogs(crosses)
@@ -199,15 +206,15 @@ def replay(*, source, days=2, asof=None, limit_items=24,
             selector=CausalPolicySelector(SELECTOR_EXPERTS,"zero_anchored_current_quarter")
             selected_experts=Counter()
             cursor = 0
-            plans = {p:[] for p,_,_ in POLICIES}
-            stats = {p:Counter() for p,_,_ in POLICIES}
-            episode_stats = {p:Counter() for p,_,_ in POLICIES}
-            seen = {p:set() for p,_,_ in POLICIES}
-            landed_episodes = {p:set() for p,_,_ in POLICIES}
-            reasons = {p:Counter() for p,_,_ in POLICIES}
-            chronological = {p:[Counter() for _ in range(days)] for p,_,_ in POLICIES}
+            plans = {p:[] for p,_,_ in policies}
+            stats = {p:Counter() for p,_,_ in policies}
+            episode_stats = {p:Counter() for p,_,_ in policies}
+            seen = {p:set() for p,_,_ in policies}
+            landed_episodes = {p:set() for p,_,_ in policies}
+            reasons = {p:Counter() for p,_,_ in policies}
+            chronological = {p:[Counter() for _ in range(days)] for p,_,_ in policies}
             zero_paired = {p:Counter() for p in ZERO_COMPARATORS}
-            paired = {p:Counter() for p,_,_ in POLICIES if p!="v166_all_history"}
+            paired = {p:Counter() for p,_,_ in policies if p!="v166_all_history"}
             event_stats={p:Counter() for p in event_totals}
             depletion_stats={p:Counter() for p in depletion_totals}
             availability_stats={p:Counter() for p in availability_totals}
@@ -226,11 +233,12 @@ def replay(*, source, days=2, asof=None, limit_items=24,
                 age = issued-polls[pi] if pi>=0 else None
                 if crosses(issued,issued):
                     age = None  # Known collection outage at issuance.
+                path_plans=path_model.plans(issued,zero_cycles,poll_age=age)
                 baseline = evidence.score(issued+model.TRAVEL_SECONDS[country])
                 forecasts = {}
-                template=template_model.plan(issued,model.TRAVEL_SECONDS[country]) if age is not None and age<=180 else None
+                template=template_model.plan(issued,model.TRAVEL_SECONDS[country]) if needs_template and age is not None and age<=180 else None
                 template_events=template_model.event_forecast(issued,key,model.TRAVEL_SECONDS[country])
-                v151=stable_earliest_departure(key,state,asof=issued,scenarios=48) if age is not None and age<=180 else None
+                v151=stable_earliest_departure(key,state,asof=issued,scenarios=48) if needs_v151 and age is not None and age<=180 else None
                 if (issued-issues.start)%(4*3600)==0:
                     # Comparable, nonoverlapping four-hour EVENT studies,
                     # independently of whether a departure is proposed.
@@ -253,7 +261,7 @@ def replay(*, source, days=2, asof=None, limit_items=24,
                 issued_outcomes = {}
                 issued_decisions={}
                 issued_forecasts={}
-                for policy, window, kind in POLICIES:
+                for policy, window, kind in policies:
                     if window not in forecasts:
                         forecasts[window] = model.predict_events(key,state,asof=issued,recent_cycles=window)
                     forecast = (rate_events if policy.startswith("zero_rate_") else
@@ -263,7 +271,18 @@ def replay(*, source, days=2, asof=None, limit_items=24,
                                 template_events if policy.startswith("daily_event_") else forecasts[window])
                     if policy.startswith("zero_hybrid_"):
                         forecast=hybrid_events[next(f for f in HYBRID_FAMILIES if policy.startswith(f+"_"))]
-                    if kind=="selector":
+                    if kind.startswith("path_"):
+                        forecast=zero_events
+                        path_plan=path_plans[kind[5:]]
+                        decision=build_item_travel_decision(forecast,now=issued,poll_age_seconds=age)
+                        path_departure=path_plan["departure_epoch"]
+                        decision=dict(decision,estimated_departure_epoch=path_departure,
+                            estimated_arrival_epoch=path_departure+model.TRAVEL_SECONDS[country]+model.GRACE if path_departure is not None else None,
+                            selected_restock_event_index=None,status=path_plan["status"],
+                            estimated_departure_deadline_epoch=None,
+                            departure_countdown_seconds=path_departure-issued if path_departure is not None else None,
+                            path_evidence=path_plan,departure_model_name="causal_complete_stock_paths_v1")
+                    elif kind=="selector":
                         selector.update(issued,{p:issued_decisions[p] for p in SELECTOR_EXPERTS},
                                         poll_age=age,flight_seconds=model.TRAVEL_SECONDS[country],score=evidence.score)
                         expert,selection=selector.select()
@@ -295,11 +314,12 @@ def replay(*, source, days=2, asof=None, limit_items=24,
                     predicted = [e["predicted_restock_epoch"] for e in forecast.get("true_restock_events",forecast["restock_events"])
                                  if issued<e["predicted_restock_epoch"]<=end
                                  and age is not None and age<=180]
-                    c["next_tick_observed_restocks"]+=len(actual)
-                    c["next_tick_forecast_restocks"]+=len(predicted)
-                    for tolerance in (15,60,600):
-                        c[f"next_tick_matched_{tolerance}s"]+=model.match_events(
-                            predicted,actual,tolerance=tolerance)["matched"]
+                    if not kind.startswith("path_"):
+                        c["next_tick_observed_restocks"]+=len(actual)
+                        c["next_tick_forecast_restocks"]+=len(predicted)
+                        for tolerance in (15,60,600):
+                            c[f"next_tick_matched_{tolerance}s"]+=model.match_events(
+                                predicted,actual,tolerance=tolerance)["matched"]
                     c["leave_now_"+baseline[0]]+=1
                     if dep is not None:
                         c["wait_seconds_sum"]+=dep-issued
@@ -332,6 +352,8 @@ def replay(*, source, days=2, asof=None, limit_items=24,
                                 "forecast_status":forecast["status"],
                                 "selected_expert":decision.get("selected_expert"),
                                 "selector_evidence":decision.get("selector_evidence"),
+                                "path_evidence":decision.get("path_evidence"),
+                                "departure_model_name":decision.get("departure_model_name"),
                                 "event_model_name":forecast.get("model_name","v163"),
                                 "observed_current_quantity":state["last_observation"].quantity if state["last_observation"] else None,
                                 "modeled_current_stock_window":forecast["current_stock_window"],
@@ -360,12 +382,17 @@ def replay(*, source, days=2, asof=None, limit_items=24,
                         c["challenger_only_success"]+=challenger=="SUCCESS" and incumbent=="FAILURE"
                         c["v166_only_success"]+=challenger=="FAILURE" and incumbent=="SUCCESS"
             results[key]={"player_flight_seconds":model.TRAVEL_SECONDS[country],"policies":{p:dict(summarize(stats[p]),
+                departure_only_model=p.startswith("zero_path_"),
                 first_proposal_per_issue_phase=summarize(episode_stats[p]),
                 replanned_hourly_starts=evaluate_reconfirmation(plans[p],cutoff=now,
                     flight_seconds=model.TRAVEL_SECONDS[country],score=evidence.score),
                 distinct_observed_stock_episodes_reached=len(landed_episodes[p]),
                 chronological_day_slices=[summarize(c) for c in chronological[p]],
-                outcome_reasons=dict(reasons[p])) for p,_,_ in POLICIES},
+                outcome_reasons=dict(reasons[p])) for p,_,_ in policies},
+                "path_established_reference_comparisons":{p:{reference:compare_reconfirmation(
+                    plans[reference],plans[p],cutoff=now,flight_seconds=model.TRAVEL_SECONDS[country],score=evidence.score)
+                    for reference in ("zero_rate_current_quarter","zero_hybrid_current_rate_current_quarter")}
+                    for p,_,_ in policies if p.startswith("zero_path_")},
                 "adaptive_selector_expert_issue_counts":dict(selected_experts),
                 "adaptive_selector_final_training":selector.select()[1],
                 "matched_zero_replanned_comparisons":{p:compare_reconfirmation(
@@ -402,7 +429,7 @@ def replay(*, source, days=2, asof=None, limit_items=24,
             if progress:
                 progress(key,len(results),limit_items)
     return {"status":"CONTINUOUS_AS_ISSUED_HISTORICAL_REPLAY",
-            "version":VERSION,"model_sha":model_sha,"asof_epoch":now,"days":days,
+            "version":VERSION,"model_sha":model_sha,"focused_zero":focused_zero,"asof_epoch":now,"days":days,
             "issue_step_seconds":300,"items_evaluated":len(results),
             "policies":{p:summarize(c) for p,c in totals.items()},"items":results,
             "event_models_fixed_four_hour":{p:dict(c,
@@ -433,6 +460,7 @@ def main():
     parser.add_argument("--days",type=int,default=2)
     parser.add_argument("--model-sha",default="unversioned")
     parser.add_argument("--journal",type=Path)
+    parser.add_argument("--focused-zero",action="store_true",help="Keep zero-clock/path policies and V166 comparator; skip unused legacy flight simulations")
     args=parser.parse_args()
     if args.journal and args.journal.resolve()==args.source.resolve():
         raise SystemExit("journal must differ from source database")
@@ -442,9 +470,9 @@ def main():
         # Exclusive creation prevents replacing prior frozen evidence.
         with args.journal.open("x",encoding="utf8") as stream:
             result=replay(source=args.source,days=args.days,journal=stream,
-                          model_sha=args.model_sha,progress=progress)
+                          model_sha=args.model_sha,progress=progress,focused_zero=args.focused_zero)
     else:
-        result=replay(source=args.source,days=args.days,model_sha=args.model_sha,progress=progress)
+        result=replay(source=args.source,days=args.days,model_sha=args.model_sha,progress=progress,focused_zero=args.focused_zero)
     print(json.dumps(result,sort_keys=True))
 
 

@@ -11,6 +11,8 @@ on:
       - 'research/quantity_rate_cycles.py'
       - 'research/zero_component_hybrids.py'
       - 'research/causal_policy_selector.py'
+      - 'research/causal_stock_paths.py'
+      - 'tests/test_causal_stock_paths.py'
       - 'tests/test_zero_component_hybrids.py'
       - 'tests/test_causal_policy_selector.py'
       - 'tests/test_quantity_rate_cycles.py'
@@ -62,6 +64,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_quantity_rate_cycles.py' -v
           python -m unittest discover -s tests -p 'test_zero_component_hybrids.py' -v
           python -m unittest discover -s tests -p 'test_causal_policy_selector.py' -v
+          python -m unittest discover -s tests -p 'test_causal_stock_paths.py' -v
           python -m unittest discover -s tests -p 'test_specialist_resolved_features.py' -v
           python -m unittest discover -s tests -p 'test_product_runtime_audit.py' -v
           python -m unittest discover -s tests -p 'test_departure_reconfirmation.py' -v
