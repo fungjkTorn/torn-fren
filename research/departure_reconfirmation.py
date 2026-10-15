@@ -5,6 +5,53 @@ A changed/absent plan replaces the old plan, including when a deadline arrives.
 """
 from collections import Counter
 from itertools import islice
+import bisect
+
+
+def evaluate_committed(plans,*,cutoff,flight_seconds,score,start_before=None,cohorts=None):
+    """Diagnostic counterfactual: freeze first proposal, refresh poll health.
+
+    No future outcome chooses the target. This intentionally ignores later
+    model advice, so is an execution ablation, not a recommended travel policy.
+    Only the current heartbeat can confirm departure; expired evidence cancels
+    the commitment. No forecast is carried across a missing departure recheck.
+    """
+    counts=Counter(starts=0,departed=0);days={};times=[p[0] for p in plans]
+    for i,(start,_,_) in enumerate(plans):
+        if start_before is not None and start>start_before:break
+        counts['starts']+=1
+        day=days.setdefault((start-plans[0][0])//86400,Counter())
+        day['starts']+=1;deadline=start+28800;choice=None
+        for issued,departure,age in islice(plans,i,None):
+            if issued>deadline:break
+            if (departure is not None and age is not None and 0<=age<=180
+                    and issued<=departure<=deadline):
+                choice=departure;break
+        wait=None;departed=False
+        if choice is None:
+            outcome='ABSTAIN' if cutoff>=deadline+300 else 'PENDING'
+        elif choice>cutoff:
+            outcome='PENDING'
+        else:
+            j=bisect.bisect_right(times,choice)-1
+            issued,_,age=plans[j]
+            if age is None or not 0<=age+choice-issued<=180:
+                outcome='ABSTAIN';counts['cancelled_stale_departure_evidence']+=1
+            else:
+                outcome,_,_=score(choice+flight_seconds)
+                wait=choice-start;departed=True
+        counts[outcome]+=1;day[outcome]+=1
+        if departed:
+            counts['departed']+=1;day['departed']+=1
+            counts['wait_seconds_sum']+=wait;day['wait_seconds_sum']+=wait
+        if cohorts is not None:cohorts.append(dict(start=start,outcome=outcome,wait=wait))
+    def summary(c):
+        n=c['SUCCESS']+c['FAILURE']
+        return dict(c,scored=n,success_fraction=round(c['SUCCESS']/n,4) if n else None,
+            departure_coverage=round(c['departed']/c['starts'],4) if c['starts'] else None)
+    return dict(summary(counts),chronological_start_day_slices=[summary(c) for _,c in sorted(days.items())],
+        cohort_grid='ALL_FIVE_MINUTE_STARTS',actual_player_execution=False,
+        protocol='Diagnostic first-proposal commitment; refresh heartbeat at departure; 8h wait; ignore later model advice; NOT a recommended travel policy.')
 
 
 def evaluate(plans, *, cutoff, flight_seconds, score, cohorts=None, start_before=None, cohort_offset=0):

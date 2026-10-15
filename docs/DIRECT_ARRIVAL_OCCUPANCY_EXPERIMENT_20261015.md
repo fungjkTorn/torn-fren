@@ -42,3 +42,13 @@ The existing frozen forward protocol keeps its original source and window.
 The new model is excluded from that already-declared protocol. The targeted
 experiment uses a separate private request/workflow and research snapshot;
 production and normal approved-source selection remain unchanged.
+
+After the first run rejected a general replacement, an execution ablation was
+added for rate, hybrid and both direct policies: take the first healthy
+proposal within the same eight-hour deadline, freeze that departure clock,
+and refresh heartbeat health at departure. Later model advice is deliberately
+ignored; stale departure evidence cancels the commitment. Compare this
+counterfactual with replanning on identical five-minute starts, including
+paired wins/losses and waits. This is a diagnostic of execution sensitivity,
+not permission to recommend ignoring fresh stock data. It does not retrain
+or change coefficients, thresholds, or existing departure policy behavior.

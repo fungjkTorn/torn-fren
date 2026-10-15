@@ -23,7 +23,7 @@ from services.travel_decision_contract_v166 import build_item_travel_decision
 from research.causal_daily_template import DailyTemplate
 from research.causal_phase_analogs import PhaseAnalogs
 from research.departure_reconfirmation import (evaluate as evaluate_reconfirmation, compare as compare_reconfirmation,
-    evaluate_utc, evaluate_all_starts, compare_cohorts)
+    evaluate_utc, evaluate_all_starts, compare_cohorts, evaluate_committed)
 from research.depletion_timing_audit import (observed_depletions, predicted_depletions, observed_restocks,
     observed_availability_losses, predicted_availability_losses, count_events)
 from research.true_zero_cycles import ZeroCycles
@@ -445,6 +445,14 @@ def replay(*, source, days=2, asof=None, limit_items=24,
                 flight_seconds=model.TRAVEL_SECONDS[country],score=evidence.score,start_before=issue_end) for p,_,_ in policies}
             utc_scores={p:evaluate_utc(plans[p],cutoff=now,flight_seconds=model.TRAVEL_SECONDS[country],
                 score=evidence.score,start_before=issue_end) for p,_,_ in policies}
+            commitment={};commit_pairs={}
+            for p in ('zero_rate_current_quarter','zero_hybrid_current_rate_current_quarter',
+                      'zero_path_direct70','zero_path_direct_peak'):
+                frozen=[]
+                commitment[p]=evaluate_committed(plans[p],cutoff=now,
+                    flight_seconds=model.TRAVEL_SECONDS[country],score=evidence.score,
+                    start_before=issue_end,cohorts=frozen)
+                commit_pairs[p]=compare_cohorts(all_cohorts[p],frozen)
             results[key]={"player_flight_seconds":model.TRAVEL_SECONDS[country],"policies":{p:dict(summarize(stats[p]),
                 departure_only_model=p.startswith("zero_path_"),
                 replanned_utc_hourly_starts=utc_scores[p],
@@ -465,6 +473,8 @@ def replay(*, source, days=2, asof=None, limit_items=24,
                     for p,_,_ in policies if p.startswith("zero_path_residual_")},
                 "residual_clock_diagnostics":{family:c.diagnostics() for family,c in corrections.items()},
                 "direct_arrival_diagnostics":direct.diagnostics(),
+                "commitment_ablation":commitment,
+                "committed_vs_replanned_paired":commit_pairs,
                 "path_all_start_zero_baseline_comparisons":{p:compare_cohorts(all_cohorts["zero_anchored_current_quarter"],all_cohorts[p])
                     for p,_,_ in policies if p.startswith("zero_path_")},
                 "path_all_start_established_reference_comparisons":{p:{reference:compare_cohorts(

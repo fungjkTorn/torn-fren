@@ -1,5 +1,5 @@
 import unittest
-from research.departure_reconfirmation import evaluate,evaluate_utc,evaluate_all_starts
+from research.departure_reconfirmation import evaluate,evaluate_utc,evaluate_all_starts,evaluate_committed,compare_cohorts
 
 
 class ReconfirmationTests(unittest.TestCase):
@@ -50,6 +50,31 @@ class ReconfirmationTests(unittest.TestCase):
         self.assertEqual(len({c['start'] for c in cohorts}),36)
         self.assertEqual(len(r['offsets']),12)
         self.assertEqual(evaluate_all_starts(plans,start_before=7200,**kw)['starts'],24)
+
+    def test_commitment_freezes_first_target_but_refreshes_health(self):
+        plans=[(1000,1600,0),(1300,1900,0),(1600,None,0),(1900,1900,0)]
+        arrivals=[]
+        def score(t):
+            arrivals.append(t)
+            return ('SUCCESS' if t==1700 else 'FAILURE'),'fixture',None
+        kw=dict(cutoff=40000,flight_seconds=100,score=score,start_before=1000)
+        frozen=[];r=evaluate_committed(plans,cohorts=frozen,**kw)
+        self.assertEqual(arrivals,[1700]);self.assertEqual(r['SUCCESS'],1)
+        replanned=[];evaluate_all_starts(plans,cohorts=replanned,**kw)
+        self.assertEqual(compare_cohorts(replanned,frozen)['challenger_only_success'],1)
+        stale=plans[:2]+[(1600,None,181)]+plans[3:]
+        arrivals.clear();r=evaluate_committed(stale,**kw)
+        self.assertFalse(arrivals)
+        self.assertEqual(r['cancelled_stale_departure_evidence'],1)
+        self.assertEqual(r['ABSTAIN'],1)
+
+    def test_commitment_unknown_pending_and_wait_limit_remain_visible(self):
+        kw=dict(flight_seconds=100,score=lambda t:('UNKNOWN','fixture',None),start_before=1000)
+        plans=[(1000,1600,0),(1300,None,0),(1600,None,0)]
+        r=evaluate_committed(plans,cutoff=1700,**kw)
+        self.assertEqual(r['UNKNOWN'],1);self.assertEqual(r['scored'],0)
+        self.assertEqual(evaluate_committed(plans[:2],cutoff=1400,**kw)['PENDING'],1)
+        self.assertEqual(evaluate_committed([(1000,40000,0)],cutoff=50000,**kw)['ABSTAIN'],1)
 
 
 if __name__=='__main__': unittest.main()
