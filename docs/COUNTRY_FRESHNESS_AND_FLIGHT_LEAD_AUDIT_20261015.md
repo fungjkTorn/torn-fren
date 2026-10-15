@@ -38,6 +38,13 @@ This short sample can reveal current delays, repeated/regressed clocks,
 omissions and fetch failures; it cannot establish long-term freshness or
 retroactively fix historical evidence.
 
+The refined probe also preserves Japan Xanax quantity and a parseable,
+timezone-qualified provider `nextRestock` value when present. This is an
+unverified external value, not an observed game event, depletion anchor or
+model input. It is captured separately to determine whether an independently
+issued comparator is available for later forward validation. Raw strings are
+not retained, and absent or malformed values stay missing.
+
 ## Fixed-lead audit
 
 Seven days of canonical UTC hourly issues, ending eight hours before the
@@ -62,3 +69,42 @@ unknown. Forecast abstentions and missing next events stay visible.
 
 No new policy is promoted from these diagnostics. The routine source pin and
 existing frozen forward protocol remain unchanged.
+
+The refined timing audit separates next-after-clock comparisons from ordinal
+event comparisons. A forecast falling just before a target clock can make
+the next-after-clock selection jump one cycle; that is not a large error for
+the same event. Ordinal pairing preserves the forecast's event number after
+issuance. It follows existing V145 continuity rules across same-phase provider
+switches, while gaps and physical phase conflicts remain unknown. The strict
+cycle-count diagnostic separately reports gaps, switches and phase conflicts;
+rejecting every switch there is deliberately more conservative than V145 and
+does not prove all switched observations are wrong.
+
+## VM activation boundary
+
+The tested collector/export payload is source commit
+`5a4d546a7e17d3766ac503765373f2bdb3f3342c`. A minimal
+`deploy/research_runner/country_clock_activation.patch` is also prepared. It
+changes only the collector's history service and preserves unrelated edits;
+patch application was verified against the previous public source with an
+additional unrelated host edit.
+
+Activation requires the VM owner because the research account cannot read or
+modify `/opt/torn-fren/data`, install `/usr/local/lib` exporter code or restart
+the collector. Do not grant it those permissions.
+
+The reviewable activation consists of checking the patch against the actual
+`/opt/torn-fren/services/history_service.py`, backing up the affected code,
+installing the new `services/country_freshness.py`, applying the collector
+patch, and updating `/usr/local/lib/torn-fren-research/export_snapshot.py`.
+Preserve existing owner/mode and unrelated changes. Restart only
+`torn-fren-poller.service`, then run `torn-fren-research-snapshot.service` after
+new polls arrive. Verify successful collector heartbeats, new per-country
+receipt rows, nonzero exported clock rows, and continued research isolation.
+No web/bot restart or prediction-source promotion is required. If activation
+fails, restore the backed-up code and original exporter and restart the poller;
+retain any clock observations already collected.
+
+A source commit or successful public probe does not mean this activation has
+happened. Historical labels remain unchanged and country-clock history absent
+until the collector and installed exporter actually produce it.

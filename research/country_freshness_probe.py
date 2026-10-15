@@ -3,12 +3,32 @@ import argparse
 import json
 import time
 import urllib.request
+from datetime import datetime
 from pathlib import Path
 
 from services.country_freshness import COUNTRIES,observation,status_at
 
 URLS={'yata':'https://yata.yt/api/v1/travel/export/',
       'prometheus':'https://api.prombot.co.uk/api/travel'}
+
+
+def japan_external_value(stocks):
+    """Unverified provider nextRestock value; never an observed event label."""
+    row=next((r for r in stocks if isinstance(r,dict) and str(r.get('name','')).casefold()=='xanax'),None)
+    if row is None:return dict(status='ITEM_MISSING')
+    value=row.get('nextRestock');stamp=None
+    if type(value) is str:
+        try:
+            parsed=datetime.fromisoformat(value.replace('Z','+00:00'))
+            if parsed.tzinfo is not None:
+                candidate=int(parsed.timestamp())
+                if 0<candidate<=9999999999:stamp=candidate
+        except (ValueError,OverflowError):pass
+    quantity=row.get('quantity')
+    return dict(quantity=quantity if type(quantity) is int and quantity>=0 else None,
+        next_restock_field_present='nextRestock' in row,next_restock_epoch=stamp,
+        status='UNVERIFIED_PROVIDER_VALUE' if stamp is not None else 'NO_PARSEABLE_PROVIDER_VALUE',
+        observed_game_event=False)
 
 
 def normalize(provider,payload,received):
@@ -23,6 +43,7 @@ def normalize(provider,payload,received):
         row=observation(country,data,provider,received,payload.get('timestamp'))
         result[country]=dict(status=status_at(row,received),age_seconds=received-row[3] if row[3] is not None else None,
             update_epoch=row[3],export_epoch=row[4],export_clock_status=row[6],item_count=row[7])
+        if country=='jap':result[country]['xanax_external_value']=japan_external_value(data.get('stocks',[]))
     return result
 
 

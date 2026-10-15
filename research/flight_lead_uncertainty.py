@@ -24,18 +24,34 @@ def point_available(stream,target):
     return any(w['predicted_restock_epoch']<=target+model.GRACE<w['predicted_stock_below_30_epoch'] for w in windows)
 
 
+def selected_events(events,observed,issued,target):
+    """Keep next-after-clock and ordinal identity comparisons distinct."""
+    chosen=next(((i,e) for i,e in enumerate(events) if e['predicted_restock_epoch']>target),None)
+    if chosen is None:return None,None,None
+    i,pred=chosen
+    next_index=bisect.bisect_right(observed,target)
+    ordinal_index=bisect.bisect_right(observed,issued)+i
+    bound=issued+28800
+    next_truth=observed[next_index] if next_index<len(observed) and observed[next_index]<=bound else None
+    ordinal_truth=observed[ordinal_index] if ordinal_index<len(observed) and observed[ordinal_index]<=bound else None
+    return pred,next_truth,ordinal_truth
+
+
 def evaluate_item(key,obs,polls,gaps,*,cutoff,start,end,trace=None):
     crosses=model._gap_index(gaps,cutoff);evidence=ArrivalEvidence(obs,polls,gaps,cutoff)
     observed=[b.epoch for a,b in zip(obs,obs[1:]) if a.epoch<b.epoch and a.quantity==0<b.quantity
               and a.source==b.source and not crosses(a.epoch,b.epoch)]
     switches=[b.epoch for a,b in zip(obs,obs[1:]) if a.source!=b.source]
+    conflicts=[b.epoch for a,b in zip(obs,obs[1:])
+        if a.source!=b.source and (a.quantity>0)!=(b.quantity>0)]
+    def contains(times,a,b):return bisect.bisect_right(times,b)>bisect.bisect_right(times,a)
     def uncertain(a,b):
-        return crosses(a,b) or bisect.bisect_right(switches,b)>bisect.bisect_right(switches,a)
+        return crosses(a,b) or contains(switches,a,b)
     flight=model.TRAVEL_SECONDS[key.split(':',1)[0]]
     leads=sorted({0,900,1800,3600,5400,flight,10800,14400})
     trackers={'zero':ZeroCycles(crosses),'rate':QuantityRateCycles(crosses),
               'hybrid':ComponentHybrid(crosses,'current_rate')}
-    data={(family,lead):dict(counts=Counter(),errors=[],widths=[])
+    data={(family,lead):dict(counts=Counter(),errors=[],widths=[],ordinal_errors=[],ordinal_widths=[])
           for family in trackers for lead in leads}
     cursor=0
     for issued in range((start//3600+1)*3600,end+1,3600):
@@ -61,19 +77,39 @@ def evaluate_item(key,obs,polls,gaps,*,cutoff,start,end,trace=None):
                     c['true_positive' if predicted and actual else 'false_positive' if predicted else 'false_negative' if actual else 'true_negative']+=1
                 # Count complete physical restocks before the fixed lead.
                 # This diagnoses cycle slips; no nearest-outcome event match.
-                if uncertain(issued,target):c['cycle_count_unknown']+=1
+                gap=crosses(issued,target);switch=contains(switches,issued,target)
+                conflict=contains(conflicts,issued,target)
+                c['cycle_count_unknown_collection_gap']+=gap
+                c['cycle_count_provider_switch']+=switch
+                c['cycle_count_provider_phase_conflict']+=conflict
+                if gap or switch:c['cycle_count_unknown']+=1
                 else:
                     predicted_count=sum(issued<e['predicted_restock_epoch']<=target for e in events)
                     true_count=bisect.bisect_right(observed,target)-bisect.bisect_right(observed,issued)
                     c['cycle_count_known']+=1
                     c['cycle_count_exact']+=predicted_count==true_count
                     c['cycle_count_absolute_difference_sum']+=abs(predicted_count-true_count)
-                pred=next((e for e in events if e['predicted_restock_epoch']>target),None)
-                j=bisect.bisect_right(observed,target)
-                truth=observed[j] if j<len(observed) and observed[j]<=issued+28800 else None
+                pred,truth,ordinal=selected_events(events,observed,issued,target)
                 if pred is None:c['no_next_forecast_in_8h']+=1;continue
+                # Ordinal pairing preserves forecast event index. Benign
+                # same-phase switches follow existing V145 continuity rules;
+                # gaps and physical phase contradictions remain unknown.
+                if ordinal is None:c['ordinal_no_observed_event_in_8h']+=1
+                elif crosses(issued,max(ordinal,pred['predicted_restock_epoch'])) or contains(conflicts,issued,max(ordinal,pred['predicted_restock_epoch'])):
+                    c['ordinal_unknown_gap_or_phase_conflict']+=1
+                else:
+                    err=pred['predicted_restock_epoch']-ordinal
+                    d['ordinal_errors'].append(err)
+                    d['ordinal_widths'].append(pred['restock_late_epoch']-pred['restock_early_epoch'])
+                    c['ordinal_compared']+=1
+                    c['ordinal_inside_proposed_bounds']+=pred['restock_early_epoch']<=ordinal<=pred['restock_late_epoch']
+                    for tolerance in (15,60,300,600):c['ordinal_error_within_'+str(tolerance)]+=abs(err)<=tolerance
                 if truth is None:c['no_next_observed_restock_in_8h']+=1;continue
-                if uncertain(target,truth):c['next_event_unknown_gap_or_provider_switch']+=1;continue
+                if uncertain(target,truth):
+                    c['next_event_unknown_gap_or_provider_switch']+=1
+                    c['next_event_unknown_collection_gap']+=crosses(target,truth)
+                    c['next_event_provider_switch']+=contains(switches,target,truth)
+                    continue
                 error=pred['predicted_restock_epoch']-truth;d['errors'].append(error)
                 lo,hi=pred['restock_early_epoch'],pred['restock_late_epoch']
                 d['widths'].append(hi-lo)
@@ -96,8 +132,17 @@ def evaluate_item(key,obs,polls,gaps,*,cutoff,start,end,trace=None):
             next_event_absolute_error_p50=q([abs(e) for e in d['errors']],.5),
             next_event_absolute_error_p90=q([abs(e) for e in d['errors']],.9),
             next_event_signed_error_p50=q(d['errors'],.5),proposed_interval_width_p50=q(d['widths'],.5),
-            next_event_proposed_interval_capture=c['next_event_inside_proposed_bounds']/c['next_event_compared'] if c['next_event_compared'] else None)
+            next_event_proposed_interval_capture=c['next_event_inside_proposed_bounds']/c['next_event_compared'] if c['next_event_compared'] else None,
+            ordinal_absolute_error_p50=q([abs(e) for e in d['ordinal_errors']],.5),
+            ordinal_absolute_error_p90=q([abs(e) for e in d['ordinal_errors']],.9),
+            ordinal_signed_error_p50=q(d['ordinal_errors'],.5),
+            ordinal_interval_width_p50=q(d['ordinal_widths'],.5),
+            ordinal_interval_capture=c['ordinal_inside_proposed_bounds']/c['ordinal_compared'] if c['ordinal_compared'] else None)
+    rows=[r for r in obs if start<r.epoch<=end]
     return dict(flight_seconds=flight,models=output,
+        source_diagnostics=dict(stock_delta_rows_by_provider=dict(Counter(r.source for r in rows)),
+            switches_in_issue_window=sum(start<t<=end for t in switches),
+            physical_phase_conflicts_on_switch=sum(start<t<=end for t in conflicts)),
         completed_buying_window_median=q(trackers['zero'].available_durations,.5),
         warning='Next-after-lead predicted and observed events are selected separately by clock, not nearest truth; cycle slips can compare different event identities. Not event-conditioned recall or player flight accuracy.')
 

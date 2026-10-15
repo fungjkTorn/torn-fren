@@ -4,13 +4,21 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from research.flight_lead_uncertainty import audit,evaluate_item,point_available,model
-from research.country_freshness_probe import probe,normalize
+from research.flight_lead_uncertainty import audit,evaluate_item,point_available,model,selected_events
+from research.country_freshness_probe import probe,normalize,japan_external_value
 
 T=1790985600
 
 
 class LeadTests(unittest.TestCase):
+    def test_clock_boundary_slip_is_not_mislabeled_as_ordinal_timing_error(self):
+        events=[{'predicted_restock_epoch':1199},{'predicted_restock_epoch':3599}]
+        # First prediction misses a fixed target by1s, so the next-after-clock
+        # comparison selects prediction2 against truth1. Ordinal stays event2.
+        pred,next_truth,ordinal=selected_events(events,[1201,3601],1000,1200)
+        self.assertEqual(pred['predicted_restock_epoch']-next_truth,2398)
+        self.assertEqual(pred['predicted_restock_epoch']-ordinal,-2)
+
     def rows(self,end,change_after=None):
         return [model.OBS(t,0 if change_after is not None and t>change_after else qty,'a')
             for origin in range(T,end+1,2400) for offset,qty in ((0,0),(600,200),(1200,20),(1800,0))
@@ -49,6 +57,16 @@ class LeadTests(unittest.TestCase):
 
 
 class ProbeTests(unittest.TestCase):
+    def test_external_next_restock_is_a_separate_unverified_value(self):
+        a=japan_external_value([dict(name='Xanax',quantity=0,nextRestock='2026-10-15T16:00:00Z')])
+        self.assertIsNotNone(a['next_restock_epoch'])
+        self.assertFalse(a['observed_game_event'])
+        self.assertEqual(a['quantity'],0)
+        for value in (None,'PRIVATE_TEXT','2026-10-15T16:00:00'):
+            a=japan_external_value([dict(name='Xanax',quantity=20,nextRestock=value)])
+            self.assertIsNone(a['next_restock_epoch'])
+            self.assertNotIn('PRIVATE_TEXT',str(a))
+
     def test_bounded_normalized_probe_retains_unchanged_regressed_and_missing_clocks(self):
         updates=iter((990,990,980,980))
         def fetch(provider):

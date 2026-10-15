@@ -8,6 +8,7 @@ import sqlite3
 import stat
 import tempfile
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 ROOT=Path(__file__).resolve().parents[1]
@@ -118,6 +119,11 @@ class SnapshotTests(unittest.TestCase):
                 self.assertEqual(rows,[(100100,100000),(100200,100000)])
                 self.assertNotIn('secret',[x[1] for x in cx.execute('PRAGMA table_info(country_stock_observations)')])
             self.assertNotIn(b'COUNTRY_SECRET',path.read_bytes())
+            previous=path.read_bytes()
+            with patch.object(mod,'MAX_COUNTRY_ROWS',1):
+                with self.assertRaisesRegex(ValueError,'country observation cap'):
+                    mod.export(src,roster,path,asof=100300,days=14)
+            self.assertEqual(path.read_bytes(),previous)
 
     def test_snapshot_replaces_atomically_without_writing_collector(self):
         with tempfile.TemporaryDirectory() as tmp:
