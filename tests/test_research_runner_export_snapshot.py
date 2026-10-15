@@ -77,7 +77,7 @@ class SnapshotTests(unittest.TestCase):
                 tables={row[0] for row in db.execute(
                     "SELECT name FROM sqlite_master WHERE type='table'")}
                 self.assertEqual(tables,{"stock_history","collection_gaps",
-                    "poll_heartbeats","research_metadata"})
+                    "poll_heartbeats","research_metadata","country_stock_observations"})
                 cols=[r[1] for r in db.execute("PRAGMA table_info(stock_history)")]
                 self.assertEqual(cols,["id","timestamp","quantity",
                                        "source","country","item_name"])
@@ -94,6 +94,30 @@ class SnapshotTests(unittest.TestCase):
             for secret in (b"SENSITIVE_DO_NOT_COPY",b"HEARTBEAT_SECRET",
                            b"SHOULD_NOT_COPY",b"SENSITIVE_GAP",b"player_api_keys"):
                 self.assertNotIn(secret,raw)
+
+    def test_optional_country_clocks_are_allowlisted_bounded_and_not_backfilled(self):
+        from services.country_freshness import DDL,record
+        with tempfile.TemporaryDirectory() as tmp:
+            src,roster,dst=fixture(tmp)
+            path=dst/'history.db'
+            mod.export(src,roster,path,asof=100300,days=14)
+            with sqlite3.connect(path) as cx:
+                self.assertEqual(cx.execute('SELECT count(*) FROM country_stock_observations').fetchone()[0],0)
+                self.assertEqual(cx.execute("SELECT value FROM research_metadata WHERE key='country_clock_schema_available'").fetchone()[0],'false')
+            with sqlite3.connect(src) as cx:
+                cx.executescript(DDL)
+                cx.execute('ALTER TABLE country_stock_observations ADD COLUMN secret TEXT')
+                for receipt,update in ((100100,100000),(100200,100000),(100400,100399)):
+                    record(cx,'jap',{'update':update,'stocks':[{}]},'yata',receipt,receipt)
+                cx.execute("UPDATE country_stock_observations SET secret='COUNTRY_SECRET'")
+            before=src.read_bytes()
+            mod.export(src,roster,path,asof=100300,days=14)
+            self.assertEqual(src.read_bytes(),before)
+            with sqlite3.connect(path) as cx:
+                rows=cx.execute('SELECT received_epoch,country_update_epoch FROM country_stock_observations').fetchall()
+                self.assertEqual(rows,[(100100,100000),(100200,100000)])
+                self.assertNotIn('secret',[x[1] for x in cx.execute('PRAGMA table_info(country_stock_observations)')])
+            self.assertNotIn(b'COUNTRY_SECRET',path.read_bytes())
 
     def test_snapshot_replaces_atomically_without_writing_collector(self):
         with tempfile.TemporaryDirectory() as tmp:

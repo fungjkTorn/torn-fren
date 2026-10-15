@@ -7,6 +7,7 @@ from pathlib import Path
 from functools import lru_cache
 
 from services.yata_api import get_country_stock
+from services import country_freshness
 
 DB_PATH = Path(__file__).parent.parent / "data" / "stock_history.db"
 
@@ -83,6 +84,10 @@ def init_db():
             # poller + web + Discord + analysis read/write pattern.
             conn.execute("PRAGMA journal_mode = WAL")
             conn.execute("PRAGMA synchronous = NORMAL")
+            # Append-only country clocks also cover polls with no item delta.
+            # Keep observed stock timestamps and all existing cycle semantics.
+            for statement in country_freshness.DDL.split(';'):
+                if statement.strip():conn.execute(statement)
 
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS stock_history (
@@ -785,6 +790,9 @@ def save_snapshot(country: str):
     changed_items = []
 
     with _connect() as conn:
+        # Legacy list-only fetch cannot supply country/export clocks. Record
+        # that absence explicitly without a second provider request.
+        country_freshness.record(conn,country,{'stocks':stock},'yata',timestamp)
         for item in stock:
             item_id = item["id"]
             item_name = item["name"]
@@ -821,7 +829,7 @@ def save_snapshot(country: str):
         f"at {time.strftime('%H:%M:%S', time.localtime(timestamp))}"
     )
 
-def save_snapshot_from_export(country: str, country_data: dict, source: str):
+def save_snapshot_from_export(country: str, country_data: dict, source: str, *, provider_export_epoch=None):
     """
     Save one country's snapshot from an already-fetched export object.
 
@@ -839,6 +847,7 @@ def save_snapshot_from_export(country: str, country_data: dict, source: str):
     changed_items = []
 
     with _connect() as conn:
+        country_freshness.record(conn,country,country_data,source,timestamp,provider_export_epoch)
         for item in stock:
             item_id = item["id"]
             item_name = item["name"]
@@ -961,7 +970,8 @@ def save_all_snapshots(export: dict):
 
     changed_by_country = {}
     for country, country_data in stocks.items():
-        changed = save_snapshot_from_export(country, country_data, source)
+        changed = save_snapshot_from_export(country, country_data, source,
+            provider_export_epoch=export.get('timestamp'))
         if changed:
             changed_by_country[country] = changed
 

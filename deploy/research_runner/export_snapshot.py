@@ -23,6 +23,7 @@ MAX_DAYS=120
 MIN_DAYS=14
 MAX_ROWS_PER_ITEM=200000
 MAX_TOTAL_ROWS=1800000
+MAX_COUNTRY_ROWS=4000000
 
 DDL="""
 CREATE TABLE stock_history(
@@ -50,6 +51,19 @@ CREATE TABLE research_metadata(
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL
 );
+CREATE TABLE country_stock_observations(
+    id INTEGER PRIMARY KEY,
+    received_epoch INTEGER NOT NULL,
+    country TEXT NOT NULL,
+    source TEXT NOT NULL,
+    country_update_epoch INTEGER,
+    export_epoch INTEGER,
+    clock_status TEXT NOT NULL,
+    export_clock_status TEXT NOT NULL,
+    item_count INTEGER NOT NULL
+);
+CREATE INDEX idx_country_observation_time
+    ON country_stock_observations(country,received_epoch,id);
 """
 
 
@@ -167,6 +181,31 @@ def export(source,roster,output,*,asof=None,days=45,
                              AND mode='poll-cycle' AND success=1
                            ORDER BY timestamp""",(start,clock))
                 )
+                has_clocks=reader.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='country_stock_observations'").fetchone() is not None
+                country_rows=0
+                if has_clocks:
+                    # Explicit columns only. Never SELECT * from production.
+                    allowed={key.split(':',1)[0] for key in catalog}
+                    cursor=reader.execute('''SELECT received_epoch,country,source,
+                        country_update_epoch,export_epoch,clock_status,export_clock_status,item_count
+                        FROM country_stock_observations WHERE received_epoch BETWEEN ? AND ?
+                        ORDER BY received_epoch,id LIMIT ?''',(start,clock,MAX_COUNTRY_ROWS+1))
+                    statuses={'MISSING','INVALID','FUTURE','REPORTED'}
+                    for scanned,row in enumerate(cursor,1):
+                        if scanned>MAX_COUNTRY_ROWS:raise ValueError('country observation cap exceeded')
+                        receipt,country,provider,update,export_clock,status,export_status,n=row
+                        if country not in allowed:continue
+                        if (type(receipt) is not int or provider not in ('yata','prometheus','unknown')
+                            or any(v is not None and (type(v) is not int or not 0<v<=9999999999) for v in (update,export_clock))
+                            or type(status) is not str or status.removeprefix('EMPTY_PAYLOAD_') not in statuses
+                            or export_status not in statuses
+                            or type(n) is not int or not 0<=n<=10000):
+                            raise ValueError('invalid country observation')
+                        country_rows+=1
+                        if country_rows>MAX_COUNTRY_ROWS:raise ValueError('country observation cap exceeded')
+                        dest.execute('''INSERT INTO country_stock_observations
+                            (received_epoch,country,source,country_update_epoch,export_epoch,
+                             clock_status,export_clock_status,item_count) VALUES(?,?,?,?,?,?,?,?)''',row)
                 metadata={
                     "schema":"torn-fren-research-stock-v1",
                     "source_cutoff_epoch":str(clock),
@@ -175,6 +214,8 @@ def export(source,roster,output,*,asof=None,days=45,
                     "row_count":str(count),
                     "contains_game_api_keys":"false",
                     "sanitized_stock_only":"true",
+                    "country_clock_schema_available":str(has_clocks).lower(),
+                    "country_clock_rows":str(country_rows),
                 }
                 dest.executemany(
                     "INSERT INTO research_metadata(key,value) VALUES(?,?)",
