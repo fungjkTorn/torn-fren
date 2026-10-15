@@ -171,15 +171,27 @@ def summarize(counts):
                 proposal_fraction=rate(counts["proposals"], counts["issues"]))
 
 
+def selected_items(item_keys=None,limit_items=24):
+    roster=model.exact_roster()
+    if type(limit_items) is not int or not 1<=limit_items<=24:
+        raise ValueError("invalid roster limit")
+    if item_keys is None:return sorted(roster)[:limit_items]
+    if (not isinstance(item_keys,(list,tuple)) or not item_keys
+        or any(type(k) is not str for k in item_keys)
+        or len(set(item_keys))!=len(item_keys) or not set(item_keys)<=set(roster)
+        or limit_items!=24):
+        raise ValueError('item subset must contain unique verified keys; do not combine with roster limit')
+    return sorted(item_keys)
+
+
 def replay(*, source, days=2, asof=None, limit_items=24,
-           journal=None, model_sha="unversioned", progress=None, focused_zero=False, issue_end=None):
+           journal=None, model_sha="unversioned", progress=None, focused_zero=False, issue_end=None,item_keys=None):
     policies=tuple(row for row in POLICIES if not focused_zero or row[0]=="v166_all_history" or row[0].startswith("zero_"))
     needs_template=any(kind.startswith("template_") for _,_,kind in policies)
     needs_v151=any(kind=="v151" for _,_,kind in policies)
     if type(days) is not int or not 1<=days<=7:
         raise ValueError("days must be 1..7")
-    if type(limit_items) is not int or not 1<=limit_items<=24:
-        raise ValueError("invalid roster limit")
+    selected=selected_items(item_keys,limit_items)
     path = Path(source).resolve(strict=True)
     results = {}
     totals = {p:Counter() for p,_,_ in policies}
@@ -206,7 +218,7 @@ def replay(*, source, days=2, asof=None, limit_items=24,
         if len(polls)>MAX_POLLS:
             raise ValueError("heartbeat cap exceeded")
         context=SharedStockContext.from_database(db,model.exact_roster(),now,model._gap_index(gaps,now))
-        for key in sorted(model.exact_roster())[:limit_items]:
+        for key in selected:
             country, name = key.split(":",1)
             raw = db.execute("SELECT timestamp,quantity,source FROM stock_history WHERE country=? AND lower(item_name)=lower(?) AND timestamp<=? ORDER BY timestamp,id LIMIT ?", (country,name,now,model.MAX_ITEM_CHANGE_ROWS+1)).fetchall()
             if len(raw)>model.MAX_ITEM_CHANGE_ROWS:
@@ -495,12 +507,13 @@ def replay(*, source, days=2, asof=None, limit_items=24,
             for p in totals:
                 totals[p].update(stats[p])
             if progress:
-                progress(key,len(results),limit_items)
+                progress(key,len(results),len(selected))
     return {"status":"CONTINUOUS_AS_ISSUED_HISTORICAL_REPLAY",
             "version":VERSION,"model_sha":model_sha,"focused_zero":focused_zero,"asof_epoch":now,"issue_window_end_epoch":issue_end,"days":days,
             "offset_columns":["utc_minute","successes","resolved","departed","starts","wait_seconds_sum"],
             "arrival_primary_protocol":"UTC hourly and all five-minute starts; source-relative hourly retained as legacy diagnostic",
             "issue_step_seconds":300,"items_evaluated":len(results),
+            "replay_item_keys":selected,"item_subset_requested":item_keys is not None,"verified_roster_size":24,
             "policies":{p:summarize(c) for p,c in totals.items()},"items":results,
             "event_models_fixed_four_hour":{p:dict(c,
                 recall_10m=rate(c['matched_600s'],c['observed']),
@@ -532,6 +545,7 @@ def main():
     parser.add_argument("--journal",type=Path)
     parser.add_argument("--issue-end",type=int,help="Freeze issue window end separately from later snapshot truth cutoff")
     parser.add_argument("--focused-zero",action="store_true",help="Keep zero-clock/path policies and V166 comparator; skip unused legacy flight simulations")
+    parser.add_argument("--item-key",action="append",dest="item_keys",help="Repeat for a verified item subset; shared context still reads all24")
     args=parser.parse_args()
     if args.journal and args.journal.resolve()==args.source.resolve():
         raise SystemExit("journal must differ from source database")
@@ -541,9 +555,9 @@ def main():
         # Exclusive creation prevents replacing prior frozen evidence.
         with args.journal.open("x",encoding="utf8") as stream:
             result=replay(source=args.source,days=args.days,journal=stream,
-                          model_sha=args.model_sha,progress=progress,focused_zero=args.focused_zero,issue_end=args.issue_end)
+                          model_sha=args.model_sha,progress=progress,focused_zero=args.focused_zero,issue_end=args.issue_end,item_keys=args.item_keys)
     else:
-        result=replay(source=args.source,days=args.days,model_sha=args.model_sha,progress=progress,focused_zero=args.focused_zero,issue_end=args.issue_end)
+        result=replay(source=args.source,days=args.days,model_sha=args.model_sha,progress=progress,focused_zero=args.focused_zero,issue_end=args.issue_end,item_keys=args.item_keys)
     print(json.dumps(result,sort_keys=True))
 
 

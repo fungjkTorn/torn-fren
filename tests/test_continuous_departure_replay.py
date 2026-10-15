@@ -58,6 +58,23 @@ class ContinuousTests(unittest.TestCase):
                            [(p,) for p in range(start,T+1,30)])
         return db
 
+    def test_explicit_subset_matches_default_prefix_and_retains_full_peer_context(self):
+        self.assertEqual(m.selected_items(['jap:Xanax']),['jap:Xanax'])
+        for invalid in ([],['jap:Xanax','jap:Xanax'],['unknown:Xanax'],'jap:Xanax',[None]):
+            with self.assertRaises(ValueError):m.selected_items(invalid)
+        with self.assertRaises(ValueError):m.selected_items(['jap:Xanax'],1)
+        with tempfile.TemporaryDirectory() as td:
+            db=self.fixture(Path(td));key=sorted(m.model.exact_roster())[0]
+            legacy=m.replay(source=db,days=1,limit_items=1,focused_zero=True)
+            real=m.SharedStockContext.from_database
+            with patch.object(m.SharedStockContext,'from_database',side_effect=real) as context:
+                subset=m.replay(source=db,days=1,item_keys=[key],focused_zero=True)
+            self.assertEqual(len(context.call_args.args[1]),24)
+            self.assertEqual(subset['items'],legacy['items'])
+            self.assertEqual(subset['replay_item_keys'],[key])
+            self.assertEqual(subset['items_evaluated'],1)
+            self.assertTrue(subset['item_subset_requested'])
+
     def test_all_issues_readonly_frozen_decisions_and_denominators(self):
         with tempfile.TemporaryDirectory() as td:
             db=self.fixture(Path(td)); before=db.read_bytes(); journal=io.StringIO()
