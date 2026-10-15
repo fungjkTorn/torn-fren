@@ -15,6 +15,7 @@ from services.arbitrage_live import (
     fetch_tornw3b_buy_offers,
     parse_tornexchange_listings_html,
     parse_weav3r_bazaar_html,
+    start_periodic_arbitrage_refresh,
 )
 
 
@@ -542,6 +543,20 @@ class LiveArbitrageParserTests(unittest.TestCase):
         self.assertEqual(report["category_filter"], "Plushies")
         self.assertIn("Artifacts", report["category_options"])
         self.assertIn("Plushies", report["category_options"])
+
+    def test_periodic_refresh_starter_is_idempotent(self):
+        import services.arbitrage_live as live
+
+        class AliveThread:
+            def is_alive(self):
+                return True
+
+        original = live._periodic_refresh_thread
+        try:
+            live._periodic_refresh_thread = AliveThread()
+            self.assertFalse(start_periodic_arbitrage_refresh())
+        finally:
+            live._periodic_refresh_thread = original
 
 
 if __name__ == "__main__":
