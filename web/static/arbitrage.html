@@ -44,6 +44,11 @@
         <option value="">Choose an item…</option>
       </select>
     </label>
+    <label>Category
+      <select id="categoryFilter">
+        <option value="">All categories</option>
+      </select>
+    </label>
     <label>Country
       <select id="countryFilter">
         <option value="">All countries</option><option>Argentina</option><option>Canada</option><option>Cayman Islands</option>
@@ -124,7 +129,7 @@
 </dialog>
 
 <script>
-let currentRows=[], catalogItems=[], catalogOptions=[], traderOptions=[], excludedTraderNames=new Set(), activeSort="total_profit", descending=true;
+let currentRows=[], catalogItems=[], catalogOptions=[], categoryOptions=[], traderOptions=[], excludedTraderNames=new Set(), activeSort="total_profit", descending=true;
 
 const money=v=>"$"+Math.round(Number(v||0)).toLocaleString();
 const pct=v=>(Number(v||0)*100).toFixed(1)+"%";
@@ -134,10 +139,12 @@ const ageText=ts=>{if(!ts)return "age ?";const s=Math.max(0,Date.now()/1000-Numb
 
 function refreshItemOptions(){
   const country=document.getElementById("countryFilter").value;
+  const category=document.getElementById("categoryFilter").value;
   const select=document.getElementById("itemSearch");
   const current=select.value;
   const options=(catalogOptions||[])
     .filter(row=>!country || (row.countries||[]).includes(country))
+    .filter(row=>!category || row.category===category)
     .sort((a,b)=>a.item_name.localeCompare(b.item_name));
 
   select.innerHTML='<option value="">Choose an item…</option>'+
@@ -147,6 +154,14 @@ function refreshItemOptions(){
   else select.value="";
 
   updateItemActionState();
+}
+
+function refreshCategoryOptions(){
+  const select=document.getElementById("categoryFilter");
+  const current=select.value;
+  select.innerHTML='<option value="">All categories</option>'+
+    (categoryOptions||[]).map(x=>'<option value="'+safe(x)+'">'+safe(x)+'</option>').join("");
+  if(current && (categoryOptions||[]).includes(current)) select.value=current;
 }
 
 function updateItemActionState(){
@@ -284,12 +299,15 @@ async function load(force=false){
   const maxPer=Number(document.getElementById("maxPerTrader").value||0);
   if(maxPer>0)params.set("max_per_trader",String(maxPer));
   const country=document.getElementById("countryFilter").value;if(country)params.set("country",country);
+  const category=document.getElementById("categoryFilter").value;if(category)params.set("category",category);
   const status=document.getElementById("status"); status.className="notice"; status.textContent=force?"Refreshing live sources…":"Loading scanner…";
   document.getElementById("scan").disabled=true; document.getElementById("force").disabled=true;
   try{
     const response=await fetch("/api/arbitrage?"+params); if(!response.ok) throw new Error("HTTP "+response.status);
-    const data=await response.json(); currentRows=data.opportunities||[]; catalogItems=data.catalog_items||[]; catalogOptions=data.catalog_options||catalogItems.map(x=>({item_name:x,countries:[]}));
+    const data=await response.json(); currentRows=data.opportunities||[]; catalogItems=data.catalog_items||[]; catalogOptions=data.catalog_options||catalogItems.map(x=>({item_name:x,countries:[],category:"Other"}));
+    categoryOptions=data.category_options||[];
     traderOptions=data.trader_options||[];
+    refreshCategoryOptions();
     refreshItemOptions();
     refreshTraderOptions(data.excluded_traders||[]);
     opportunityCount.textContent=Number(data.opportunity_count||0).toLocaleString(); listingCount.textContent=Number(data.listing_count||0).toLocaleString();
@@ -318,6 +336,7 @@ document.getElementById("rows").addEventListener("click",e=>{
 document.getElementById("itemSearch").addEventListener("change",()=>{updateItemActionState();render();});
 document.getElementById("sortBy").onchange=e=>{activeSort=e.target.value;descending=true;render();};
 document.getElementById("countryFilter").onchange=()=>{refreshItemOptions();load(false);};
+document.getElementById("categoryFilter").onchange=()=>{refreshItemOptions();load(false);};
 document.getElementById("buySource").onchange=()=>load(false);
 document.getElementById("buyerSource").onchange=()=>load(false);
 document.getElementById("addExclusion").onclick=()=>{
