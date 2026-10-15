@@ -51,6 +51,89 @@ _COUNTRY_NAMES = {
     "sou": "South Africa",
 }
 
+_ITEM_CATEGORY_GROUPS = {
+    "plushie": "Plushies",
+    "flower": "Flowers",
+    "artifact": "Artifacts",
+    "primary": "Weapons",
+    "secondary": "Weapons",
+    "melee": "Weapons",
+    "defensive": "Armor",
+    "drug": "Drugs",
+    "medical": "Medical",
+    "temporary": "Temporary",
+    "candy": "Candy",
+    "alcohol": "Alcohol",
+    "energy drink": "Energy Drinks",
+    "booster": "Boosters & Enhancers",
+    "enhancer": "Boosters & Enhancers",
+    "supply pack": "Supply Packs",
+    "electronic": "Electronics",
+    "jewelry": "Jewelry",
+    "clothing": "Clothing",
+    "book": "Books",
+    "virus": "Viruses",
+    "special": "Special",
+    "other": "Other",
+}
+
+
+def _display_category(item_type: Optional[str]) -> str:
+    raw = (item_type or "Other").strip()
+    return _ITEM_CATEGORY_GROUPS.get(raw.casefold(), raw.title() if raw else "Other")
+
+
+def _fetch_torn_item_types(
+    *,
+    session: Optional[requests.Session] = None,
+) -> dict[str, str]:
+    """Fetch Torn's official item type metadata in one globally cached API call."""
+    api_key = (os.getenv("TORN_API_KEY") or "").strip()
+    if not api_key:
+        return {}
+
+    session = session or _session()
+    response = session.get(
+        f"{TORN_API_BASE}/torn/items",
+        headers={"Authorization": f"ApiKey {api_key}", "accept": "application/json"},
+        timeout=HTTP_TIMEOUT_SECONDS,
+    )
+    response.raise_for_status()
+    data = response.json()
+    if data.get("error"):
+        raise RuntimeError(str(data["error"]))
+
+    items = data.get("items") or []
+    if isinstance(items, dict):
+        iterable = []
+        for key, value in items.items():
+            row = dict(value or {})
+            row.setdefault("id", key)
+            iterable.append(row)
+    else:
+        iterable = items
+
+    result: dict[str, str] = {}
+    for row in iterable:
+        item_id = str(row.get("id") or row.get("item_id") or "").strip()
+        item_type = str(
+            row.get("type")
+            or row.get("item_type")
+            or row.get("category")
+            or ""
+        ).strip()
+        if item_id and item_type:
+            result[item_id] = item_type
+    return result
+
+
+def _fallback_item_type(item_name: str) -> str:
+    name = (item_name or "").casefold()
+    if "plushie" in name:
+        return "Plushie"
+    return "Other"
+
+
 _MONEY_RE = re.compile(r"\$\s*([\d,]+)")
 _PLAYER_ID_RE = re.compile(r"\[(\d+)\]")
 
@@ -61,6 +144,8 @@ class ForeignItem:
     item_name: str
     countries: tuple[str, ...]
     abroad_costs: tuple[int, ...]
+    item_type: str = "Other"
+    category: str = "Other"
 
     @property
     def weav3r_url(self) -> str:
@@ -131,6 +216,8 @@ def _load_persisted_snapshot() -> bool:
                 item_name=str(row["item_name"]),
                 countries=tuple(row.get("countries") or ()),
                 abroad_costs=tuple(int(v) for v in (row.get("abroad_costs") or ())),
+                item_type=str(row.get("item_type") or "Other"),
+                category=str(row.get("category") or _display_category(row.get("item_type"))),
             )
             for row in payload.get("catalog") or []
         ]
@@ -271,6 +358,11 @@ def get_foreign_item_catalog() -> list[ForeignItem]:
     export = get_travel_export() or {}
     stocks = export.get("stocks") or {}
 
+    try:
+        item_types = _fetch_torn_item_types()
+    except Exception:
+        item_types = {}
+
     by_item: dict[str, dict] = {}
 
     for country_code, country_data in stocks.items():
@@ -306,6 +398,10 @@ def get_foreign_item_catalog() -> list[ForeignItem]:
                 item_name=value["item_name"],
                 countries=tuple(sorted(value["countries"])),
                 abroad_costs=tuple(sorted(value["abroad_costs"])),
+                item_type=item_types.get(value["item_id"], _fallback_item_type(value["item_name"])),
+                category=_display_category(
+                    item_types.get(value["item_id"], _fallback_item_type(value["item_name"]))
+                ),
             )
             for value in by_item.values()
         ],
@@ -1332,6 +1428,7 @@ def build_arbitrage_report(
     buy_source: str = "all",
     buyer_source: str = "all",
     country: Optional[str] = None,
+    category: Optional[str] = None,
     excluded_traders: Optional[list[str]] = None,
     max_opportunities_per_trader: Optional[int] = None,
     diversified: bool = False,
@@ -1341,6 +1438,7 @@ def build_arbitrage_report(
     buy_source = (buy_source or "all").strip().casefold()
     buyer_source = (buyer_source or "all").strip().casefold()
     country_filter = (country or "").strip().casefold()
+    category_filter = (category or "").strip().casefold()
 
     listings = list(snapshot["listings"])
     offers = list(snapshot["offers"])
@@ -1398,9 +1496,13 @@ def build_arbitrage_report(
         row["countries"] = list(foreign_item.countries) if foreign_item else []
         row["abroad_costs"] = list(foreign_item.abroad_costs) if foreign_item else []
         row["buy_url"] = foreign_item.weav3r_url if foreign_item else None
+        row["item_type"] = foreign_item.item_type if foreign_item else "Other"
+        row["category"] = foreign_item.category if foreign_item else "Other"
         if country_filter and not any(
             country_filter in name.casefold() for name in row["countries"]
         ):
+            continue
+        if category_filter and row["category"].casefold() != category_filter:
             continue
         labels, buyer_meta = _anomaly_labels_for_item(
             opportunity,
@@ -1536,15 +1638,25 @@ def build_arbitrage_report(
         "buy_source_filter": buy_source,
         "buyer_source_filter": buyer_source,
         "country_filter": country or None,
+        "category_filter": category or None,
         "excluded_traders": sorted(excluded_set, key=str.casefold),
         "max_opportunities_per_trader": max_opportunities_per_trader,
         "diversified": diversified,
         "catalog_count": len(snapshot["catalog"]),
         "catalog_items": [item.item_name for item in snapshot["catalog"]],
         "catalog_options": [
-            {"item_name": item.item_name, "countries": list(item.countries)}
+            {
+                "item_name": item.item_name,
+                "countries": list(item.countries),
+                "item_type": item.item_type,
+                "category": item.category,
+            }
             for item in snapshot["catalog"]
         ],
+        "category_options": sorted(
+            {item.category for item in snapshot["catalog"] if item.category},
+            key=str.casefold,
+        ),
         "listing_count": len(snapshot["listings"]),
         "offer_count": len(snapshot["offers"]),
         "opportunity_count": len(output),
