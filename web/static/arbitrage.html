@@ -207,7 +207,9 @@ function render(){
   });
   updateSortIndicators();
 
+  let renderErrors=0;
   document.getElementById("rows").innerHTML=rows.map(row=>{
+    try{
     const countries=(row.countries||[]).map(x=>'<span class="pill">'+safe(x)+'</span>').join("");
     const itemHtml=row.buy_url?'<a class="row-link" href="'+safe(row.buy_url)+'" target="_blank" rel="noreferrer">'+safe(row.item_name)+'</a>':'<b>'+safe(row.item_name)+'</b>';
     const traderHtml=row.buyer_url?'<a class="row-link" href="'+safe(row.buyer_url)+'" target="_blank" rel="noreferrer">'+safe(row.buyer_name)+'</a>':'<b>'+safe(row.buyer_name)+'</b>';
@@ -227,9 +229,19 @@ function render(){
       '<td>'+traderHtml+'<div class="tiny muted">'+safe(sourceLabel(row.buyer_source))+'</div>'+
       (row.second_best_buyer_name?'<div class="tiny muted">#2 '+safe(row.second_best_buyer_name)+' · '+money(row.second_best_buyer_price)+' · gap '+money(row.buyer_price_gap)+'</div>':'')+
       '</td><td>'+sources+'</td><td>'+anomalies+'</td></tr>';
+    }catch(err){
+      renderErrors++;
+      console.error("Failed to render arbitrage row", row, err);
+      return '<tr><td colspan="14" class="error" style="padding:18px">Could not render '+safe(row&&row.item_name||"opportunity")+'. Check browser console for details.</td></tr>';
+    }
   }).join("");
 
   if(!rows.length) document.getElementById("rows").innerHTML='<tr><td colspan="14" class="muted" style="text-align:center;padding:30px">No qualifying opportunities match these filters/search.</td></tr>';
+  if(renderErrors){
+    const status=document.getElementById("status");
+    status.classList.add("error");
+    status.textContent += " · "+renderErrors+" row rendering error"+(renderErrors===1?"":"s");
+  }
 }
 
 async function inspectItem(name){
