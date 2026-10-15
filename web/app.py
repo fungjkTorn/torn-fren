@@ -82,6 +82,7 @@ def api_arbitrage(
     buy_source: str = Query("all"),
     buyer_source: str = Query("all"),
     country: str | None = Query(None),
+    category: str | None = Query(None),
     mode: str = Query("arbitrage"),
     exclude_traders: str | None = Query(None),
     max_per_trader: int | None = Query(None, ge=1, le=1000),
@@ -119,6 +120,7 @@ def api_arbitrage(
         buy_source=buy_source,
         buyer_source=buyer_source,
         country=country,
+        category=category,
         excluded_traders=[
             name.strip()
             for name in (exclude_traders or "").split(",")
