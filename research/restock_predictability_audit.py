@@ -10,10 +10,10 @@ from pathlib import Path
 
 import numpy as np
 
-from research.continuous_departure_replay import selected_items,MAX_POLLS
 from research.true_zero_cycles import model
 
 PERIODS=(300,600,900,1800,3600,7200)
+MAX_POLLS=400000
 
 
 def quantile(values,p):
@@ -41,7 +41,7 @@ def cycles_from_rows(rows,crosses,cutoff):
             invalid=(obs.epoch<=previous.epoch or crosses(previous.epoch,obs.epoch)
                 or (obs.source!=previous.source and (obs.quantity>0)!=(previous.quantity>0)))
             if invalid and active is not None:
-                active['outcome']='UNKNOWN';active=None
+                active.update(outcome='UNKNOWN',invalidated_at=obs.epoch);active=None
             restock=(not invalid and previous.quantity==0<obs.quantity and previous.source==obs.source)
             if restock:
                 restocks.append(obs.epoch)
@@ -151,6 +151,7 @@ def evaluate(key,rows,polls,gaps,*,cutoff,days=7,trace=None):
 
 
 def audit(source,*,item_keys=None,days=7,model_sha='unversioned'):
+    from research.continuous_departure_replay import selected_items
     if type(days) is not int or not 1<=days<=7:raise ValueError('invalid days')
     keys=selected_items(item_keys);path=Path(source).resolve(strict=True)
     with closing(sqlite3.connect(path.as_uri()+'?mode=ro',uri=True)) as db:
