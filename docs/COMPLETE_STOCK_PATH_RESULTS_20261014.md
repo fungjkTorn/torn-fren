@@ -1,5 +1,7 @@
 # Complete stock path results — October14 evening,2026
 
+> Evaluation update: these legacy hourly starts were snapshot-relative and sensitive to the starting minute. See [all-start robustness results](COHORT_ROBUSTNESS_RESULTS_20261015.md) for every five-minute start, fixed UTC-hour diagnostics and same-snapshot comparisons.
+
 Private [run38661757886](https://github.com/fungjkTorn/torn-fren-research-private/actions/runs/38661757886) SUCCESS. Numerical source7dc462dd8a128df44407f5df7db05423225dbdc3; CI38661654234 passed75 tests plus Chromium and compatibility checks. Snapshot cutoff1792024856 (2026-10-15T00:40:56.000Z); seven days,24 verified items,23 focused policies,168 hourly starts/item.
 
 Historical sampled stock>=30 at simulated arrival, with five-minute replanning,180s source expiry and8h maximum wait. Not actual player flights, exact game-event timing, calibrated success probability, or earliest-optimal departure accuracy. These data overlap inspected history. Support thresholds70/80 are empirical path votes, not success probabilities.
