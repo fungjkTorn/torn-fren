@@ -14,6 +14,7 @@ import sqlite3
 import sys
 import time
 from collections import Counter
+from functools import lru_cache
 from contextlib import closing
 from pathlib import Path
 
@@ -21,7 +22,8 @@ from deploy.scripts import v163_readonly_event_first_preview as model
 from services.travel_decision_contract_v166 import build_item_travel_decision
 from research.causal_daily_template import DailyTemplate
 from research.causal_phase_analogs import PhaseAnalogs
-from research.departure_reconfirmation import evaluate as evaluate_reconfirmation, compare as compare_reconfirmation
+from research.departure_reconfirmation import (evaluate as evaluate_reconfirmation, compare as compare_reconfirmation,
+    evaluate_utc, evaluate_all_starts, compare_cohorts)
 from research.depletion_timing_audit import (observed_depletions, predicted_depletions, observed_restocks,
     observed_availability_losses, predicted_availability_losses, count_events)
 from research.true_zero_cycles import ZeroCycles
@@ -200,6 +202,7 @@ def replay(*, source, days=2, asof=None, limit_items=24,
             true_restocks = observed_restocks(obs,crosses)
             unavailable = observed_availability_losses(obs,crosses)
             evidence = ArrivalEvidence(obs,polls,gaps,now)
+            evidence.score=lru_cache(maxsize=32768)(evidence.score)
             path_model=CausalStockPaths(obs,polls,crosses,cutoff=now,
                                        flight_seconds=model.TRAVEL_SECONDS[country],score=evidence.score,
                                        context=lambda asof,item_key=key:context.at(asof,item_key))
@@ -394,14 +397,29 @@ def replay(*, source, days=2, asof=None, limit_items=24,
                         c["matched_issues"]+=1
                         c["challenger_only_success"]+=challenger=="SUCCESS" and incumbent=="FAILURE"
                         c["v166_only_success"]+=challenger=="FAILURE" and incumbent=="SUCCESS"
+            all_cohorts={p:[] for p,_,_ in policies}
+            all_start_scores={p:evaluate_all_starts(plans[p],cohorts=all_cohorts[p],cutoff=now,
+                flight_seconds=model.TRAVEL_SECONDS[country],score=evidence.score,start_before=issue_end) for p,_,_ in policies}
+            utc_scores={p:evaluate_utc(plans[p],cutoff=now,flight_seconds=model.TRAVEL_SECONDS[country],
+                score=evidence.score,start_before=issue_end) for p,_,_ in policies}
             results[key]={"player_flight_seconds":model.TRAVEL_SECONDS[country],"policies":{p:dict(summarize(stats[p]),
                 departure_only_model=p.startswith("zero_path_"),
+                replanned_utc_hourly_starts=utc_scores[p],
+                replanned_all_five_minute_starts=all_start_scores[p],
                 first_proposal_per_issue_phase=summarize(episode_stats[p]),
                 replanned_hourly_starts=evaluate_reconfirmation(plans[p],cutoff=now,
                     flight_seconds=model.TRAVEL_SECONDS[country],score=evidence.score,start_before=issue_end),
                 distinct_observed_stock_episodes_reached=len(landed_episodes[p]),
                 chronological_day_slices=[summarize(c) for c in chronological[p]],
                 outcome_reasons=dict(reasons[p])) for p,_,_ in policies},
+                "path_local_all_start_comparisons":{p:compare_cohorts(all_cohorts["zero_path_analog"+p[-2:]],all_cohorts[p])
+                    for p,_,_ in policies if p.startswith("zero_path_regime")},
+                "path_all_start_zero_baseline_comparisons":{p:compare_cohorts(all_cohorts["zero_anchored_current_quarter"],all_cohorts[p])
+                    for p,_,_ in policies if p.startswith("zero_path_")},
+                "path_all_start_established_reference_comparisons":{p:{reference:compare_cohorts(
+                    all_cohorts[reference],all_cohorts[p])
+                    for reference in ("zero_rate_current_quarter","zero_hybrid_current_rate_current_quarter")}
+                    for p,_,_ in policies if p.startswith("zero_path_")},
                 "path_local_analog_comparisons":{p:compare_reconfirmation(plans["zero_path_analog"+p[-2:]],plans[p],
                     cutoff=now,flight_seconds=model.TRAVEL_SECONDS[country],score=evidence.score,start_before=issue_end)
                     for p,_,_ in policies if p.startswith("zero_path_regime")},
@@ -447,6 +465,8 @@ def replay(*, source, days=2, asof=None, limit_items=24,
                 progress(key,len(results),limit_items)
     return {"status":"CONTINUOUS_AS_ISSUED_HISTORICAL_REPLAY",
             "version":VERSION,"model_sha":model_sha,"focused_zero":focused_zero,"asof_epoch":now,"issue_window_end_epoch":issue_end,"days":days,
+            "offset_columns":["utc_minute","successes","resolved","departed","starts","wait_seconds_sum"],
+            "arrival_primary_protocol":"UTC hourly and all five-minute starts; source-relative hourly retained as legacy diagnostic",
             "issue_step_seconds":300,"items_evaluated":len(results),
             "policies":{p:summarize(c) for p,c in totals.items()},"items":results,
             "event_models_fixed_four_hour":{p:dict(c,

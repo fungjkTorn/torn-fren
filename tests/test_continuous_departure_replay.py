@@ -77,11 +77,17 @@ class ContinuousTests(unittest.TestCase):
                 self.assertEqual(c["issues"],288)
                 rc=report["items"][next(iter(report["items"]))]["policies"][policy]["replanned_hourly_starts"]
                 self.assertEqual(rc["starts"],24)
+                detail=report["items"][next(iter(report["items"]))]["policies"][policy]
+                self.assertEqual(detail["replanned_utc_hourly_starts"]["starts"],24)
+                pooled=detail["replanned_all_five_minute_starts"]
+                self.assertEqual(pooled["starts"],288)
+                self.assertEqual(len(pooled["offsets"]),12)
                 self.assertEqual(sum(rc.get(k,0) for k in ("SUCCESS","FAILURE","PENDING","UNKNOWN","ABSTAIN")),24)
                 self.assertEqual(sum(c.get(k,0) for k in ("SUCCESS","FAILURE","PENDING","UNKNOWN","ABSTAIN")),288)
                 self.assertEqual(c["proposals"]+c.get("ABSTAIN",0),288)
             item=next(iter(report["items"].values()))
             self.assertEqual(len(item["path_established_reference_comparisons"]),5)
+            self.assertTrue(all(v["starts"]==288 for refs in item["path_all_start_established_reference_comparisons"].values() for v in refs.values()))
             self.assertTrue(all(v["starts"]==24 for refs in item["path_established_reference_comparisons"].values() for v in refs.values()))
             self.assertEqual(len(item["matched_zero_replanned_comparisons"]),len(m.ZERO_COMPARATORS))
             for c in item["matched_zero_replanned_comparisons"].values():
