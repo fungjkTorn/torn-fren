@@ -110,6 +110,29 @@ class ContinuousTests(unittest.TestCase):
                 if a["issued_epoch"]<=split:
                     self.assertEqual({k:a[k] for k in fields},{k:b[k] for k in fields})
 
+    def test_fixed_issue_window_preserves_forecasts_while_truth_matures(self):
+        with tempfile.TemporaryDirectory() as td:
+            db=self.fixture(Path(td));end=T-14400
+            before=io.StringIO();after=io.StringIO()
+            m.replay(source=db,days=1,asof=end,limit_items=1,journal=before,
+                     model_sha="fixed",focused_zero=True)
+            r=m.replay(source=db,days=1,asof=T,issue_end=end,limit_items=1,journal=after,
+                       model_sha="fixed",focused_zero=True)
+            a=[json.loads(x) for x in before.getvalue().splitlines()]
+            b=[json.loads(x) for x in after.getvalue().splitlines()]
+            self.assertEqual(len(a),len(b))
+            fields=("issue_id","issued_epoch","departure_epoch","forecast_events","path_evidence","selector_evidence")
+            for left,right in zip(a,b):
+                self.assertLessEqual(right["issued_epoch"],end)
+                self.assertEqual({k:left[k] for k in fields},{k:right[k] for k in fields})
+            self.assertEqual(r["issue_window_end_epoch"],end)
+            self.assertEqual(r["asof_epoch"],T)
+            item=next(iter(r["items"].values()))
+            self.assertTrue(item["post_window_replanning_plans"])
+            self.assertTrue(all(v["replanned_hourly_starts"]["starts"]==24 for v in item["policies"].values()))
+            self.assertLessEqual(sum(x["outcome"]=="PENDING" for x in b),sum(x["outcome"]=="PENDING" for x in a))
+            with self.assertRaises(ValueError):m.replay(source=db,days=1,issue_end=T+1,limit_items=1)
+
     def test_missing_heartbeat_abstains_and_cutoff_is_snapshot_not_wallclock(self):
         with tempfile.TemporaryDirectory() as td:
             db=self.fixture(Path(td))

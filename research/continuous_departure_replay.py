@@ -153,7 +153,7 @@ def summarize(counts):
 
 
 def replay(*, source, days=2, asof=None, limit_items=24,
-           journal=None, model_sha="unversioned", progress=None, focused_zero=False):
+           journal=None, model_sha="unversioned", progress=None, focused_zero=False, issue_end=None):
     policies=tuple(row for row in POLICIES if not focused_zero or row[0]=="v166_all_history" or row[0].startswith("zero_"))
     needs_template=any(kind.startswith("template_") for _,_,kind in policies)
     needs_v151=any(kind=="v151" for _,_,kind in policies)
@@ -176,8 +176,12 @@ def replay(*, source, days=2, asof=None, limit_items=24,
         now = cutoff if asof is None else asof
         if type(now) is not int or now<=days*86400 or now>cutoff:
             raise ValueError("invalid cutoff")
-        start = now-days*86400
-        issues = range((start//300+1)*300, now+1, 300)
+        issue_end=now if issue_end is None else issue_end
+        if type(issue_end) is not int or not days*86400<issue_end<=now:
+            raise ValueError("invalid fixed issue window end")
+        start = issue_end-days*86400
+        plan_end=min(now,issue_end+28800)
+        issues = range((start//300+1)*300, plan_end+1, 300)
         gaps = db.execute("SELECT start_timestamp,end_timestamp FROM collection_gaps WHERE start_timestamp<=? ORDER BY start_timestamp", (now,)).fetchall()
         polls = [int(r[0]) for r in db.execute("SELECT timestamp FROM poll_heartbeats WHERE mode='poll-cycle' AND success=1 AND timestamp<=? ORDER BY timestamp LIMIT ?", (now, MAX_POLLS+1))]
         if len(polls)>MAX_POLLS:
@@ -227,7 +231,7 @@ def replay(*, source, days=2, asof=None, limit_items=24,
                     for hybrid in hybrids.values():hybrid.add(obs[cursor])
                     cursor+=1
                 state = phases.asof()
-                event_cohort=(issued-issues.start)%(4*3600)==0
+                event_cohort=issued<=issue_end and (issued-issues.start)%(4*3600)==0
                 legacy_needed=not focused_zero or event_cohort
                 analog_events = analogs.forecast(key,state,asof=issued) if legacy_needed else None
                 recent_events = recent_analogs.forecast(key,state,asof=issued) if legacy_needed else None
@@ -293,13 +297,15 @@ def replay(*, source, days=2, asof=None, limit_items=24,
                         expert,selection=selector.select()
                         forecast=issued_forecasts[expert]
                         decision=dict(issued_decisions[expert],selected_expert=expert,selector_evidence=selection)
-                        selected_experts[expert]+=1
+                        if issued<=issue_end:selected_experts[expert]+=1
                     else:
                         decision = choose(forecast,issued,age,kind,template,v151)
                     issued_decisions[policy]=decision
                     issued_forecasts[policy]=forecast
                     dep = decision["estimated_departure_epoch"]
                     plans[policy].append((issued, dep, age))
+                    if issued>issue_end:
+                        continue
                     arrival = dep+model.TRAVEL_SECONDS[country] if dep is not None else None
                     # Freeze the decision before consulting any outcome evidence.
                     outcome, reason, proof = evidence.score(arrival) if arrival is not None else ("ABSTAIN",decision["status"],None)
@@ -372,6 +378,8 @@ def replay(*, source, days=2, asof=None, limit_items=24,
                                 "outcome":outcome,"outcome_reason":reason,"evidence":proof,
                                 "leave_now_outcome":baseline[0]}
                         journal.write(json.dumps(record,sort_keys=True)+"\n")
+                if issued>issue_end:
+                    continue
                 for p,c in zero_paired.items():
                     base=issued_outcomes[ZERO_COMPARATORS[p]]
                     challenger=issued_outcomes[p]
@@ -390,22 +398,23 @@ def replay(*, source, days=2, asof=None, limit_items=24,
                 departure_only_model=p.startswith("zero_path_"),
                 first_proposal_per_issue_phase=summarize(episode_stats[p]),
                 replanned_hourly_starts=evaluate_reconfirmation(plans[p],cutoff=now,
-                    flight_seconds=model.TRAVEL_SECONDS[country],score=evidence.score),
+                    flight_seconds=model.TRAVEL_SECONDS[country],score=evidence.score,start_before=issue_end),
                 distinct_observed_stock_episodes_reached=len(landed_episodes[p]),
                 chronological_day_slices=[summarize(c) for c in chronological[p]],
                 outcome_reasons=dict(reasons[p])) for p,_,_ in policies},
                 "path_local_analog_comparisons":{p:compare_reconfirmation(plans["zero_path_analog"+p[-2:]],plans[p],
-                    cutoff=now,flight_seconds=model.TRAVEL_SECONDS[country],score=evidence.score)
+                    cutoff=now,flight_seconds=model.TRAVEL_SECONDS[country],score=evidence.score,start_before=issue_end)
                     for p,_,_ in policies if p.startswith("zero_path_regime")},
                 "path_established_reference_comparisons":{p:{reference:compare_reconfirmation(
-                    plans[reference],plans[p],cutoff=now,flight_seconds=model.TRAVEL_SECONDS[country],score=evidence.score)
+                    plans[reference],plans[p],cutoff=now,flight_seconds=model.TRAVEL_SECONDS[country],score=evidence.score,start_before=issue_end)
                     for reference in ("zero_rate_current_quarter","zero_hybrid_current_rate_current_quarter")}
                     for p,_,_ in policies if p.startswith("zero_path_")},
+                "post_window_replanning_plans":{p:[row for row in rows if row[0]>issue_end] for p,rows in plans.items()} if plan_end>issue_end else {},
                 "adaptive_selector_expert_issue_counts":dict(selected_experts),
                 "adaptive_selector_final_training":selector.select()[1],
                 "matched_zero_replanned_comparisons":{p:compare_reconfirmation(
                     plans[ZERO_COMPARATORS[p]],plans[p],
-                    cutoff=now,flight_seconds=model.TRAVEL_SECONDS[country],score=evidence.score)
+                    cutoff=now,flight_seconds=model.TRAVEL_SECONDS[country],score=evidence.score,start_before=issue_end)
                     for p in zero_paired},
                 "matched_zero_baseline_comparisons":{p:dict(c) for p,c in zero_paired.items()},
                 "matched_v166_comparisons":{p:dict(c) for p,c in paired.items()}}
@@ -437,7 +446,7 @@ def replay(*, source, days=2, asof=None, limit_items=24,
             if progress:
                 progress(key,len(results),limit_items)
     return {"status":"CONTINUOUS_AS_ISSUED_HISTORICAL_REPLAY",
-            "version":VERSION,"model_sha":model_sha,"focused_zero":focused_zero,"asof_epoch":now,"days":days,
+            "version":VERSION,"model_sha":model_sha,"focused_zero":focused_zero,"asof_epoch":now,"issue_window_end_epoch":issue_end,"days":days,
             "issue_step_seconds":300,"items_evaluated":len(results),
             "policies":{p:summarize(c) for p,c in totals.items()},"items":results,
             "event_models_fixed_four_hour":{p:dict(c,
@@ -468,6 +477,7 @@ def main():
     parser.add_argument("--days",type=int,default=2)
     parser.add_argument("--model-sha",default="unversioned")
     parser.add_argument("--journal",type=Path)
+    parser.add_argument("--issue-end",type=int,help="Freeze issue window end separately from later snapshot truth cutoff")
     parser.add_argument("--focused-zero",action="store_true",help="Keep zero-clock/path policies and V166 comparator; skip unused legacy flight simulations")
     args=parser.parse_args()
     if args.journal and args.journal.resolve()==args.source.resolve():
@@ -478,9 +488,9 @@ def main():
         # Exclusive creation prevents replacing prior frozen evidence.
         with args.journal.open("x",encoding="utf8") as stream:
             result=replay(source=args.source,days=args.days,journal=stream,
-                          model_sha=args.model_sha,progress=progress,focused_zero=args.focused_zero)
+                          model_sha=args.model_sha,progress=progress,focused_zero=args.focused_zero,issue_end=args.issue_end)
     else:
-        result=replay(source=args.source,days=args.days,model_sha=args.model_sha,progress=progress,focused_zero=args.focused_zero)
+        result=replay(source=args.source,days=args.days,model_sha=args.model_sha,progress=progress,focused_zero=args.focused_zero,issue_end=args.issue_end)
     print(json.dumps(result,sort_keys=True))
 
 

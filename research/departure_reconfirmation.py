@@ -6,11 +6,13 @@ A changed/absent plan replaces the old plan, including when a deadline arrives.
 from collections import Counter
 
 
-def evaluate(plans, *, cutoff, flight_seconds, score, cohorts=None):
+def evaluate(plans, *, cutoff, flight_seconds, score, cohorts=None, start_before=None):
     counts = Counter()
     days={}
     for start_index in range(0, len(plans), 12):
         start = plans[start_index][0]
+        if start_before is not None and start>start_before:
+            break
         deadline = start + 28800
         counts['starts'] += 1
         day=days.setdefault((start-plans[0][0])//86400,Counter())
