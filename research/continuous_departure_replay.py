@@ -33,6 +33,7 @@ from research.causal_policy_selector import CausalPolicySelector
 from research.causal_stock_paths import CausalStockPaths
 from research.phase_aligned_stock_paths import PhaseAlignedStockPaths
 from research.arrival_clock_correction import ArrivalClockCorrection
+from research.direct_arrival_occupancy import DirectArrivalOccupancy
 from research.shared_stock_context import SharedStockContext
 from services.travel_window_policy import project_policy
 from research.v151_stable_earliest_departure import stable_earliest_departure
@@ -73,6 +74,7 @@ POLICIES += tuple(("zero_path_"+mode,None,"path_"+mode) for mode in CausalStockP
 POLICIES += tuple(("zero_path_aligned_"+mode,None,"path_aligned_"+mode) for mode in PhaseAlignedStockPaths.MODES)
 POLICIES += tuple(("zero_path_residual_"+family+"_"+mode,None,"path_residual_"+family+"_"+mode)
                   for family in ('rate','hybrid') for mode in ArrivalClockCorrection.MODES)
+POLICIES += tuple(("zero_path_"+mode,None,"path_"+mode) for mode in DirectArrivalOccupancy.MODES)
 ZERO_COMPARATORS={p:("zero_anchored_midpoint" if p.endswith("_midpoint") else
                     "zero_anchored_quarter" if p.endswith("_quarter") and not p.endswith("_current_quarter") else
                     "zero_anchored_current_quarter")
@@ -238,6 +240,8 @@ def replay(*, source, days=2, asof=None, limit_items=24,
             aligned_paths=PhaseAlignedStockPaths(obs,crosses,cutoff=now,
                 flight_seconds=model.TRAVEL_SECONDS[country],interval_score=evidence.interval_score)
             corrections={family:ArrivalClockCorrection(family) for family in ('rate','hybrid')}
+            direct=DirectArrivalOccupancy(obs,polls,crosses,cutoff=now,
+                flight_seconds=model.TRAVEL_SECONDS[country],score=evidence.score)
             template_model=DailyTemplate(obs,crosses)
             phases = model._ReplayPhases(crosses)
             analogs = PhaseAnalogs(crosses)
@@ -278,6 +282,7 @@ def replay(*, source, days=2, asof=None, limit_items=24,
                 if crosses(issued,issued):
                     age = None  # Known collection outage at issuance.
                 path_plans=path_model.plans(issued,zero_cycles,poll_age=age)
+                path_plans.update(direct.plans(issued,zero_cycles,poll_age=age))
                 path_plans.update({'aligned_'+mode:plan for mode,plan in
                     aligned_paths.plans(issued,zero_cycles,poll_age=age).items()})
                 for family,base_forecast in (('rate',rate_events),('hybrid',hybrid_events['zero_hybrid_current_rate'])):
@@ -459,6 +464,7 @@ def replay(*, source, days=2, asof=None, limit_items=24,
                     for reference in ("zero_path_regime70","zero_path_regime80","zero_path_aligned_analog70","zero_path_aligned_analog50")}
                     for p,_,_ in policies if p.startswith("zero_path_residual_")},
                 "residual_clock_diagnostics":{family:c.diagnostics() for family,c in corrections.items()},
+                "direct_arrival_diagnostics":direct.diagnostics(),
                 "path_all_start_zero_baseline_comparisons":{p:compare_cohorts(all_cohorts["zero_anchored_current_quarter"],all_cohorts[p])
                     for p,_,_ in policies if p.startswith("zero_path_")},
                 "path_all_start_established_reference_comparisons":{p:{reference:compare_cohorts(

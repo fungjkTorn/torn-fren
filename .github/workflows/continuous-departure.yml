@@ -14,6 +14,8 @@ on:
       - 'research/causal_stock_paths.py'
       - 'research/phase_aligned_stock_paths.py'
       - 'research/arrival_clock_correction.py'
+      - 'research/direct_arrival_occupancy.py'
+      - 'tests/test_direct_arrival_occupancy.py'
       - 'tests/test_arrival_clock_correction.py'
       - 'tests/test_phase_aligned_stock_paths.py'
       - 'research/shared_stock_context.py'
@@ -73,6 +75,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_causal_stock_paths.py' -v
           python -m unittest discover -s tests -p 'test_phase_aligned_stock_paths.py' -v
           python -m unittest discover -s tests -p 'test_arrival_clock_correction.py' -v
+          python -m unittest discover -s tests -p 'test_direct_arrival_occupancy.py' -v
           python -m unittest discover -s tests -p 'test_shared_stock_context.py' -v
           python -m unittest discover -s tests -p 'test_specialist_resolved_features.py' -v
           python -m unittest discover -s tests -p 'test_product_runtime_audit.py' -v
