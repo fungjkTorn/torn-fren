@@ -28,6 +28,16 @@ class EvidenceTests(unittest.TestCase):
         self.assertEqual(self.evidence([(100,200,"yata"),(1001,200,"other")]).score(1000)[1],"ITEM_PROVIDER_SWITCH")
         self.assertEqual(self.evidence([(100,200,"yata")],gaps=[(1001,1002)]).score(1000)[1],"COLLECTION_GAP")
 
+    def test_training_minute_rejects_excursions_between_good_endpoints(self):
+        polls=(990,1010,1050,1070)
+        for rows,gaps in (([(100,200,'a'),(1020,0,'a'),(1040,200,'a')],()),
+                          ([(100,200,'a'),(1020,200,'b'),(1040,200,'a')],()),
+                          ([(100,200,'a')],[(1020,1040)])):
+            e=self.evidence(rows,polls=polls,gaps=gaps)
+            self.assertEqual(e.score(1000)[0],'SUCCESS')
+            self.assertEqual(e.score(1060)[0],'SUCCESS')
+            self.assertEqual(e.interval_score(1000,1060),-1)
+
 
 class ContinuousTests(unittest.TestCase):
     def fixture(self, directory):
@@ -86,7 +96,7 @@ class ContinuousTests(unittest.TestCase):
                 self.assertEqual(sum(c.get(k,0) for k in ("SUCCESS","FAILURE","PENDING","UNKNOWN","ABSTAIN")),288)
                 self.assertEqual(c["proposals"]+c.get("ABSTAIN",0),288)
             item=next(iter(report["items"].values()))
-            self.assertEqual(len(item["path_established_reference_comparisons"]),5)
+            self.assertEqual(len(item["path_established_reference_comparisons"]),9)
             self.assertTrue(all(v["starts"]==288 for refs in item["path_all_start_established_reference_comparisons"].values() for v in refs.values()))
             self.assertTrue(all(v["starts"]==24 for refs in item["path_established_reference_comparisons"].values() for v in refs.values()))
             self.assertEqual(len(item["matched_zero_replanned_comparisons"]),len(m.ZERO_COMPARATORS))

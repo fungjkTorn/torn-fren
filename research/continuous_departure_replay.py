@@ -31,6 +31,7 @@ from research.quantity_rate_cycles import QuantityRateCycles
 from research.zero_component_hybrids import ComponentHybrid
 from research.causal_policy_selector import CausalPolicySelector
 from research.causal_stock_paths import CausalStockPaths
+from research.phase_aligned_stock_paths import PhaseAlignedStockPaths
 from research.shared_stock_context import SharedStockContext
 from services.travel_window_policy import project_policy
 from research.v151_stable_earliest_departure import stable_earliest_departure
@@ -68,6 +69,7 @@ SELECTOR_EXPERTS=("zero_anchored_current_quarter","zero_anchored_midpoint",
                   for kind in ("midpoint","current_quarter"))
 POLICIES += (("zero_adaptive_selector",None,"selector"),)
 POLICIES += tuple(("zero_path_"+mode,None,"path_"+mode) for mode in CausalStockPaths.MODES+CausalStockPaths.REGIME_MODES)
+POLICIES += tuple(("zero_path_aligned_"+mode,None,"path_aligned_"+mode) for mode in PhaseAlignedStockPaths.MODES)
 ZERO_COMPARATORS={p:("zero_anchored_midpoint" if p.endswith("_midpoint") else
                     "zero_anchored_quarter" if p.endswith("_quarter") and not p.endswith("_current_quarter") else
                     "zero_anchored_current_quarter")
@@ -117,6 +119,18 @@ class ArrivalEvidence:
             "post_quantity": self.rows[b].quantity,
             "item_provider": self.rows[a].source,
         }
+
+    def interval_score(self,start,end):
+        """Known stock phase across a full training bin, including excursions."""
+        left=self.score(start);right=self.score(end)
+        if left[0] not in ('SUCCESS','FAILURE') or left[0]!=right[0]:return -1
+        before=left[2]['pre_poll'];after=right[2]['post_poll']
+        if self.crosses(before,after):return -1
+        a=bisect.bisect_right(self.times,before)-1
+        b=bisect.bisect_right(self.times,after)-1
+        segment=self.rows[a:b+1]
+        if len({r.source for r in segment})!=1 or len({r.quantity>=30 for r in segment})!=1:return -1
+        return int(left[0]=='SUCCESS')
 
 
 def choose(forecast, issued, poll_age, kind, template=None, v151=None):
@@ -206,6 +220,8 @@ def replay(*, source, days=2, asof=None, limit_items=24,
             path_model=CausalStockPaths(obs,polls,crosses,cutoff=now,
                                        flight_seconds=model.TRAVEL_SECONDS[country],score=evidence.score,
                                        context=lambda asof,item_key=key:context.at(asof,item_key))
+            aligned_paths=PhaseAlignedStockPaths(obs,crosses,cutoff=now,
+                flight_seconds=model.TRAVEL_SECONDS[country],interval_score=evidence.interval_score)
             template_model=DailyTemplate(obs,crosses)
             phases = model._ReplayPhases(crosses)
             analogs = PhaseAnalogs(crosses)
@@ -246,6 +262,8 @@ def replay(*, source, days=2, asof=None, limit_items=24,
                 if crosses(issued,issued):
                     age = None  # Known collection outage at issuance.
                 path_plans=path_model.plans(issued,zero_cycles,poll_age=age)
+                path_plans.update({'aligned_'+mode:plan for mode,plan in
+                    aligned_paths.plans(issued,zero_cycles,poll_age=age).items()})
                 baseline = evidence.score(issued+model.TRAVEL_SECONDS[country])
                 forecasts = {}
                 template=template_model.plan(issued,model.TRAVEL_SECONDS[country]) if (needs_template or event_cohort) and age is not None and age<=180 else None
@@ -414,6 +432,9 @@ def replay(*, source, days=2, asof=None, limit_items=24,
                 outcome_reasons=dict(reasons[p])) for p,_,_ in policies},
                 "path_local_all_start_comparisons":{p:compare_cohorts(all_cohorts["zero_path_analog"+p[-2:]],all_cohorts[p])
                     for p,_,_ in policies if p.startswith("zero_path_regime")},
+                "aligned_all_start_reference_comparisons":{p:{reference:compare_cohorts(all_cohorts[reference],all_cohorts[p])
+                    for reference in ("zero_path_analog70","zero_path_analog80","zero_path_regime70","zero_path_regime80")}
+                    for p,_,_ in policies if p.startswith("zero_path_aligned_")},
                 "path_all_start_zero_baseline_comparisons":{p:compare_cohorts(all_cohorts["zero_anchored_current_quarter"],all_cohorts[p])
                     for p,_,_ in policies if p.startswith("zero_path_")},
                 "path_all_start_established_reference_comparisons":{p:{reference:compare_cohorts(
