@@ -6,6 +6,7 @@ from unittest.mock import patch
 from services.arbitrage_live import (
     ForeignItem,
     _anomaly_labels_for_item,
+    _display_category,
     build_arbitrage_report,
     build_trader_finder,
     fetch_torn_item_market,
@@ -501,6 +502,46 @@ class LiveArbitrageParserTests(unittest.TestCase):
         self.assertEqual(row["market_reference_profit_per_item"], 40)
         self.assertEqual(report["max_capital"], 500)
         self.assertEqual(report["min_total_profit"], 100)
+
+    def test_category_grouping_and_filter(self):
+        self.assertEqual(_display_category("Plushie"), "Plushies")
+        self.assertEqual(_display_category("Flower"), "Flowers")
+        self.assertEqual(_display_category("Artifact"), "Artifacts")
+        self.assertEqual(_display_category("Primary"), "Weapons")
+        self.assertEqual(_display_category("Secondary"), "Weapons")
+        self.assertEqual(_display_category("Melee"), "Weapons")
+        self.assertEqual(_display_category("Defensive"), "Armor")
+
+        snapshot = {
+            "timestamp": 123.0,
+            "refreshing": False,
+            "catalog": [
+                ForeignItem("1", "Camel Plushie", ("United Arab Emirates",), (100,), "Plushie", "Plushies"),
+                ForeignItem("2", "Basalt Point", ("Argentina",), (100,), "Artifact", "Artifacts"),
+            ],
+            "listings": [
+                BazaarListing("Camel Plushie", 100, 5, "tornw3b_bazaar", item_id="1"),
+                BazaarListing("Basalt Point", 100, 5, "tornw3b_bazaar", item_id="2"),
+            ],
+            "offers": [
+                BuyOffer("Camel Plushie", 150, "torn_exchange", "Buyer A", item_id="1"),
+                BuyOffer("Basalt Point", 150, "torn_exchange", "Buyer B", item_id="2"),
+            ],
+            "errors": [],
+        }
+
+        with patch("services.arbitrage_live.get_source_snapshot", return_value=snapshot):
+            report = build_arbitrage_report(
+                min_profit_per_item=20,
+                category="Plushies",
+            )
+
+        self.assertEqual(report["opportunity_count"], 1)
+        self.assertEqual(report["opportunities"][0]["item_name"], "Camel Plushie")
+        self.assertEqual(report["opportunities"][0]["category"], "Plushies")
+        self.assertEqual(report["category_filter"], "Plushies")
+        self.assertIn("Artifacts", report["category_options"])
+        self.assertIn("Plushies", report["category_options"])
 
 
 if __name__ == "__main__":
