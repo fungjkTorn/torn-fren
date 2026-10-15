@@ -81,7 +81,7 @@ class ContinuousTests(unittest.TestCase):
                 self.assertEqual(sum(c.get(k,0) for k in ("SUCCESS","FAILURE","PENDING","UNKNOWN","ABSTAIN")),288)
                 self.assertEqual(c["proposals"]+c.get("ABSTAIN",0),288)
             item=next(iter(report["items"].values()))
-            self.assertEqual(len(item["path_established_reference_comparisons"]),3)
+            self.assertEqual(len(item["path_established_reference_comparisons"]),5)
             self.assertTrue(all(v["starts"]==24 for refs in item["path_established_reference_comparisons"].values() for v in refs.values()))
             self.assertEqual(len(item["matched_zero_replanned_comparisons"]),len(m.ZERO_COMPARATORS))
             for c in item["matched_zero_replanned_comparisons"].values():

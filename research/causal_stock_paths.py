@@ -16,6 +16,7 @@ from research.true_zero_cycles import ZeroCycles, model
 class CausalStockPaths:
     MAX_WAIT=28800
     MODES=('recent70','analog70','analog80')
+    REGIME_MODES=('regime70','regime80')
 
     @staticmethod
     def features(tracker,asof):
@@ -32,10 +33,12 @@ class CausalStockPaths:
                 math.log1p(model.quantile(lo[-8:],.5)/600),
                 math.sin(angle),math.cos(angle))
 
-    def __init__(self,observations,polls,crosses,*,cutoff,flight_seconds,score):
+    def __init__(self,observations,polls,crosses,*,cutoff,flight_seconds,score,context=None):
+        self.context=context
+        self.modes=self.MODES+self.REGIME_MODES if context is not None else self.MODES
         self.flight=flight_seconds
         self.delays=np.arange(0,self.MAX_WAIT+1,120,dtype=np.int64)
-        self.starts=[];features=[];outcomes=[]
+        self.starts=[];features=[];outcomes=[];contexts=[]
         score_cache={}
         tracker=ZeroCycles(crosses);cursor=0
         if observations:
@@ -58,12 +61,14 @@ class CausalStockPaths:
                         score_cache[arrival]=1 if outcome=='SUCCESS' else 0 if outcome=='FAILURE' else -1
                     row.append(score_cache[arrival])
                 self.starts.append(start);features.append(feature);outcomes.append(row)
+                contexts.append(context(start) if context is not None else None)
         self.starts=np.asarray(self.starts,dtype=np.int64)
         self.features_matrix=np.asarray(features,dtype=float).reshape((-1,7))
+        self.context_matrix=np.asarray([c if c is not None else (float("nan"),)*4 for c in contexts],dtype=float).reshape((-1,4))
         self.outcomes=np.asarray(outcomes,dtype=np.int8).reshape((-1,len(self.delays)))
 
     def plans(self,issued,tracker,*,poll_age):
-        empty={m:dict(departure_epoch=None,status='INSUFFICIENT_CAUSAL_PATH_SUPPORT') for m in self.MODES}
+        empty={m:dict(departure_epoch=None,status='INSUFFICIENT_CAUSAL_PATH_SUPPORT') for m in self.modes}
         if tracker.last is not None and tracker.last.epoch>issued:
             raise ValueError('future stock observation in path query')
         feature=self.features(tracker,issued)
@@ -78,9 +83,17 @@ class CausalStockPaths:
         current=np.asarray(feature)
         distance=np.mean((self.features_matrix[candidates,1:]-current[1:])**2,axis=1)
         order=np.argsort(distance,kind='stable')[:32]
-        picks={'recent':candidates,'analog':candidates[order]}
-        for name,ids in picks.items():
-            weights=(np.ones(len(ids)) if name=='recent' else np.exp(-np.sqrt(distance[order])))
+        picks={'recent':(candidates,np.ones(len(candidates))),
+               'analog':(candidates[order],np.exp(-np.sqrt(distance[order])))}
+        context=self.context(issued) if self.context is not None else None
+        if context is not None:
+            valid=np.all(np.isfinite(self.context_matrix[candidates]),axis=1)
+            ids=candidates[valid]
+            if len(ids)>=24:
+                regime_distance=distance[valid]+np.mean((self.context_matrix[ids]-np.asarray(context))**2,axis=1)
+                chosen=np.argsort(regime_distance,kind='stable')[:32]
+                picks['regime']=(ids[chosen],np.exp(-np.sqrt(regime_distance[chosen])))
+        for name,(ids,weights) in picks.items():
             weights=weights/weights.sum()
             values=self.outcomes[ids]
             known=values>=0
@@ -92,7 +105,7 @@ class CausalStockPaths:
             # scenario agreement, not a calibrated success probability.
             smooth=np.minimum(support,(support+np.r_[support[0],support[:-1]]+
                                        np.r_[support[1:],support[-1]])/3)
-            for mode in self.MODES:
+            for mode in self.modes:
                 if not mode.startswith(name):
                     continue
                 threshold=.8 if mode.endswith('80') else .7
@@ -100,7 +113,9 @@ class CausalStockPaths:
                 j=int(selected[0]) if len(selected) else None
                 empty[mode]=dict(departure_epoch=issued+int(self.delays[j]) if j is not None else None,
                     status='HISTORICAL_PATH_PROPOSAL' if j is not None else 'NO_SUPPORTED_PATH_DEPARTURE',
-                    model_name='causal_complete_stock_paths_v1',mode=mode,
+                    model_name='causal_shared_regime_stock_paths_v1' if name=='regime' else 'causal_complete_stock_paths_v1',mode=mode,
+                    shared_context=context if name=='regime' else None,
+                    context_excludes_target=name=='regime',
                     selected_paths=len(ids),latest_training_path_end=int(self.starts[ids].max())+self.MAX_WAIT+self.flight+190,
                     uncalibrated_path_support=float(smooth[j]) if j is not None else None,
                     known_path_mass=float(mass[j]) if j is not None else None,

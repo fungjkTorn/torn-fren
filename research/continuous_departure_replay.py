@@ -29,6 +29,7 @@ from research.quantity_rate_cycles import QuantityRateCycles
 from research.zero_component_hybrids import ComponentHybrid
 from research.causal_policy_selector import CausalPolicySelector
 from research.causal_stock_paths import CausalStockPaths
+from research.shared_stock_context import SharedStockContext
 from services.travel_window_policy import project_policy
 from research.v151_stable_earliest_departure import stable_earliest_departure
 
@@ -64,7 +65,7 @@ SELECTOR_EXPERTS=("zero_anchored_current_quarter","zero_anchored_midpoint",
                   family+"_"+kind for family in HYBRID_FAMILIES
                   for kind in ("midpoint","current_quarter"))
 POLICIES += (("zero_adaptive_selector",None,"selector"),)
-POLICIES += tuple(("zero_path_"+mode,None,"path_"+mode) for mode in CausalStockPaths.MODES)
+POLICIES += tuple(("zero_path_"+mode,None,"path_"+mode) for mode in CausalStockPaths.MODES+CausalStockPaths.REGIME_MODES)
 ZERO_COMPARATORS={p:("zero_anchored_midpoint" if p.endswith("_midpoint") else
                     "zero_anchored_quarter" if p.endswith("_quarter") and not p.endswith("_current_quarter") else
                     "zero_anchored_current_quarter")
@@ -181,6 +182,7 @@ def replay(*, source, days=2, asof=None, limit_items=24,
         polls = [int(r[0]) for r in db.execute("SELECT timestamp FROM poll_heartbeats WHERE mode='poll-cycle' AND success=1 AND timestamp<=? ORDER BY timestamp LIMIT ?", (now, MAX_POLLS+1))]
         if len(polls)>MAX_POLLS:
             raise ValueError("heartbeat cap exceeded")
+        context=SharedStockContext.from_database(db,model.exact_roster(),now,model._gap_index(gaps,now))
         for key in sorted(model.exact_roster())[:limit_items]:
             country, name = key.split(":",1)
             raw = db.execute("SELECT timestamp,quantity,source FROM stock_history WHERE country=? AND lower(item_name)=lower(?) AND timestamp<=? ORDER BY timestamp,id LIMIT ?", (country,name,now,model.MAX_ITEM_CHANGE_ROWS+1)).fetchall()
@@ -195,7 +197,8 @@ def replay(*, source, days=2, asof=None, limit_items=24,
             unavailable = observed_availability_losses(obs,crosses)
             evidence = ArrivalEvidence(obs,polls,gaps,now)
             path_model=CausalStockPaths(obs,polls,crosses,cutoff=now,
-                                       flight_seconds=model.TRAVEL_SECONDS[country],score=evidence.score)
+                                       flight_seconds=model.TRAVEL_SECONDS[country],score=evidence.score,
+                                       context=lambda asof,item_key=key:context.at(asof,item_key))
             template_model=DailyTemplate(obs,crosses)
             phases = model._ReplayPhases(crosses)
             analogs = PhaseAnalogs(crosses)
@@ -283,7 +286,7 @@ def replay(*, source, days=2, asof=None, limit_items=24,
                             selected_restock_event_index=None,status=path_plan["status"],
                             estimated_departure_deadline_epoch=None,
                             departure_countdown_seconds=path_departure-issued if path_departure is not None else None,
-                            path_evidence=path_plan,departure_model_name="causal_complete_stock_paths_v1")
+                            path_evidence=path_plan,departure_model_name=path_plan.get("model_name","causal_complete_stock_paths_v1"))
                     elif kind=="selector":
                         selector.update(issued,{p:issued_decisions[p] for p in SELECTOR_EXPERTS},
                                         poll_age=age,flight_seconds=model.TRAVEL_SECONDS[country],score=evidence.score)
@@ -391,6 +394,9 @@ def replay(*, source, days=2, asof=None, limit_items=24,
                 distinct_observed_stock_episodes_reached=len(landed_episodes[p]),
                 chronological_day_slices=[summarize(c) for c in chronological[p]],
                 outcome_reasons=dict(reasons[p])) for p,_,_ in policies},
+                "path_local_analog_comparisons":{p:compare_reconfirmation(plans["zero_path_analog"+p[-2:]],plans[p],
+                    cutoff=now,flight_seconds=model.TRAVEL_SECONDS[country],score=evidence.score)
+                    for p,_,_ in policies if p.startswith("zero_path_regime")},
                 "path_established_reference_comparisons":{p:{reference:compare_reconfirmation(
                     plans[reference],plans[p],cutoff=now,flight_seconds=model.TRAVEL_SECONDS[country],score=evidence.score)
                     for reference in ("zero_rate_current_quarter","zero_hybrid_current_rate_current_quarter")}
