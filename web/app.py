@@ -7,11 +7,21 @@ from fastapi.responses import FileResponse
 from services.history_service import get_item_history_since, get_stock_catalog, get_stock_graph_analysis
 from services.prediction_v2_live import build_live_prediction_v2
 from services.admin_health import build_admin_health
-from services.arbitrage_live import build_arbitrage_report, build_arbitrage_item_diagnostic, build_trader_finder
+from services.arbitrage_live import (
+    build_arbitrage_report,
+    build_arbitrage_item_diagnostic,
+    build_trader_finder,
+    start_periodic_arbitrage_refresh,
+)
 
 app = FastAPI(title="Torn Fren Stock Graph")
 
 STATIC_DIR = Path(__file__).parent / "static"
+
+
+@app.on_event("startup")
+def _start_arbitrage_refresh_loop():
+    start_periodic_arbitrage_refresh()
 
 
 @app.get("/api/history")
