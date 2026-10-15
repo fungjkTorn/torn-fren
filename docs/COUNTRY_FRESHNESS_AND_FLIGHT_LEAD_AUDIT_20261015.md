@@ -108,3 +108,15 @@ retain any clock observations already collected.
 A source commit or successful public probe does not mean this activation has
 happened. Historical labels remain unchanged and country-clock history absent
 until the collector and installed exporter actually produce it.
+
+This host preflight prepares and checks the exact tested collector diff and
+reports the active service configuration; it does not apply the patch or
+restart anything:
+
+```bash
+git -C /home/ubuntu/torn-fren-v38-probe fetch origin research/v38-full-roster-live-prep-20261009
+git -C /home/ubuntu/torn-fren-v38-probe diff 846376743e8284396b95081a4326ae62a2fa6ac0 5a4d546a7e17d3766ac503765373f2bdb3f3342c -- services/history_service.py > /tmp/torn-country-clock.patch
+git -C /opt/torn-fren apply --check /tmp/torn-country-clock.patch
+systemctl show torn-fren-poller.service -p ExecStart -p WorkingDirectory -p User --no-pager
+sha256sum /usr/local/lib/torn-fren-research/export_snapshot.py
+```
