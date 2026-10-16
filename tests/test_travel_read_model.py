@@ -19,7 +19,63 @@ def snapshot():
                 "predicted_stock_below_30_epoch":T+3200}]}}}
 
 
+def departure_snapshot(departure=T+1200):
+    data=snapshot();data['model_sha']='a'*40
+    data['item_departure_recommendations']={'mex:Jaguar Plushie':{
+        'item_key':'mex:Jaguar Plushie','asof_epoch':T,'model_sha':'a'*40,
+        'policy':'zero_path_analog70','model_name':'causal_complete_stock_paths_v1',
+        'player_flight_seconds':1020,'target_quantity':30,'depletion_stock_quantity':0,
+        'event_timing_prediction_supported':False,'departure_epoch':departure,
+        'status':'HISTORICAL_PATH_PROPOSAL'}}
+    return data
+
+
 class BoardTests(unittest.TestCase):
+    def test_explicit_departure_keeps_independent_event_graph_and_exact_landing(self):
+        data=departure_snapshot();before=json.dumps(data,sort_keys=True)
+        row=build_board(data,now=T)['rows'][0]
+        self.assertEqual(row['departure_epoch'],T+1200)
+        self.assertEqual(row['arrival_epoch'],T+1200+1020)
+        self.assertEqual(row['decision']['estimated_arrival_epoch'],T+1200+1020+10)
+        self.assertEqual(row['departure_deadline_epoch'],T+1200)
+        self.assertEqual(row['decision']['forecast_events'],[])
+        self.assertEqual(len(row['event_timeline']),1)
+        self.assertEqual(row['decision']['depletion_stock_quantity'],0)
+        self.assertEqual(row['departure_source'],'explicit_recommendation')
+        self.assertEqual(json.dumps(data,sort_keys=True),before)
+
+    def test_departure_abstention_override_expiry_never_falls_back_to_event_adapter(self):
+        for data,now,overrides in ((departure_snapshot(None),T,None),
+                (departure_snapshot(T+10),T+11,None),
+                (departure_snapshot(),T,{'mex':1500}),
+                (departure_snapshot(),T+171,None)):
+            row=build_board(data,now=now,flight_overrides=overrides)['rows'][0]
+            self.assertIsNone(row['departure_epoch'])
+            self.assertIsNone(row['arrival_epoch'])
+            self.assertEqual(len(row['event_timeline']),1)
+        # Even a very recent global poll cannot renew a frozen model issue.
+        data=departure_snapshot();data['source_heartbeat_age_seconds']=0
+        row=build_board(data,now=T+300)['rows'][0]
+        self.assertEqual(row['decision']['status'],'STALE_DATA')
+
+    def test_mixed_departure_identity_source_issue_and_anchor_rejected(self):
+        for field,value in (('item_key','uni:Nessie Plushie'),('asof_epoch',T-300),
+                ('model_sha','b'*40),('depletion_stock_quantity',30),
+                ('departure_epoch',T-1),('event_timing_prediction_supported',True)):
+            data=departure_snapshot();data['item_departure_recommendations']['mex:Jaguar Plushie'][field]=value
+            with self.assertRaises(ValueError):build_board(data,now=T)
+
+    def test_event_evidence_cannot_be_borrowed_for_departure_model(self):
+        data=departure_snapshot();data['item_evidence']={'mex:Jaguar Plushie':{
+            'successes':90,'resolved_arrivals':100,'policy':'zero_path_analog70',
+            'player_flight_seconds':1020,'model_sha':'a'*40,
+            'forecast_model':'v163','cycle_window':'all'}}
+        self.assertFalse(build_board(data,now=T)['rows'][0]['evidence']['applies_to_selected_trip'])
+        data['item_evidence']['mex:Jaguar Plushie'].update(
+            departure_model='causal_complete_stock_paths_v1',evidence_role='departure')
+        self.assertTrue(build_board(data,now=T)['rows'][0]['evidence']['applies_to_selected_trip'])
+        self.assertFalse(build_board(data,now=T,flight_overrides={'mex':1500})['rows'][0]['evidence']['applies_to_selected_trip'])
+
     def test_shared_buffer_flight_geometry_and_current_stock(self):
         f=snapshot()["items"]["mex:Jaguar Plushie"]
         q=project_policy(f,now=T,poll_age_seconds=10,kind="quarter")

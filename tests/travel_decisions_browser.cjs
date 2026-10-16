@@ -41,6 +41,17 @@ const fs=require('fs'),cp=require('child_process'),assert=require('assert');
  await page.getByRole('button',{name:'Apply',exact:true}).click();await request;
  await page.waitForFunction(()=>document.querySelector('.timings').textContent.includes('25m'));
  assert((await page.locator('.graphlink').getAttribute('href')).includes('country=mex'));
+ await page.locator('#search').fill('Panda');
+ await page.getByRole('button',{name:'Panda Plushie',exact:false}).filter({has:page.locator('.secondary')}).click();
+ assert((await page.locator('.events').textContent()).includes('3 restock estimates'));
+ assert((await page.locator('.events').textContent()).includes('independently'));
+ assert.notEqual(await page.locator('#tripDeparture').textContent(),'—');
+ await page.evaluate(()=>{const row=rows.find(r=>r.item_key==='chi:Panda Plushie');row.decision.valid_until_epoch=now()-1;tick();});
+ assert.equal(await page.locator('#tripDeparture').textContent(),'—');
+ assert.equal(await page.locator('#tripArrival').textContent(),'—');
+ assert.equal(await page.locator('#tripDeadline').textContent(),'—');
+ await page.locator('#search').fill('Jaguar');
+ await page.getByRole('button',{name:'Jaguar Plushie',exact:false}).filter({has:page.locator('.secondary')}).click();
  await page.locator('#search').fill('');
  fs.mkdirSync('test-output',{recursive:true});
  await page.screenshot({path:'test-output/travel-decisions-desktop.png',fullPage:true});
@@ -58,5 +69,28 @@ const fs=require('fs'),cp=require('child_process'),assert=require('assert');
  await page.waitForFunction(()=>!document.getElementById('tripClock'));
  assert((await page.locator('#trip').textContent()).includes('Forecast unavailable'));
  assert.deepEqual(errors,[]);
+ // Exercise the original graph's additive panel and marker without a CDN.
+ const graph=await browser.newPage();
+ await graph.setContent('<div id="sharedDeparturePreview" hidden></div>');
+ await graph.evaluate(()=>{window.Chart={register(plugin){window.testPlugin=plugin;}};});
+ await graph.addScriptTag({content:fs.readFileSync('web/static/shared_departure_preview.js','utf8')});
+ await graph.evaluate(()=>{
+   const t=Math.floor(Date.now()/1000);window.testNow=t;window.testDraws=0;
+   const row={departure_epoch:t+1200,departure_deadline_epoch:t+1200,
+     departure_source:'explicit_recommendation',decision:{player_flight_seconds:1020,valid_until_epoch:t+100}};
+   window.sharedDeparturePreview.set({row,source_poll_age_seconds:10,asof_epoch:t,evaluated_at_epoch:t});
+   window.testChart={scales:{x:{getPixelForValue(){return 50;}}},chartArea:{left:0,right:300,top:0,bottom:200},
+     ctx:{save(){},restore(){},setLineDash(){},beginPath(){},moveTo(){},lineTo(){},stroke(){window.testDraws++;},fillText(){}}};
+   window.testPlugin.afterDraw(window.testChart);
+ });
+ assert((await graph.locator('#sharedDeparturePreview').textContent()).includes('Land'));
+ assert.equal(await graph.evaluate(()=>window.testDraws),1);
+ await graph.evaluate(()=>{Date.now=()=>(window.testNow+101)*1000;window.testPlugin.afterDraw(window.testChart);});
+ assert.equal(await graph.evaluate(()=>window.testDraws),1);
+ await graph.waitForTimeout(1100);
+ assert((await graph.locator('#sharedDeparturePreview').textContent()).includes('Await a fresh'));
+ await graph.evaluate(()=>window.sharedDeparturePreview.clear());
+ assert.equal(await graph.locator('#sharedDeparturePreview').isHidden(),true);
+ await graph.close();
  await browser.close();console.log('Travel UI: search, category, watchlist persistence, personalized flight, graph link, desktop/mobile passed.');
 })().catch(e=>{console.error(e);process.exit(1)});

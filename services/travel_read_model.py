@@ -10,6 +10,7 @@ from pathlib import Path
 from urllib.parse import urlencode
 
 from services.travel_window_policy import project_policy
+from services.departure_recommendation import project_recommendation
 
 COUNTRIES={"arg":"Argentina","can":"Canada","cay":"Cayman Islands","chi":"China",
            "haw":"Hawaii","jap":"Japan","mex":"Mexico","sou":"South Africa",
@@ -34,6 +35,9 @@ def build_board(snapshot,*,now,flight_overrides=None):
     overrides=flight_overrides or {}
     assignments=snapshot.get("item_policies",{})
     evidence=snapshot.get("item_evidence",{})
+    recommendations=snapshot.get('item_departure_recommendations',{})
+    if not isinstance(recommendations,dict) or set(recommendations)-set(snapshot['items']):
+        raise ValueError('departure recommendation outside event roster')
     rows=[]
     for key,forecast in sorted(snapshot["items"].items()):
         country,name=key.split(":",1)
@@ -42,6 +46,13 @@ def build_board(snapshot,*,now,flight_overrides=None):
             raise ValueError("mixed issue or item identities")
         decision=project_policy(forecast,now=now,poll_age_seconds=age,kind=policy,
             player_flight_seconds=overrides.get(country))
+        event_decision=decision
+        recommendation=recommendations.get(key)
+        if key in recommendations:
+            decision=project_recommendation(recommendation,item_key=key,issued=issued,
+                model_sha=snapshot.get('model_sha'),now=now,poll_age_seconds=age,
+                player_flight_seconds=event_decision['player_flight_seconds'])
+            policy=recommendation['policy']
         record=evidence.get(key)
         study=None
         if isinstance(record,dict):
@@ -59,14 +70,23 @@ def build_board(snapshot,*,now,flight_overrides=None):
                        "prospective_certified":False}
                 study['applies_to_selected_trip']=(study['matches_selected_policy']
                     and study['matches_selected_flight'] and study['matches_selected_model'])
+                if recommendation is not None:
+                    study['matches_selected_model']=(record.get('model_sha')==snapshot.get('model_sha')
+                        and record.get('departure_model')==recommendation['model_name']
+                        and record.get('evidence_role')=='departure')
+                    study['applies_to_selected_trip']=(study['matches_selected_policy']
+                        and study['matches_selected_flight'] and study['matches_selected_model'])
         depart=decision["estimated_departure_epoch"]
         landing=depart+decision["player_flight_seconds"] if depart is not None else None
         rows.append({"item_key":key,"country":country,"country_name":COUNTRIES.get(country,country),
                      "item_name":name,"category":category(name),
                      "observed_quantity":forecast.get("observed_current_quantity"),
                      "last_quantity_change_epoch":forecast.get("last_quantity_change_epoch"),
-                     "model_name":forecast.get('model_name',snapshot.get("model_version","V163 event forecast")),
+                     "model_name":recommendation['model_name'] if recommendation is not None else forecast.get('model_name',snapshot.get("model_version","V163 event forecast")),
                      "policy":policy,"evidence":study,"decision":decision,
+                     "event_timeline":event_decision['forecast_events'],
+                     "event_model_name":forecast.get('model_name','v163'),
+                     "departure_source":"explicit_recommendation" if recommendation is not None else "event_adapter",
                      "departure_epoch":depart,"arrival_epoch":landing,
                      "departure_deadline_epoch":decision["estimated_departure_deadline_epoch"],
                      "graph_url":"/?"+urlencode({"country":country,"item":name}),

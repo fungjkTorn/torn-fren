@@ -401,6 +401,10 @@ def api_history(
     except Exception as exc:
         analysis["prediction_v2_error"] = str(exc)
 
+    if os.environ.get('TORN_FREN_TRAVEL_DECISIONS_BETA')=='1':
+        from web.travel_decisions_router import shared_item
+        analysis['shared_departure_preview']=shared_item(country,item,now=int(time.time()))
+
     return {
         "country": country,
         "item": item,

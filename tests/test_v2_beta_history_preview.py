@@ -50,6 +50,17 @@ def api(*,enabled=False,at=N,stale=False,result=None):
         return web.api_history("can","Crocus",1440)
 
 class BetaHistoryEndpointTests(unittest.TestCase):
+    def test_selected_shared_departure_is_additive_and_uses_original_issue(self):
+        record={'status':'RESEARCH_PREVIEW','asof_epoch':N-10,
+            'row':{'item_key':'can:Crocus','departure_epoch':N+1200}}
+        with patch.dict('os.environ',{'TORN_FREN_TRAVEL_DECISIONS_BETA':'1'}),patch(
+                'web.travel_decisions_router.shared_item',return_value=record) as reader:
+            response=api()
+        self.assertEqual(response['analysis']['shared_departure_preview'],record)
+        self.assertEqual(reader.call_args.kwargs['now'],N)
+        self.assertEqual(response['analysis']['prediction']['prediction_number'],2)
+        self.assertEqual(response['rows'][0]['quantity'],200)
+
     def test_disabled_by_default_does_not_change_existing_history_response(self):
         response=api()
         self.assertNotIn("beta_item_timeline",response["analysis"])

@@ -7,10 +7,23 @@ from unittest.mock import patch
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from web.travel_decisions_router import router
-from test_travel_read_model import snapshot,T
+from test_travel_read_model import snapshot,departure_snapshot,T
+from web.travel_decisions_router import shared_item
 
 
 class RouterTests(unittest.TestCase):
+    def test_graph_and_travel_board_consume_identical_selected_recommendation(self):
+        with tempfile.TemporaryDirectory() as td:
+            p=Path(td)/'selected.json';p.write_text(json.dumps(departure_snapshot()))
+            with patch.dict(os.environ,{'TORN_FREN_TRAVEL_DECISIONS_BETA':'1',
+                    'TORN_FREN_TRAVEL_EVENT_SNAPSHOT':str(p)}),patch('web.travel_decisions_router.time.time',return_value=T):
+                graph=shared_item('mex','Jaguar Plushie',now=T)
+                api=self.client.get('/api/travel-decisions').json()
+                self.assertEqual(graph['row'],api['rows'][0])
+                self.assertEqual(graph['row']['departure_epoch'],T+1200)
+                p.write_text('{invalid')
+                self.assertIsNone(shared_item('mex','Jaguar Plushie',now=T)['row'])
+
     def setUp(self):
         app=FastAPI();app.include_router(router);self.client=TestClient(app)
 

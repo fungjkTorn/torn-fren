@@ -11,6 +11,22 @@ router=APIRouter()
 cache=SnapshotCache()
 
 
+def shared_item(country,item,*,now):
+    """Same precomputed board row for the existing detailed graph; no fitting."""
+    location=os.environ.get('TORN_FREN_TRAVEL_EVENT_SNAPSHOT')
+    if not location:
+        return {'status':'NO_EVENT_SNAPSHOT','row':None}
+    try:
+        result=build_board(cache.read(location),now=now)
+        key=country.strip().lower()+':'+item.strip()
+        row=next((r for r in result['rows'] if r['item_key']==key),None)
+        return {'status':'RESEARCH_PREVIEW','row':row,'asof_epoch':result['asof_epoch'],
+            'evaluated_at_epoch':result['evaluated_at_epoch'],
+            'source_poll_age_seconds':result['source_poll_age_seconds']}
+    except (OSError,ValueError,TypeError,KeyError):
+        return {'status':'SHARED_DEPARTURE_UNAVAILABLE','row':None}
+
+
 def enabled():
     if os.environ.get("TORN_FREN_TRAVEL_DECISIONS_BETA")!="1":
         raise HTTPException(status_code=404,detail="Travel Decisions beta disabled")

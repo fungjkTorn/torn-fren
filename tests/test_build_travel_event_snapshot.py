@@ -1,6 +1,7 @@
 import json
 import tempfile
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 from research.build_travel_event_snapshot import prepare,publish
 import test_continuous_departure_replay as fixtures
@@ -8,6 +9,59 @@ T=fixtures.T
 
 
 class PublisherTests(unittest.TestCase):
+    def test_staged_item_profile_keeps_weak_items_and_medication_nonactionable(self):
+        from services.travel_read_model import build_board
+        profile=Path(__file__).resolve().parents[1]/'deploy/research_runner/flowers_plushies_candidate_assignments_20261016.json'
+        assignments=json.loads(profile.read_text())
+        self.assertEqual(set(assignments),set(fixtures.m.model.exact_roster()))
+        self.assertEqual(sum(c['departure_policy']!='disabled' for c in assignments.values()),14)
+        with tempfile.TemporaryDirectory() as td:
+            db=fixtures.ContinuousTests().fixture(Path(td))
+            result=prepare(db,model_sha='a'*40,now=T,assignments=assignments)
+            board=build_board(result,now=T)
+            self.assertEqual(board['item_count'],24)
+            for row in board['rows']:
+                self.assertEqual(row['decision']['depletion_stock_quantity'],0)
+                if assignments[row['item_key']]['departure_policy']=='disabled':
+                    self.assertIsNone(row['departure_epoch'])
+                    self.assertEqual(row['decision']['reason'],'ITEM_NOT_ENABLED_FOR_DEPARTURE_PREVIEW')
+
+    def test_explicit_path_model_is_generated_from_past_only_and_consumed(self):
+        from services.travel_read_model import build_board
+        from research.causal_stock_paths import CausalStockPaths
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td);db=fixtures.ContinuousTests().fixture(root);before=db.read_bytes()
+            original=CausalStockPaths.plans
+            observed=[]
+            def capture(instance,issued,tracker,*,poll_age):
+                plans=original(instance,issued,tracker,poll_age=poll_age)
+                observed.append(plans['analog70'])
+                self.assertTrue(all(instance.starts+instance.MAX_WAIT+instance.flight+190<=issued))
+                return plans
+            with patch.object(CausalStockPaths,'plans',capture):
+                result=prepare(db,model_sha='a'*40,now=T,assignments={
+                    'mex:Jaguar Plushie':{'event_history':'true_zero_all',
+                        'flight_adapter':'median','departure_policy':'zero_path_analog70'}})
+            record=result['item_departure_recommendations']['mex:Jaguar Plushie']
+            self.assertEqual(record['departure_epoch'],observed[0]['departure_epoch'])
+            self.assertEqual(record['depletion_stock_quantity'],0)
+            row=next(r for r in build_board(result,now=T)['rows'] if r['item_key']=='mex:Jaguar Plushie')
+            self.assertEqual(row['policy'],'zero_path_analog70')
+            self.assertEqual(row['departure_epoch'],record['departure_epoch'])
+            self.assertEqual(row['event_model_name'],'true_zero_anchored_cycles_v1')
+            self.assertEqual(db.read_bytes(),before)
+            output=root/'selected.json';publish(result,output,source=db)
+            self.assertEqual(json.loads(output.read_text()),result)
+
+    def test_unintegrated_candidate_and_legacy_anchor_not_silently_substituted(self):
+        for policy,history in (('zero_path_tree_stable_peak','true_zero_all'),
+                               ('zero_path_regime70','true_zero_all'),
+                               ('zero_path_analog70','all_history')):
+            with self.assertRaises(ValueError):prepare('unused',model_sha='a'*40,
+                assignments={'mex:Jaguar Plushie':{'event_history':history,
+                    'flight_adapter':'median','departure_policy':policy}},
+                allow_legacy_availability_baselines=True)
+
     def test_consistent_readonly_per_item_models_and_atomic_consumer_snapshot(self):
         with tempfile.TemporaryDirectory() as td:
             root=Path(td);db=fixtures.ContinuousTests().fixture(root);before=db.read_bytes()

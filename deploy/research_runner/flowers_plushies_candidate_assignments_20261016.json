@@ -1,0 +1,122 @@
+{
+  "arg:Ceibo Flower": {
+    "event_history": "true_zero_all",
+    "flight_adapter": "median",
+    "departure_policy": "zero_path_analog70"
+  },
+  "arg:Monkey Plushie": {
+    "event_history": "true_zero_all",
+    "flight_adapter": "median",
+    "departure_policy": "disabled"
+  },
+  "can:Crocus": {
+    "event_history": "true_zero_all",
+    "flight_adapter": "median",
+    "departure_policy": "zero_path_analog70"
+  },
+  "can:Wolverine Plushie": {
+    "event_history": "true_zero_all",
+    "flight_adapter": "median",
+    "departure_policy": "zero_path_analog70"
+  },
+  "can:Xanax": {
+    "event_history": "true_zero_all",
+    "flight_adapter": "median",
+    "departure_policy": "disabled"
+  },
+  "cay:Banana Orchid": {
+    "event_history": "true_zero_all",
+    "flight_adapter": "median",
+    "departure_policy": "zero_path_analog70"
+  },
+  "cay:Stingray Plushie": {
+    "event_history": "true_zero_all",
+    "flight_adapter": "median",
+    "departure_policy": "zero_path_analog70"
+  },
+  "chi:Panda Plushie": {
+    "event_history": "true_zero_all",
+    "flight_adapter": "median",
+    "departure_policy": "disabled"
+  },
+  "chi:Peony": {
+    "event_history": "true_zero_all",
+    "flight_adapter": "median",
+    "departure_policy": "zero_path_analog70"
+  },
+  "haw:Orchid": {
+    "event_history": "true_zero_all",
+    "flight_adapter": "median",
+    "departure_policy": "zero_path_analog70"
+  },
+  "jap:Cherry Blossom": {
+    "event_history": "true_zero_all",
+    "flight_adapter": "median",
+    "departure_policy": "zero_path_analog80"
+  },
+  "jap:Xanax": {
+    "event_history": "true_zero_all",
+    "flight_adapter": "median",
+    "departure_policy": "disabled"
+  },
+  "mex:Dahlia": {
+    "event_history": "true_zero_all",
+    "flight_adapter": "median",
+    "departure_policy": "zero_path_analog70"
+  },
+  "mex:Jaguar Plushie": {
+    "event_history": "true_zero_all",
+    "flight_adapter": "median",
+    "departure_policy": "zero_path_analog70"
+  },
+  "sou:African Violet": {
+    "event_history": "true_zero_all",
+    "flight_adapter": "median",
+    "departure_policy": "zero_path_analog70"
+  },
+  "sou:Lion Plushie": {
+    "event_history": "true_zero_all",
+    "flight_adapter": "median",
+    "departure_policy": "disabled"
+  },
+  "swi:Chamois Plushie": {
+    "event_history": "true_zero_all",
+    "flight_adapter": "median",
+    "departure_policy": "disabled"
+  },
+  "swi:Edelweiss": {
+    "event_history": "true_zero_all",
+    "flight_adapter": "median",
+    "departure_policy": "zero_path_analog70"
+  },
+  "uae:Camel Plushie": {
+    "event_history": "true_zero_all",
+    "flight_adapter": "median",
+    "departure_policy": "disabled"
+  },
+  "uae:Tribulus Omanense": {
+    "event_history": "true_zero_all",
+    "flight_adapter": "median",
+    "departure_policy": "zero_path_analog70"
+  },
+  "uni:Heather": {
+    "event_history": "true_zero_all",
+    "flight_adapter": "median",
+    "departure_policy": "zero_path_analog70"
+  },
+  "uni:Nessie Plushie": {
+    "event_history": "true_zero_all",
+    "flight_adapter": "median",
+    "departure_policy": "disabled"
+  },
+  "uni:Red Fox Plushie": {
+    "event_history": "true_zero_all",
+    "flight_adapter": "median",
+    "departure_policy": "disabled"
+  },
+  "uni:Xanax": {
+    "event_history": "true_zero_all",
+    "flight_adapter": "median",
+    "departure_policy": "disabled"
+  }
+}

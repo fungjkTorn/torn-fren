@@ -667,6 +667,7 @@
       </div>
     </div>
 
+    <div id="sharedDeparturePreview" hidden role="status" style="padding:12px 20px;color:#b8ef76"></div>
     <section id="insights-panel" aria-live="polite">
       <div class="insight-section" id="history-section">
         <div class="insight-title">Observed history</div>
@@ -762,6 +763,7 @@
     <div id="hint">Scroll or swipe left/right for older data · hover on PC or tap on mobile for exact recorded values</div>
   </main>
 
+  <script src="/shared_departure_preview.js"></script>
   <script>
     const params = new URLSearchParams(window.location.search);
     let country = (params.get("country") || "uni").toLowerCase();
@@ -1734,6 +1736,7 @@
 
         const data = await response.json();
         if (requestId !== loadGeneration || requestedSelectionKey !== selectionKey()) return;
+        window.dispatchEvent(new CustomEvent('torn-shared-departure',{detail:data.analysis?.shared_departure_preview||null}));
         cachedRows = data.rows || [];
         cachedAnalysis = data.analysis || null;
         cachedFetchMinutes = requestedFetchMinutes;
@@ -1779,6 +1782,7 @@
       } catch (error) {
         if (requestId !== loadGeneration || requestedSelectionKey !== selectionKey()) return;
         console.error(error);
+        window.sharedDeparturePreview.clear();
         predictionRefreshFailed = true;
         updateFlightTicker();
         liveStateEl.className = "live-state offline";
@@ -1864,6 +1868,7 @@
     }
 
     async function changeSelection(nextCountry, nextItem = null) {
+      window.sharedDeparturePreview.clear();
       country = nextCountry.toLowerCase();
       if (nextItem !== null) item = nextItem;
       populateItemSelect();
@@ -1973,6 +1978,7 @@
 
     window.addEventListener("resize", () => updateChartSize(currentMinutes, currentAnalysis, currentFetchMinutes));
 
+    window.addEventListener('torn-shared-departure-tick',()=>{if(chart)chart.draw();});
     setInterval(updateFlightTicker, 1000);
 
     (async function boot() {

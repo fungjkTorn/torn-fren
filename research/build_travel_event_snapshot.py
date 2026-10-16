@@ -4,6 +4,7 @@ Explicit assignments only. Runs separately from web requests and never writes
 the source database. The operator chooses an output JSON path and cadence.
 """
 import argparse
+import bisect
 import json
 import os
 import re
@@ -18,6 +19,31 @@ from research.causal_phase_analogs import PhaseAnalogs
 from research.true_zero_cycles import ZeroCycles
 from services.travel_read_model import MAX_BYTES, build_board
 from services.travel_window_policy import POLICIES
+
+PATH_POLICIES=frozenset(('zero_path_recent70','zero_path_analog70','zero_path_analog80'))
+
+
+def path_recommendation(key, observations, polls, gaps, crosses, tracker, *,
+                        issued, poll_age, model_sha, policy):
+    """Use the research numerical model unchanged, outside HTTP handlers."""
+    flight=model.TRAVEL_SECONDS[key.split(':',1)[0]]
+    if policy=='disabled':
+        return dict(item_key=key,asof_epoch=issued,model_sha=model_sha,
+            policy=policy,model_name='departure_disabled_pending_validation',
+            departure_epoch=None,status='ITEM_NOT_ENABLED_FOR_DEPARTURE_PREVIEW',
+            player_flight_seconds=flight,target_quantity=30,depletion_stock_quantity=0,
+            event_timing_prediction_supported=False)
+    from functools import lru_cache
+    from research.causal_stock_paths import CausalStockPaths
+    from research.continuous_departure_replay import ArrivalEvidence
+    evidence=ArrivalEvidence(observations,polls,gaps,issued)
+    paths=CausalStockPaths(observations,polls,crosses,cutoff=issued,
+        flight_seconds=flight,score=lru_cache(maxsize=32768)(evidence.score))
+    plan=paths.plans(issued,tracker,poll_age=poll_age)[policy.removeprefix('zero_path_')]
+    return dict(plan,item_key=key,asof_epoch=issued,model_sha=model_sha,
+        policy=policy,player_flight_seconds=flight,target_quantity=30,
+        depletion_stock_quantity=0,event_timing_prediction_supported=False,
+        model_name=plan.get('model_name','causal_complete_stock_paths_v1'))
 
 
 def prepare(source, *, model_sha, assignments=None, now=None, allow_legacy_availability_baselines=False):
@@ -36,6 +62,9 @@ def prepare(source, *, model_sha, assignments=None, now=None, allow_legacy_avail
             raise ValueError('invalid explicit model assignment')
         if config['event_history']!='true_zero_all' and not allow_legacy_availability_baselines:
             raise ValueError('legacy availability clocks require explicit research-only opt-in')
+        if 'departure_policy' in config and (config['departure_policy'] not in PATH_POLICIES|{'disabled'}
+            or config['event_history']!='true_zero_all'):
+            raise ValueError('unsupported departure policy or nonzero event anchor')
     path = Path(source).resolve(strict=True)
     with closing(sqlite3.connect(path.as_uri()+'?mode=ro',uri=True,timeout=12)) as db:
         db.execute('PRAGMA query_only=ON'); db.execute('BEGIN')
@@ -50,7 +79,15 @@ def prepare(source, *, model_sha, assignments=None, now=None, allow_legacy_avail
         crosses = model._gap_index(gaps,clock)
         if crosses(clock,clock):
             raise ValueError('active collection outage')
-        items={}; policies={}
+        items={}; policies={}; recommendations={}
+        polls=[]
+        if any('departure_policy' in c for c in assignments.values()):
+            from research.continuous_departure_replay import MAX_POLLS
+            polls=[r[0] for r in db.execute("SELECT timestamp FROM poll_heartbeats WHERE mode='poll-cycle' AND success=1 AND timestamp<=? ORDER BY timestamp LIMIT ?",(clock,MAX_POLLS+1))]
+            if len(polls)>MAX_POLLS or any(type(t) is not int for t in polls):
+                raise ValueError('invalid bounded poll history')
+        pi=bisect.bisect_right(polls,clock)-1
+        path_age=clock-polls[pi] if pi>=0 else None
         for key in sorted(roster):
             country,name=key.split(':',1)
             raw=db.execute('SELECT timestamp,quantity,source FROM stock_history WHERE country=? AND lower(item_name)=lower(?) AND timestamp<=? ORDER BY timestamp,id LIMIT ?',
@@ -72,9 +109,14 @@ def prepare(source, *, model_sha, assignments=None, now=None, allow_legacy_avail
                       analog.forecast(key,state,asof=clock) if analog is not None else
                       model.predict_events(key,state,asof=clock,recent_cycles=8 if config['event_history']=='recent_8' else None))
             items[key]=forecast; policies[key]=config['flight_adapter']
+            if 'departure_policy' in config:
+                recommendations[key]=path_recommendation(key,[model.OBS(*r) for r in raw],
+                    polls,gaps,crosses,zero,issued=clock,poll_age=path_age,
+                    model_sha=model_sha,policy=config['departure_policy'])
     snapshot={'asof_epoch':clock,'source_heartbeat_age_seconds':age,
               'model_sha':model_sha,'model_version':'Explicit per-item research event policies',
               'items':items,'item_policies':policies,'item_assignments':assignments,
+              'item_departure_recommendations':recommendations,
               'production_model_promoted':False,'calibration_state':'UNCALIBRATED'}
     build_board(snapshot,now=clock)  # Validate the exact consumer contract.
     return snapshot
