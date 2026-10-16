@@ -1,6 +1,8 @@
 # Private shared recommendation canary
 
-Status: implementation prepared; owner-side preflight and live start pending.
+Status: implementation tested and committed; owner-side preflight and live start pending.
+
+Tested implementation pin: `00bbfa9355bcb76954feefae2b6d8c930c68426a`. [CI run 38942179526](https://github.com/fungjkTorn/torn-fren/actions/runs/38942179526) passed both causal/contract and browser jobs. V35, V38 and profitability compatibility workflows also passed. These checks establish software behavior, not live prediction accuracy.
 
 This trial serves a separate website on **127.0.0.1:8770**. It reads the existing graph API on localhost:8000 and the collector SQLite database in read-only mode. It does not install services, replace deployed files, change collector permissions, or alter ports 8000, 8001 or 8765. Stop the foreground process with Ctrl+C to stop the trial.
 
@@ -12,6 +14,7 @@ Use the existing owner SSH session. Set `CANARY_PIN` to the exact tested impleme
 
 ```bash
 set -e
+CANARY_PIN=00bbfa9355bcb76954feefae2b6d8c930c68426a
 : "${CANARY_PIN:?Set the tested 40-character implementation SHA first}"
 CANARY_CODE="$HOME/torn-fren-shared-canary-${CANARY_PIN:0:12}"
 CANARY_STATE="$HOME/torn-fren-shared-canary-state-${CANARY_PIN:0:12}"
