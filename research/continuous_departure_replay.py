@@ -36,6 +36,7 @@ from research.arrival_clock_correction import ArrivalClockCorrection
 from research.direct_arrival_occupancy import DirectArrivalOccupancy
 from research.cycle_regression_paths import CycleRegressionPaths
 from research.inventory_feature_paths import InventoryFeaturePaths
+from research.tree_arrival_occupancy import TreeArrivalOccupancy
 from research.shared_stock_context import SharedStockContext
 from services.travel_window_policy import project_policy
 from research.v151_stable_earliest_departure import stable_earliest_departure
@@ -79,6 +80,7 @@ POLICIES += tuple(("zero_path_residual_"+family+"_"+mode,None,"path_residual_"+f
 POLICIES += tuple(("zero_path_"+mode,None,"path_"+mode) for mode in DirectArrivalOccupancy.MODES)
 POLICIES += tuple(("zero_path_cycle_"+mode,None,"path_cycle_"+mode) for mode in CycleRegressionPaths.MODES)
 POLICIES += tuple(("zero_path_inventory_"+mode,None,"path_inventory_"+mode) for mode in InventoryFeaturePaths.MODES)
+POLICIES += tuple(("zero_path_tree_"+mode,None,"path_tree_"+mode) for mode in TreeArrivalOccupancy.MODES)
 ZERO_COMPARATORS={p:("zero_anchored_midpoint" if p.endswith("_midpoint") else
                     "zero_anchored_quarter" if p.endswith("_quarter") and not p.endswith("_current_quarter") else
                     "zero_anchored_current_quarter")
@@ -242,6 +244,7 @@ def replay(*, source, days=2, asof=None, limit_items=24,
                                        flight_seconds=model.TRAVEL_SECONDS[country],score=evidence.score,
                                        context=lambda asof,item_key=key:context.at(asof,item_key))
             inventory_paths=InventoryFeaturePaths(path_model,obs,crosses)
+            tree_paths=TreeArrivalOccupancy(obs,polls,crosses,cutoff=now,flight_seconds=model.TRAVEL_SECONDS[country],score=evidence.score)
             aligned_paths=PhaseAlignedStockPaths(obs,crosses,cutoff=now,
                 flight_seconds=model.TRAVEL_SECONDS[country],interval_score=evidence.interval_score)
             corrections={family:ArrivalClockCorrection(family) for family in ('rate','hybrid')}
@@ -291,6 +294,8 @@ def replay(*, source, days=2, asof=None, limit_items=24,
                 path_plans=path_model.plans(issued,zero_cycles,poll_age=age)
                 path_plans.update({'inventory_'+mode:plan for mode,plan in
                     inventory_paths.plans(issued,rate_cycles,poll_age=age).items()})
+                path_plans.update({'tree_'+mode:plan for mode,plan in
+                    tree_paths.plans(issued,rate_cycles,poll_age=age).items()})
                 path_plans.update(direct.plans(issued,zero_cycles,poll_age=age))
                 path_plans.update({'cycle_'+mode:plan for mode,plan in
                     cycle_paths.plans(issued,zero_cycles,poll_age=age).items()})
@@ -484,6 +489,13 @@ def replay(*, source, days=2, asof=None, limit_items=24,
                     for p,_,_ in policies if p.startswith("zero_path_residual_")},
                 "residual_clock_diagnostics":{family:c.diagnostics() for family,c in corrections.items()},
                 "direct_arrival_diagnostics":direct.diagnostics(),
+                "tree_all_start_reference_comparisons":{p:{reference:compare_cohorts(all_cohorts[reference],all_cohorts[p])
+                    for reference in ('zero_path_analog70','zero_path_regime70','zero_path_regime80',
+                                      'zero_path_aligned_analog70','zero_path_aligned_analog50',
+                                      'zero_path_residual_rate_recent','zero_path_direct70','zero_path_direct_peak',
+                                      'zero_path_inventory_phase70','zero_path_inventory_quantity70','zero_path_inventory_flow70')}
+                    for p,_,_ in policies if p.startswith('zero_path_tree_')},
+                "tree_training_diagnostics":tree_paths.training,
                 "inventory_all_start_reference_comparisons":{p:{reference:compare_cohorts(all_cohorts[reference],all_cohorts[p])
                     for reference in ('zero_path_analog70','zero_path_regime70','zero_path_regime80',
                                       'zero_path_aligned_analog70','zero_path_aligned_analog50',
