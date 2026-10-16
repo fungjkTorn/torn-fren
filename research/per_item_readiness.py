@@ -15,6 +15,38 @@ COHERENT_POLICIES={
 }
 
 
+def arrival_evidence(policies):
+    """Expose every measured departure policy without inventing event compatibility.
+
+    This is evidence, not a ranking or assignment. In particular, a detached
+    departure predictor cannot supply the graph's restock/depletion timeline.
+    """
+    rows=[]
+    for name,policy in sorted(policies.items()):
+        measured=policy.get('replanned_all_five_minute_starts')
+        if not isinstance(measured,dict):
+            continue
+        departed=measured.get('departed',0)
+        rows.append({'policy':name,
+            'starts':measured.get('starts'),
+            'successes':measured.get('SUCCESS',0),
+            'failures':measured.get('FAILURE',0),
+            'unknown':measured.get('UNKNOWN',0),
+            'pending':measured.get('PENDING',0),
+            'abstained':measured.get('ABSTAIN',0),
+            'resolved_arrivals':measured.get('scored',0),
+            'success_fraction':measured.get('success_fraction'),
+            'departure_coverage':measured.get('departure_coverage'),
+            'mean_wait_seconds':measured.get('wait_seconds_sum',0)/departed if departed else None,
+            'chronological_day_slices':measured.get('chronological_start_day_slices',[]),
+            'legacy_event_adapter_mapping_available':name in COHERENT_POLICIES,
+            'departure_only_model':policy.get('departure_only_model',False),
+            'restock_timing_accuracy_inferred':False,
+            'depletion_timing_accuracy_inferred':False,
+            'release_assignment_verified':False})
+    return rows
+
+
 def readiness(report):
     rows=[]
     for key,item in sorted(report['items'].items()):
@@ -59,6 +91,12 @@ def readiness(report):
             'HISTORICAL_TARGET_MET_NEEDS_FORWARD_VALIDATION' if qualified else
             'PROMISING_BELOW_TARGET' if promising else 'MORE_RESEARCH_REQUIRED',
             'research_candidate':chosen,'qualified_candidate_count':len(qualified),
+            'status_scope':'LEGACY_EVENT_ADAPTER_POLICIES_ONLY',
+            'legacy_event_adapter_policy_coverage':{
+                'evaluated':sorted(set(item['policies']) & set(COHERENT_POLICIES)),
+                'missing':sorted(set(COHERENT_POLICIES)-set(item['policies'])),
+                'outside_legacy_mapping':sorted(set(item['policies'])-set(COHERENT_POLICIES))},
+            'arrival_policy_evidence':arrival_evidence(item['policies']),
             'production_model_changed':False})
     return {'status':'PER_ITEM_RESEARCH_READINESS','model_sha':report.get('model_sha'),
             'asof_epoch':report.get('asof_epoch'),'days':report.get('days'),
@@ -67,6 +105,8 @@ def readiness(report):
             'minimum_resolved_arrivals':500,'minimum_scored_issue_phase_proposals':20,
             'rows':rows,'automatic_model_promotion':False,
             'genuine_prospective_validation':False,
+            'readiness_status_scope':'Legacy event/adapter assessment, not a complete arrival-policy ranking or release certification',
+            'arrival_evidence_protocol':'All five-minute replanning starts; unknown and pending excluded from resolved success; correlated cohorts',
             'evidence_unit':'Correlated historical issues and first proposals per known issue phase, not independent player flights',
             'selection_warning':'Candidates selected from inspected history; fresh forward validation required. Event-stream compatibility excludes detached daily-target and V151 policies until their integration is complete.'}
 
