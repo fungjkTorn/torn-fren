@@ -60,6 +60,15 @@ on:
       - 'web/app.py'
       - 'web/static/index.html'
       - 'web/static/shared_departure_preview.js'
+      - 'services/experimental_shared_departures.py'
+      - 'web/shared_experimental_overlay.py'
+      - 'web/static/shared_experimental_rows.js'
+      - 'deploy/scripts/prepare_shared_experimental_page.py'
+      - 'tests/test_shared_experimental*'
+      - 'tests/test_prepare_shared_experimental_page.py'
+      - 'tests/shared_experimental_browser.cjs'
+      - 'tests/experimental_shared_fixture.py'
+      - 'tests/fixtures/experimental_owner_20261012.html'
       - 'web/travel_decisions*'
       - 'tests/test_travel_read_model.py'
       - 'tests/test_causal_daily_template.py'
@@ -112,6 +121,9 @@ jobs:
           python -m unittest discover -s tests -p 'test_departure_reconfirmation.py' -v
           python -m unittest discover -s tests -p 'test_build_travel_event_snapshot.py' -v
           python -m unittest discover -s tests -p 'test_publication_snapshot_probe.py' -v
+          python -m unittest discover -s tests -p 'test_shared_experimental_departures.py' -v
+          python -m unittest discover -s tests -p 'test_shared_experimental_overlay.py' -v
+          python -m unittest discover -s tests -p 'test_prepare_shared_experimental_page.py' -v
           python -m unittest discover -s tests -p 'test_travel_decisions_router.py' -v
           python -m unittest discover -s tests -p 'test_per_item_readiness.py' -v
       - name: Check player interface JavaScript
@@ -136,6 +148,7 @@ jobs:
       - run: npm install --no-save playwright@1.56.1
       - run: npx playwright install --with-deps chromium
       - run: node tests/travel_decisions_browser.cjs
+      - run: node tests/shared_experimental_browser.cjs
       - name: Save synthetic UI screenshots
         if: always()
         uses: actions/upload-artifact@v4
