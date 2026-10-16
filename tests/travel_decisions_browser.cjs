@@ -4,11 +4,12 @@ const fs=require('fs'),cp=require('child_process'),assert=require('assert');
 (async()=>{
  const browser=await chromium.launch({headless:true});
  const page=await browser.newPage({viewport:{width:1440,height:1050}});
- let failApi=false;
+ let failApi=false,holdNextApi=false,heldRoute=null,heldSignal=null;
  const errors=[];page.on('pageerror',e=>errors.push(e.message));
  await page.route('http://travel-preview.test/**',async route=>{
   const u=new URL(route.request().url());
   if(u.pathname==='/api/travel-decisions'){
+   if(holdNextApi){holdNextApi=false;heldRoute=route;heldSignal();return;}
    if(failApi)return route.fulfill({status:503,contentType:'application/json',body:'{}'});
    const args=['tests/travel_decisions_fixture.py'];
    if(u.searchParams.has('country'))args.push(u.searchParams.get('country'),u.searchParams.get('flight_seconds'));
@@ -20,6 +21,13 @@ const fs=require('fs'),cp=require('child_process'),assert=require('assert');
  });
  await page.goto('http://travel-preview.test/travel-decisions');
  await page.waitForSelector('.item');
+ assert.equal(await page.locator('.item').count(),6);
+ // An older response cannot replace a newer refresh or flight selection.
+ const heldReady=new Promise(resolve=>{heldSignal=resolve;});holdNextApi=true;
+ await page.evaluate(()=>{load();});await heldReady;
+ await page.evaluate(()=>load());
+ await heldRoute.fulfill({contentType:'application/json',body:JSON.stringify({rows:[]})});
+ await page.waitForTimeout(100);
  assert.equal(await page.locator('.item').count(),6);
  assert.equal(await page.locator('#more').isVisible(),false);
  await page.getByRole('button',{name:'Watch Jaguar Plushie',exact:true}).click();
@@ -83,7 +91,8 @@ const fs=require('fs'),cp=require('child_process'),assert=require('assert');
  // Exercise the original graph's additive panel and marker without a CDN.
  const graph=await browser.newPage();
  await graph.setContent('<div id="sharedDeparturePreview" hidden></div>');
- await graph.evaluate(()=>{window.Chart={register(plugin){window.testPlugin=plugin;}};});
+ await graph.evaluate(()=>{window.Chart={register(plugin){window.testPlugin=plugin;}};
+   const original=setInterval;window.setInterval=(fn,ms)=>{if(ms===10000)window.testLightPoll=fn;return original(fn,ms);};});
  await graph.addScriptTag({content:fs.readFileSync('web/static/shared_departure_preview.js','utf8')});
  await graph.evaluate(()=>{
    const t=Math.floor(Date.now()/1000);window.testNow=t;window.testDraws=0;
@@ -100,6 +109,27 @@ const fs=require('fs'),cp=require('child_process'),assert=require('assert');
  assert.equal(await graph.evaluate(()=>window.testDraws),1);
  await graph.waitForTimeout(1100);
  assert((await graph.locator('#sharedDeparturePreview').textContent()).includes('Await a fresh'));
+ await graph.evaluate(async()=>{
+   const t=Math.floor(Date.now()/1000);
+   const row={item_key:'mex:Jaguar Plushie',departure_epoch:t+1200,departure_deadline_epoch:t+1200,
+     departure_source:'explicit_recommendation',decision:{player_flight_seconds:1020,valid_until_epoch:t+100}};
+   const board={rows:[row],source_poll_age_seconds:10,asof_epoch:t,evaluated_at_epoch:t};
+   window.sharedDeparturePreview.set({...board,row});
+   window.testLightReads=0;window.fetch=async()=>{window.testLightReads++;return {ok:true,json:async()=>board};};
+   await window.testLightPoll();
+ });
+ assert.equal(await graph.evaluate(()=>window.testLightReads),1);
+ // A delayed light refresh from the old selection is ignored.
+ await graph.evaluate(()=>{
+   window.fetch=()=>new Promise(resolve=>{window.releaseLight=()=>resolve({ok:true,json:async()=>({rows:[],asof_epoch:0,evaluated_at_epoch:0,source_poll_age_seconds:999})});});
+   window.pendingLight=window.testLightPoll();
+   const t=Math.floor(Date.now()/1000),row={item_key:'chi:Peony',departure_epoch:t+3600,departure_deadline_epoch:t+3600,
+     departure_source:'explicit_recommendation',decision:{player_flight_seconds:9600,valid_until_epoch:t+100}};
+   window.sharedDeparturePreview.set({row,source_poll_age_seconds:10,asof_epoch:t,evaluated_at_epoch:t});
+   window.releaseLight();
+ });
+ await graph.evaluate(()=>window.pendingLight);
+ assert((await graph.locator('#sharedDeparturePreview').textContent()).includes('Leave in 60m'));
  await graph.evaluate(()=>{
    const t=window.testNow+101;
    window.sharedDeparturePreview.set({row:{departure_epoch:t-10,departure_deadline_epoch:t+20,

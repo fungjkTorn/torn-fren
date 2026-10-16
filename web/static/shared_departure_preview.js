@@ -1,7 +1,7 @@
 /* Optional graph panel and marker from the same snapshot as Travel Decisions. */
 (() => {
   'use strict';
-  let data=null;
+  let data=null,itemKey=null,generation=0,polling=false;
   const now=()=>Math.floor(Date.now()/1000);
   const stamp=t=>new Date(t*1000).toLocaleTimeString();
   const displayedDeparture=row=>row.departure_source==='explicit_recommendation'&&!row.decision.publication_tolerance_seconds
@@ -29,9 +29,24 @@
     }
     panel.textContent=message;
   }
-  window.sharedDeparturePreview={set(value){data=value||null;render();},clear(){data=null;render();}};
+  window.sharedDeparturePreview={set(value){generation++;data=value||null;itemKey=value?.row?.item_key||null;render();},clear(){generation++;data=null;itemKey=null;render();}};
   window.addEventListener('torn-shared-departure',e=>window.sharedDeparturePreview.set(e.detail));
   setInterval(render,1000);
+  // Refresh only precomputed recommendations, without rerunning graph history.
+  setInterval(async()=>{
+    if(!itemKey||polling)return;
+    const key=itemKey,seq=generation,controller=new AbortController();
+    const timeout=setTimeout(()=>controller.abort(),8000);polling=true;
+    try{
+      const response=await fetch('/api/travel-decisions',{cache:'no-store',signal:controller.signal});
+      if(!response.ok)throw Error('Shared feed unavailable');
+      const board=await response.json();
+      if(!Array.isArray(board.rows))throw Error('Invalid shared feed');
+      if(seq!==generation||key!==itemKey)return;
+      data={...board,row:board.rows.find(row=>row.item_key===key)||null};render();
+    }catch(_){if(seq===generation&&key===itemKey){data={row:null};render();}}
+    finally{clearTimeout(timeout);polling=false;}
+  },10000);
   if(window.Chart)Chart.register({id:'selectedDepartureEstimate',afterDraw(chart){
     if(!active()||!chart.scales?.x)return;
     const x=chart.scales.x.getPixelForValue(displayedDeparture(data.row)*1000),area=chart.chartArea;
