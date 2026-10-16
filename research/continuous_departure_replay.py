@@ -493,7 +493,7 @@ def replay(*, source, days=2, asof=None, limit_items=24,
                     for reference in ('zero_path_analog70','zero_path_regime70','zero_path_regime80',
                                       'zero_path_aligned_analog70','zero_path_aligned_analog50',
                                       'zero_path_residual_rate_recent','zero_path_direct70','zero_path_direct_peak',
-                                      'zero_path_inventory_phase70','zero_path_inventory_quantity70','zero_path_inventory_flow70')}
+                                      'zero_path_inventory_phase70','zero_path_inventory_quantity70','zero_path_inventory_flow70','zero_path_inventory_flow_peak')}
                     for p,_,_ in policies if p.startswith('zero_path_tree_')},
                 "tree_training_diagnostics":tree_paths.training,
                 "inventory_all_start_reference_comparisons":{p:{reference:compare_cohorts(all_cohorts[reference],all_cohorts[p])
