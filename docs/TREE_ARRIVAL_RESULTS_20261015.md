@@ -33,6 +33,8 @@ Monkey recent70 reaches78.77% versus72.98%, but coverage falls96.58→72.37% and
 
 Panda and Nessie do not show a useful balanced gain. Strong controls also reject generalization: Jaguar regime80 reference98.19%/99.95%/13.5min versus best tree recent70 83.17%/83.43%/100.9min. Peony reference93.81%/99.75%/65.2min versus stable peak91.74%/85.17%/122.4min. Preserve their incumbents.
 
-A separate Camel patient forward window is being configured with primary tree_stable_peak versus inventory_flow_peak and secondary aligned50 for cost disclosure. It uses the same numerical models, fixed capacity and recency rules; helper/reporting changes do not retune the candidate. One24-hour future-period reconstruction will not establish long-term consistency or actual-flight accuracy. Original full-roster and Chamois protocol pins remain unchanged.
+A separate Camel patient forward window is configured with primary tree_stable_peak versus inventory_flow_peak and secondary aligned50 for cost disclosure. It uses the same numerical models, fixed capacity and recency rules; helper/reporting changes do not retune the candidate. One24-hour future-period reconstruction will not establish long-term consistency or actual-flight accuracy. Original full-roster and Chamois protocol pins remain unchanged.
 
  Four fixed variants and all reference results are retained, including abstentions. A higher conditional success percentage is insufficient without coverage, wait and chronological consistency. Model scores are uncalibrated. Both existing frozen validation protocols remain unchanged.
+
+Operational validation details: [CAMEL_PATIENT_FORWARD_STATUS_20261015.md](CAMEL_PATIENT_FORWARD_STATUS_20261015.md).
