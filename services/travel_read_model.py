@@ -71,11 +71,14 @@ def build_board(snapshot,*,now,flight_overrides=None):
                 study['applies_to_selected_trip']=(study['matches_selected_policy']
                     and study['matches_selected_flight'] and study['matches_selected_model'])
                 if recommendation is not None:
+                    study['matches_selected_execution_policy']=(record.get('execution_policy','strict_point_v1')
+                        ==decision['execution_policy'])
                     study['matches_selected_model']=(record.get('model_sha')==snapshot.get('model_sha')
                         and record.get('departure_model')==recommendation['model_name']
                         and record.get('evidence_role')=='departure')
                     study['applies_to_selected_trip']=(study['matches_selected_policy']
-                        and study['matches_selected_flight'] and study['matches_selected_model'])
+                        and study['matches_selected_flight'] and study['matches_selected_model']
+                        and study['matches_selected_execution_policy'])
         depart=decision["estimated_departure_epoch"]
         landing=depart+decision["player_flight_seconds"] if depart is not None else None
         rows.append({"item_key":key,"country":country,"country_name":COUNTRIES.get(country,country),

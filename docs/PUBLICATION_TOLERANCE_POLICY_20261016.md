@@ -1,0 +1,15 @@
+# Bounded publication tolerance preview
+
+A separate `publication_delay_30s_v1` execution policy is now implemented alongside the original default `strict_point_v1`. Numerical departure-model predictions are unchanged. No production configuration, active Camel/Chamois test, routine approved source pin, or existing candidate profile was changed.
+
+Only a model's original leave-now point (departure equal to issue time) can receive up to30seconds of publication tolerance. Future points retain strict deadlines: the delay audit did not test adding30seconds after a future point. The deadline is anchored to the original issue, capped by cumulative source freshness, and never renewed by HTTP requests. Stale source, issue expiry, custom-flight mismatch, abstention or missed deadline clears departure and landing. Actual landing is actual departure plus flight; ten-second evaluation grace remains separate.
+
+The staged alternative profile is `deploy/research_runner/flowers_plushies_tolerance30_candidate_20261016.json`. It enables the same14candidate flower/plushie models as the earlier profile, while the other10items remain disabled. The original profile remains strict and available for comparison. This is not a14-item release certificate: coverage, unknown outcomes, consistency and operational integration still need review.
+
+The shared read model requires historical evidence to match the selected execution policy as well as item model, flight, source and departure policy. A strict-point percentage cannot be displayed as evidence for the tolerance policy. The graph panel now advances its displayed landing from the actual current permitted departure during the allowance; both views clear clocks at expiry. Restock/depletion event provenance remains independent and physical depletion remains exactly zero.
+
+Tests cover actual departures at0/5/15/30seconds, rejection at31seconds, source-limited shorter windows, future-point rejection, unchanged inputs, incompatible flights and evidence separation. The actual consumer was compared with the fixed historical late arm over100combinations of original120second-grid points, source ages and0–30second publication delays. The publisher tests both profiles and rejects unsupported execution assignments.
+
+`research/publication_snapshot_probe.py` also measures real offline snapshot build time on a sanitized historical snapshot. It projects both strict and selected profiles at the simulated publication finish time without changing the original issue. Tests show that35seconds of preparation exhausts a30second allowance, while10seconds can preserve a fresh immediate recommendation. Network/user delay is additional and is not measured by that probe.
+
+The earlier seven-day diagnostic remains exploratory historical evidence, not new forward certification or permission to delay every future point. This preview must not be promoted merely because it exposes more clocks. Real feed cadence, compute cost, publication latency and the deployed experimental adapter remain release gates. No new background service is installed by these changes.

@@ -1,6 +1,8 @@
 """Project an explicit precomputed departure without inventing stock events."""
 import re
 
+EXECUTION_POLICIES=frozenset(('strict_point_v1','publication_delay_30s_v1'))
+
 
 def project_recommendation(record, *, item_key, issued, model_sha, now,
                            poll_age_seconds, player_flight_seconds):
@@ -23,31 +25,42 @@ def project_recommendation(record, *, item_key, issued, model_sha, now,
         raise ValueError('invalid recommended departure')
     if type(now) is not int or type(issued) is not int or issued>now:
         raise ValueError('invalid departure clock')
+    execution=record.get('execution_policy','strict_point_v1')
+    if execution not in EXECUTION_POLICIES:
+        raise ValueError('unsupported departure execution policy')
+    # Only original leave-now points were tested for publication slippage.
+    # Future points retain their strict deadline, not an untested extension.
+    tolerance=30 if execution=='publication_delay_30s_v1' and departure==issued else 0
+    valid_until=(min(issued+299,now+180-poll_age_seconds)
+        if type(poll_age_seconds) is int and 0<=poll_age_seconds<=180 else issued-1)
+    deadline=departure+tolerance if departure is not None else None
+    if tolerance:
+        deadline=min(deadline,valid_until)
     status='MODEL_ABSTAIN';reason=record.get('status','NO_SUPPORTED_DEPARTURE')
     if (poll_age_seconds is None or not 0<=poll_age_seconds<=180 or now-issued>=300):
         status='STALE_DATA';reason='RECOMMENDATION_RECHECK_REQUIRED'
     elif player_flight_seconds!=flight:
         reason='FLIGHT_SPECIFIC_RECOMPUTATION_REQUIRED'
-    elif departure is not None and departure<now:
+    elif departure is not None and deadline<now:
         status='DEPARTURE_PASSED';reason='POINT_DEPARTURE_PASSED_RECHECK'
     elif departure is not None:
-        status='ESTIMATED_DEPARTURE_WINDOW_OPEN' if departure==now else 'WAIT_FOR_ESTIMATED_DEPARTURE'
-        reason='POINT_DEPARTURE_RECONFIRM_REQUIRED'
+        status='ESTIMATED_DEPARTURE_WINDOW_OPEN' if departure<=now else 'WAIT_FOR_ESTIMATED_DEPARTURE'
+        reason='PUBLICATION_TOLERANCE_RECONFIRM_REQUIRED' if tolerance else 'POINT_DEPARTURE_RECONFIRM_REQUIRED'
     active=status in ('ESTIMATED_DEPARTURE_WINDOW_OPEN','WAIT_FOR_ESTIMATED_DEPARTURE')
-    chosen=departure if active else None
+    chosen=max(departure,now) if active else None
     return {'item_key':item_key,'asof_epoch':issued,'evaluated_at_epoch':now,
         'status':status,'reason':reason,'player_flight_seconds':player_flight_seconds,
         'target_quantity':30,'depletion_stock_quantity':0,
         'restock_timer_anchor':'physical_zero','arrival_grace_seconds':10,
         'estimated_departure_epoch':chosen,
-        # A point forecast supplies no safe interval for shifting departure.
-        'estimated_departure_deadline_epoch':chosen,
+        'estimated_departure_deadline_epoch':deadline if active else None,
         'estimated_arrival_epoch':chosen+flight+10 if chosen is not None else None,
         'departure_countdown_seconds':chosen-now if chosen is not None else None,
         'selected_restock_event_index':None,'forecast_events':[],
         'prediction_calibrated':False,'verified_arrival_stock_success_probability':None,
         'departure_recommendation_is_estimate':True,'no_automated_gameplay':True,
         'departure_model_name':record['model_name'],'departure_policy':record['policy'],
+        'execution_policy':execution,'publication_tolerance_seconds':tolerance,
+        'model_departure_epoch':departure,
         'event_timing_prediction_supported':False,
-        'valid_until_epoch':min(issued+299,now+180-poll_age_seconds)
-            if type(poll_age_seconds) is int and 0<=poll_age_seconds<=180 else issued-1}
+        'valid_until_epoch':valid_until}

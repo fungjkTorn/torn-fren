@@ -19,6 +19,7 @@ from research.causal_phase_analogs import PhaseAnalogs
 from research.true_zero_cycles import ZeroCycles
 from services.travel_read_model import MAX_BYTES, build_board
 from services.travel_window_policy import POLICIES
+from services.departure_recommendation import EXECUTION_POLICIES
 
 PATH_POLICIES=frozenset(('zero_path_recent70','zero_path_analog70','zero_path_analog80'))
 
@@ -65,6 +66,10 @@ def prepare(source, *, model_sha, assignments=None, now=None, allow_legacy_avail
         if 'departure_policy' in config and (config['departure_policy'] not in PATH_POLICIES|{'disabled'}
             or config['event_history']!='true_zero_all'):
             raise ValueError('unsupported departure policy or nonzero event anchor')
+        if 'execution_policy' in config and (config['execution_policy'] not in EXECUTION_POLICIES
+            or config.get('departure_policy') not in PATH_POLICIES|{'disabled'}
+            or (config.get('departure_policy')=='disabled' and config['execution_policy']!='strict_point_v1')):
+            raise ValueError('invalid explicit execution assignment')
     path = Path(source).resolve(strict=True)
     with closing(sqlite3.connect(path.as_uri()+'?mode=ro',uri=True,timeout=12)) as db:
         db.execute('PRAGMA query_only=ON'); db.execute('BEGIN')
@@ -113,6 +118,7 @@ def prepare(source, *, model_sha, assignments=None, now=None, allow_legacy_avail
                 recommendations[key]=path_recommendation(key,[model.OBS(*r) for r in raw],
                     polls,gaps,crosses,zero,issued=clock,poll_age=path_age,
                     model_sha=model_sha,policy=config['departure_policy'])
+                recommendations[key]['execution_policy']=config.get('execution_policy','strict_point_v1')
     snapshot={'asof_epoch':clock,'source_heartbeat_age_seconds':age,
               'model_sha':model_sha,'model_version':'Explicit per-item research event policies',
               'items':items,'item_policies':policies,'item_assignments':assignments,

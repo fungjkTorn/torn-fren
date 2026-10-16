@@ -41,6 +41,17 @@ const fs=require('fs'),cp=require('child_process'),assert=require('assert');
  await page.getByRole('button',{name:'Apply',exact:true}).click();await request;
  await page.waitForFunction(()=>document.querySelector('.timings').textContent.includes('25m'));
  assert((await page.locator('.graphlink').getAttribute('href')).includes('country=mex'));
+ await page.evaluate(()=>{
+   const row=rows.find(r=>r.item_key==='mex:Jaguar Plushie');window.savedTestRow=structuredClone(row);
+   row.departure_epoch=now()-10;row.departure_deadline_epoch=now()+20;
+   row.decision.execution_policy='publication_delay_30s_v1';row.decision.publication_tolerance_seconds=30;
+   row.decision.valid_until_epoch=now()+100;tick();
+ });
+ assert.notEqual(await page.locator('#tripDeparture').textContent(),'—');
+ assert.equal(await page.locator('#tripArrival').textContent(),await page.evaluate(()=>time(now()+rows.find(r=>r.item_key==='mex:Jaguar Plushie').decision.player_flight_seconds)));
+ await page.evaluate(()=>{rows.find(r=>r.item_key==='mex:Jaguar Plushie').departure_deadline_epoch=now()-1;tick();});
+ assert.equal(await page.locator('#tripArrival').textContent(),'—');
+ await page.evaluate(()=>{Object.assign(rows.find(r=>r.item_key==='mex:Jaguar Plushie'),window.savedTestRow);tick();});
  await page.locator('#search').fill('Panda');
  await page.getByRole('button',{name:'Panda Plushie',exact:false}).filter({has:page.locator('.secondary')}).click();
  assert((await page.locator('.events').textContent()).includes('3 restock estimates'));
@@ -87,6 +98,17 @@ const fs=require('fs'),cp=require('child_process'),assert=require('assert');
  assert.equal(await graph.evaluate(()=>window.testDraws),1);
  await graph.evaluate(()=>{Date.now=()=>(window.testNow+101)*1000;window.testPlugin.afterDraw(window.testChart);});
  assert.equal(await graph.evaluate(()=>window.testDraws),1);
+ await graph.waitForTimeout(1100);
+ assert((await graph.locator('#sharedDeparturePreview').textContent()).includes('Await a fresh'));
+ await graph.evaluate(()=>{
+   const t=window.testNow+101;
+   window.sharedDeparturePreview.set({row:{departure_epoch:t-10,departure_deadline_epoch:t+20,
+     departure_source:'explicit_recommendation',decision:{publication_tolerance_seconds:30,
+       player_flight_seconds:1020,valid_until_epoch:t+100}},
+     source_poll_age_seconds:10,asof_epoch:t-10,evaluated_at_epoch:t});
+ });
+ assert((await graph.locator('#sharedDeparturePreview').textContent()).includes(await graph.evaluate(()=>new Date((window.testNow+101+1020)*1000).toLocaleTimeString())));
+ await graph.evaluate(()=>{Date.now=()=>(window.testNow+122)*1000;});
  await graph.waitForTimeout(1100);
  assert((await graph.locator('#sharedDeparturePreview').textContent()).includes('Await a fresh'));
  await graph.evaluate(()=>window.sharedDeparturePreview.clear());

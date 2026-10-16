@@ -31,6 +31,48 @@ def departure_snapshot(departure=T+1200):
 
 
 class BoardTests(unittest.TestCase):
+    def test_publication_tolerance_has_fixed_deadline_and_actual_landing(self):
+        data=departure_snapshot(T)
+        record=data['item_departure_recommendations']['mex:Jaguar Plushie']
+        record['execution_policy']='publication_delay_30s_v1'
+        before=json.dumps(data,sort_keys=True)
+        for delay in (0,5,15,30):
+            row=build_board(data,now=T+delay)['rows'][0]
+            self.assertEqual(row['departure_epoch'],T+delay)
+            self.assertEqual(row['arrival_epoch'],T+delay+1020)
+            self.assertEqual(row['departure_deadline_epoch'],T+30)
+            self.assertEqual(row['decision']['model_departure_epoch'],T)
+            self.assertEqual(row['decision']['publication_tolerance_seconds'],30)
+            self.assertEqual(len(row['event_timeline']),1)
+        self.assertEqual(json.dumps(data,sort_keys=True),before)
+        self.assertIsNone(build_board(data,now=T+31)['rows'][0]['departure_epoch'])
+        data['source_heartbeat_age_seconds']=170
+        row=build_board(data,now=T+5)['rows'][0]
+        self.assertEqual(row['departure_deadline_epoch'],T+10)
+        self.assertIsNone(build_board(data,now=T+11)['rows'][0]['departure_epoch'])
+
+    def test_tolerance_never_extends_future_points_stale_data_or_custom_flights(self):
+        for departure,now,age,override in ((T+120,T+121,10,None),
+                (T,T+20,161,None),(T,T+300,0,None),
+                (T,T+10,10,{'mex':1500})):
+            data=departure_snapshot(departure);data['source_heartbeat_age_seconds']=age
+            data['item_departure_recommendations']['mex:Jaguar Plushie']['execution_policy']='publication_delay_30s_v1'
+            row=build_board(data,now=now,flight_overrides=override)['rows'][0]
+            self.assertIsNone(row['departure_epoch'])
+            self.assertIsNone(row['arrival_epoch'])
+
+    def test_point_evidence_is_not_reused_for_publication_tolerance(self):
+        data=departure_snapshot(T)
+        data['item_departure_recommendations']['mex:Jaguar Plushie']['execution_policy']='publication_delay_30s_v1'
+        data['item_evidence']={'mex:Jaguar Plushie':{'successes':99,'resolved_arrivals':100,
+            'policy':'zero_path_analog70','player_flight_seconds':1020,'model_sha':'a'*40,
+            'departure_model':'causal_complete_stock_paths_v1','evidence_role':'departure'}}
+        self.assertFalse(build_board(data,now=T+10)['rows'][0]['evidence']['applies_to_selected_trip'])
+        data['item_evidence']['mex:Jaguar Plushie']['execution_policy']='publication_delay_30s_v1'
+        self.assertTrue(build_board(data,now=T+10)['rows'][0]['evidence']['applies_to_selected_trip'])
+        data['item_departure_recommendations']['mex:Jaguar Plushie']['execution_policy']='arbitrary_10_minutes'
+        with self.assertRaises(ValueError):build_board(data,now=T)
+
     def test_explicit_departure_keeps_independent_event_graph_and_exact_landing(self):
         data=departure_snapshot();before=json.dumps(data,sort_keys=True)
         row=build_board(data,now=T)['rows'][0]

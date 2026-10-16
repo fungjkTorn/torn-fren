@@ -47,6 +47,8 @@ on:
       - 'research/product_runtime_audit.py'
       - 'research/departure_reconfirmation.py'
       - 'research/build_travel_event_snapshot.py'
+      - 'research/publication_snapshot_probe.py'
+      - 'tests/test_publication_snapshot_probe.py'
       - 'tests/test_build_travel_event_snapshot.py'
       - 'tests/test_departure_reconfirmation.py'
       - 'tests/test_product_runtime_audit.py'
@@ -109,6 +111,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_product_runtime_audit.py' -v
           python -m unittest discover -s tests -p 'test_departure_reconfirmation.py' -v
           python -m unittest discover -s tests -p 'test_build_travel_event_snapshot.py' -v
+          python -m unittest discover -s tests -p 'test_publication_snapshot_probe.py' -v
           python -m unittest discover -s tests -p 'test_travel_decisions_router.py' -v
           python -m unittest discover -s tests -p 'test_per_item_readiness.py' -v
       - name: Check player interface JavaScript

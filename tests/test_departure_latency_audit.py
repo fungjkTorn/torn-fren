@@ -6,6 +6,32 @@ from research.departure_latency_audit import outcome,assess,audit
 
 
 class LatencyTests(unittest.TestCase):
+    def test_actual_consumer_matches_fixed_late_arm_up_to_thirty_seconds(self):
+        from services.departure_recommendation import project_recommendation
+        # The actual analog departure grid is 120 seconds. Only original
+        # delay-zero points can be missed by a <=30s publication delay.
+        for offset in (0,120,240,360,None):
+            for age in (0,10,150,170,181):
+                for delay in (0,5,15,30):
+                    dep=1000+offset if offset is not None else None
+                    record={'item_key':'mex:Jaguar Plushie','asof_epoch':1000,'model_sha':'a'*40,
+                        'policy':'zero_path_analog70','model_name':'causal_complete_stock_paths_v1',
+                        'player_flight_seconds':1020,'target_quantity':30,'depletion_stock_quantity':0,
+                        'event_timing_prediction_supported':False,'departure_epoch':dep,
+                        'execution_policy':'publication_delay_30s_v1'}
+                    d=project_recommendation(record,item_key=record['item_key'],issued=1000,
+                        model_sha='a'*40,now=1000+delay,poll_age_seconds=age+delay,
+                        player_flight_seconds=1020)
+                    kind,wait=outcome(1000,dep,age,delay=delay,flight=1020,
+                        score=lambda t:('SUCCESS',None,None),allow_late=True)
+                    if kind=='SUCCESS':
+                        self.assertEqual(d['estimated_departure_epoch'],1000+wait)
+                        self.assertEqual(d['estimated_arrival_epoch'],1000+wait+1020+10)
+                    elif kind=='STALE':
+                        self.assertTrue(d['estimated_departure_epoch'] is None or
+                            d['estimated_departure_epoch']>d['valid_until_epoch'])
+                    if offset not in (0,None):self.assertEqual(d['publication_tolerance_seconds'],0)
+
     def test_strict_point_expires_while_late_arm_is_measured_at_actual_arrival(self):
         seen=[]
         def score(t):seen.append(t);return ('SUCCESS',None,None)

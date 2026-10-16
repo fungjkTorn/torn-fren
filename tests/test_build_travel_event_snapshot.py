@@ -9,6 +9,29 @@ T=fixtures.T
 
 
 class PublisherTests(unittest.TestCase):
+    def test_tolerance_profile_is_explicit_and_old_profile_remains_strict(self):
+        from services.travel_read_model import build_board
+        root=Path(__file__).resolve().parents[1]
+        profile=json.loads((root/'deploy/research_runner/flowers_plushies_tolerance30_candidate_20261016.json').read_text())
+        old=json.loads((root/'deploy/research_runner/flowers_plushies_candidate_assignments_20261016.json').read_text())
+        self.assertTrue(all('execution_policy' not in c for c in old.values()))
+        with tempfile.TemporaryDirectory() as td:
+            db=fixtures.ContinuousTests().fixture(Path(td));before=db.read_bytes()
+            snapshot=prepare(db,model_sha='a'*40,now=T,assignments=profile)
+            board=build_board(snapshot,now=T+10)
+            for row in board['rows']:
+                expected=profile[row['item_key']]['execution_policy']
+                self.assertEqual(row['decision']['execution_policy'],expected)
+                if row['decision']['model_departure_epoch']==T and expected=='publication_delay_30s_v1':
+                    self.assertEqual(row['departure_epoch'],T+10)
+                    self.assertEqual(row['arrival_epoch'],T+10+row['decision']['player_flight_seconds'])
+            self.assertEqual(db.read_bytes(),before)
+        for config in ({'execution_policy':'publication_delay_30s_v1'},
+                       {'departure_policy':'disabled','execution_policy':'publication_delay_30s_v1'},
+                       {'departure_policy':'zero_path_analog70','execution_policy':'unsafe_delay'}):
+            with self.assertRaises(ValueError):prepare('unused',model_sha='a'*40,
+                assignments={'mex:Jaguar Plushie':dict(event_history='true_zero_all',flight_adapter='median',**config)})
+
     def test_staged_item_profile_keeps_weak_items_and_medication_nonactionable(self):
         from services.travel_read_model import build_board
         profile=Path(__file__).resolve().parents[1]/'deploy/research_runner/flowers_plushies_candidate_assignments_20261016.json'
