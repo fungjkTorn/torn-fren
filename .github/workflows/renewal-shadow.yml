@@ -1,0 +1,22 @@
+name: Full roster renewal shadow safeguards
+on:
+  push:
+    branches: [research/v38-full-roster-live-prep-20261009]
+    paths:
+      - 'research/japan_xanax/renewal_shadow.py'
+      - 'tests/test_renewal_shadow.py'
+      - '.github/workflows/renewal-shadow.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  shadow-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install numpy==1.26.4
+      - run: OPENBLAS_NUM_THREADS=1 python -m unittest discover -s tests -p test_renewal_shadow.py -v
