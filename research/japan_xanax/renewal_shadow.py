@@ -46,12 +46,17 @@ class History:
                 self.restock=t;self.phase_start=t;self.batch=q;self.buy_end=None
         self.last=row
 
-    def plans(self,issued,*,poll_age,flight_seconds=FLIGHT,diagnostics=None):
+    def plans(self,issued,*,poll_age,flight_seconds=FLIGHT,diagnostics=None,
+              cycle_limit=96,half_life_seconds=3*86400):
+        if type(cycle_limit) is not int or not 16<=cycle_limit<=96:
+            raise ValueError('Bounded cycle memory required')
+        if type(half_life_seconds) is not int or not 21600<=half_life_seconds<=3*86400:
+            raise ValueError('Bounded recency half life required')
         if self.last is not None and self.last[0]>issued:raise ValueError('Future stock observation')
         empty={m:dict(departure=None,status='INSUFFICIENT_PAST_CYCLES') for m in MODES}
         if poll_age is None or not 0<=poll_age<=180 or self.crosses(issued,issued):return empty
         empty['leave_now_control']=dict(departure=issued,status='SHADOW_CONTROL')
-        cycles=[c for c in self.cycles if c.end<=issued][-96:]
+        cycles=[c for c in self.cycles if c.end<=issued][-cycle_limit:]
         if len(cycles)<16 or self.phase_start is None or issued-self.last[0]>86400:return empty
         high=self.last[1]>0;age=issued-self.phase_start
         durations=np.array([(c.end-c.restock) if high else (c.restock-c.zero) for c in cycles])
@@ -62,7 +67,7 @@ class History:
         for family in FAMILIES:
             seed=int.from_bytes(hashlib.sha256(f'{family}:{issued}'.encode()).digest()[:8],'big')
             rng=np.random.default_rng(seed);support=np.zeros(len(delays))
-            weights=np.exp2(-(issued-np.array([c.end for c in cycles]))/(3*86400))
+            weights=np.exp2(-(issued-np.array([c.end for c in cycles]))/half_life_seconds)
             weights/=weights.sum();initial=weights[eligible];initial/=initial.sum()
             for _ in range(64):
                 index=int(rng.choice(eligible,p=initial));c=cycles[index]

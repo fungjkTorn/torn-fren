@@ -9,6 +9,8 @@ on:
       - 'tests/test_shadow_scorecard.py'
       - 'research/japan_xanax/coverage_challengers.py'
       - 'tests/test_japan_coverage_challengers.py'
+      - 'research/japan_xanax/recent_regime.py'
+      - 'tests/test_japan_recent_regime.py'
       - '.github/workflows/renewal-shadow.yml'
   workflow_dispatch:
 permissions:
@@ -26,3 +28,4 @@ jobs:
       - run: OPENBLAS_NUM_THREADS=1 python -m unittest discover -s tests -p test_renewal_shadow.py -v
       - run: OPENBLAS_NUM_THREADS=1 python -m unittest discover -s tests -p test_shadow_scorecard.py -v
       - run: OPENBLAS_NUM_THREADS=1 python -m unittest discover -s tests -p test_japan_coverage_challengers.py -v
+      - run: OPENBLAS_NUM_THREADS=1 python -m unittest discover -s tests -p test_japan_recent_regime.py -v
