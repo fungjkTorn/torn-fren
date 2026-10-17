@@ -15,6 +15,8 @@ on:
       - 'tests/test_japan_departure_stability.py'
       - 'research/japan_xanax/forecast_gap_audit.py'
       - 'tests/test_japan_forecast_gap_audit.py'
+      - 'research/japan_xanax/zero_handoff.py'
+      - 'tests/test_japan_zero_handoff.py'
       - '.github/workflows/renewal-shadow.yml'
   workflow_dispatch:
 permissions:
@@ -35,3 +37,4 @@ jobs:
       - run: OPENBLAS_NUM_THREADS=1 python -m unittest discover -s tests -p test_japan_recent_regime.py -v
       - run: OPENBLAS_NUM_THREADS=1 python -m unittest discover -s tests -p test_japan_departure_stability.py -v
       - run: OPENBLAS_NUM_THREADS=1 python -m unittest discover -s tests -p test_japan_forecast_gap_audit.py -v
+      - run: OPENBLAS_NUM_THREADS=1 python -m unittest discover -s tests -p test_japan_zero_handoff.py -v
