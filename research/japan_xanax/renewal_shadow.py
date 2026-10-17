@@ -46,7 +46,7 @@ class History:
                 self.restock=t;self.phase_start=t;self.batch=q;self.buy_end=None
         self.last=row
 
-    def plans(self,issued,*,poll_age,flight_seconds=FLIGHT):
+    def plans(self,issued,*,poll_age,flight_seconds=FLIGHT,diagnostics=None):
         if self.last is not None and self.last[0]>issued:raise ValueError('Future stock observation')
         empty={m:dict(departure=None,status='INSUFFICIENT_PAST_CYCLES') for m in MODES}
         if poll_age is None or not 0<=poll_age<=180 or self.crosses(issued,issued):return empty
@@ -91,6 +91,8 @@ class History:
                     zero=start+c.end-c.restock
                 if zero<=int(land[-1])+GRACE:raise ValueError('Simulation cycle cap exceeded')
             support/=64
+            if diagnostics is not None:
+                diagnostics[family]=dict(delays=delays.tolist(),support=support.tolist())
             # Fixed gates are uncalibrated scenario agreement, never a probability.
             peak=float(support.max())
             for gate in ('peak','60'):
