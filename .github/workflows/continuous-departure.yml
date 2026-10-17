@@ -161,3 +161,4 @@ jobs:
         with:
           name: travel-decisions-synthetic-ui
           path: test-output/*.png
+          retention-days: 2
