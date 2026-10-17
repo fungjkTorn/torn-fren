@@ -14,9 +14,11 @@ MODES=('sequence_blocks_peak','zero_handoff180','rate_current_quarter','leave_no
 
 
 def issued_plans(source,issued):
+    # source_data pins this checkout before the deployment helper can select
+    # the VM's older staged research package during its module import.
+    rows,polls,crosses,evidence,cutoff=source_data(source,now=issued,item_key=KEY)
     from research.quantity_rate_cycles import QuantityRateCycles
     from deploy.scripts.v163_readonly_event_first_preview import OBS
-    rows,polls,crosses,evidence,cutoff=source_data(source,now=issued,item_key=KEY)
     age=issued-cutoff
     if not 0<=age<=180:raise ValueError('Source heartbeat stale')
     h=History(crosses);anchor=ZeroAnchor(crosses,180);rate=QuantityRateCycles(crosses)

@@ -35,3 +35,21 @@ recorder tests cover genuine handoff plan restoration, atomic publication-floor
 records, stale-publication rejection, and incomplete-follow-up scoring. The four
 underlying handoff tests cover true-zero provenance, unchanged training identity,
 provider disagreement, gaps, and no future-poll approval.
+
+## VM legacy-stage startup correction
+
+The initial31fd6ddd run failed before saving predictions because issued_plans
+imported the quantity helper before source_data pinned the checkout. The helper's
+legacy VM staging logic redirected research.__path__ to v160_stage, which lacks
+continuous_departure_replay. This was an import-order bug, not a missing GitHub
+file. The corrected function pins/loads source_data before helper imports.
+
+A fresh-subprocess regression reproduces the exact old ModuleNotFoundError using
+a legacy-stage mirror lacking the newer replay file. The correction passes with
+that environment. Explicitly setting TORNFREN_REPLAY_WORK to the current checkout
+and TORNFREN_REPLAY_PINNED_RESEARCH to its research directory before starting Python
+also recovers the existing31fd6ddd pin without changing model source or results.
+Both launch routes are tested with a real read-only collector fixture and checked
+for unchanged source bytes. Add a foreground issued_plans preflight before nohup
+to catch import/source errors before printing a recorder PID. Five paired tests pass.
+Do not reuse/overwrite the failed run's journal; use a new timestamped journal.
