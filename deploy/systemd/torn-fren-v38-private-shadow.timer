@@ -1,0 +1,12 @@
+[Unit]
+Description=Optional V38 source-pinned five-model private research snapshots
+
+[Timer]
+OnCalendar=*-*-* *:0/5:00
+AccuracySec=5s
+RandomizedDelaySec=0
+Persistent=false
+Unit=torn-fren-v38-private-shadow.service
+
+[Install]
+WantedBy=timers.target

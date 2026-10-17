@@ -667,6 +667,7 @@
       </div>
     </div>
 
+    <div id="sharedDeparturePreview" hidden role="status" style="padding:12px 20px;color:#b8ef76"></div>
     <section id="insights-panel" aria-live="polite">
       <div class="insight-section" id="history-section">
         <div class="insight-title">Observed history</div>
@@ -762,6 +763,7 @@
     <div id="hint">Scroll or swipe left/right for older data · hover on PC or tap on mobile for exact recorded values</div>
   </main>
 
+  <script src="/shared_departure_preview.js"></script>
   <script>
     const params = new URLSearchParams(window.location.search);
     let country = (params.get("country") || "uni").toLowerCase();
@@ -818,6 +820,7 @@
     let loadGeneration = 0;
     let previousActivePrediction = null;
     let lastFetchCompletedAt = null;
+    let predictionRefreshFailed = false;
     let cachedRows = [];
     let cachedAnalysis = null;
     let cachedFetchMinutes = 0;
@@ -1130,11 +1133,13 @@
       const depletionBuffer = lifetime
         ? Math.max(60, Math.min(300, Math.round(lifetime * 0.10)))
         : 60;
-      let latestArrival = depletion ? depletion - depletionBuffer : null;
-      if (!latestArrival || latestArrival <= earliestArrival) {
-        latestArrival = prediction.window_end_timestamp || calibratedArrival || estimate;
+      // The restock-window end is NOT an upper bound on available stock.
+      // If the predicted stocked interval closes before our conservative
+      // arrival, there is no feasible flight; never invent zero-width GO.
+      const latestArrival = depletion ? depletion - depletionBuffer : null;
+      if (!Number.isFinite(latestArrival) || latestArrival <= earliestArrival) {
+        return null;
       }
-      if (!latestArrival || latestArrival < earliestArrival) latestArrival = earliestArrival;
 
       return {
         earliestArrival,
@@ -1157,35 +1162,36 @@
 
       for (const candidate of predictions) {
         const window = departureWindowForPrediction(candidate, flightSeconds);
-        if (!window) continue;
+        if (!window) {
+          candidate.usable_for_departure = false;
+          continue;
+        }
         candidate.usable_for_departure = nowSeconds <= window.latestLeave;
         if (!next && candidate.usable_for_departure) next = candidate;
       }
 
       const current = analysis.prediction;
-      const changed = Boolean(
-        next?.estimate_timestamp &&
-        (
-          !current?.estimate_timestamp ||
-          next.prediction_number !== current.prediction_number ||
-          next.estimate_timestamp !== current.estimate_timestamp
-        )
-      );
+      const changed = next
+        ? (!current?.estimate_timestamp ||
+           next.prediction_number !== current.prediction_number ||
+           next.estimate_timestamp !== current.estimate_timestamp)
+        : Boolean(current?.estimate_timestamp);
 
       if (!changed) return false;
 
       previousActivePrediction = current ? { ...current } : null;
       analysis.prediction_v2.display_prediction = next;
-      analysis.prediction_v2.active_prediction_number = next.prediction_number;
-      analysis.prediction_v2.cycles_before_active_target =
-        Math.max(0, (next.prediction_number || 1) - 1);
-      analysis.prediction = {
+      analysis.prediction_v2.active_prediction_number =
+        next?.prediction_number ?? null;
+      analysis.prediction_v2.cycles_before_active_target = next
+        ? Math.max(0, (next.prediction_number || 1) - 1) : null;
+      analysis.prediction = next ? {
         ...next,
         confidence: next.travel_reliability,
         sample_count: v2.model_evidence_tier,
         excluded_sample_count: null,
         note: v2.note,
-      };
+      } : null;
 
       // Redraw all target-dependent UI immediately; no model rebuild/network
       // request is needed just because the clock crossed a departure deadline.
@@ -1195,8 +1201,30 @@
     }
 
 
+    function departureGuidanceBlock(analysis, nowSeconds, refreshFailed) {
+      if (refreshFailed) return "Refresh failed; recheck before departing.";
+      if (!analysis || analysis.prediction_v2_stale !== false) {
+        return "Forecast is refreshing or unavailable; recheck before departing.";
+      }
+      // A successful HTTP request cannot renew the underlying forecast or
+      // certify per-country provider freshness. Bound reuse of this response.
+      const checked = analysis.prediction_v2_checked_at;
+      const heartbeat = analysis.collector_last_success_timestamp;
+      if (!Number.isFinite(checked) || checked <= 0 || checked > nowSeconds ||
+          nowSeconds - checked >= 300) {
+        return "Forecast response expired; refresh before departing.";
+      }
+      if (!Number.isFinite(heartbeat) || heartbeat <= 0 || heartbeat > nowSeconds ||
+          nowSeconds - heartbeat > 180) {
+        return "Collector evidence is stale or unknown; recheck before departing.";
+      }
+      return null;
+    }
+
     function updateFlightTicker() {
-      if (rollPredictionTargetClientSide()) return;
+      const guidanceBlock = departureGuidanceBlock(
+        currentAnalysis, Date.now() / 1000, predictionRefreshFailed);
+      if (!guidanceBlock && rollPredictionTargetClientSide()) return;
 
       const flightMinutes = PI_PILOT_FLIGHT_MINUTES[country];
       const prediction = currentAnalysis?.prediction;
@@ -1222,6 +1250,14 @@
         return;
       }
 
+      if (guidanceBlock) {
+        flightDeadlineEl.textContent = "RECHECK REQUIRED";
+        flightCountdownEl.textContent = "--:--:--";
+        flightStatusEl.textContent = guidanceBlock;
+        flightMetaEl.textContent = `${countryName} · PI + pilot ${formatFlightMinutes(flightMinutes)} · last forecast retained for reference`;
+        return;
+      }
+
       const nowSeconds = Date.now() / 1000;
       const etaIfLeavingNow = nowSeconds + flightSeconds;
       const targetNumber = prediction.prediction_number || 1;
@@ -1235,20 +1271,20 @@
         const wait = window.earliestLeave - nowSeconds;
         flightDeadlineEl.textContent = "TOO EARLY";
         flightCountdownEl.textContent = formatDurationSeconds(wait);
-        flightStatusEl.textContent = `Wait ~${formatCompactDuration(wait)} before the current safe departure range opens.`;
+        flightStatusEl.textContent = `Wait ~${formatCompactDuration(wait)} before the modeled departure range opens; recheck near departure.`;
         if (wait <= 15 * 60) flightSection.classList.add("flight-urgent");
       } else if (nowSeconds <= window.latestLeave) {
         const remaining = window.latestLeave - nowSeconds;
         flightSection.classList.add("flight-urgent");
-        flightDeadlineEl.textContent = "GOOD TO LEAVE";
+        flightDeadlineEl.textContent = "MODELED DEPARTURE WINDOW";
         flightCountdownEl.textContent = formatDurationSeconds(remaining);
-        flightStatusEl.textContent = `ETA is inside the current modeled stock-available window for P${targetNumber}.`;
+        flightStatusEl.textContent = `ETA is inside the modeled window for P${targetNumber}; ≥30 stock at landing and country-feed freshness are unverified.`;
       } else {
         const late = nowSeconds - window.latestLeave;
         flightSection.classList.add("flight-missed");
         flightDeadlineEl.textContent = "LATE";
         flightCountdownEl.textContent = `+${formatDurationSeconds(late)}`;
-        flightStatusEl.textContent = `Leaving now is past the modeled safe departure range for P${targetNumber}; depletion risk is rising.`;
+        flightStatusEl.textContent = `Leaving now is past the modeled departure range for P${targetNumber}; depletion risk is rising.`;
       }
 
       const windowText = window
@@ -1700,11 +1736,13 @@
 
         const data = await response.json();
         if (requestId !== loadGeneration || requestedSelectionKey !== selectionKey()) return;
+        window.dispatchEvent(new CustomEvent('torn-shared-departure',{detail:data.analysis?.shared_departure_preview||null}));
         cachedRows = data.rows || [];
         cachedAnalysis = data.analysis || null;
         cachedFetchMinutes = requestedFetchMinutes;
         cachedSelectionKey = requestedSelectionKey;
         previousActivePrediction = oldPrediction;
+        predictionRefreshFailed = false;
         updateInsights(data.analysis);
         scheduleWarmRefresh(data.analysis);
         updateChartSize(minutes, data.analysis, currentFetchMinutes);
@@ -1744,6 +1782,9 @@
       } catch (error) {
         if (requestId !== loadGeneration || requestedSelectionKey !== selectionKey()) return;
         console.error(error);
+        window.sharedDeparturePreview.clear();
+        predictionRefreshFailed = true;
+        updateFlightTicker();
         liveStateEl.className = "live-state offline";
         liveStateEl.textContent = "Refresh failed";
         statusEl.textContent = "Could not load stock history. Make sure the FastAPI server is running.";
@@ -1827,6 +1868,7 @@
     }
 
     async function changeSelection(nextCountry, nextItem = null) {
+      window.sharedDeparturePreview.clear();
       country = nextCountry.toLowerCase();
       if (nextItem !== null) item = nextItem;
       populateItemSelect();
@@ -1834,6 +1876,7 @@
       syncLocationAndTitle();
 
       previousActivePrediction = null;
+      predictionRefreshFailed = false;
       currentAnalysis = null;
       loadGeneration += 1;
       loadingData = false;
@@ -1935,6 +1978,7 @@
 
     window.addEventListener("resize", () => updateChartSize(currentMinutes, currentAnalysis, currentFetchMinutes));
 
+    window.addEventListener('torn-shared-departure-tick',()=>{if(chart)chart.draw();});
     setInterval(updateFlightTicker, 1000);
 
     (async function boot() {

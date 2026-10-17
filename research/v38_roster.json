@@ -1,0 +1,190 @@
+{
+  "schema": "torn-fren-v38-live-research-roster",
+  "created_for": "2026-10-10-research-target",
+  "policy": {
+    "replan_seconds": 300,
+    "max_departure_wait_seconds": 28800,
+    "min_arrival_quantity": 30,
+    "arrival_grace_seconds": 10,
+    "live_public_routing_unchanged": true,
+    "development_scores_not_probabilities": true
+  },
+  "items": {
+    "arg:Ceibo Flower": {
+      "category": "flower",
+      "model_family": "V18",
+      "config_name": "dyn3",
+      "source_path": "services/plushie_flower_dynamic_planner_v18.py",
+      "source_verified": true,
+      "stage": "REQUIRES_LIVE_VALIDATION"
+    },
+    "arg:Monkey Plushie": {
+      "category": "plushie",
+      "model_family": "online_template_expert",
+      "config_name": null,
+      "source_path": "checkpoint4_online_selector.py",
+      "source_verified": false,
+      "stage": "REQUIRES_LIVE_VALIDATION"
+    },
+    "can:Crocus": {
+      "category": "flower",
+      "model_family": "V18",
+      "config_name": "dyn5",
+      "source_path": "services/plushie_flower_dynamic_planner_v18.py",
+      "source_verified": true,
+      "stage": "REQUIRES_LIVE_VALIDATION"
+    },
+    "can:Wolverine Plushie": {
+      "category": "plushie",
+      "model_family": "V18",
+      "config_name": "dyn8",
+      "source_path": "services/plushie_flower_dynamic_planner_v18.py",
+      "source_verified": true,
+      "stage": "REQUIRES_LIVE_VALIDATION"
+    },
+    "cay:Banana Orchid": {
+      "category": "flower",
+      "model_family": "V18",
+      "config_name": "dyn7",
+      "source_path": "services/plushie_flower_dynamic_planner_v18.py",
+      "source_verified": true,
+      "stage": "REQUIRES_LIVE_VALIDATION"
+    },
+    "cay:Stingray Plushie": {
+      "category": "plushie",
+      "model_family": "V18",
+      "config_name": "dyn7",
+      "source_path": "services/plushie_flower_dynamic_planner_v18.py",
+      "source_verified": true,
+      "stage": "REQUIRES_LIVE_VALIDATION"
+    },
+    "chi:Panda Plushie": {
+      "category": "plushie",
+      "model_family": "two_expert_extra_trees",
+      "config_name": null,
+      "source_path": "panda_pair_selector_ml.py",
+      "source_verified": false,
+      "stage": "REQUIRES_LIVE_VALIDATION"
+    },
+    "chi:Peony": {
+      "category": "flower",
+      "model_family": "V20",
+      "config_name": "traj12",
+      "source_path": "services/plushie_flower_dynamic_planner_v20.py",
+      "source_verified": true,
+      "stage": "REQUIRES_LIVE_VALIDATION"
+    },
+    "haw:Orchid": {
+      "category": "flower",
+      "model_family": "V18",
+      "config_name": "dyn3",
+      "source_path": "services/plushie_flower_dynamic_planner_v18.py",
+      "source_verified": true,
+      "stage": "REQUIRES_LIVE_VALIDATION"
+    },
+    "jap:Cherry Blossom": {
+      "category": "flower",
+      "model_family": "V19",
+      "config_name": "dyn2",
+      "source_path": "services/plushie_flower_dynamic_planner_v19.py",
+      "source_verified": true,
+      "stage": "REQUIRES_LIVE_VALIDATION"
+    },
+    "jap:Xanax": {
+      "category": "other",
+      "model_family": "japan_xanax_specialist",
+      "config_name": null,
+      "source_path": null,
+      "source_verified": false,
+      "stage": "REQUIRES_LIVE_VALIDATION"
+    },
+    "mex:Dahlia": {
+      "category": "flower",
+      "model_family": "V18",
+      "config_name": "dyn2",
+      "source_path": "services/plushie_flower_dynamic_planner_v18.py",
+      "source_verified": true,
+      "stage": "REQUIRES_LIVE_VALIDATION"
+    },
+    "mex:Jaguar Plushie": {
+      "category": "plushie",
+      "model_family": "V18",
+      "config_name": "dyn3",
+      "source_path": "services/plushie_flower_dynamic_planner_v18.py",
+      "source_verified": true,
+      "stage": "REQUIRES_LIVE_VALIDATION"
+    },
+    "sou:African Violet": {
+      "category": "flower",
+      "model_family": "V19",
+      "config_name": "dyn7",
+      "source_path": "services/plushie_flower_dynamic_planner_v19.py",
+      "source_verified": true,
+      "stage": "REQUIRES_LIVE_VALIDATION"
+    },
+    "sou:Lion Plushie": {
+      "category": "plushie",
+      "model_family": "two_expert_logistic",
+      "config_name": null,
+      "source_path": "lion_pair_selector_ml.py",
+      "source_verified": false,
+      "stage": "REQUIRES_LIVE_VALIDATION"
+    },
+    "swi:Chamois Plushie": {
+      "category": "plushie",
+      "model_family": "online_template_expert",
+      "config_name": null,
+      "source_path": "checkpoint4_online_selector.py",
+      "source_verified": false,
+      "stage": "REQUIRES_LIVE_VALIDATION"
+    },
+    "swi:Edelweiss": {
+      "category": "flower",
+      "model_family": "V19",
+      "config_name": "dyn9",
+      "source_path": "services/plushie_flower_dynamic_planner_v19.py",
+      "source_verified": true,
+      "stage": "REQUIRES_LIVE_VALIDATION"
+    },
+    "uae:Camel Plushie": {
+      "category": "plushie",
+      "model_family": "template_probability_selector",
+      "config_name": null,
+      "source_path": "camel_fast_selector.py",
+      "source_verified": false,
+      "stage": "REQUIRES_LIVE_VALIDATION"
+    },
+    "uae:Tribulus Omanense": {
+      "category": "flower",
+      "model_family": "V18",
+      "config_name": "dyn3",
+      "source_path": "services/plushie_flower_dynamic_planner_v18.py",
+      "source_verified": true,
+      "stage": "REQUIRES_LIVE_VALIDATION"
+    },
+    "uni:Heather": {
+      "category": "flower",
+      "model_family": "V18",
+      "config_name": "dyn3",
+      "source_path": "services/plushie_flower_dynamic_planner_v18.py",
+      "source_verified": true,
+      "stage": "REQUIRES_LIVE_VALIDATION"
+    },
+    "uni:Nessie Plushie": {
+      "category": "plushie",
+      "model_family": "recent_phase_template",
+      "config_name": null,
+      "source_path": "recent_phase_select.py",
+      "source_verified": false,
+      "stage": "REQUIRES_LIVE_VALIDATION"
+    },
+    "uni:Red Fox Plushie": {
+      "category": "plushie",
+      "model_family": "global_regime_analog",
+      "config_name": null,
+      "source_path": "rf_localgrid.py",
+      "source_verified": false,
+      "stage": "REQUIRES_LIVE_VALIDATION"
+    }
+  }
+}

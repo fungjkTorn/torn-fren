@@ -1275,6 +1275,12 @@ def build_live_prediction_v2(
         force_profile=force_profile,
     )
 
+    # A model computation has its OWN issuance. This is not the HTTP
+    # response-check timestamp, which can refresh without a model refit.
+    # Preserve this timestamp through /api/history prediction caching.
+    # Historical replay callers must not construe it as a past as-of issue.
+    result["forecast_model_computed_at"] = int(time.time())
+
     if record_audit:
         try:
             from services.forecast_auditor import record_forecast_snapshot

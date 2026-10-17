@@ -1,4 +1,8 @@
 from pathlib import Path
+import os
+from research.v38_prediction_store import read as read_v38_snapshots
+from web.catalog_cache_v38 import CatalogCache
+from web.v38_revision_fingerprint import revision as v38_source_revision
 import copy
 import threading
 import time
@@ -8,7 +12,7 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
-from services.history_service import get_item_history_since, get_stock_catalog, get_stock_graph_analysis, get_latest_item_snapshot
+from services.history_service import DB_PATH, get_item_history_since, get_stock_catalog, get_stock_graph_analysis, get_latest_item_snapshot
 from services.prediction_v2_live import build_live_prediction_v2
 from services.admin_health import build_admin_health
 from services.forecast_auditor import get_recent_active_forecasts
@@ -16,6 +20,8 @@ from services.profitability import enrich_items_with_profitability, profitabilit
 from web.private_shadow_v29 import champion_shadow
 
 app = FastAPI(title="Torn Fren Stock Graph")
+
+_V38_CATALOG_CACHE = CatalogCache(ttl=30, max_stale=180)
 
 STATIC_DIR = Path(__file__).parent / "static"
 
@@ -35,45 +41,58 @@ def _analysis_worker(country, item):
     return get_stock_graph_analysis(country, item, 168)
 
 
-def _store_analysis_result(key, future):
+def _store_analysis_result(key, future, revision=None):
     try:
         value = future.result()
     except Exception:
         value = None
     with _PREDICTION_LOCK:
         if value is not None:
-            _ANALYSIS_CACHE[key] = {"cached_at": time.time(), "value": value}
+            _ANALYSIS_CACHE[key] = {"cached_at": time.time(), "value": value,
+                                    "source_revision": revision}
         if _ANALYSIS_FUTURES.get(key) is future:
             _ANALYSIS_FUTURES.pop(key, None)
 
 
-def _ensure_analysis_future(country, item):
+def _ensure_analysis_future(country, item, revision=None):
     key = _prediction_key(country, item)
     with _PREDICTION_LOCK:
         future = _ANALYSIS_FUTURES.get(key)
         if future is None or future.done():
             future = _PREDICTION_EXECUTOR.submit(_analysis_worker, country, item)
             _ANALYSIS_FUTURES[key] = future
-            future.add_done_callback(lambda f, k=key: _store_analysis_result(k, f))
+            future.add_done_callback(
+                lambda f, k=key, rev=revision: _store_analysis_result(k, f, rev)
+            )
     return key, future
 
 
-def _get_analysis_nonblocking(country, item):
+def _get_analysis_nonblocking(country, item, revision=None):
     key = _prediction_key(country, item)
     now = time.time()
     with _PREDICTION_LOCK:
         cached = _ANALYSIS_CACHE.get(key)
 
-    if cached:
+    if revision is not None:
+        if cached and cached.get("source_revision") == revision:
+            return cached["value"], False
+    elif cached:
         age = now - cached["cached_at"]
         if age > _ANALYSIS_CACHE_TTL_SECONDS:
             _ensure_analysis_future(country, item)
         return cached["value"], age > _ANALYSIS_CACHE_TTL_SECONDS
 
-    key, future = _ensure_analysis_future(country, item)
+    key, future = _ensure_analysis_future(country, item, revision=revision)
     try:
         value = future.result(timeout=0.35)
-        return _roll_prediction_to_now(value, now), False
+        if revision is not None:
+            with _PREDICTION_LOCK:
+                current = _ANALYSIS_CACHE.get(key)
+            if not current or current.get("source_revision") != revision:
+                return None, True
+        # Graph analysis is not a forecast; do NOT add prediction countdown
+        # fields to its original response, including on a cold cache miss.
+        return value, False
     except FutureTimeoutError:
         return None, True
 
@@ -127,13 +146,11 @@ def _latest_safe_leave_timestamp(prediction):
         float(depletion) - depletion_buffer
         if depletion is not None else None
     )
+    # The end of a restock prediction interval is not the end of the stocked
+    # interval. A nonexistent/negative arrival window is NOT an executable
+    # departure and must not collapse to a fabricated single instant.
     if latest_arrival is None or latest_arrival <= earliest_arrival:
-        latest_arrival = (
-            late_restock_bound or calibrated_arrival or estimate
-        )
-    if latest_arrival is None:
         return None
-    latest_arrival = max(float(latest_arrival), float(earliest_arrival))
     return latest_arrival - float(travel)
 
 
@@ -189,7 +206,7 @@ def _roll_prediction_to_now(prediction_v2, now=None):
     return result
 
 
-def _store_prediction_result(key, future):
+def _store_prediction_result(key, future, revision=None):
     try:
         value = future.result()
     except Exception as exc:
@@ -198,34 +215,44 @@ def _store_prediction_result(key, future):
             "note": f"Prediction v2 background calculation failed: {exc}",
         }
     with _PREDICTION_LOCK:
-        _PREDICTION_CACHE[key] = {"cached_at": time.time(), "value": value}
+        _PREDICTION_CACHE[key] = {"cached_at": time.time(), "value": value,
+                                  "source_revision": revision}
         if _PREDICTION_FUTURES.get(key) is future:
             _PREDICTION_FUTURES.pop(key, None)
 
 
-def _ensure_prediction_future(country, item):
+def _ensure_prediction_future(country, item, revision=None):
     key = _prediction_key(country, item)
     with _PREDICTION_LOCK:
         future = _PREDICTION_FUTURES.get(key)
         if future is None or future.done():
             future = _PREDICTION_EXECUTOR.submit(build_live_prediction_v2, country, item)
             _PREDICTION_FUTURES[key] = future
-            future.add_done_callback(lambda f, k=key: _store_prediction_result(k, f))
+            future.add_done_callback(
+                lambda f, k=key, rev=revision: _store_prediction_result(k, f, rev)
+            )
     return key, future
 
 
-def _get_prediction_nonblocking(country, item):
+def _get_prediction_nonblocking(country, item, revision=None):
     key = _prediction_key(country, item)
     now = time.time()
     with _PREDICTION_LOCK:
         cached = _PREDICTION_CACHE.get(key)
 
-    if cached and now - cached["cached_at"] <= _PREDICTION_CACHE_TTL_SECONDS:
+    # Experimental source-versioned policy. Reuse an unchanged item within
+    # its five-minute planning slot; never pass a superseded revision as fresh.
+    if revision is not None:
+        if cached and cached.get("source_revision") == revision:
+            error=cached["value"].get("status") == "error"
+            if not error or now-cached["cached_at"] <= _PREDICTION_CACHE_TTL_SECONDS:
+                return _roll_prediction_to_now(cached["value"], now), False
+    elif cached and now - cached["cached_at"] <= _PREDICTION_CACHE_TTL_SECONDS:
         return _roll_prediction_to_now(cached["value"], now), False
 
-    key, future = _ensure_prediction_future(country, item)
+    key, future = _ensure_prediction_future(country, item, revision=revision)
 
-    if cached:
+    if cached and (revision is None or cached.get("source_revision") == revision):
         # Serve the last known prediction immediately while a fresh one is
         # calculated in the background. The graph auto-refresh will pick up
         # the refreshed result without blocking stock history rendering.
@@ -237,7 +264,13 @@ def _get_prediction_nonblocking(country, item):
     # holding the graph request for tens of seconds or minutes.
     try:
         value = future.result(timeout=0.35)
-        return value, False
+        if revision is not None:
+            with _PREDICTION_LOCK:
+                current = _PREDICTION_CACHE.get(key)
+            if not current or current.get("source_revision") != revision:
+                return {"status":"warming","display_prediction":None,
+                        "note":"Waiting for current stock revision forecast."},True
+        return _roll_prediction_to_now(value, now), False
     except FutureTimeoutError:
         return {
             "status": "warming",
@@ -261,7 +294,17 @@ def api_history(
     hours = minutes / 60
     rows = get_item_history_since(country, item, hours)
     latest_item_state = get_latest_item_snapshot(country, item) or {}
-    base_analysis, analysis_warming = _get_analysis_nonblocking(country, item)
+    research_cache = os.environ.get("TORN_FREN_V38_REVISION_CACHE") == "1"
+    source_status, revision_token = ("DISABLED", None)
+    if research_cache:
+        source_status, revision_token = v38_source_revision(
+            DB_PATH,country=country,item=item,
+            item_state=latest_item_state,now=int(time.time()))
+    if research_cache and source_status != "FRESH":
+        base_analysis, analysis_warming = None, True
+    else:
+        base_analysis, analysis_warming = _get_analysis_nonblocking(
+            country, item,revision=revision_token)
     analysis = _analysis_for_window(base_analysis, minutes) if base_analysis else {
         "current_stock": rows[-1]["quantity"] if rows else None,
         "current_cost": latest_item_state.get("cost"),
@@ -288,9 +331,23 @@ def api_history(
     # Prediction v2 is isolated from the base history analysis so a model-side
     # issue cannot take the graph down.  The old prediction is retained as
     # baseline_prediction for diagnostics.
+    analysis["baseline_prediction"] = analysis.get("prediction")
+    analysis["prediction"] = None
+    analysis["prediction_v2_stale"] = True
+    # Response validation time, NOT a new model issue or country-feed timestamp.
+    analysis["prediction_v2_checked_at"] = int(time.time())
     try:
-        prediction_v2, prediction_stale = _get_prediction_nonblocking(country, item)
-        analysis["baseline_prediction"] = analysis.get("prediction")
+        if research_cache and source_status != "FRESH":
+            prediction_v2 = {
+                "status":source_status, "display_prediction":None,"predictions":[],
+                "note":"Verified stock source unavailable; no live departure forecast."
+            }
+            prediction_stale = True
+        elif research_cache:
+            prediction_v2, prediction_stale = _get_prediction_nonblocking(
+                country,item,revision=revision_token)
+        else:
+            prediction_v2, prediction_stale = _get_prediction_nonblocking(country,item)
         analysis["prediction_v2"] = prediction_v2
         analysis["prediction_v2_stale"] = bool(prediction_stale)
 
@@ -304,7 +361,10 @@ def api_history(
                 "excluded_sample_count": None,
                 "note": prediction_v2.get("note"),
             }
-        elif prediction_v2.get("status") == "warming":
+        elif prediction_v2 and prediction_v2.get("status") in (
+            "warming","COLLECTOR_STALE_OR_NO_HEARTBEAT",
+            "NO_VERIFIABLE_REVISION","FUTURE_STOCK","NO_ITEM_STATE"
+        ):
             # Do not expose the older baseline predictor as if it were the
             # current Prediction v2 result while the expensive profile warms.
             analysis["prediction"] = None
@@ -315,8 +375,35 @@ def api_history(
             since_timestamp=int(time.time()) - minutes * 60,
             limit=16,
         )
+
+        # Optional, READ-ONLY shared candidate contract for the future two-view
+        # beta. Disabled by default. The V2 computation time is frozen by the
+        # model, NOT replaced with the timestamp of this HTTP request.
+        if os.environ.get("TORN_FREN_V2_BETA_TIMELINE") == "1":
+            try:
+                from research.v2_beta_departure_bridge import build_item_timeline
+                analysis["beta_item_timeline"] = build_item_timeline(
+                    f"{country}:{item}", prediction_v2,
+                    now=int(time.time()),
+                    issued_at=(
+                        prediction_v2.get("forecast_model_computed_at")
+                        if isinstance(prediction_v2, dict) else None
+                    ),
+                    stock_as_of=analysis.get("collector_last_success_timestamp"),
+                    forecast_stale=bool(prediction_stale),
+                )
+            except (ValueError, TypeError, KeyError) as bridge_error:
+                analysis["beta_item_timeline"] = {
+                    "status": "BETA_PREVIEW_UNAVAILABLE",
+                    "reason": type(bridge_error).__name__,
+                    "first_reachable": None,
+                }
     except Exception as exc:
         analysis["prediction_v2_error"] = str(exc)
+
+    if os.environ.get('TORN_FREN_TRAVEL_DECISIONS_BETA')=='1':
+        from web.travel_decisions_router import shared_item
+        analysis['shared_departure_preview']=shared_item(country,item,now=int(time.time()))
 
     return {
         "country": country,
@@ -327,8 +414,7 @@ def api_history(
     }
 
 
-@app.get("/api/catalog")
-def api_catalog():
+def _build_catalog_uncached():
     catalog = get_stock_catalog()
     countries = []
     market_meta = None
@@ -348,6 +434,31 @@ def api_catalog():
     }
 
 
+@app.get("/api/catalog")
+def api_catalog():
+    # Opt-in research variant. No change to production until explicit approval.
+    if os.environ.get("TORN_FREN_V38_CATALOG_CACHE") == "1":
+        return _V38_CATALOG_CACHE.get(_build_catalog_uncached)
+    return _build_catalog_uncached()
+
+
+@app.get("/api/research/v38/predictions")
+def api_v38_research_predictions(country: str | None = None, item: str | None = None):
+    """Opt-in beta: SQLite snapshot reads only. No champion/V2 computation."""
+    if os.environ.get("TORN_FREN_V38_EXPERIMENTAL_API") != "1":
+        raise HTTPException(status_code=404, detail="Experimental API disabled")
+    location = os.environ.get("TORN_FREN_V38_SNAPSHOT_DB")
+    if not location:
+        return {"experimental": True, "status": "SIDECAR_NOT_CONFIGURED",
+                "fallback_required": True}
+    if bool(country) != bool(item):
+        raise HTTPException(status_code=400, detail="country and item must be paired")
+    key = f"{country.strip().lower()}:{item.strip()}" if country and item else None
+    snapshot = read_v38_snapshots(location, int(time.time()), key=key, limit=236)
+    return {"experimental": True, "probability_calibrated": False,
+            "source": "PRECOMPUTED_SIDECAR_ONLY", "latest": snapshot}
+
+
 @app.get("/api/admin/health")
 def api_admin_health():
     return build_admin_health()
@@ -362,5 +473,9 @@ def admin_page():
 # This does not replace /api/history V2 or alter profitability graph routes.
 app.add_api_route("/api/research/champion-shadow", champion_shadow,
                   methods=["GET"], include_in_schema=False)
+
+# Additive research-only discovery routes. No changes to either legacy view.
+from web.travel_decisions_router import router as travel_decisions_router
+app.include_router(travel_decisions_router)
 
 app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="static")

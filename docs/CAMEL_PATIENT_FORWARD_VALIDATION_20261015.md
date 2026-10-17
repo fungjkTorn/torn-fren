@@ -1,0 +1,15 @@
+# Separate Camel patient-strategy validation
+
+The fixed stable tree peak model is a promising patient-strategy candidate. On the inspected seven-day snapshot, it scored82.61% simulated arrival success at85.17% departure coverage and100.5min mean wait. The earlier inventory-flow peak model scored77.39% at82.84% coverage and102.6min mean wait; its worst-day success55.05% rose to79.47%. This comparison holds the broad waiting strategy roughly comparable. Historical matched patient-versus-patient outcomes were not emitted by the first tree source; the future comparison explicitly adds them.
+
+The fast default remains a separate cost comparator: aligned analog50 scored66.21% at100% coverage and4.1min mean wait. The candidate must not be described as a faster replacement or an82.61% guarantee. Source scores are uncalibrated; these are reconstructed sampled-stock outcomes, not actual flights. One inspected week does not certify future performance.
+
+Freeze exactly one primary comparison for uae:Camel Plushie: zero_path_tree_stable_peak against zero_path_inventory_flow_peak. Always retain zero_path_aligned_analog50 as a secondary comparison for the waiting/coverage tradeoff. Freeze source, model settings, schedules, item and thresholds in requests/camel_tree_forward_v1.json before the window begins; no selection of another tree variant after results.
+
+Planned window:15 October2026 21:30EDT through16 October2026 21:30EDT (16October01:30UTC→17October01:30UTC). As in the established replay,288 five-minute starts are after the left boundary through the right boundary. Maximum wait8h, source expiry180s, standard UAE flight10800s, evidence190s plus300s issue allowance. Earliest mature snapshot17October08:38:10EDT/12:38:10UTC; snapshot and scheduling delay may add time.
+
+Warm start from retained observed past. Tree labels mature individually before fixed UTC12-hour refits; stable history14d and seven-day half-life,24 depth-two trees. Patient analog paths must mature through their full horizon before each issue. No retuning, cold-start model selection or replacement of frozen policies. The helper/extra comparison source adds reporting/validation only; numerical tree and analog code remains unchanged from the seven-day numerical experiment.
+
+A useful follow-up screen requires >=200 known outcomes/model, >=80% departure coverage, <=2 percentage points coverage loss, >=3 percentage points resolved-success gain, no higher mean wait, more matched wins than losses, and <=2 percentage points additional UNKNOWN mass. Every raw count, PENDING/UNKNOWN/ABSTAIN, UTC hourly/12 offsets and fast-reference cost stays visible. One24-hour result cannot establish long-term consistency; no automatic promotion or deployment.
+
+The existing serialized private scheduler checks this independently, waits on sanitized snapshot cutoff and marks the protocol done only after report upload. The original full-roster and separate Chamois protocol sources and dates remain unchanged. No new cron, gameplay action or production change is required.

@@ -1,0 +1,29 @@
+[Unit]
+Description=Torn Fren strictly private five-model V38 research-only shadow worker
+After=local-fs.target
+ConditionPathExists=/home/ubuntu/torn-fren-v38-probe/.venv/bin/python
+ConditionPathExists=/opt/torn-fren/data/stock_history.db
+
+[Service]
+Type=oneshot
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/home/ubuntu/torn-fren-v38-probe
+Environment=PYTHONUNBUFFERED=1
+Environment=OPENBLAS_NUM_THREADS=1
+Environment=OMP_NUM_THREADS=1
+# Private-only measured admission; original launch probe stays conservative.
+Environment=TORN_FREN_V38_IDLE_ADMISSION=1
+Environment=MKL_NUM_THREADS=1
+ExecStart=/home/ubuntu/torn-fren-v38-probe/.venv/bin/python -m research.v38_budgeted_runner --execute --db /opt/torn-fren/data/stock_history.db --sidecar /var/lib/torn-fren-v38/private_predictions.db --max-jobs 5 --per-worker 30 --budget 180 --max-rows 10000 --allow-item uni:Heather --allow-item "can:Wolverine Plushie" --allow-item "arg:Ceibo Flower" --allow-item "jap:Cherry Blossom" --allow-item "uni:Nessie Plushie"
+Nice=19
+CPUQuota=25%
+MemoryMax=1024M
+TimeoutStartSec=240
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectHome=read-only
+ProtectSystem=strict
+ReadOnlyPaths=/opt/torn-fren/data
+ReadWritePaths=/var/lib/torn-fren-v38
+UMask=0077

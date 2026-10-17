@@ -1,0 +1,43 @@
+name: Full roster renewal shadow safeguards
+on:
+  push:
+    branches: [research/v38-full-roster-live-prep-20261009]
+    paths:
+      - 'research/japan_xanax/renewal_shadow.py'
+      - 'tests/test_renewal_shadow.py'
+      - 'research/shadow_scorecard.py'
+      - 'tests/test_shadow_scorecard.py'
+      - 'research/japan_xanax/coverage_challengers.py'
+      - 'tests/test_japan_coverage_challengers.py'
+      - 'research/japan_xanax/recent_regime.py'
+      - 'tests/test_japan_recent_regime.py'
+      - 'research/japan_xanax/departure_stability.py'
+      - 'tests/test_japan_departure_stability.py'
+      - 'research/japan_xanax/forecast_gap_audit.py'
+      - 'tests/test_japan_forecast_gap_audit.py'
+      - 'research/japan_xanax/zero_handoff.py'
+      - 'tests/test_japan_zero_handoff.py'
+      - 'research/japan_xanax/handoff_shadow.py'
+      - 'tests/test_japan_handoff_shadow.py'
+      - '.github/workflows/renewal-shadow.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  shadow-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install numpy==1.26.4
+      - run: OPENBLAS_NUM_THREADS=1 python -m unittest discover -s tests -p test_renewal_shadow.py -v
+      - run: OPENBLAS_NUM_THREADS=1 python -m unittest discover -s tests -p test_shadow_scorecard.py -v
+      - run: OPENBLAS_NUM_THREADS=1 python -m unittest discover -s tests -p test_japan_coverage_challengers.py -v
+      - run: OPENBLAS_NUM_THREADS=1 python -m unittest discover -s tests -p test_japan_recent_regime.py -v
+      - run: OPENBLAS_NUM_THREADS=1 python -m unittest discover -s tests -p test_japan_departure_stability.py -v
+      - run: OPENBLAS_NUM_THREADS=1 python -m unittest discover -s tests -p test_japan_forecast_gap_audit.py -v
+      - run: OPENBLAS_NUM_THREADS=1 python -m unittest discover -s tests -p test_japan_zero_handoff.py -v
+      - run: OPENBLAS_NUM_THREADS=1 python -m unittest discover -s tests -p test_japan_handoff_shadow.py -v
