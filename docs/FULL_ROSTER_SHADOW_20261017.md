@@ -47,3 +47,15 @@ for Japan Xanax, and a disabled website item must remain included in shadow test
 This script records bounded eight-hour sessions; nohup survives SSH disconnects
 and laptop sleep, but it is not a VM reboot service. The owner must start the new
 process on the VM because the research runner cannot read the live collector.
+
+## Comparable scorecards
+
+`python -m research.shadow_scorecard --source SOURCE --journal EXISTING.sqlite
+--expected-model-sha RECORDED_SHA` provides a read-only analysis of an existing
+journal without restarting its recorder. The expected SHA identifies the recorded
+model, independently of the newer reporting code. Every model uses the first
+item/hour issue; missing model records remain missing, never substituted with a
+later and potentially more favorable issue. Reports show proposal coverage,
+known success, pending, unknown, abstentions, missing records, average waiting,
+status/reason counts and paired wins/losses versus both controls. Immediate plans
+and frozen future plans are separate. Neither table is a reconfirmed flight test.

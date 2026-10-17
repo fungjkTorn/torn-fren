@@ -5,6 +5,8 @@ on:
     paths:
       - 'research/japan_xanax/renewal_shadow.py'
       - 'tests/test_renewal_shadow.py'
+      - 'research/shadow_scorecard.py'
+      - 'tests/test_shadow_scorecard.py'
       - '.github/workflows/renewal-shadow.yml'
   workflow_dispatch:
 permissions:
@@ -20,3 +22,4 @@ jobs:
           python-version: '3.12'
       - run: pip install numpy==1.26.4
       - run: OPENBLAS_NUM_THREADS=1 python -m unittest discover -s tests -p test_renewal_shadow.py -v
+      - run: OPENBLAS_NUM_THREADS=1 python -m unittest discover -s tests -p test_shadow_scorecard.py -v
