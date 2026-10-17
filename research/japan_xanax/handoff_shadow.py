@@ -7,7 +7,7 @@ import subprocess
 import time
 from contextlib import closing
 from pathlib import Path
-from research.japan_xanax.renewal_shadow import History,KEY,FLIGHT,STEP,ROOT,source_data,rate_plan
+from research.japan_xanax.renewal_shadow import History,KEY,FLIGHT,STEP,WAIT,ROOT,source_data,rate_plan
 from research.japan_xanax.zero_handoff import ZeroAnchor
 
 MODES=('sequence_blocks_peak','zero_handoff180','rate_current_quarter','leave_now_control')
@@ -46,6 +46,8 @@ def record(source,journal,*,model_sha,duration=28800):
                 with db:
                     for mode,p in selected.items():
                         dep=p['departure'];dep=max(dep,issued+15,published) if dep is not None else None
+                        if dep is not None and dep>issued+WAIT:
+                            p=dict(p,status='ABSTAIN_OUTSIDE_EIGHT_HOUR_HORIZON');dep=None
                         r=dict(p,departure=dep,published=published,issued=issued,item_key=KEY,mode=mode,
                             model_sha=model_sha,source_cutoff=cutoff,poll_age_seconds=issued-cutoff,
                             arrival=dep+FLIGHT if dep is not None else None,flight_seconds=FLIGHT,
