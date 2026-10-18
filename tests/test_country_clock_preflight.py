@@ -2,6 +2,7 @@ import json
 import sqlite3
 import tempfile
 import unittest
+from types import SimpleNamespace
 from pathlib import Path
 from unittest.mock import patch
 from deploy.scripts import country_clock_preflight as m
@@ -85,6 +86,9 @@ class ClockPreflightTests(unittest.TestCase):
             (folder/'country_clock_activation.patch').write_text('--- a/target.py\n+++ b/target.py\n@@ -1 +1 @@\n-original\n+patched\n')
             r=m.patch_check(root,payload)
             self.assertEqual(r['status'],'APPLICABLE');self.assertEqual(target.read_text(),'original\n')
+            with patch.object(m.subprocess,'run',return_value=SimpleNamespace(returncode=128)):
+                r=m.patch_check(root,payload)
+            self.assertEqual(r['status'],'CHECK_UNAVAILABLE')
 
     def test_invalid_clock_schema_stays_unknown(self):
         with tempfile.TemporaryDirectory() as td:

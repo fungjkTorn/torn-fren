@@ -100,7 +100,8 @@ def patch_check(root,payload):
         raw=patch.read_bytes()
         if len(raw)>200000:raise ValueError('Patch cap exceeded')
         result=subprocess.run(['git','-C',str(root),'apply','--check','-'],input=raw,capture_output=True,timeout=15)
-        return dict(status='APPLICABLE' if result.returncode==0 else 'DOES_NOT_APPLY',
+        status='APPLICABLE' if result.returncode==0 else 'DOES_NOT_APPLY' if result.returncode==1 else 'CHECK_UNAVAILABLE'
+        return dict(status=status,
             patch_sha256=hashlib.sha256(raw).hexdigest(),returncode=result.returncode,
             limitation='Check only; already-applied or locally changed code can both fail this check. No patch applied.')
     except (OSError,ValueError,subprocess.TimeoutExpired) as exc:
