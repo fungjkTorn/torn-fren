@@ -47,7 +47,7 @@ class History:
         self.last=row
 
     def plans(self,issued,*,poll_age,flight_seconds=FLIGHT,diagnostics=None,
-              cycle_limit=96,half_life_seconds=3*86400):
+              cycle_limit=96,half_life_seconds=3*86400,stable_scenarios=False):
         if type(cycle_limit) is not int or not 16<=cycle_limit<=96:
             raise ValueError('Bounded cycle memory required')
         if type(half_life_seconds) is not int or not 21600<=half_life_seconds<=3*86400:
@@ -69,7 +69,13 @@ class History:
             rng=np.random.default_rng(seed);support=np.zeros(len(delays))
             weights=np.exp2(-(issued-np.array([c.end for c in cycles]))/half_life_seconds)
             weights/=weights.sum();initial=weights[eligible];initial/=initial.sum()
-            for _ in range(64):
+            for scenario in range(64):
+                if stable_scenarios:
+                    # Common random numbers across successive issues in the
+                    # same observed phase. Separate scenario streams prevent
+                    # horizon-length changes from shifting every later draw.
+                    stable_seed=int.from_bytes(hashlib.sha256(f'{family}:{self.phase_start}:{scenario}'.encode()).digest()[:8],'big')
+                    rng=np.random.default_rng(stable_seed)
                 index=int(rng.choice(eligible,p=initial));c=cycles[index]
                 if high:
                     remaining=c.end-c.restock-age
