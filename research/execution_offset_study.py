@@ -17,6 +17,64 @@ OFFSETS=(-1200,-900,-600,-300,0,300,600)
 MIN_KNOWN=8
 
 
+class ReplannedCalibration:
+    """Fast regime correction from matched COMPLETED policy episodes.
+
+    This corrects the training/execution mismatch of a near-term point critic.
+    Hourly visitor cohorts simulate every expert; repeated baseline departure
+    buckets count once. An expert switches only after paired wins over control.
+    """
+    EXPERTS=tuple(o for o in OFFSETS if o<=0)
+    def __init__(self,flight):
+        self.flight=flight;self.active=[];self.completed=deque(maxlen=32)
+        self.seen=set();self.ticks=0;self.last=None;self.counts=Counter()
+
+    def update(self,issued,choices,age,score):
+        if self.last is not None and issued!=self.last+STEP:raise ValueError('Consecutive replay clock required')
+        self.last=issued
+        if self.ticks%12==0:self.active.append(dict(start=issued,experts={o:{} for o in self.EXPERTS}))
+        self.ticks+=1;waiting=[]
+        for cohort in self.active:
+            for offset,state in cohort['experts'].items():
+                if 'outcome' in state:continue
+                if 'departure' in state:
+                    dep=state['departure']
+                    if dep+self.flight+190<=issued:
+                        outcome,_,evidence=score(dep+self.flight)
+                        if outcome=='PENDING' or evidence is not None and evidence.get('post_poll',0)>issued:
+                            raise ValueError('Future label in matched episode')
+                        state['outcome']=outcome
+                elif issued>cohort['start']+WAIT:state['outcome']='ABSTAIN'
+                else:
+                    dep=choices[offset]
+                    if (dep is not None and issued<=dep<issued+STEP and dep<=cohort['start']+WAIT
+                        and age is not None and 0<=age+dep-issued<=180):state['departure']=dep
+            if all('outcome' in s for s in cohort['experts'].values()):
+                baseline=cohort['experts'][0]
+                identity=baseline['departure']//STEP if 'departure' in baseline else ('no_departure',cohort['start'])
+                if identity not in self.seen:
+                    self.seen.add(identity);cohort['ready']=issued;self.completed.append(cohort)
+                    self.counts['distinct_completed_policy_episodes']+=1
+            else:waiting.append(cohort)
+        self.active=waiting
+
+    def select(self,issued,*,recent=3):
+        if any(c['ready']>issued for c in self.completed):raise ValueError('Future completed episode')
+        rows=sorted(self.completed,key=lambda c:c['start'])[-recent:]
+        best=(0.,0,0);winner=0;details={}
+        for offset in self.EXPERTS:
+            if offset==0:continue
+            paired=[c for c in rows if all(c['experts'][o]['outcome'] in ('SUCCESS','FAILURE') for o in (0,offset))]
+            wins=sum(c['experts'][0]['outcome']=='FAILURE' and c['experts'][offset]['outcome']=='SUCCESS' for c in paired)
+            losses=sum(c['experts'][0]['outcome']=='SUCCESS' and c['experts'][offset]['outcome']=='FAILURE' for c in paired)
+            minimum=3 if recent==3 else 6;required=2 if recent==3 else 3
+            eligible=len(paired)>=minimum and wins>=required and losses==0
+            details[offset]=dict(matched=len(paired),wins=wins,losses=losses,eligible=eligible)
+            rank=((wins-losses)/len(paired),len(paired),-abs(offset)) if paired else (0.,0,0)
+            if eligible and rank>best:best=rank;winner=offset
+        return winner,dict(recent_distinct_episodes=len(rows),latest_maturity=max((c['ready'] for c in rows),default=None),comparisons=details)
+
+
 def bounded_departure(issued,departure,offset=0):
     if departure is None:return None
     if type(departure) is not int:raise ValueError('Integer departure required')
@@ -115,7 +173,8 @@ def run(source,*,model_sha):
         flight=TRAVEL_SECONDS[key.split(':',1)[0]]
         if cutoff<ISSUES[-1]+WAIT+flight+190:raise ValueError('Immature fixed study')
         rate=QuantityRateCycles(crosses);history=History(crosses);cursor=0
-        calibration=ExecutionCalibration(flight);plans={};selected=Counter();forecast_diagnostics=[]
+        calibration=ExecutionCalibration(flight);matched=ReplannedCalibration(flight)
+        plans={};selected=Counter();forecast_diagnostics=[]
         warmup=ISSUE_START-7*86400
         for issued in range(warmup,ISSUES[-1]+WAIT+STEP,STEP):
             while cursor<len(rows) and rows[cursor][0]<=issued:
@@ -124,6 +183,9 @@ def run(source,*,model_sha):
             pi=bisect.bisect_right(polls,issued)-1;age=issued-polls[pi] if pi>=0 else None
             base=rate_plan(rate,key,issued,age)['departure']
             choices={offset:bounded_departure(issued,base,offset) for offset in OFFSETS}
+            matched.update(issued,choices,age,evidence.score)
+            rapid,rapid_info=matched.select(issued,recent=3)
+            stable,stable_info=matched.select(issued,recent=6)
             phase='ZERO' if rate.last is not None and rate.last.quantity==0 else 'POSITIVE'
             calibration.observe(issued,choices,phase,age)
             fallback,fo=calibration.choose(issued,choices,phase,gated=False)
@@ -131,18 +193,20 @@ def run(source,*,model_sha):
             if issued<ISSUE_START:continue
             current={('rate_control' if o==0 else 'offset_%+d'%o):d for o,d in choices.items()}
             current.update(adaptive_fallback=fallback,adaptive_gated=gated,
+                           matched_recent3=choices[rapid],matched_recent6=choices[stable],
                            leave_now_control=issued+15 if age is not None and age+15<=180 else None)
             sequence=history.plans(issued,poll_age=age,flight_seconds=flight)
             current['sequence_control']=bounded_departure(issued,sequence['sequence_blocks_peak']['departure'])
             for mode,dep in current.items():plans.setdefault(mode,[]).append((issued,dep,age))
             selected['fallback_'+str(fo)]+=1;selected['gated_'+str(go)]+=1
+            selected['matched3_'+str(rapid)]+=1;selected['matched6_'+str(stable)]+=1
             if issued in ISSUES:
                 forecast=rate.forecast(key,asof=issued)
                 forecast_diagnostics.append(dict(issued=issued,phase=phase,
                     observed_quantity=rate.last.quantity if rate.last is not None else None,
                     estimated_departure=base,
                     forecast_events=forecast.get('restock_events'),
-                    calibration=calibration.estimates(issued,phase)))
+                    calibration=calibration.estimates(issued,phase),matched_recent3=rapid_info,matched_recent6=stable_info))
         prior={};prior_records=[]
         for mode,values in plans.items():
             c=[];prior[mode]=evaluate_all_starts(values,cutoff=cutoff,flight_seconds=flight,
@@ -153,7 +217,7 @@ def run(source,*,model_sha):
         result[key]=dict(truth_cutoff=cutoff,earlier_three_day=prior,
             earlier_distinct=concentration(prior_records),failed_nine=summarize(failed),
             failed_nine_distinct=concentration(failed),failed_nine_records=failed,
-            calibration_counts=dict(calibration.counts),selection_counts=dict(selected),
+            calibration_counts=dict(calibration.counts),matched_episode_counts=dict(matched.counts),selection_counts=dict(selected),
             forecast_diagnostics=forecast_diagnostics)
     return dict(model_sha=model_sha,items=result,offsets_seconds=OFFSETS,
         minimum_known_training=MIN_KNOWN,training_half_life_seconds=21600,

@@ -1,5 +1,5 @@
 import unittest
-from research.execution_offset_study import ExecutionCalibration,bounded_departure,OFFSETS
+from research.execution_offset_study import ExecutionCalibration,ReplannedCalibration,bounded_departure,OFFSETS
 
 
 class CalibrationTests(unittest.TestCase):
@@ -43,3 +43,21 @@ class CalibrationTests(unittest.TestCase):
         self.assertEqual(bounded_departure(1000,1010,-1200),1015)
         self.assertIsNone(bounded_departure(1000,1000+28800,300))
         self.assertIsNone(bounded_departure(1000,None,-300))
+
+    def test_matched_correction_requires_paired_gains_and_retains_good_control(self):
+        c=ReplannedCalibration(600)
+        for i in range(3):
+            c.completed.append(dict(start=i,ready=100+i,experts={o:dict(outcome='SUCCESS' if o==-600 else 'FAILURE') for o in c.EXPERTS}))
+        self.assertEqual(c.select(200,recent=3)[0],-600)
+        c.completed[-1]['experts'][0]['outcome']='SUCCESS'
+        c.completed[-1]['experts'][-600]['outcome']='FAILURE'
+        self.assertEqual(c.select(200,recent=3)[0],0)
+
+    def test_matched_labels_wait_for_actual_episode_arrival(self):
+        c=ReplannedCalibration(600);calls=[]
+        def score(a):calls.append(a);return 'SUCCESS','TEST',dict(post_poll=a+10)
+        for issued in (1000,1300,1600):c.update(issued,{o:issued+15 for o in c.EXPERTS},0,score)
+        self.assertFalse(calls)
+        c.update(1900,{o:1915 for o in c.EXPERTS},0,score)
+        self.assertEqual(len(c.completed),1)
+        self.assertTrue(all(a+190<=1900 for a in calls))

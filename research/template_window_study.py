@@ -72,8 +72,8 @@ def plateau_choice(values,issued,position='center'):
     return issued+int(delays[group[k]])
 
 
-def nessie_choices(timeline,issued):
-    key=('uni','Nessie Plushie');ctx=SimpleNamespace(timelines={key:timeline})
+def nessie_choices(timeline,issued,*,item_key='uni:Nessie Plushie'):
+    key=tuple(item_key.split(':',1));ctx=SimpleNamespace(timelines={key:timeline})
     result={};diagnostics={}
     for label,lags in (('day1',(1,)),('day12',(1,2)),('day127',(1,2,7))):
         p=FastTemplatePlanner(ctx,*key,lags=lags,lookback=7200,shift_range=3600,minfit=.5)
@@ -96,20 +96,21 @@ def source_gaps(source):
         return c.execute('SELECT start_timestamp,end_timestamp FROM collection_gaps ORDER BY start_timestamp').fetchall()
 
 
-def nessie_study(source,*,model_sha):
+def nessie_study(source,*,model_sha,item_key='uni:Nessie Plushie'):
     from research.departure_reconfirmation import evaluate_all_starts
-    key='uni:Nessie Plushie';rows,polls,crosses,evidence,cutoff=source_data(source,item_key=key)
-    gaps=source_gaps(source);flight=TRAVEL_SECONDS['uni'];plans={};checks=[]
+    key=item_key;country,item=key.split(':',1)
+    rows,polls,crosses,evidence,cutoff=source_data(source,item_key=key)
+    gaps=source_gaps(source);flight=TRAVEL_SECONDS[country];plans={};checks=[]
     for issued in range(ISSUE_START,ISSUES[-1]+WAIT+STEP,STEP):
         timeline=GuardedTimeline(rows,gaps,key,issued)
-        selected,info=nessie_choices(timeline,issued)
+        selected,info=nessie_choices(timeline,issued,item_key=key)
         pi=bisect.bisect_right(polls,issued)-1;age=issued-polls[pi] if pi>=0 else None
         fresh=age is not None and 0<=age+15<=180 and not crosses(issued,issued)
         for mode,dep in selected.items():
             plans.setdefault(mode,[]).append((issued,bounded_departure(issued,dep) if fresh else None,age))
         if issued in ISSUES:
-            native=TemplatePlanner(SimpleNamespace(timelines={('uni','Nessie Plushie'):timeline}),
-                'uni','Nessie Plushie',lags=(1,),lookback=7200,shift_range=3600,minfit=.5).plan(issued)
+            native=TemplatePlanner(SimpleNamespace(timelines={(country,item):timeline}),
+                country,item,lags=(1,),lookback=7200,shift_range=3600,minfit=.5).plan(issued)
             if int(native[0])!=selected['day1_center']:raise ValueError('Original Nessie parity failure')
             checks.append(dict(issued=issued,diagnostics=info,original_departure=int(native[0])))
     earlier={}
@@ -127,7 +128,9 @@ def nessie_study(source,*,model_sha):
         earlier_three_day=earlier,failed_nine_replanned=summarize(records),
         failed_nine_distinct=concentration(records),failed_nine_records=records,
         failed_nine_frozen=summarize(frozen),frozen_records=frozen,original_parity_checks=checks,
-        future_observation_guard=True,automatic_promotion=False,raw_scores_calibrated=False)
+        future_observation_guard=True,automatic_promotion=False,raw_scores_calibrated=False,
+        native_incumbent_parity_applicable=key=='uni:Nessie Plushie',
+        interpretation='Availability-pattern transfer only for non-Nessie items; not their incumbent model and not a restock/depletion clock.')
 
 
 def strong_choices(db,key,issued):

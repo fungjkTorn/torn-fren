@@ -40,3 +40,13 @@ class TemplateStudyTests(unittest.TestCase):
         plans,info=nessie_choices(tl,T)
         self.assertIsNone(plans['day127_identified_quarter'])
         self.assertIsNotNone(plans['day1_center'])
+
+    def test_pattern_transfer_uses_own_country_flight(self):
+        rows=[]
+        for t in range(T-10*DAY,T+1,3600):rows.extend([(t,0,'a'),(t+1800,100,'a'),(t+2400,0,'a')])
+        for key in ('can:Xanax','jap:Xanax'):
+            tl=GuardedTimeline(rows,[],key,T)
+            chosen,_=nessie_choices(tl,T,item_key=key)
+            country,item=key.split(':',1)
+            p=TemplatePlanner(SimpleNamespace(timelines={(country,item):tl}),country,item,lags=(1,),minfit=.5).plan(T)
+            self.assertEqual(chosen['day1_center'],int(p[0]))
