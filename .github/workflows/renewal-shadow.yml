@@ -19,6 +19,10 @@ on:
       - 'tests/test_japan_zero_handoff.py'
       - 'research/japan_xanax/handoff_shadow.py'
       - 'tests/test_japan_handoff_shadow.py'
+      - 'research/japan_xanax/target_trace.py'
+      - 'research/japan_xanax/cadence_replay.py'
+      - 'tests/test_japan_target_trace.py'
+      - 'tests/test_japan_cadence_replay.py'
       - '.github/workflows/renewal-shadow.yml'
   workflow_dispatch:
 permissions:
@@ -41,3 +45,5 @@ jobs:
       - run: OPENBLAS_NUM_THREADS=1 python -m unittest discover -s tests -p test_japan_forecast_gap_audit.py -v
       - run: OPENBLAS_NUM_THREADS=1 python -m unittest discover -s tests -p test_japan_zero_handoff.py -v
       - run: OPENBLAS_NUM_THREADS=1 python -m unittest discover -s tests -p test_japan_handoff_shadow.py -v
+      - run: OPENBLAS_NUM_THREADS=1 python -m unittest discover -s tests -p test_japan_target_trace.py -v
+      - run: OPENBLAS_NUM_THREADS=1 python -m unittest discover -s tests -p test_japan_cadence_replay.py -v
