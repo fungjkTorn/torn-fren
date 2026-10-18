@@ -68,12 +68,14 @@ def describe(history,halves,issued):
         zero_phases=summarize(halves.low,issued),positive_phases=summarize(halves.high,issued))
 
 
-def run(source,*,model_sha):
-    rows,polls,crosses,evidence,cutoff=source_data(source,now=TRUTH_CUTOFF,item_key=KEY)
-    if cutoff!=TRUTH_CUTOFF:raise ValueError('Fixed truth cutoff unavailable')
+def run(source,*,model_sha,latest=False):
+    rows,polls,crosses,evidence,cutoff=source_data(source,now=None if latest else TRUTH_CUTOFF,item_key=KEY)
+    if not latest and cutoff!=TRUTH_CUTOFF:raise ValueError('Fixed truth cutoff unavailable')
+    end=(cutoff//STEP)*STEP if latest else ISSUE_END
+    start=end-86400+STEP if latest else ISSUE_START
     h=History(crosses);halves=HalfPhases(crosses);cursor=0;issues=Counter();daily={};snapshots=[]
     reset_losses=Counter();resets=Counter();previous_cycle_ends=None;cycle_set_changes=0
-    for issued in range(ISSUE_START,ISSUE_END+STEP,STEP):
+    for issued in range(start,end+STEP,STEP):
         while cursor<len(rows) and rows[cursor][0]<=issued:
             row=rows[cursor];prev=h.last;reason=None
             if prev is not None:
@@ -81,25 +83,26 @@ def run(source,*,model_sha):
                 elif row[2]!=prev[2]:reason='PROVIDER_SWITCH'
                 elif crosses(prev[0],row[0]):reason='COLLECTION_GAP'
                 elif row[1]>prev[1]>0:reason='POSITIVE_TOP_UP'
-            if reason and ISSUE_START<=row[0]<=ISSUE_END:
+            if reason and start<=row[0]<=end:
                 resets[reason]+=1
                 if h.low is not None:reset_losses[reason+':open_zero_cycle']+=1
                 if h.restock is not None:reset_losses[reason+':open_positive_cycle']+=1
             h.add(row);halves.add(row);cursor+=1
         pi=bisect.bisect_right(polls,issued)-1;age=issued-polls[pi] if pi>=0 else None
         reason,info=prerequisite(h,issued,age);issues[reason]+=1
-        day=(issued-ISSUE_START)//86400;daily.setdefault(str(day),Counter())[reason]+=1
+        day=(issued-start)//86400;daily.setdefault(str(day),Counter())[reason]+=1
         ends=tuple(c.end for c in h.cycles[-96:])
         if previous_cycle_ends is not None and ends!=previous_cycle_ends:cycle_set_changes+=1
         previous_cycle_ends=ends
-        if issued in (ISSUE_START,ISSUE_START+86400,ISSUE_START+2*86400,ISSUE_END):
+        if issued in (start,start+86400,start+2*86400,end):
             snapshots.append(describe(h,halves,issued))
-    return dict(item_key=KEY,model_sha=model_sha,issue_start=ISSUE_START,issue_end=ISSUE_END,truth_cutoff=cutoff,
+    return dict(item_key=KEY,model_sha=model_sha,issue_start=start,issue_end=end,truth_cutoff=cutoff,
+        window='latest_snapshot_day' if latest else 'fixed_development_three_days',
         prerequisite_counts=dict(issues),daily_prerequisites={k:dict(v) for k,v in daily.items()},
         whole_cycle_training_set_changes=cycle_set_changes,phase_resets=dict(resets),
         reset_losses=dict(reset_losses),snapshots=snapshots,
-        whole_cycle_ends_in_window=[c.end for c in h.cycles if ISSUE_START<=c.end<=ISSUE_END],
-        clean_zero_half_ends_in_window=[r['end'] for r in halves.low if ISSUE_START<=r['end']<=ISSUE_END],
-        clean_positive_half_ends_in_window=[r['end'] for r in halves.high if ISSUE_START<=r['end']<=ISSUE_END],
+        whole_cycle_ends_in_window=[c.end for c in h.cycles if start<=c.end<=end],
+        clean_zero_half_ends_in_window=[r['end'] for r in halves.low if start<=r['end']<=end],
+        clean_positive_half_ends_in_window=[r['end'] for r in halves.high if start<=r['end']<=end],
         new_forecast_model=False,accuracy_results=False,automatic_promotion=False,
-        limitation='Training representation audit on reused development days. A clean half phase does not prove an entire zero/restock/zero cycle. More intervals do not prove accuracy or independence. No cross-provider joins, inferred zero events or model changes.')
+        limitation='Training representation audit, not an arrival accuracy test. Latest window is snapshot evidence, not a direct read of the owner journal. A clean half phase does not prove an entire zero/restock/zero cycle. More intervals do not prove accuracy or independence. No cross-provider joins, inferred zero events or model changes.')

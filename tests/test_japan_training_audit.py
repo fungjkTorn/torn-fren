@@ -1,9 +1,21 @@
 import unittest
+from unittest.mock import patch
+from research.japan_xanax import training_audit as m
 from research.japan_xanax.training_audit import HalfPhases,summarize
 from research.japan_xanax.renewal_shadow import History
 
 
 class TrainingAuditTests(unittest.TestCase):
+    def test_latest_snapshot_window_is_bounded_and_keeps_future_rows_out(self):
+        cutoff=1792291234
+        rows=[(cutoff+100,0,'a')]
+        with patch.object(m,'source_data',return_value=(rows,[cutoff-20],lambda a,b:False,None,cutoff)):
+            r=m.run('unused',model_sha='a'*40,latest=True)
+        self.assertEqual(sum(r['prerequisite_counts'].values()),288)
+        self.assertLessEqual(r['issue_end'],cutoff)
+        self.assertEqual(r['whole_cycle_ends_in_window'],[])
+        self.assertEqual(r['window'],'latest_snapshot_day')
+
     def test_half_phase_from_left_censored_zero_is_not_a_whole_cycle(self):
         h=History(lambda a,b:False);p=HalfPhases(lambda a,b:False)
         for row in [(0,0,'a'),(50,100,'a'),(80,20,'a'),(100,0,'a')]:h.add(row);p.add(row)
