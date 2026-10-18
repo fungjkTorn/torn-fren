@@ -37,6 +37,9 @@ on:
       - 'tests/test_country_clock_preflight.py'
       - 'deploy/scripts/prepare_country_clock_patch.py'
       - 'tests/test_prepare_country_clock_patch.py'
+      - 'deploy/scripts/activate_country_clocks.py'
+      - 'deploy/patches/country-clock-20261018/**'
+      - 'tests/test_activate_country_clocks.py'
       - '.github/workflows/renewal-shadow.yml'
   workflow_dispatch:
 permissions:
@@ -68,3 +71,4 @@ jobs:
       - run: OPENBLAS_NUM_THREADS=1 python -m unittest discover -s tests -p test_japan_training_handoff.py -v
       - run: python -m unittest discover -s tests -p test_country_clock_preflight.py -v
       - run: python -m unittest discover -s tests -p test_prepare_country_clock_patch.py -v
+      - run: python -m unittest discover -s tests -p test_activate_country_clocks.py -v
