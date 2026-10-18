@@ -219,7 +219,13 @@ def record(source,journal,*,model_sha,duration=28800,item_keys=None):
                     for key,flight,selected,cutoff in prepared:
                         for mode,plan in selected.items():
                             dep=plan['departure'];actual=max(dep,published) if dep is not None else None
-                            r=dict(plan,mode=mode,departure=actual,published=published,model_sha=model_sha,item_key=key,
+                            # Apply the same fixed wait horizon to every family,
+                            # including rate forecasts with distant event windows.
+                            bounded_plan=dict(plan)
+                            if actual is not None and actual>issued+WAIT:
+                                actual=None
+                                bounded_plan['status']='ABSTAIN_OUTSIDE_EIGHT_HOUR_HORIZON'
+                            r=dict(bounded_plan,mode=mode,departure=actual,published=published,model_sha=model_sha,item_key=key,
                                 issued=issued,source_cutoff=cutoff,poll_age_seconds=issued-cutoff,
                                 arrival=actual+flight if actual is not None else None,
                                 flight_seconds=flight,target_quantity=30,grace_seconds=10,

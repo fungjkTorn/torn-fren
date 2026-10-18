@@ -81,6 +81,23 @@ class RenewalTests(unittest.TestCase):
         self.assertEqual(r['policies']['leave_now_control']['scored'],288)
         self.assertFalse(r['automatic_promotion'])
 
+    def test_recorder_rejects_rate_plan_outside_wait_horizon(self):
+        data=(rows(),[T],lambda a,b:False,None,T)
+        with tempfile.TemporaryDirectory() as td:
+            source=Path(td)/'source.db';source.write_bytes(b'untouched-source')
+            journal=Path(td)/'shadow.sqlite'
+            far=dict(departure=T+m.WAIT+1,status='FORECAST',depletion_stock_quantity=0)
+            with patch.object(m,'source_data',return_value=data),patch.object(m,'rate_plan',return_value=far), \
+                 patch.object(m.time,'time',return_value=T), \
+                 patch.object(m.time,'monotonic',side_effect=[0,0,0,1,61]),patch.object(m.time,'sleep'),patch('builtins.print'):
+                m.record(source,journal,model_sha='a'*40,duration=60,item_keys=['jap:Xanax'])
+            with sqlite3.connect(journal) as db:
+                saved=json.loads(db.execute("SELECT record FROM plans WHERE mode='rate_current_quarter'").fetchone()[0])
+            self.assertIsNone(saved['departure']);self.assertIsNone(saved['arrival'])
+            self.assertEqual(saved['status'],'ABSTAIN_OUTSIDE_EIGHT_HOUR_HORIZON')
+            self.assertEqual(far['departure'],T+m.WAIT+1)
+            self.assertEqual(source.read_bytes(),b'untouched-source')
+
     def test_shadow_recorder_includes_all24_and_scorer_keeps_each_model(self):
         class Evidence:
             def score(self,arrival):return ('SUCCESS','TEST',None)
