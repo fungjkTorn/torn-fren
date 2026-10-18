@@ -1,0 +1,19 @@
+# Japan training freshness and clean half-phase experiment
+
+The training audit used source3384a04a7e96666554cc2758422b8abf92af185d, private run39090873523, on the same inspected development window1791956700..1792215600 with fixed truth cutoff1792254014. This is an evidence audit, not an accuracy result.
+
+The original model accepted four new full physical-zero/restock/physical-zero cycles over these three days. It started with74 completed cycles and ended with78. At the first issue, the newest accepted whole cycle was56.34h old; at day1 it was80.34h old. The recency-weighted mean whole-cycle age was169.63h at the start and102.17h at the end. A short recency half-life cannot create recent completed training tuples which were never accepted.
+
+There were140 provider-switch resets in the inspected window. These interrupted28 open zero-cycle states and13 open positive-cycle states (overlapping states, not41 independent completed-cycle losses). Original prerequisites reproduce451 READY and413 UNKNOWN_PHYSICAL_PHASE issues. No collection-gap or positive-topup resets occurred in this specific window.
+
+Clean separately observed half phases provided six newly completed zero spells and18 newly completed positive spells, versus four whole tuples. Zero spells require a directly observed positive->exactly0 anchor and same-provider continuity to a directly observed0->positive transition. Positive spells require a directly observed0->positive start, same-provider continuity and no topup until exactly0; their >=30 availability end is stored separately. A positive half can be accepted when its earlier depleted onset was left censored. These halves do not establish complete observed whole cycles and are never relabeled as such. Provider switches and gaps cannot join them.
+
+## Predeclared modeling ablation
+
+Train separate last96 clean zero and last96 clean positive duration distributions. Preserve the joint positive-duration / >=30 availability pair. Model successive low/high durations independently, explicitly an assumption, not an observed pairing. Compare72h and6h recency half-lives, each with original peak and absolute.60 support gates. This is four research candidates. The longer-memory variant separates changed training representation from the shorter recency change.
+
+Require16 clean halves of each type and four phase-age survivors. Keep the original strict current phase and existing180s zero-agreement current-phase handoff. Never infer a new depletion time, bridge providers in training, or hold expired advice. True depletion0, buy quantity>=30 through+10sec, five-minute cadence, publication15sec, forecast/source TTL300/180sec, eight-hour wait and the same864 visitor starts remain unchanged.
+
+Exactly marginalize the empirical alternating process at integer-second resolution: cycle kernel is the product distribution of low/high durations; compute renewal recurrence and convolve with the buy-availability reward. Avoid seeded path selection and accumulated time-grid rounding. Compare original sequence, original handoff, leave-now, plus four candidates; reproduce historical control fingerprints. Report unknowns, daily slices, wait, coverage and distinct departure concentration. Same inspected development days; no independent validation or automatic promotion. Cleaner partial intervals may still have censoring/selection bias and more training rows do not establish better accuracy.
+
+Tests independently enumerate small alternating paths to verify both physical-zero and positive-onset kernels, check the exact buy-end+10 boundary, current phase age, future-completion exclusion, unknown-phase abstention and current-stock<30 handling. The audit has separate tests proving partial intervals never become manufactured whole cycles or cross provider/gap/topup boundaries.

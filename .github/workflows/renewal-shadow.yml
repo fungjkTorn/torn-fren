@@ -29,6 +29,8 @@ on:
       - 'tests/test_japan_exact_renewal.py'
       - 'research/japan_xanax/training_audit.py'
       - 'tests/test_japan_training_audit.py'
+      - 'research/japan_xanax/half_phase_renewal.py'
+      - 'tests/test_japan_half_phase_renewal.py'
       - '.github/workflows/renewal-shadow.yml'
   workflow_dispatch:
 permissions:
@@ -56,3 +58,4 @@ jobs:
       - run: OPENBLAS_NUM_THREADS=1 python -m unittest discover -s tests -p test_japan_common_random.py -v
       - run: OPENBLAS_NUM_THREADS=1 python -m unittest discover -s tests -p test_japan_exact_renewal.py -v
       - run: OPENBLAS_NUM_THREADS=1 python -m unittest discover -s tests -p test_japan_training_audit.py -v
+      - run: OPENBLAS_NUM_THREADS=1 python -m unittest discover -s tests -p test_japan_half_phase_renewal.py -v
