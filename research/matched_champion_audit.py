@@ -70,9 +70,12 @@ def native_plan(db,key,issued,timeout=12):
                 native_generation=result.get('model_generation'),seconds=time.monotonic()-began)
 
 
-def supply_audit(rows,crosses,cutoff,hours=24):
+def supply_audit(rows,crosses,cutoff,hours=24,*,start_epoch=None):
     """Observed carried-state time, NOT certified game occupancy or events."""
-    start=cutoff-hours*3600; durations=Counter();events=Counter();windows=[]
+    rows=[r for r in rows if r[0]<=cutoff]
+    start=cutoff-hours*3600 if start_epoch is None else start_epoch
+    if start>=cutoff:raise ValueError('Invalid supply audit interval')
+    durations=Counter();events=Counter();windows=[]
     for a,b in zip(rows,rows[1:]):
         left=max(start,a[0]);right=min(cutoff,b[0])
         if right<=left:continue
@@ -88,10 +91,38 @@ def supply_audit(rows,crosses,cutoff,hours=24):
     for c in h.cycles:
         if start<=c.end<=cutoff:windows.append(dict(zero=c.zero,restock=c.restock,end=c.end,
             available_seconds=c.available,batch=c.batch))
-    return dict(start=start,end=cutoff,observed_interval_seconds=dict(durations),events=dict(events),
+    tail=None
+    if rows:
+        last=rows[-1]
+        tail=dict(last_delta_epoch=last[0],quantity=last[1],provider=last[2],
+            delta_age_seconds=cutoff-last[0],
+            carried_tail_seconds=max(0,cutoff-max(start,last[0])),
+            collection_gap_to_cutoff=crosses(last[0],cutoff),freshness_certified=False)
+    return dict(start=start,end=cutoff,observed_interval_seconds=dict(durations),events=dict(events),last_carried_state=tail,
                 strict_completed_cycles=windows,
                 latest_strict_cycle_age_hours=(cutoff-h.cycles[-1].end)/3600 if h.cycles else None,
                 limitation='Adjacent item-delta evidence only; provider switches/gaps ambiguous. Last unclosed interval excluded. Physical depletion=0, availability target=30.')
+
+
+def supply_windows(source,*,model_sha):
+    from research.plushie_champions.common import TRAVEL_SECONDS
+    result={}
+    for key in ('can:Xanax','jap:Xanax'):
+        rows,_,crosses,_,cutoff=source_data(source,item_key=key)
+        flight=TRAVEL_SECONDS[key.split(':',1)[0]]
+        end=ISSUES[-1]+WAIT+flight+190
+        if end>cutoff:raise ValueError('Immature arrival domain')
+        result[key]=dict(truth_cutoff=cutoff,
+            trial_issue_window=supply_audit(rows,crosses,ISSUES[-1]+300,start_epoch=ISSUES[0]),
+            trial_possible_arrival_window=supply_audit(rows,crosses,end,start_epoch=ISSUES[0]+flight+15),
+            latest_day=supply_audit(rows,crosses,cutoff),
+            issue_states=[])
+        times=[r[0] for r in rows]
+        for issued in ISSUES:
+            i=bisect.bisect_right(times,issued)-1
+            result[key]['issue_states'].append(dict(issued=issued,last_delta=rows[i] if i>=0 else None,
+                last_delta_age=issued-times[i] if i>=0 else None))
+    return dict(model_sha=model_sha,items=result,accuracy_results=False,automatic_promotion=False)
 
 
 def summarize(records):

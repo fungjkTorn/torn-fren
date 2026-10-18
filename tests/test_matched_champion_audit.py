@@ -41,6 +41,13 @@ class MatchedTests(unittest.TestCase):
         self.assertEqual(r['strict_completed_cycles'],[]) # first zero was left censored
         self.assertEqual(r['observed_interval_seconds']['ambiguous_seconds'],10)
 
+    def test_historical_supply_window_ignores_future_transitions(self):
+        rows=[(0,10,'a'),(20,0,'a'),(40,100,'a'),(60,0,'a'),(100,100,'a')]
+        r=m.supply_audit(rows,lambda a,b:False,70,start_epoch=10)
+        self.assertEqual(r['strict_completed_cycles'][0]['end'],60)
+        self.assertEqual(r['latest_strict_cycle_age_hours'],10/3600)
+        self.assertEqual(r['events']['observed_restock_transitions'],1)
+
     def test_exact_predeclared_nine_hours_and_explicit_coverage(self):
         self.assertEqual(len(m.ISSUES),9)
         self.assertEqual(len(set(m.ISSUES)),9)
