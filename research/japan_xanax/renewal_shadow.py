@@ -10,6 +10,7 @@ import json
 import os
 import sqlite3
 import subprocess
+import sys
 import time
 from collections import namedtuple
 from contextlib import closing
@@ -209,15 +210,18 @@ def record(source,journal,*,model_sha,duration=28800,item_keys=None):
                     flight=TRAVEL_SECONDS[key.split(':',1)[0]]
                     selected=history.plans(issued,poll_age=issued-cutoff,flight_seconds=flight)
                     selected['rate_current_quarter']=rate_plan(rate,key,issued,issued-cutoff)
-                    prepared.append((key,flight,selected))
+                    prepared.append((key,flight,selected,cutoff))
                 published=int(time.time())
                 if published-issued>30:raise ValueError('Shadow publication exceeded30s budget')
+                if any(not 0<=published-cutoff<=180 for _,_,_,cutoff in prepared):
+                    raise ValueError('Shadow source expired before publication')
                 with db:
-                    for key,flight,selected in prepared:
+                    for key,flight,selected,cutoff in prepared:
                         for mode,plan in selected.items():
                             dep=plan['departure'];actual=max(dep,published) if dep is not None else None
                             r=dict(plan,mode=mode,departure=actual,published=published,model_sha=model_sha,item_key=key,
-                                issued=issued,arrival=actual+flight if actual is not None else None,
+                                issued=issued,source_cutoff=cutoff,poll_age_seconds=issued-cutoff,
+                                arrival=actual+flight if actual is not None else None,
                                 flight_seconds=flight,target_quantity=30,grace_seconds=10,
                                 execution='FROZEN_SHADOW_PLAN_FUTURE_RECONFIRMATION_UNTESTED',
                                 actual_gameplay=False,website_publication=False)
@@ -229,25 +233,52 @@ def record(source,journal,*,model_sha,duration=28800,item_keys=None):
             time.sleep(min(max(0,until-began-elapsed),max(1,STEP-elapsed)))
 
 
-def score_journal(source,journal):
+def score_journal(source,journal,*,expected_sha=None,progress=None):
     source=Path(source).resolve(strict=True);journal=Path(journal).resolve(strict=True)
     if source==journal:raise ValueError('Separate shadow journal required')
     with closing(sqlite3.connect(journal.as_uri()+'?mode=ro',uri=True)) as db:
-        sha=db.execute("SELECT value FROM metadata WHERE key='model_sha'").fetchone()[0]
-        raw=db.execute('SELECT record FROM plans ORDER BY issued,item_key,mode LIMIT 100001').fetchall()
+        metadata=db.execute("SELECT value FROM metadata WHERE key='model_sha'").fetchone()
+        if metadata is None:raise ValueError('Missing shadow model identity')
+        sha=metadata[0]
+        if expected_sha is not None and sha!=expected_sha:raise ValueError('Journal differs from declared model source')
+        raw=db.execute('SELECT issued,item_key,mode,record FROM plans ORDER BY issued,item_key,mode LIMIT 100001').fetchall()
     if len(raw)>100000:raise ValueError('Shadow journal cap exceeded')
     from collections import Counter,defaultdict
-    records=[json.loads(r[0]) for r in raw];first={}
+    records=[];missing_clocks=0
+    for issued,key,mode,encoded in raw:
+        r=json.loads(encoded)
+        if (r.get('issued'),r.get('item_key'),r.get('mode'),r.get('model_sha'))!=(issued,key,mode,sha):
+            raise ValueError('Shadow record identity mismatch')
+        clock=r.get('source_cutoff');age=r.get('poll_age_seconds')
+        if clock is None and age is None:missing_clocks+=1
+        elif (type(clock) is not int or type(age) is not int or type(r.get('published')) is not int
+              or age!=issued-clock or not 0<=age<=180 or not issued<=r['published']
+              or not 0<=r['published']-clock<=180):
+            raise ValueError('Invalid recorded source clock')
+        records.append(r)
+    first={}
     for r in records:first.setdefault((r['item_key'],r['mode'],r['issued']//3600),r)
     # Mode is deliberately stored in the DB identity as well as the record.
     groups=defaultdict(Counter);evidence={}
     for r in first.values():
         key=r['item_key']
-        if key not in evidence:evidence[key]=source_data(source,item_key=key)[3]
+        if key not in evidence:
+            began=time.monotonic()
+            # Freeze the truth clock across the roster instead of evaluating
+            # later items against later collector heartbeats.
+            data=source_data(source,now=truth_cutoff if evidence else None,item_key=key)
+            if not evidence:truth_cutoff=data[4]
+            if data[4]!=truth_cutoff:raise ValueError('Source heartbeat moved backwards during scoring')
+            evidence[key]=data[3]
+            if progress is not None:progress(dict(status='SCORING_ITEM',item_key=key,
+                evidence_load_seconds=time.monotonic()-began,truth_cutoff=truth_cutoff))
         c=groups[(key,r['mode'])];c['issues']+=1
         outcome='ABSTAIN' if r['arrival'] is None else evidence[key].score(r['arrival'])[0]
         c[outcome]+=1
-    return dict(model_sha=sha,records=len(records),metric='First observed item/model/UTC-hour frozen shadow plan; future reconfirmation untested',
+    return dict(model_sha=sha,records=len(records),truth_cutoff=truth_cutoff if evidence else None,
+        records_missing_source_clock=missing_clocks,
+        source_clock_limitation='Older records without source clocks cannot establish source freshness at departure; frozen arrival scoring only.',
+        metric='First observed item/model/UTC-hour frozen shadow plan; future reconfirmation untested',
         actual_flights=False,website_publication=False,items={key:{mode:dict(c,known=c['SUCCESS']+c['FAILURE'],success_fraction=c['SUCCESS']/(c['SUCCESS']+c['FAILURE']) if c['SUCCESS']+c['FAILURE'] else None) for (k,mode),c in groups.items() if k==key} for key in sorted({k for k,_ in groups})})
 
 
@@ -256,6 +287,7 @@ def main():
     p.add_argument('--source',required=True);p.add_argument('--model-sha',required=True)
     p.add_argument('--days',type=int,default=3);p.add_argument('--journal');p.add_argument('--duration-seconds',type=int,default=28800)
     p.add_argument('--item-key',default=KEY)
+    p.add_argument('--progress',action='store_true',help='Score progress on stderr; JSON result stays on stdout')
     a=p.parse_args()
     sha=subprocess.check_output(['git','-C',str(ROOT),'rev-parse','HEAD'],text=True).strip()
     if sha!=a.model_sha:raise ValueError('Pinned checkout differs from declared model source')
@@ -263,7 +295,8 @@ def main():
     else:
         if not a.journal:p.error('--journal required')
         if a.action=='record':record(a.source,a.journal,model_sha=sha,duration=a.duration_seconds)
-        else:print(json.dumps(score_journal(a.source,a.journal),sort_keys=True,indent=2))
+        else:print(json.dumps(score_journal(a.source,a.journal,expected_sha=sha,
+            progress=(lambda r:print(json.dumps(r,sort_keys=True),file=sys.stderr,flush=True)) if a.progress else None),sort_keys=True,indent=2))
 
 
 if __name__=='__main__':main()

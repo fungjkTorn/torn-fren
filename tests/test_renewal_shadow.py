@@ -84,9 +84,43 @@ class RenewalTests(unittest.TestCase):
                 self.assertEqual(db.execute('SELECT COUNT(*) FROM plans').fetchone()[0],24*len(m.MODES))
                 self.assertEqual(db.execute('SELECT COUNT(DISTINCT item_key) FROM plans').fetchone()[0],24)
                 self.assertEqual(db.execute("SELECT COUNT(*) FROM plans WHERE item_key='jap:Xanax'").fetchone()[0],len(m.MODES))
+                saved=json.loads(db.execute('SELECT record FROM plans LIMIT 1').fetchone()[0])
+                self.assertEqual(saved['source_cutoff'],T)
+                self.assertEqual(saved['poll_age_seconds'],0)
             before=journal.read_bytes()
-            with patch.object(m,'source_data',return_value=data):r=m.score_journal(source,journal)
+            progress=[]
+            with patch.object(m,'source_data',return_value=data) as reads:
+                r=m.score_journal(source,journal,expected_sha='a'*40,progress=progress.append)
+            self.assertEqual(len(progress),24)
+            self.assertEqual(reads.call_args_list[0].kwargs['now'],None)
+            self.assertTrue(all(c.kwargs['now']==T for c in reads.call_args_list[1:]))
+            self.assertEqual(r['truth_cutoff'],T)
+            self.assertEqual(r['records_missing_source_clock'],0)
             self.assertEqual(len(r['items']),24)
             self.assertEqual(set(r['items']['jap:Xanax']),set(m.MODES))
             self.assertEqual(before,journal.read_bytes());self.assertEqual(source.read_bytes(),b'untouched-source')
             with self.assertRaises(ValueError):m.record(source,journal,model_sha='a'*40,duration=60)
+            with self.assertRaises(ValueError):m.score_journal(source,journal,expected_sha='b'*40)
+            with sqlite3.connect(journal) as db:
+                for issued,key,mode,encoded in db.execute('SELECT * FROM plans').fetchall():
+                    record=json.loads(encoded);record.pop('source_cutoff');record.pop('poll_age_seconds')
+                    db.execute('UPDATE plans SET record=? WHERE issued=? AND item_key=? AND mode=?',(json.dumps(record),issued,key,mode))
+            with patch.object(m,'source_data',return_value=data):legacy=m.score_journal(source,journal)
+            self.assertEqual(legacy['records_missing_source_clock'],24*len(m.MODES))
+            with sqlite3.connect(journal) as db:
+                record['model_sha']='tampered'
+                db.execute('UPDATE plans SET record=? WHERE issued=? AND item_key=? AND mode=?',(json.dumps(record),issued,key,mode))
+            with self.assertRaises(ValueError):m.score_journal(source,journal)
+
+    def test_source_expiring_during_build_cannot_publish_a_partial_roster(self):
+        class Evidence:
+            def score(self,arrival):return ('SUCCESS','TEST',None)
+        data=([],[T-175],lambda a,b:False,Evidence(),T-175)
+        with tempfile.TemporaryDirectory() as td:
+            source=Path(td)/'source.db';source.write_bytes(b'untouched-source')
+            journal=Path(td)/'shadow.sqlite'
+            with patch.object(m,'source_data',return_value=data),patch.object(m.time,'time',side_effect=[T,T+15]), \
+                 patch.object(m.time,'monotonic',side_effect=[0,0,0,1,61]),patch.object(m.time,'sleep'),patch('builtins.print'):
+                m.record(source,journal,model_sha='a'*40,duration=60)
+            with sqlite3.connect(journal) as db:
+                self.assertEqual(db.execute('SELECT COUNT(*) FROM plans').fetchone()[0],0)
