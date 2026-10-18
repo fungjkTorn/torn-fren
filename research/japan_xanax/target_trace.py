@@ -25,10 +25,14 @@ def trace(records,*,asof,issue_end=None):
     for (item,mode),values in sorted(groups.items()):
         values=sorted(values,key=lambda r:r['published']);counts=Counter();examples=defaultdict(list);targets=set()
         if len({r['published'] for r in values})!=len(values):raise ValueError('Duplicate publication clock')
-        departures=[]
+        departures=[];statuses=Counter()
         for i,r in enumerate(values):
             if issue_end is not None and r['issued']>issue_end:continue
             issued=r['issued'];dep=r['departure'];published=r['published'];counts['recorded_issues']+=1
+            statuses[r.get('status','UNSPECIFIED')]+=1
+            if r.get('borrowed_zero_phase'):
+                counts['borrowed_phase_issues']+=1
+                counts['borrowed_phase_no_forecast' if dep is None else 'borrowed_phase_forecast']+=1
             if dep is None:counts['no_forecast']+=1;continue
             targets.add(dep);counts['forecast_issues']+=1
             counts['near_target' if dep<issued+300 else 'distant_target']+=1
@@ -62,8 +66,20 @@ def trace(records,*,asof,issue_end=None):
                     replacement=changed['departure'] if changed else None,
                     replacement_status=changed.get('status') if changed else None))
         result.setdefault(item,{})[mode]=dict(counts=dict(counts),distinct_proposed_targets=len(targets),
-            distinct_eligible_departures=len(set(departures)),eligible_departure_examples=sorted(set(departures))[:10],examples=dict(examples))
-    return dict(asof=asof,items=result,read_only=True,actual_flights=False,
+            distinct_eligible_departures=len(set(departures)),eligible_departure_examples=sorted(set(departures))[:10],examples=dict(examples),status_counts=dict(statuses))
+    comparisons={}
+    for (item,mode),values in groups.items():
+        baseline=groups.get((item,'sequence_blocks_peak'))
+        if mode=='sequence_blocks_peak' or baseline is None:continue
+        base={r['issued']:r for r in baseline};c=Counter()
+        for r in values:
+            if issue_end is not None and r['issued']>issue_end:continue
+            if r['issued'] not in base:c['missing_baseline']+=1;continue
+            a=base[r['issued']]['departure'];b=r['departure']
+            label=('same_abstention' if a is None else 'same_target') if a==b else ('restored_forecast' if a is None else 'lost_forecast' if b is None else 'earlier_target' if b<a else 'later_target')
+            c[label]+=1
+        comparisons.setdefault(item,{})[mode]=dict(c)
+    return dict(asof=asof,items=result,same_issue_vs_sequence=comparisons,read_only=True,actual_flights=False,
         limitation='Target-fate counts are per proposed issue, highly correlated. Eligible departures use actual publication, exclusive 300sec forecast validity and inclusive 180sec source expiry. No arrival outcomes inferred.')
 
 

@@ -54,5 +54,12 @@ class TraceTests(unittest.TestCase):
             self.assertEqual(v['records'],1);self.assertEqual(path.read_bytes(),before)
             with self.assertRaises(ValueError):read_journal(path,expected_sha='b'*40)
 
+    def test_handoff_borrowing_and_restored_forecasts_are_reported_separately(self):
+        base=dict(r(0,None),mode='sequence_blocks_peak')
+        alt=dict(r(0,60),mode='zero_handoff180',borrowed_zero_phase=True)
+        v=trace([base,alt],asof=100)
+        self.assertEqual(v['same_issue_vs_sequence']['jap:Xanax']['zero_handoff180']['restored_forecast'],1)
+        self.assertEqual(v['items']['jap:Xanax']['zero_handoff180']['counts']['borrowed_phase_forecast'],1)
+
 
 if __name__=='__main__':unittest.main()
