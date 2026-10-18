@@ -40,6 +40,8 @@ on:
       - 'deploy/scripts/activate_country_clocks.py'
       - 'deploy/patches/country-clock-20261018/**'
       - 'tests/test_activate_country_clocks.py'
+      - 'research/japan_xanax/clock_continuity_audit.py'
+      - 'tests/test_japan_clock_continuity_audit.py'
       - '.github/workflows/renewal-shadow.yml'
   workflow_dispatch:
 permissions:
@@ -72,3 +74,4 @@ jobs:
       - run: python -m unittest discover -s tests -p test_country_clock_preflight.py -v
       - run: python -m unittest discover -s tests -p test_prepare_country_clock_patch.py -v
       - run: python -m unittest discover -s tests -p test_activate_country_clocks.py -v
+      - run: OPENBLAS_NUM_THREADS=1 python -m unittest discover -s tests -p test_japan_clock_continuity_audit.py -v
