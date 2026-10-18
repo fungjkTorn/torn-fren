@@ -33,6 +33,19 @@ class MatchedTests(unittest.TestCase):
         self.assertIn('causal.sqlite',child.call_args.args[0])
         self.assertNotIn('truth.sqlite',child.call_args.args[0])
 
+    def test_actual_native_worker_needs_no_http_library_or_provider(self):
+        with tempfile.TemporaryDirectory() as td:
+            source=Path(td)/'source.sqlite'
+            with sqlite3.connect(source) as c:
+                c.executescript('''CREATE TABLE stock_history(id INTEGER PRIMARY KEY,timestamp,country,item_name,quantity,source);
+                CREATE TABLE poll_heartbeats(timestamp,mode,success);
+                CREATE TABLE collection_gaps(start_timestamp,end_timestamp,reason);
+                INSERT INTO stock_history VALUES(1,90,'can','Xanax',0,'a');
+                INSERT INTO poll_heartbeats VALUES(99,'poll-cycle',1);''')
+            before=source.read_bytes();r=m.native_plan(source,'can:Xanax',100)
+            self.assertEqual(r['status'],'INSUFFICIENT_HISTORICAL_FEATURES',r)
+            self.assertEqual(source.read_bytes(),before)
+
     def test_true_zero_and_availability_loss_are_distinct(self):
         rows=[(0,0,'a'),(20,100,'a'),(40,20,'a'),(50,0,'a'),(60,100,'b')]
         r=m.supply_audit(rows,lambda a,b:False,70)
@@ -65,3 +78,24 @@ class MatchedTests(unittest.TestCase):
         r=m.paired_native(records)['x']
         self.assertEqual(r['both_known'],1)
         self.assertEqual(r['challenger_only_success'],1)
+
+    def test_reconfirmation_generates_plans_only_from_past_rows(self):
+        t=1792255500;seen=[]
+        class History:
+            def __init__(self,crosses):self.last=None
+            def add(self,row):self.last=row
+            def plans(self,issued,**kwargs):
+                seen.append((issued,self.last[0]))
+                return {'leave_now_control':dict(departure=issued,status='CONTROL')}
+        class Evidence:
+            def score(self,arrival):return ('SUCCESS','TEST',None)
+        data=([(t-10,0,'a'),(t+300,100,'a'),(t+10000,99999,'future')],
+              [t,t+300,t+600,t+900],lambda a,b:False,Evidence(),t+50000)
+        with patch.object(m,'ISSUES',(t,)),patch.object(m,'WAIT',600), \
+             patch.object(m,'History',History),patch.object(m,'source_data',return_value=data), \
+             patch.object(m,'rate_plan',return_value=dict(departure=None,status='NONE')):
+            r=m.xanax_reconfirmation('truth.sqlite',model_sha='a'*40)
+        self.assertTrue(all(observed<=issued for issued,observed in seen))
+        self.assertEqual(seen[0],(t,t-10))
+        self.assertEqual(r['items']['can:Xanax']['replanned']['leave_now_control']['known'],1)
+        self.assertEqual(r['items']['can:Xanax']['frozen_records'][0]['departure'],t+15)

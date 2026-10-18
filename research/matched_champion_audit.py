@@ -53,7 +53,18 @@ def native_plan(db,key,issued,timeout=12):
     route=native_routes().get(key)
     if route is None:return dict(status='NATIVE_ADAPTER_UNVERIFIED',departure=None)
     country,item=key.split(':',1)
-    child="import importlib,json,sys; m=importlib.import_module(sys.argv[1]); print(json.dumps(m.predict(sys.argv[2],sys.argv[3],sys.argv[4],int(sys.argv[5]))))"
+    # History imports a live HTTP provider at module load even though frozen
+    # inference only uses SQLite. Disable that provider inside this child:
+    # no HTTP dependency, credentials or request is needed for historical math.
+    child="""import importlib,json,sys,types
+def forbidden(*args,**kwargs):
+    raise RuntimeError('HTTP provider forbidden in historical native inference')
+provider=types.ModuleType('services.yata_api')
+provider.get_country_stock=forbidden
+sys.modules['services.yata_api']=provider
+m=importlib.import_module(sys.argv[1])
+print(json.dumps(m.predict(sys.argv[2],sys.argv[3],sys.argv[4],int(sys.argv[5]))))
+"""
     began=time.monotonic()
     try:
         p=subprocess.run([sys.executable,'-B','-c',child,route,str(db),country,item,str(issued)],
@@ -61,7 +72,10 @@ def native_plan(db,key,issued,timeout=12):
         result=json.loads(p.stdout.strip().splitlines()[-1])
     except subprocess.TimeoutExpired:
         return dict(status='NATIVE_COMPUTE_TIMEOUT',departure=None,seconds=timeout)
-    except (subprocess.CalledProcessError,ValueError,IndexError) as e:
+    except subprocess.CalledProcessError as e:
+        return dict(status='NATIVE_WORKER_ERROR',departure=None,error_type=type(e).__name__,
+                    diagnostic=(e.stderr or '')[-1000:])
+    except (ValueError,IndexError) as e:
         return dict(status='NATIVE_WORKER_ERROR',departure=None,error_type=type(e).__name__)
     dep=result.get('recommended_departure_timestamp')
     if dep is not None and (type(dep) is not int or not issued<=dep<=issued+WAIT):
@@ -125,6 +139,51 @@ def supply_windows(source,*,model_sha):
     return dict(model_sha=model_sha,items=result,accuracy_results=False,automatic_promotion=False)
 
 
+def xanax_reconfirmation(source,*,model_sha):
+    """Same nine starts: frozen generic proposal versus five-minute advice.
+
+    Uses the existing departure evidence expiry/execution contract unchanged.
+    Native specialists are NOT simulated by this execution ablation.
+    """
+    from research.departure_reconfirmation import evaluate
+    from research.quantity_rate_cycles import QuantityRateCycles
+    from research.plushie_champions.common import TRAVEL_SECONDS
+    from deploy.scripts.v163_readonly_event_first_preview import OBS
+    results={}
+    for key in ('can:Xanax','jap:Xanax'):
+        rows,polls,crosses,evidence,cutoff=source_data(source,item_key=key)
+        history=History(crosses);rate=QuantityRateCycles(crosses);cursor=0;plans={}
+        flight=TRAVEL_SECONDS[key.split(':',1)[0]]
+        for issued in range(ISSUES[0],ISSUES[-1]+WAIT+301,300):
+            while cursor<len(rows) and rows[cursor][0]<=issued:
+                row=rows[cursor];history.add(row);rate.add(OBS(*row));cursor+=1
+            pi=bisect.bisect_right(polls,issued)-1;age=issued-polls[pi] if pi>=0 else None
+            selected=history.plans(issued,poll_age=age,flight_seconds=flight)
+            selected['rate_current_quarter']=rate_plan(rate,key,issued,age)
+            for mode,p in selected.items():
+                dep=p['departure'];dep=max(dep,issued+15) if dep is not None else None
+                if dep is not None and dep>issued+WAIT:dep=None
+                plans.setdefault(mode,[]).append((issued,dep,age))
+        frozen=[];replanned=[]
+        for mode,values in plans.items():
+            index={v[0]:i for i,v in enumerate(values)}
+            for start in ISSUES:
+                i=index[start];_,dep,age=values[i]
+                outcome=evidence.score(dep+flight)[0] if dep is not None else 'ABSTAIN'
+                frozen.append(dict(issued=start,mode=mode,departure=dep,status='FROZEN_GENERIC',outcome=outcome))
+                c=[]
+                evaluate(values[i:],cutoff=cutoff,flight_seconds=flight,score=evidence.score,
+                         start_before=start,cohorts=c)
+                if len(c)!=1:raise ValueError('Matched issue identity changed')
+                row=c[0];actual=start+row['wait'] if row['wait'] is not None else None
+                replanned.append(dict(issued=start,mode=mode,departure=actual,status='REPLANNED_GENERIC',outcome=row['outcome']))
+        results[key]=dict(truth_cutoff=cutoff,frozen=summarize(frozen),replanned=summarize(replanned),
+                          frozen_records=frozen,replanned_records=replanned)
+    return dict(model_sha=model_sha,issue_epochs=ISSUES,items=results,
+                automatic_promotion=False,actual_flights=False,
+                limitation='Paired retrospective execution ablation of generic families only. Fifteen-second publication floor, every-five-minute advice, 180-second departure evidence expiry; nine correlated starts. Does not establish native specialist accuracy or reproduce owner journal timestamps.')
+
+
 def summarize(records):
     out={}
     for mode in sorted({r['mode'] for r in records}):
@@ -186,7 +245,8 @@ def run(source,out,*,model_sha):
                     status=p['status']
                     if dep is not None and dep>issued+WAIT:dep=None;status='ABSTAIN_OUTSIDE_EIGHT_HOUR_HORIZON'
                     outcome,reason,_=evidence.score(dep+flight) if dep is not None else ('ABSTAIN',status,None)
-                    all_records[key].append(dict(issued=issued,mode=mode,departure=dep,status=status,outcome=outcome,reason=reason))
+                    all_records[key].append(dict(issued=issued,mode=mode,departure=dep,status=status,outcome=outcome,reason=reason,
+                        native_diagnostic=p if mode=='native_specialist' else None))
                 report=dict(item_key=key,model_sha=model_sha,truth_cutoff=cutoff,issue_epochs=ISSUES,
                     policies=summarize(all_records[key]),paired_vs_native=paired_native(all_records[key]),records=all_records[key],
                     supply=supply_audit(rows,crosses,cutoff) if key in ('can:Xanax','jap:Xanax') else None,
