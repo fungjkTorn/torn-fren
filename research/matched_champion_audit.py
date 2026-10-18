@@ -32,7 +32,10 @@ def causal_copy(source, target, issued):
                 timestamp INTEGER,country TEXT,item_name TEXT,quantity INTEGER,source TEXT);
                 CREATE TABLE poll_heartbeats(id INTEGER PRIMARY KEY,timestamp INTEGER,mode TEXT,success INTEGER);
                 CREATE TABLE collection_gaps(id INTEGER PRIMARY KEY,start_timestamp INTEGER,end_timestamp INTEGER,reason TEXT);
-                CREATE INDEX stock_item ON stock_history(country,item_name,timestamp);''')
+                CREATE INDEX stock_item ON stock_history(country,item_name,timestamp);
+                CREATE INDEX stock_clock ON stock_history(timestamp);
+                CREATE INDEX poll_clock ON poll_heartbeats(mode,success,timestamp);
+                CREATE INDEX gap_clock ON collection_gaps(start_timestamp,end_timestamp);''')
             with dst:
                 dst.executemany('INSERT INTO stock_history VALUES(?,?,?,?,?,?)',src.execute(
                     'SELECT id,timestamp,country,item_name,quantity,source FROM stock_history WHERE timestamp<=?',(issued,)))

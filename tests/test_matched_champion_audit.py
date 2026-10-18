@@ -23,6 +23,8 @@ class MatchedTests(unittest.TestCase):
                 self.assertEqual(c.execute('SELECT timestamp,quantity FROM stock_history').fetchall(),[(90,0)])
                 self.assertEqual(c.execute('SELECT MAX(timestamp) FROM poll_heartbeats').fetchone()[0],99)
                 self.assertEqual(c.execute('SELECT start_timestamp,end_timestamp FROM collection_gaps').fetchall(),[(80,None)])
+                plan=c.execute("EXPLAIN QUERY PLAN SELECT timestamp FROM poll_heartbeats WHERE mode='poll-cycle' AND success=1 AND timestamp BETWEEN 80 AND 100 ORDER BY timestamp").fetchall()
+                self.assertTrue(any('SEARCH' in r[3] and 'poll_clock' in r[3] for r in plan),plan)
             self.assertEqual(source.read_bytes(),before)
 
     def test_missing_native_not_substituted_and_worker_only_sees_slice(self):
