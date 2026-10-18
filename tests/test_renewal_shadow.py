@@ -2,6 +2,8 @@ import json
 import sqlite3
 import tempfile
 import unittest
+import io
+from contextlib import redirect_stdout
 from pathlib import Path
 from unittest.mock import patch
 from research.japan_xanax import renewal_shadow as m
@@ -18,6 +20,17 @@ def rows():
 
 
 class RenewalTests(unittest.TestCase):
+    def test_readonly_scoring_distinguishes_scorer_from_original_producer_pin(self):
+        with patch('sys.argv',['renewal_shadow','score','--source','source.db','--journal','old.sqlite','--model-sha','a'*40]), \
+             patch.object(m.subprocess,'check_output',return_value='b'*40), \
+             patch.object(m,'score_journal',return_value={'model_sha':'a'*40}) as score,redirect_stdout(io.StringIO()) as out:
+            m.main()
+        self.assertEqual(score.call_args.kwargs['expected_sha'],'a'*40)
+        self.assertEqual(json.loads(out.getvalue()),{'model_sha':'a'*40,'scorer_sha':'b'*40})
+        with patch('sys.argv',['renewal_shadow','record','--source','source.db','--journal','new.sqlite','--model-sha','a'*40]), \
+             patch.object(m.subprocess,'check_output',return_value='b'*40):
+            with self.assertRaises(ValueError):m.main()
+
     def history(self):
         h=m.History(lambda a,b:False)
         for row in rows():h.add(row)

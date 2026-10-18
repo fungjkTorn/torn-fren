@@ -290,13 +290,18 @@ def main():
     p.add_argument('--progress',action='store_true',help='Score progress on stderr; JSON result stays on stdout')
     a=p.parse_args()
     sha=subprocess.check_output(['git','-C',str(ROOT),'rev-parse','HEAD'],text=True).strip()
-    if sha!=a.model_sha:raise ValueError('Pinned checkout differs from declared model source')
+    # Read-only scoring may inspect an older producer's journal. Keep its
+    # recorded model identity distinct from this checkout's scorer identity.
+    if a.action!='score' and sha!=a.model_sha:raise ValueError('Pinned checkout differs from declared model source')
     if a.action=='benchmark':print(json.dumps(benchmark(a.source,days=a.days,model_sha=sha,item_key=a.item_key),sort_keys=True))
     else:
         if not a.journal:p.error('--journal required')
         if a.action=='record':record(a.source,a.journal,model_sha=sha,duration=a.duration_seconds)
-        else:print(json.dumps(score_journal(a.source,a.journal,expected_sha=sha,
-            progress=(lambda r:print(json.dumps(r,sort_keys=True),file=sys.stderr,flush=True)) if a.progress else None),sort_keys=True,indent=2))
+        else:
+            result=score_journal(a.source,a.journal,expected_sha=a.model_sha,
+                progress=(lambda r:print(json.dumps(r,sort_keys=True),file=sys.stderr,flush=True)) if a.progress else None)
+            result['scorer_sha']=sha
+            print(json.dumps(result,sort_keys=True,indent=2))
 
 
 if __name__=='__main__':main()
