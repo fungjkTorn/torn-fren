@@ -1,5 +1,7 @@
 # Country clock logging: compatible activation ready for owner review
 
+**Status: activated by the owner on October18,2026.** The reported result was COUNTRY_CLOCK_ACTIVATED with two new Japan receipts and22 exported country-clock rows (snapshot cutoff1792296722). Backup:/var/backups/torn-fren-country-clocks/20261018T041129Z-dakyjklw. Prediction models remain unchanged and no new accuracy rate is established. The commands below retain the installation record; do not repeat activation on an already updated host.
+
 This enables measurement needed to investigate Japan's broken/stale cycle training. It does not fix or promote a prediction model or establish a new success rate.
 
 ## Installed state verified read-only
