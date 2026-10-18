@@ -107,6 +107,23 @@ def summarize(records):
     return out
 
 
+def paired_native(records):
+    native={r['issued']:r for r in records if r['mode']=='native_specialist'}
+    out={}
+    for mode in sorted({r['mode'] for r in records}-{'native_specialist'}):
+        counts=Counter()
+        for r in (r for r in records if r['mode']==mode):
+            n=native[r['issued']]
+            if r['outcome'] in ('SUCCESS','FAILURE') and n['outcome'] in ('SUCCESS','FAILURE'):
+                counts['both_known']+=1
+                counts['challenger_success']+=int(r['outcome']=='SUCCESS')
+                counts['native_success']+=int(n['outcome']=='SUCCESS')
+                counts['challenger_only_success']+=int(r['outcome']=='SUCCESS' and n['outcome']=='FAILURE')
+                counts['native_only_success']+=int(n['outcome']=='SUCCESS' and r['outcome']=='FAILURE')
+        out[mode]=dict(counts)
+    return out
+
+
 def run(source,out,*,model_sha):
     from deploy.scripts.v163_readonly_event_first_preview import exact_roster,OBS
     from research.plushie_champions.common import TRAVEL_SECONDS
@@ -140,7 +157,7 @@ def run(source,out,*,model_sha):
                     outcome,reason,_=evidence.score(dep+flight) if dep is not None else ('ABSTAIN',status,None)
                     all_records[key].append(dict(issued=issued,mode=mode,departure=dep,status=status,outcome=outcome,reason=reason))
                 report=dict(item_key=key,model_sha=model_sha,truth_cutoff=cutoff,issue_epochs=ISSUES,
-                    policies=summarize(all_records[key]),records=all_records[key],
+                    policies=summarize(all_records[key]),paired_vs_native=paired_native(all_records[key]),records=all_records[key],
                     supply=supply_audit(rows,crosses,cutoff) if key in ('can:Xanax','jap:Xanax') else None,
                     frozen_proposals=True,future_departure_reconfirmation_tested=False,automatic_promotion=False,
                     exact_owner_journal_reproduction=False,

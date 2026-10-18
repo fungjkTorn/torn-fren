@@ -49,3 +49,12 @@ class MatchedTests(unittest.TestCase):
         r=m.summarize(records)['x']
         self.assertEqual(r['success_fraction'],1);self.assertEqual(r['proposal_coverage'],.5)
         self.assertEqual(r['statuses']['TIMEOUT'],1)
+
+    def test_comparison_uses_only_same_issue_both_known(self):
+        records=[dict(mode='native_specialist',issued=100,outcome='FAILURE'),
+                 dict(mode='native_specialist',issued=200,outcome='ABSTAIN'),
+                 dict(mode='x',issued=100,outcome='SUCCESS'),
+                 dict(mode='x',issued=200,outcome='SUCCESS')]
+        r=m.paired_native(records)['x']
+        self.assertEqual(r['both_known'],1)
+        self.assertEqual(r['challenger_only_success'],1)
