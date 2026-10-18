@@ -1,4 +1,9 @@
 import unittest
+import json
+import sqlite3
+import tempfile
+from pathlib import Path
+from research.japan_xanax.target_trace import read_journal
 from research.japan_xanax.target_trace import trace
 
 
@@ -37,6 +42,17 @@ class TraceTests(unittest.TestCase):
         record=r(0,60);del record['source_cutoff']
         v=counts([record]);self.assertEqual(v['distinct_eligible_departures'],0)
         self.assertEqual(v['counts']['SOURCE_HEALTH_UNRECORDED'],1)
+
+    def test_journal_is_read_only_and_recorded_model_identity_is_required(self):
+        with tempfile.TemporaryDirectory() as td:
+            path=Path(td)/'journal.sqlite';sha='a'*40;record=dict(r(0,60),model_sha=sha)
+            with sqlite3.connect(path) as db:
+                db.executescript('CREATE TABLE metadata(key TEXT,value TEXT);CREATE TABLE plans(issued INTEGER,item_key TEXT,mode TEXT,record TEXT);')
+                db.execute('INSERT INTO metadata VALUES(?,?)',('model_sha',sha))
+                db.execute('INSERT INTO plans VALUES(?,?,?,?)',(0,'jap:Xanax','test',json.dumps(record)))
+            before=path.read_bytes();v=read_journal(path,expected_sha=sha,asof=100)
+            self.assertEqual(v['records'],1);self.assertEqual(path.read_bytes(),before)
+            with self.assertRaises(ValueError):read_journal(path,expected_sha='b'*40)
 
 
 if __name__=='__main__':unittest.main()
