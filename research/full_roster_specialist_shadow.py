@@ -16,11 +16,17 @@ from collections import Counter,defaultdict
 from contextlib import closing
 from pathlib import Path
 
+# Pin BEFORE v163 can be imported. Its VM compatibility bootstrap otherwise
+# replaces research.__path__ with the older staged package; setting these
+# variables later inside source_data cannot undo that earlier path mutation.
+ROOT=Path(__file__).resolve().parents[1]
+os.environ['TORNFREN_REPLAY_WORK']=str(ROOT)
+os.environ['TORNFREN_REPLAY_PINNED_RESEARCH']=str(ROOT/'research')
+
 from research.japan_xanax.renewal_shadow import History,source_data,rate_plan,MODES,STEP,WAIT
 from research.matched_champion_audit import native_routes
 from research.plushie_champions.common import TRAVEL_SECONDS
 
-ROOT=Path(__file__).resolve().parents[1]
 ARTIFACTS=Path('/home/ubuntu/torn-fren-private-models')
 CACHE=Path('/var/lib/torn-fren-v47/online_expert_cache.db')
 SPECIAL='specialist_control'

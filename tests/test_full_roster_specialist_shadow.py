@@ -1,5 +1,8 @@
 import json
+import os
 import sqlite3
+import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -8,6 +11,28 @@ from research.full_roster_specialist_shadow import normalize,specialist,store,sc
 
 
 class SpecialistShadowTests(unittest.TestCase):
+    def test_vm_staged_research_cannot_replace_checkout_before_source_data(self):
+        root=Path(__file__).resolve().parents[1]
+        child='''import os,pathlib
+from research import full_roster_specialist_shadow as shadow
+# This is the actual tick's import order, BEFORE source_data runs.
+from deploy.scripts import v163_readonly_event_first_preview
+import research
+from research import continuous_departure_replay as replay
+root=pathlib.Path(shadow.__file__).resolve().parents[1]
+assert list(research.__path__)==[str(root/'research')]
+assert pathlib.Path(replay.__file__).resolve()==root/'research/continuous_departure_replay.py'
+assert os.environ['TORNFREN_REPLAY_PINNED_RESEARCH']==str(root/'research')
+print('CHECKOUT_IMPORTS_OK')
+'''
+        with tempfile.TemporaryDirectory() as td:
+            stale=Path(td)/'research';stale.mkdir()
+            env=dict(os.environ,TORNFREN_REPLAY_WORK=td,TORNFREN_REPLAY_PINNED_RESEARCH=str(stale))
+            result=subprocess.run([sys.executable,'-B','-c',child],cwd=root,env=env,
+                                  capture_output=True,text=True,timeout=20)
+            self.assertEqual(result.returncode,0,result.stderr)
+            self.assertIn('CHECKOUT_IMPORTS_OK',result.stdout)
+
     def test_failed_partial_cycle_never_exposes_an_incomplete_roster(self):
         def interrupted(source,state,sha,db):
             store(db,key='jap:Xanax',mode='rate',raw=dict(departure=130,status='PLAN'),
