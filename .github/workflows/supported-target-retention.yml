@@ -1,0 +1,30 @@
+name: Supported target retention research checks
+on:
+  push:
+    paths:
+      - 'research/supported_target_retention.py'
+      - 'research/supported_target_replay.py'
+      - 'tests/test_supported_target_retention.py'
+      - 'tests/test_supported_target_replay.py'
+      - '.github/workflows/supported-target-retention.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  policy-and-native-parity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install numpy==1.26.4
+      - name: Verify current support, visitor deadlines and original model parity
+        run: >-
+          python -m unittest
+          tests.test_supported_target_retention
+          tests.test_supported_target_replay
+          tests.test_template_window_study
+          tests.test_v103_champion_score_curves
+          tests.test_fixed_roster_release_check -v
