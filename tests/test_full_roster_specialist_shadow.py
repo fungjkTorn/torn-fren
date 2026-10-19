@@ -4,10 +4,39 @@ import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
-from research.full_roster_specialist_shadow import normalize,specialist,store,score,tick,capture
+from research.full_roster_specialist_shadow import normalize,specialist,store,score,tick,capture,status
 
 
 class SpecialistShadowTests(unittest.TestCase):
+    def test_failed_partial_cycle_never_exposes_an_incomplete_roster(self):
+        def interrupted(source,state,sha,db):
+            store(db,key='jap:Xanax',mode='rate',raw=dict(departure=130,status='PLAN'),
+                  queried=100,published=105,heartbeat=90,sha=sha,commit=False)
+            raise ValueError('Source expired before remaining items')
+        with tempfile.TemporaryDirectory() as td:
+            with patch('research.v60_private_snapshot_probe.approved_collector_source',return_value=True), \
+                 patch('research.full_roster_specialist_shadow.setup',return_value=Path(td)), \
+                 patch('research.full_roster_specialist_shadow.tick',side_effect=interrupted):
+                r=capture('unused',td,'pin',once=True)
+            self.assertEqual(r['status'],'FULL_ROSTER_CAPTURE_UNAVAILABLE')
+            with sqlite3.connect(Path(td)/'plans.sqlite') as c:
+                self.assertEqual(c.execute('SELECT COUNT(*) FROM plans').fetchone()[0],0)
+                self.assertEqual(c.execute('SELECT COUNT(*) FROM cycles').fetchone()[0],1)
+
+    def test_status_reads_real_journal_schema_without_modifying_or_admitting_it(self):
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td);(root/'shadow-source.json').write_text(json.dumps(dict(model_sha='pin')))
+            (root/'capture.lock').touch()
+            with sqlite3.connect(root/'plans.sqlite') as c:
+                c.executescript("CREATE TABLE plans(issued,item_key,mode,record);CREATE TABLE cycles(attempted_at,status,summary);")
+                store(c,key='jap:Xanax',mode='rate',raw=dict(departure=130,status='PLAN'),queried=100,published=105,heartbeat=90,sha='pin')
+            before=(root/'plans.sqlite').read_bytes()
+            with patch('research.v38_idle_admission.inspect',return_value=dict(allowed=True,idle_fraction=.8)):
+                r=status(root,'pin')
+            self.assertEqual(r['last_publication'],105);self.assertEqual(r['recorded_items'],1)
+            self.assertFalse(r['recorder_running']);self.assertEqual(r['measured_cpu_diagnostics_only'],dict(idle_fraction=.8))
+            self.assertEqual((root/'plans.sqlite').read_bytes(),before)
+
     def test_startup_wait_is_bounded_even_if_host_never_becomes_available(self):
         current=[0.0]
         def wait(seconds):current[0]+=seconds

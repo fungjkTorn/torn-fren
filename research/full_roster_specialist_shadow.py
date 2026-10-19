@@ -90,14 +90,14 @@ def setup(state,sha):
     return state
 
 
-def store(db,*,key,mode,raw,queried,published,heartbeat,sha):
+def store(db,*,key,mode,raw,queried,published,heartbeat,sha,commit=True):
     record=dict(raw,**normalize(raw,queried=queried,published=published,heartbeat=heartbeat,
                               flight=TRAVEL_SECONDS[key.split(':',1)[0]]))
     record.update(item_key=key,mode=mode,issued=queried,published=published,source_cutoff=heartbeat,
                   poll_age_seconds=queried-heartbeat,model_sha=sha,physical_depletion_quantity=0,
                   arrival_target=30,grace_seconds=10,actual_flights=False,website_publication=False)
     db.execute('INSERT INTO plans VALUES(?,?,?,?)',(queried,key,mode,json.dumps(record,sort_keys=True)))
-    db.commit()
+    if commit:db.commit()
 
 
 def tick(source,state,sha,db):
@@ -129,7 +129,7 @@ def tick(source,state,sha,db):
         published=int(time.time())
         for mode,raw in selected.items():
             store(db,key=key,mode=mode,raw=dict(raw,identity='PHYSICAL_ZERO_CHALLENGER'),queried=queried,
-                  published=published,heartbeat=heartbeat,sha=sha);generic_rows+=1
+                  published=published,heartbeat=heartbeat,sha=sha,commit=False);generic_rows+=1
     for key in keys:
         queried=int(time.time());heartbeat=cutoffs[key]
         raw=(specialist(snapshot,key,queried) if queried-heartbeat<=150 else
@@ -137,7 +137,7 @@ def tick(source,state,sha,db):
         published=int(time.time());r=normalize(raw,queried=queried,published=published,heartbeat=heartbeat,
                                              flight=TRAVEL_SECONDS[key.split(':',1)[0]])
         statuses[r['status']]+=1
-        store(db,key=key,mode=SPECIAL,raw=raw,queried=queried,published=published,heartbeat=heartbeat,sha=sha)
+        store(db,key=key,mode=SPECIAL,raw=raw,queried=queried,published=published,heartbeat=heartbeat,sha=sha,commit=False)
     return dict(status='ALL24_SPECIALIST_SHADOW_RECORDED',items=24,generic_models_per_item=8,
         specialist_rows=24,generic_rows=generic_rows,specialist_statuses=dict(statuses),
         japan_zero_models_tested=8,legacy_japan_excluded=True,seconds=round(time.monotonic()-started,2),
@@ -159,6 +159,7 @@ def capture(source,state,sha,*,duration=28800,once=False,startup_wait=3600,clock
                 began=clock();attempted=int(time.time());failure=None
                 try:result=tick(source,state,sha,db)
                 except (OSError,ValueError,sqlite3.Error) as e:
+                    db.rollback() # A failed cycle must not expose a subset of the roster.
                     failure=e;result=dict(status='FULL_ROSTER_CAPTURE_UNAVAILABLE',error_type=type(e).__name__)
                 db.execute('INSERT INTO cycles VALUES(?,?,?)',(attempted,result['status'],json.dumps(result,sort_keys=True)));db.commit()
                 print(json.dumps(result,sort_keys=True),flush=True)
@@ -185,12 +186,18 @@ def status(state,sha):
         c.execute('PRAGMA query_only=ON')
         latest=c.execute('SELECT attempted_at,status,summary FROM cycles ORDER BY attempted_at DESC LIMIT 1').fetchone()
         counts=dict(c.execute('SELECT status,COUNT(*) FROM cycles GROUP BY status'))
-        items,rows,last=c.execute('SELECT COUNT(DISTINCT item_key),COUNT(*),MAX(published) FROM plans').fetchone()
+        items,rows=c.execute('SELECT COUNT(DISTINCT item_key),COUNT(*) FROM plans').fetchone()
+        last_record=c.execute('SELECT record FROM plans ORDER BY rowid DESC LIMIT 1').fetchone()
+        last=json.loads(last_record[0]).get('published') if last_record else None
     running=False
     with (state/'capture.lock').open('r') as lock:
         try:fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
         except BlockingIOError:running=True
+    from research.v38_idle_admission import inspect as measured_cpu
+    measured=measured_cpu(sample_seconds=1)
+    diagnostics={k:measured[k] for k in ('idle_fraction','psi_some_avg10','psi_full_avg10','steal_fraction','cpu_slots','one_minute_load','reason') if k in measured}
     return dict(status='ALL24_SHADOW_STATUS',recorder_running=running,recorded_items=items,plan_rows=rows,
+        measured_cpu_diagnostics_only=diagnostics,
         last_publication=last,attempt_statuses=counts,last_attempt=latest[0] if latest else None,
         last_attempt_status=latest[1] if latest else None,
         last_attempt_detail=json.loads(latest[2]) if latest else None,
