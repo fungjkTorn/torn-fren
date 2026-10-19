@@ -107,8 +107,10 @@ def tick(source,state,sha,db):
     from deploy.scripts.v163_readonly_event_first_preview import exact_roster,OBS
     keys=sorted(exact_roster())
     if len(keys)!=24 or len(native_routes())!=19:raise ValueError('Roster/source identity changed')
-    if not capacity()['allowed']:
-        return dict(status='ALL24_SHADOW_DEFERRED_CPU_PRESSURE',items_recorded=0)
+    admission=capacity()
+    if not admission['allowed']:
+        return dict(status='ALL24_SHADOW_DEFERRED_CPU_PRESSURE',items_recorded=0,
+                    capacity=admission,next_check_seconds=30)
     snapshot=state/'snapshot.sqlite';started=time.monotonic()
     snap=snapshot_with_retry(source,snapshot)
     if snap.get('status')!='PRIVATE_SNAPSHOT_READY' or not snap.get('published'):
@@ -142,7 +144,7 @@ def tick(source,state,sha,db):
         accuracy_verified=False,website_publication=False)
 
 
-def capture(source,state,sha,*,duration=28800,once=False):
+def capture(source,state,sha,*,duration=28800,once=False,startup_wait=3600,clock=time.monotonic,sleeper=time.sleep):
     from research.v60_private_snapshot_probe import approved_collector_source
     if not approved_collector_source(source):raise ValueError('Only approved collector source allowed')
     os.umask(0o077);state=setup(state,sha)
@@ -152,20 +154,47 @@ def capture(source,state,sha,*,duration=28800,once=False):
             db.executescript('CREATE TABLE IF NOT EXISTS metadata(key TEXT PRIMARY KEY,value TEXT);CREATE TABLE IF NOT EXISTS plans(issued INTEGER,item_key TEXT,mode TEXT,record TEXT,PRIMARY KEY(issued,item_key,mode));CREATE TABLE IF NOT EXISTS cycles(attempted_at INTEGER PRIMARY KEY,status TEXT,summary TEXT);')
             db.execute('INSERT OR IGNORE INTO metadata VALUES(?,?)',('model_sha',sha));db.commit()
             if db.execute("SELECT value FROM metadata WHERE key='model_sha'").fetchone()[0]!=sha:raise ValueError('Journal source mismatch')
-            until=time.monotonic()+duration
-            while time.monotonic()<until:
-                began=time.monotonic();attempted=int(time.time());failure=None
+            waiting_until=clock()+startup_wait;until=None
+            while clock()<(until if until is not None else waiting_until):
+                began=clock();attempted=int(time.time());failure=None
                 try:result=tick(source,state,sha,db)
                 except (OSError,ValueError,sqlite3.Error) as e:
                     failure=e;result=dict(status='FULL_ROSTER_CAPTURE_UNAVAILABLE',error_type=type(e).__name__)
                 db.execute('INSERT INTO cycles VALUES(?,?,?)',(attempted,result['status'],json.dumps(result,sort_keys=True)));db.commit()
                 print(json.dumps(result,sort_keys=True),flush=True)
                 if once:
-                    if failure is not None:raise failure
-                    if result.get('status')!='ALL24_SPECIALIST_SHADOW_RECORDED':
-                        raise ValueError('Preflight deferred; no recording process should be started yet')
                     return result
-                time.sleep(min(max(0,until-time.monotonic()),max(1,STEP-(time.monotonic()-began))))
+                if until is None and result.get('status')=='ALL24_SPECIALIST_SHADOW_RECORDED':
+                    until=clock()+duration
+                    print(json.dumps(dict(status='ALL24_COLLECTION_WINDOW_STARTED',duration_seconds=duration)),flush=True)
+                deadline=until if until is not None else waiting_until
+                interval=30 if until is None else STEP
+                sleeper(min(max(0,deadline-clock()),max(1,interval-(clock()-began))))
+            if until is None:
+                result=dict(status='ALL24_STARTUP_WAIT_EXPIRED',startup_wait_seconds=startup_wait,collection_started=False)
+                print(json.dumps(result),flush=True)
+                return result
+
+
+def status(state,sha):
+    state=Path(state).expanduser()
+    if not state.exists():return dict(status='ALL24_STATE_NOT_CREATED_YET',recorded_items=0,collection_started=False)
+    state=state.resolve(strict=True)
+    if json.loads((state/'shadow-source.json').read_text()).get('model_sha')!=sha:raise ValueError('Wrong shadow identity')
+    with closing(sqlite3.connect((state/'plans.sqlite').as_uri()+'?mode=ro',uri=True)) as c:
+        c.execute('PRAGMA query_only=ON')
+        latest=c.execute('SELECT attempted_at,status,summary FROM cycles ORDER BY attempted_at DESC LIMIT 1').fetchone()
+        counts=dict(c.execute('SELECT status,COUNT(*) FROM cycles GROUP BY status'))
+        items,rows,last=c.execute('SELECT COUNT(DISTINCT item_key),COUNT(*),MAX(published) FROM plans').fetchone()
+    running=False
+    with (state/'capture.lock').open('r') as lock:
+        try:fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
+        except BlockingIOError:running=True
+    return dict(status='ALL24_SHADOW_STATUS',recorder_running=running,recorded_items=items,plan_rows=rows,
+        last_publication=last,attempt_statuses=counts,last_attempt=latest[0] if latest else None,
+        last_attempt_status=latest[1] if latest else None,
+        last_attempt_detail=json.loads(latest[2]) if latest else None,
+        collection_started=counts.get('ALL24_SPECIALIST_SHADOW_RECORDED',0)>0)
 
 
 def score(source,state,sha):
@@ -214,14 +243,17 @@ def score(source,state,sha):
 
 
 def main():
-    p=argparse.ArgumentParser(description=__doc__);p.add_argument('action',choices=('preflight','record','score'))
+    p=argparse.ArgumentParser(description=__doc__);p.add_argument('action',choices=('preflight','record','score','status'))
     p.add_argument('--source',default='/opt/torn-fren/data/stock_history.db');p.add_argument('--state',required=True)
     p.add_argument('--model-sha',required=True);p.add_argument('--duration-seconds',type=int,default=28800)
+    p.add_argument('--startup-wait-seconds',type=int,default=3600)
     p.add_argument('--compact',action='store_true')
     a=p.parse_args();head=subprocess.check_output(['git','-C',str(ROOT),'rev-parse','HEAD'],text=True).strip()
     if a.action!='score' and head!=a.model_sha:raise ValueError('Pinned checkout differs')
     if not 60<=a.duration_seconds<=86400:raise ValueError('Bounded duration required')
-    if a.action=='score':
+    if not 30<=a.startup_wait_seconds<=7200:raise ValueError('Bounded startup wait required')
+    if a.action=='status':print(json.dumps(status(a.state,a.model_sha),sort_keys=True))
+    elif a.action=='score':
         result=score(a.source,a.state,a.model_sha)
         if not a.compact:print(json.dumps(result,sort_keys=True))
         else:
@@ -239,7 +271,10 @@ def main():
             for mode in MODES:print(mode+' | '+cell('jap:Xanax',mode))
             print(json.dumps(dict(records=result['records'],truth_cutoff=result['truth_cutoff'],model_sha=a.model_sha,
                                   capture_attempt_statuses=result['capture_attempt_statuses'])))
-    else:capture(a.source,a.state,a.model_sha,duration=a.duration_seconds,once=a.action=='preflight')
+    else:
+        result=capture(a.source,a.state,a.model_sha,duration=a.duration_seconds,once=a.action=='preflight',startup_wait=a.startup_wait_seconds)
+        if a.action=='preflight' and result.get('status')!='ALL24_SPECIALIST_SHADOW_RECORDED':raise SystemExit(2)
+        if result and result.get('status')=='ALL24_STARTUP_WAIT_EXPIRED':raise SystemExit(3)
 
 
 if __name__=='__main__':main()

@@ -15,7 +15,8 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime,timezone
 from pathlib import Path
 
-from research.matched_champion_audit import causal_copy,native_plan,native_routes,summarize
+from research.matched_champion_audit import native_plan,native_routes,summarize
+from research.causal_replay_slice import CausalReplaySlice
 from research.execution_offset_study import bounded_departure,concentration
 from research.japan_xanax.renewal_shadow import source_data,rate_plan,WAIT,STEP
 from research.plushie_champions.common import TRAVEL_SECONDS
@@ -98,31 +99,29 @@ def item_check(source,out,key,model_sha):
     modes=['rate_current_quarter','leave_now_control']+native_modes
     cohorts=Cohorts(modes);rate=QuantityRateCycles(crosses);cursor=0;calls=Counter()
     work=Path(out)/key.split(':',1)[0]/key.split(':',1)[1].replace(' ','_');work.mkdir(parents=True,exist_ok=True)
-    for issued in range(START,END+WAIT+STEP+1,STEP):
-        cohorts.begin(issued)
-        if not cohorts.active:continue
-        while cursor<len(rows) and rows[cursor][0]<=issued:
-            rate.add(OBS(*rows[cursor]));cursor+=1
-        pi=bisect.bisect_right(polls,issued)-1;age=issued-polls[pi] if pi>=0 else None
-        fresh=age is not None and 0<=age+15<=180 and not crosses(issued,issued)
-        choices={}
-        if fresh:
-            if cohorts.needs(['rate_current_quarter']):
-                choices['rate_current_quarter']=bounded_departure(issued,rate_plan(rate,key,issued,age)['departure'])
-            choices['leave_now_control']=issued+15
-            if native_modes and cohorts.needs(native_modes):
-                db=work/'causal.sqlite'
-                try:
-                    causal_copy(source,db,issued)
+    with CausalReplaySlice(source,work/'causal.sqlite') as mirror:
+        for issued in range(START,END+WAIT+STEP+1,STEP):
+            cohorts.begin(issued)
+            if not cohorts.active:continue
+            while cursor<len(rows) and rows[cursor][0]<=issued:
+                rate.add(OBS(*rows[cursor]));cursor+=1
+            pi=bisect.bisect_right(polls,issued)-1;age=issued-polls[pi] if pi>=0 else None
+            fresh=age is not None and 0<=age+15<=180 and not crosses(issued,issued)
+            choices={}
+            if fresh:
+                if cohorts.needs(['rate_current_quarter']):
+                    choices['rate_current_quarter']=bounded_departure(issued,rate_plan(rate,key,issued,age)['departure'])
+                choices['leave_now_control']=issued+15
+                if native_modes and cohorts.needs(native_modes):
+                    db=work/'causal.sqlite'
+                    mirror.advance(issued)
                     if key=='cay:Banana Orchid':raw,status=banana_choices(db,issued)
                     else:
                         r=native_plan(db,key,issued,timeout=20)
                         raw={'native_specialist':r['departure']};status=r['status']
                     calls[status]+=1
                     for mode,dep in raw.items():choices[mode]=bounded_departure(issued,dep)
-                finally:
-                    if db.exists():db.chmod(0o600);db.unlink()
-        cohorts.advance(issued,choices,age)
+            cohorts.advance(issued,choices,age)
     records=cohorts.score(evidence,flight)
     primary=[r for r in records if r['issued'] in PRIMARY]
     errors=sum(v for k,v in calls.items() if 'ERROR' in k or 'TIMEOUT' in k)
@@ -140,14 +139,19 @@ def item_check(source,out,key,model_sha):
     return report
 
 
-def run(source,out,*,model_sha):
+def run(source,out,*,model_sha,item_keys=None):
     from deploy.scripts.v163_readonly_event_first_preview import exact_roster
-    keys=sorted(exact_roster());out=Path(out);out.mkdir(parents=True,exist_ok=True)
-    if len(keys)!=24:raise ValueError('Exact24 roster required')
+    roster=set(exact_roster())
+    if len(roster)!=24:raise ValueError('Exact24 roster required')
+    missing_with_control={'arg:Ceibo Flower','uae:Camel Plushie','uni:Nessie Plushie','uni:Red Fox Plushie','uni:Xanax'}
+    if item_keys is not None and (len(item_keys)!=5 or set(item_keys)!=missing_with_control):
+        raise ValueError('Follow-up must contain the exact four missing items and fixed parity control')
+    keys=sorted(roster if item_keys is None else item_keys);out=Path(out);out.mkdir(parents=True,exist_ok=True)
     # Two item workers only; both access isolated, immutable research evidence.
     with ThreadPoolExecutor(max_workers=2) as pool:
         results=list(pool.map(lambda k:item_check(source,out,k,model_sha),keys))
     return dict(model_sha=model_sha,item_count=len(results),primary_starts=PRIMARY,
+        full_roster_run=item_keys is None,
         secondary_starts=STARTS,native_supported=sum(r['native_supported'] for r in results),
         items={r['item_key']:dict(primary=r['primary'],primary_distinct=r['primary_distinct'],
              review_status=r['review_status'],worker_errors=r['worker_errors']) for r in results},

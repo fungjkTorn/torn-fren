@@ -4,10 +4,45 @@ import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
-from research.full_roster_specialist_shadow import normalize,specialist,store,score,tick
+from research.full_roster_specialist_shadow import normalize,specialist,store,score,tick,capture
 
 
 class SpecialistShadowTests(unittest.TestCase):
+    def test_startup_wait_is_bounded_even_if_host_never_becomes_available(self):
+        current=[0.0]
+        def wait(seconds):current[0]+=seconds
+        with tempfile.TemporaryDirectory() as td:
+            with patch('research.v60_private_snapshot_probe.approved_collector_source',return_value=True), \
+                 patch('research.full_roster_specialist_shadow.setup',return_value=Path(td)), \
+                 patch('research.full_roster_specialist_shadow.tick',return_value=dict(status='ALL24_SHADOW_DEFERRED_CPU_PRESSURE')), \
+                 patch('research.full_roster_specialist_shadow.time.time',side_effect=lambda:1000+int(current[0])):
+                result=capture('unused',td,'pin',duration=60,startup_wait=60,clock=lambda:current[0],sleeper=wait)
+            self.assertEqual(result['status'],'ALL24_STARTUP_WAIT_EXPIRED')
+            self.assertFalse(result['collection_started']);self.assertEqual(current[0],60)
+
+    def test_record_retries_deferral_without_spending_collection_window(self):
+        current=[0.0];observed=[]
+        def wait(seconds):current[0]+=seconds
+        def cycle(*args):
+            observed.append(current[0])
+            return dict(status='ALL24_SHADOW_DEFERRED_CPU_PRESSURE' if len(observed)==1 else 'ALL24_SPECIALIST_SHADOW_RECORDED')
+        with tempfile.TemporaryDirectory() as td:
+            with patch('research.v60_private_snapshot_probe.approved_collector_source',return_value=True), \
+                 patch('research.full_roster_specialist_shadow.setup',return_value=Path(td)), \
+                 patch('research.full_roster_specialist_shadow.tick',side_effect=cycle), \
+                 patch('research.full_roster_specialist_shadow.time.time',side_effect=lambda:1000+int(current[0])):
+                capture('unused',td,'pin',duration=60,startup_wait=60,clock=lambda:current[0],sleeper=wait)
+            self.assertEqual(observed,[0,30]);self.assertEqual(current[0],90)
+            with sqlite3.connect(Path(td)/'plans.sqlite') as c:self.assertEqual(c.execute('SELECT COUNT(*) FROM cycles').fetchone()[0],2)
+
+    def test_preflight_deferral_returns_clean_status_without_exception(self):
+        with tempfile.TemporaryDirectory() as td:
+            with patch('research.v60_private_snapshot_probe.approved_collector_source',return_value=True), \
+                 patch('research.full_roster_specialist_shadow.setup',return_value=Path(td)), \
+                 patch('research.full_roster_specialist_shadow.tick',return_value=dict(status='ALL24_SHADOW_DEFERRED_CPU_PRESSURE')):
+                result=capture('unused',td,'pin',once=True)
+            self.assertEqual(result['status'],'ALL24_SHADOW_DEFERRED_CPU_PRESSURE')
+
     def test_past_targets_not_silently_shifted_to_publication(self):
         r=normalize(dict(departure=100,status='PLAN'),queried=100,published=120,heartbeat=90,flight=20)
         self.assertIsNone(r['departure']);self.assertEqual(r['status'],'DEPARTURE_PASSED_BEFORE_PUBLICATION')

@@ -4,11 +4,17 @@ on:
     paths:
       - 'research/full_roster_specialist_shadow.py'
       - 'tests/test_full_roster_specialist_shadow.py'
+      - 'research/causal_replay_slice.py'
+      - 'research/fixed_roster_release_check.py'
+      - 'tests/test_causal_replay_slice.py'
       - '.github/workflows/full-roster-specialist-shadow.yml'
   pull_request:
     paths:
       - 'research/full_roster_specialist_shadow.py'
       - 'tests/test_full_roster_specialist_shadow.py'
+      - 'research/causal_replay_slice.py'
+      - 'research/fixed_roster_release_check.py'
+      - 'tests/test_causal_replay_slice.py'
 permissions:
   contents: read
 jobs:
@@ -20,4 +26,4 @@ jobs:
         with:
           python-version: '3.12'
       - run: python -m pip install numpy==1.26.4
-      - run: python -m unittest tests.test_full_roster_specialist_shadow tests.test_canary_model_inventory tests.test_fixed_roster_release_check tests.test_matched_champion_audit tests.test_departure_reconfirmation
+      - run: python -m unittest tests.test_full_roster_specialist_shadow tests.test_causal_replay_slice tests.test_canary_model_inventory tests.test_fixed_roster_release_check tests.test_matched_champion_audit tests.test_departure_reconfirmation
