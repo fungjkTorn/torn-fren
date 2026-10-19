@@ -149,19 +149,19 @@ def capture(source,state,sha,*,duration=28800,once=False):
     with (state/'capture.lock').open('a') as lock:
         fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
         with closing(sqlite3.connect(state/'plans.sqlite')) as db:
-            db.executescript('CREATE TABLE IF NOT EXISTS metadata(key TEXT PRIMARY KEY,value TEXT);CREATE TABLE IF NOT EXISTS plans(issued INTEGER,item_key TEXT,mode TEXT,record TEXT,PRIMARY KEY(issued,item_key,mode));')
+            db.executescript('CREATE TABLE IF NOT EXISTS metadata(key TEXT PRIMARY KEY,value TEXT);CREATE TABLE IF NOT EXISTS plans(issued INTEGER,item_key TEXT,mode TEXT,record TEXT,PRIMARY KEY(issued,item_key,mode));CREATE TABLE IF NOT EXISTS cycles(attempted_at INTEGER PRIMARY KEY,status TEXT,summary TEXT);')
             db.execute('INSERT OR IGNORE INTO metadata VALUES(?,?)',('model_sha',sha));db.commit()
             if db.execute("SELECT value FROM metadata WHERE key='model_sha'").fetchone()[0]!=sha:raise ValueError('Journal source mismatch')
             until=time.monotonic()+duration
             while time.monotonic()<until:
-                began=time.monotonic()
+                began=time.monotonic();attempted=int(time.time());failure=None
                 try:result=tick(source,state,sha,db)
                 except (OSError,ValueError,sqlite3.Error) as e:
-                    result=dict(status='FULL_ROSTER_CAPTURE_UNAVAILABLE',error_type=type(e).__name__)
-                    print(json.dumps(result),flush=True)
-                    if once:raise
-                else:print(json.dumps(result,sort_keys=True),flush=True)
+                    failure=e;result=dict(status='FULL_ROSTER_CAPTURE_UNAVAILABLE',error_type=type(e).__name__)
+                db.execute('INSERT INTO cycles VALUES(?,?,?)',(attempted,result['status'],json.dumps(result,sort_keys=True)));db.commit()
+                print(json.dumps(result,sort_keys=True),flush=True)
                 if once:
+                    if failure is not None:raise failure
                     if result.get('status')!='ALL24_SPECIALIST_SHADOW_RECORDED':
                         raise ValueError('Preflight deferred; no recording process should be started yet')
                     return result
@@ -174,6 +174,8 @@ def score(source,state,sha):
         c.execute('PRAGMA query_only=ON')
         if c.execute("SELECT value FROM metadata WHERE key='model_sha'").fetchone()[0]!=sha:raise ValueError('Wrong model source')
         raw=c.execute('SELECT record FROM plans ORDER BY issued,item_key,mode LIMIT 100001').fetchall()
+        has_cycles=c.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='cycles'").fetchone()
+        attempts=dict(c.execute('SELECT status,COUNT(*) FROM cycles GROUP BY status')) if has_cycles else None
     if len(raw)>100000:raise ValueError('Journal cap exceeded')
     first={};near={};statuses=Counter()
     for (encoded,) in raw:
@@ -206,7 +208,7 @@ def score(source,state,sha):
             result[key]=dict(c,known=known,success_fraction=c['SUCCESS']/known if known else None,
                 proposal_coverage=c['proposals']/c['hourly_opportunities'])
         return result
-    return dict(model_sha=sha,records=len(raw),truth_cutoff=cutoff,first_hourly_frozen=counts(first),
+    return dict(model_sha=sha,records=len(raw),truth_cutoff=cutoff,capture_attempt_statuses=attempts,first_hourly_frozen=counts(first),
         first_hourly_near_term_eligible=counts(near),statuses=dict(statuses),actual_flights=False,
         limitation='Near-term eligibility is not actual execution. Frozen future plans require later reconfirmation; no calibrated probability or automatic promotion.')
 
@@ -235,7 +237,8 @@ def main():
             for key in sorted(exact_roster()):print(key+' | '+cell(key,SPECIAL)+' | '+cell(key,'rate_current_quarter'))
             print('Japan: legacy specialist excluded; all eight physical-zero challenger models are tested:')
             for mode in MODES:print(mode+' | '+cell('jap:Xanax',mode))
-            print(json.dumps(dict(records=result['records'],truth_cutoff=result['truth_cutoff'],model_sha=a.model_sha)))
+            print(json.dumps(dict(records=result['records'],truth_cutoff=result['truth_cutoff'],model_sha=a.model_sha,
+                                  capture_attempt_statuses=result['capture_attempt_statuses'])))
     else:capture(a.source,a.state,a.model_sha,duration=a.duration_seconds,once=a.action=='preflight')
 
 

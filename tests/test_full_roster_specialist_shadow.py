@@ -42,12 +42,13 @@ class SpecialistShadowTests(unittest.TestCase):
             def score(self,t):return 'UNKNOWN',None,None
         with tempfile.TemporaryDirectory() as td:
             with sqlite3.connect(Path(td)/'plans.sqlite') as c:
-                c.executescript("CREATE TABLE metadata(key,value);INSERT INTO metadata VALUES('model_sha','pin');CREATE TABLE plans(issued,item_key,mode,record);")
+                c.executescript("CREATE TABLE metadata(key,value);INSERT INTO metadata VALUES('model_sha','pin');CREATE TABLE plans(issued,item_key,mode,record);CREATE TABLE cycles(attempted_at,status,summary);INSERT INTO cycles VALUES(100,'ALL24_SPECIALIST_SHADOW_RECORDED','{}'),(400,'ALL24_SHADOW_DEFERRED_CPU_PRESSURE','{}');")
                 for mode,dep in (('soon',130),('future',600)):
                     store(c,key='jap:Xanax',mode=mode,raw=dict(departure=dep,status='PLAN'),
                           queried=100,published=105,heartbeat=90,sha='pin')
             with patch('research.full_roster_specialist_shadow.source_data',return_value=(None,None,None,E(),1000)):
-                r=score('not-opened',td,'pin')['first_hourly_near_term_eligible']
+                report=score('not-opened',td,'pin');r=report['first_hourly_near_term_eligible']
+            self.assertEqual(report['capture_attempt_statuses']['ALL24_SHADOW_DEFERRED_CPU_PRESSURE'],1)
             self.assertEqual(r['jap:Xanax|future']['proposal_coverage'],0)
             self.assertEqual(r['jap:Xanax|future']['NO_NEAR_TERM_ELIGIBILITY'],1)
             self.assertEqual(r['jap:Xanax|soon']['UNKNOWN'],1)
