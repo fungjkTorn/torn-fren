@@ -1,0 +1,23 @@
+name: Full24 specialist shadow safeguards
+on:
+  push:
+    paths:
+      - 'research/full_roster_specialist_shadow.py'
+      - 'tests/test_full_roster_specialist_shadow.py'
+      - '.github/workflows/full-roster-specialist-shadow.yml'
+  pull_request:
+    paths:
+      - 'research/full_roster_specialist_shadow.py'
+      - 'tests/test_full_roster_specialist_shadow.py'
+permissions:
+  contents: read
+jobs:
+  safeguards:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install numpy==1.26.4
+      - run: python -m unittest tests.test_full_roster_specialist_shadow tests.test_canary_model_inventory tests.test_fixed_roster_release_check tests.test_matched_champion_audit tests.test_departure_reconfirmation
