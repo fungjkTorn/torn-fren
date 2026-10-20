@@ -1,6 +1,11 @@
 import unittest
+import json
+from pathlib import Path
+import tempfile
+from types import SimpleNamespace
+from unittest.mock import patch
 from research.supported_target_retention import WAIT, STEP, MODES
-from research.supported_target_replay import schedule, score_records
+from research.supported_target_replay import schedule, score_records, collect_item
 
 
 def tick(q, native, points, age=0):
@@ -8,6 +13,35 @@ def tick(q, native, points, age=0):
 
 
 class ReplayTests(unittest.TestCase):
+    def test_collection_finishes_all_causal_inference_before_exporting_labels(self):
+        calls=[];queries=tuple(range(0,WAIT+2*STEP,STEP))
+        class Mirror:
+            def __init__(self,*a): pass
+            def __enter__(self): return self
+            def advance(self,q): calls.append(q)
+            def __exit__(self,*a): pass
+        class Evidence:
+            def score(self,arrival):
+                self_check.assertEqual(tuple(calls),queries)
+                return 'UNKNOWN','FIXTURE_UNKNOWN',None
+        self_check=self
+        def child(args,**kwargs):
+            q=int(args[-1])
+            return SimpleNamespace(stdout=json.dumps(dict(issued=q,native=q,points=[[q,.9]])))
+        source=([],list(queries),lambda a,b:False,Evidence(),WAIT+STEP+9600+190)
+        with tempfile.TemporaryDirectory() as td, \
+             patch('research.japan_xanax.renewal_shadow.source_data',return_value=source), \
+             patch('research.causal_replay_slice.CausalReplaySlice',Mirror), \
+             patch('research.supported_target_replay.subprocess.run',side_effect=child):
+            report=collect_item('unused',td,'chi:Peony',(0,),25)
+            self.assertEqual(report['worker_errors'],0)
+            work=Path(td)/'chi-Peony'
+            bands=[json.loads(s) for s in (work/'as-issued-bands.jsonl').read_text().splitlines()]
+            labels=[json.loads(s) for s in (work/'arrival-evaluation.jsonl').read_text().splitlines()]
+            self.assertEqual(len(bands),len(queries));self.assertEqual(len(labels),len(queries))
+            self.assertTrue(all(l['outcome']=='UNKNOWN' and l['training_input'] is False for l in labels))
+            self.assertTrue(all('outcome' not in b for b in bands))
+
     def test_current_support_can_resolve_repeated_postponement(self):
         ticks = [tick(0, 600, ((300, .8), (600, .8), (900, .8)))]
         for q in range(STEP, WAIT+STEP+1, STEP):

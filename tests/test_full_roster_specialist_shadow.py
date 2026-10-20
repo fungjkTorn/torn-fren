@@ -7,10 +7,41 @@ import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
-from research.full_roster_specialist_shadow import normalize,specialist,store,score,tick,capture,status
+from research.full_roster_specialist_shadow import normalize,specialist,store,score,tick,capture,status,capture_inputs,source_data
 
 
 class SpecialistShadowTests(unittest.TestCase):
+    def test_batch_capture_matches_individual_readers_without_source_writes(self):
+        from deploy.scripts.v163_readonly_event_first_preview import exact_roster
+        keys=sorted(exact_roster())
+        with tempfile.TemporaryDirectory() as td:
+            source=Path(td)/'source.sqlite'
+            with sqlite3.connect(source) as c:
+                c.executescript('CREATE TABLE stock_history(id INTEGER PRIMARY KEY,timestamp INTEGER,country TEXT,item_name TEXT,quantity INTEGER,source TEXT);'
+                    'CREATE TABLE poll_heartbeats(timestamp INTEGER,mode TEXT,success INTEGER);'
+                    'CREATE TABLE collection_gaps(start_timestamp INTEGER,end_timestamp INTEGER);')
+                c.executemany('INSERT INTO poll_heartbeats VALUES(?,?,1)',[(q,'poll-cycle') for q in range(100,1001,30)])
+                c.executemany('INSERT INTO collection_gaps VALUES(?,?)',[(350,400),(900,None),(1100,1200)])
+                for key in keys:
+                    country,item=key.split(':',1)
+                    c.executemany('INSERT INTO stock_history(timestamp,country,item_name,quantity,source) VALUES(?,?,?,?,?)',
+                        [(q,country,item,n,'a') for q,n in ((100,0),(300,100),(500,20),(600,0),(1100,999))])
+            before=source.read_bytes()
+            batch,crosses,cutoff=capture_inputs(source,keys,now=1000)
+            self.assertEqual(cutoff,1000)
+            for key in keys:
+                rows,polls,old_crosses,_,old_cutoff=source_data(source,now=1000,item_key=key)
+                self.assertEqual((batch[key],cutoff),(rows,old_cutoff))
+                for a,b in ((100,200),(300,400),(400,500),(900,950),(1000,1100)):
+                    self.assertEqual(crosses(a,b),old_crosses(a,b))
+            self.assertEqual(source.read_bytes(),before)
+            with self.assertRaisesRegex(ValueError,'Exact24'):
+                capture_inputs(source,keys[:-1],now=1000)
+            with sqlite3.connect(source) as c:
+                c.execute("UPDATE stock_history SET quantity=-1 WHERE country='jap'")
+            with self.assertRaisesRegex(ValueError,'Invalid stock'):
+                capture_inputs(source,keys,now=1000)
+
     def test_vm_staged_research_cannot_replace_checkout_before_source_data(self):
         root=Path(__file__).resolve().parents[1]
         child='''import os,pathlib
@@ -132,18 +163,31 @@ print('CHECKOUT_IMPORTS_OK')
         with tempfile.TemporaryDirectory() as td:
             with sqlite3.connect(Path(td)/'plans.sqlite') as c:
                 c.executescript("CREATE TABLE metadata(key,value);INSERT INTO metadata VALUES('model_sha','pin');CREATE TABLE plans(issued,item_key,mode,record);CREATE TABLE cycles(attempted_at,status,summary);INSERT INTO cycles VALUES(100,'ALL24_SPECIALIST_SHADOW_RECORDED','{}'),(400,'ALL24_SHADOW_DEFERRED_CPU_PRESSURE','{}');")
-                for mode,dep in (('soon',130),('future',600)):
+                for mode,dep in (('paired_recent_peak',130),('sequence_blocks_peak',600)):
                     store(c,key='jap:Xanax',mode=mode,raw=dict(departure=dep,status='PLAN'),
                           queried=100,published=105,heartbeat=90,sha='pin')
             with patch('research.full_roster_specialist_shadow.source_data',return_value=(None,None,None,E(),1000)):
                 report=score('not-opened',td,'pin');r=report['first_hourly_near_term_eligible']
             self.assertEqual(report['capture_attempt_statuses']['ALL24_SHADOW_DEFERRED_CPU_PRESSURE'],1)
-            self.assertEqual(r['jap:Xanax|future']['proposal_coverage'],0)
-            self.assertEqual(r['jap:Xanax|future']['NO_NEAR_TERM_ELIGIBILITY'],1)
-            self.assertEqual(r['jap:Xanax|soon']['UNKNOWN'],1)
-            self.assertIsNone(r['jap:Xanax|soon']['success_fraction'])
+            self.assertEqual(r['jap:Xanax|sequence_blocks_peak']['proposal_coverage'],0)
+            self.assertEqual(r['jap:Xanax|sequence_blocks_peak']['NO_NEAR_TERM_ELIGIBILITY'],1)
+            self.assertEqual(r['jap:Xanax|paired_recent_peak']['UNKNOWN'],1)
+            self.assertIsNone(r['jap:Xanax|paired_recent_peak']['success_fraction'])
+            self.assertFalse(report['capture_diagnostics']['complete_footprints'])
+
+    def test_score_rejects_sql_and_encoded_identity_mismatch_before_truth_reads(self):
+        with tempfile.TemporaryDirectory() as td:
+            with sqlite3.connect(Path(td)/'plans.sqlite') as c:
+                c.executescript("CREATE TABLE metadata(key,value);INSERT INTO metadata VALUES('model_sha','pin');CREATE TABLE plans(issued,item_key,mode,record);")
+                store(c,key='jap:Xanax',mode='rate_current_quarter',raw=dict(departure=None,status='ABSTAIN'),
+                      queried=100,published=105,heartbeat=90,sha='pin')
+                c.execute('UPDATE plans SET issued=200');c.commit()
+            with patch('research.full_roster_specialist_shadow.source_data') as truth:
+                with self.assertRaisesRegex(ValueError,'identity mismatch'):score('unused',td,'pin')
+                truth.assert_not_called()
 
     def test_full_cycle_never_drops_items_or_japan_zero_challengers(self):
+        from deploy.scripts.v163_readonly_event_first_preview import exact_roster
         original=specialist
         def worker(db,key,q):
             return original(db,key,q) if key=='jap:Xanax' else dict(departure=None,status='MODEL_ABSTAINED')
@@ -151,7 +195,7 @@ print('CHECKOUT_IMPORTS_OK')
             c.execute('CREATE TABLE plans(issued,item_key,mode,record)')
             with patch('research.v65_private_mirror_shadow_tick.snapshot_with_retry',return_value=dict(status='PRIVATE_SNAPSHOT_READY',published=True)), \
                  patch('research.v38_capacity_guard.inspect',return_value=dict(allowed=True)), \
-                 patch('research.full_roster_specialist_shadow.source_data',return_value=([],[],lambda a,b:False,None,995)), \
+                 patch('research.full_roster_specialist_shadow.capture_inputs',return_value=({k:[] for k in exact_roster()},lambda a,b:False,995)), \
                  patch('research.full_roster_specialist_shadow.rate_plan',return_value=dict(departure=None,status='EMPTY')), \
                  patch('research.full_roster_specialist_shadow.time.time',return_value=1000), \
                  patch('research.full_roster_specialist_shadow.specialist',side_effect=worker):

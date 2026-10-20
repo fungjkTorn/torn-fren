@@ -120,6 +120,15 @@ def collect_item(source, out, key, starts, timeout):
             journal.flush()
     # No labels are passed into schedule, including for choosing retained targets.
     records = score_records(schedule(ticks, starts), evidence, flight)
+    # Export sampled evaluation labels only AFTER inference and scheduling.
+    # These let hosted research reuse frozen curves without rerunning native
+    # inference or exporting stock rows / the restricted SQLite source.
+    with (work/'arrival-evaluation.jsonl').open('x') as labels:
+        for tick in ticks:
+            dep=tick['issued']+15
+            outcome,reason,_=evidence.score(dep+flight)
+            labels.write(json.dumps(dict(departure=dep,arrival=dep+flight,
+                outcome=outcome,reason=reason,training_input=False),sort_keys=True)+'\n')
     report = dict(item_key=key, starts=starts, truth_cutoff=cutoff, records=records,
         policies=summarize(records), distinct=concentration(records),
         inference_status_counts=dict(counts), seconds=time.monotonic()-began,

@@ -106,6 +106,37 @@ def store(db,*,key,mode,raw,queried,published,heartbeat,sha,commit=True):
     if commit:db.commit()
 
 
+def capture_inputs(source,keys,*,now=None):
+    """One readonly transaction; shared poll/gap checks once for all24.
+
+    Capture needs rows and gap guards, not 25 arrival-truth evaluators. Retain
+    the same evidence limits/row validation as source_data, without repeatedly
+    materializing the identical successful-poll history for every item.
+    """
+    from research.continuous_departure_replay import model,MAX_POLLS
+    if len(keys)!=24 or set(keys)!=set(model.exact_roster()):raise ValueError('Exact24 capture inputs required')
+    clock=int(time.time()) if now is None else now
+    with closing(sqlite3.connect(Path(source).resolve(strict=True).as_uri()+'?mode=ro',uri=True,timeout=12)) as c:
+        c.execute('PRAGMA query_only=ON');c.execute('BEGIN')
+        heartbeat=model.read_heartbeat(c)
+        if heartbeat is None:raise ValueError('Missing successful heartbeat')
+        cutoff=min(clock,heartbeat)
+        polls=c.execute("SELECT COUNT(*) FROM (SELECT 1 FROM poll_heartbeats WHERE mode='poll-cycle' AND success=1 AND timestamp<=? LIMIT ?)",
+                        (cutoff,MAX_POLLS+1)).fetchone()[0]
+        gaps=c.execute('SELECT start_timestamp,end_timestamp FROM collection_gaps WHERE start_timestamp<=? ORDER BY start_timestamp LIMIT ?',
+                       (cutoff,model.MAX_GAPS+1)).fetchall()
+        if polls>MAX_POLLS or len(gaps)>model.MAX_GAPS:raise ValueError('Source evidence cap exceeded')
+        rows={}
+        for key in keys:
+            country,item=key.split(':',1)
+            values=c.execute('SELECT timestamp,quantity,source FROM stock_history WHERE country=? AND lower(item_name)=lower(?) AND timestamp<=? ORDER BY timestamp,id LIMIT ?',
+                             (country,item,cutoff,model.MAX_ITEM_CHANGE_ROWS+1)).fetchall()
+            if len(values)>model.MAX_ITEM_CHANGE_ROWS:raise ValueError('Source evidence cap exceeded')
+            if any(type(t) is not int or type(q) is not int or q<0 or not s for t,q,s in values):raise ValueError('Invalid stock observations')
+            rows[key]=values
+    return rows,model._gap_index(gaps,cutoff),cutoff
+
+
 def tick(source,state,sha,db):
     from research.v65_private_mirror_shadow_tick import snapshot_with_retry
     from research.v38_capacity_guard import inspect as capacity
@@ -121,11 +152,11 @@ def tick(source,state,sha,db):
     snap=snapshot_with_retry(source,snapshot)
     if snap.get('status')!='PRIVATE_SNAPSHOT_READY' or not snap.get('published'):
         raise ValueError('Fresh isolated snapshot unavailable')
-    source_data(snapshot) # checkout-pinned bootstrap; no live HTTP history
+    inputs,crosses,heartbeat=capture_inputs(snapshot,keys)
     cutoffs={};generic_rows=0;statuses=Counter()
     # All24 receive all8 physical-zero challengers before native compute.
     for key in keys:
-        queried=int(time.time());rows,_,crosses,_,heartbeat=source_data(snapshot,now=queried,item_key=key)
+        queried=int(time.time());rows=inputs[key]
         cutoffs[key]=heartbeat;history=History(crosses);rate=QuantityRateCycles(crosses)
         if not 0<=queried-heartbeat<=180:raise ValueError('Snapshot expired before full roster generation')
         for row in rows:history.add(row);rate.add(OBS(*row))
@@ -213,16 +244,25 @@ def status(state,sha):
 def score(source,state,sha):
     journal=Path(state).expanduser().resolve(strict=True)/'plans.sqlite'
     with closing(sqlite3.connect(journal.as_uri()+'?mode=ro',uri=True)) as c:
-        c.execute('PRAGMA query_only=ON')
+        c.execute('PRAGMA query_only=ON');c.execute('BEGIN')
         if c.execute("SELECT value FROM metadata WHERE key='model_sha'").fetchone()[0]!=sha:raise ValueError('Wrong model source')
-        raw=c.execute('SELECT record FROM plans ORDER BY issued,item_key,mode LIMIT 100001').fetchall()
+        raw=c.execute('SELECT issued,item_key,mode,record FROM plans ORDER BY rowid LIMIT 100001').fetchall()
         has_cycles=c.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='cycles'").fetchone()
-        attempts=dict(c.execute('SELECT status,COUNT(*) FROM cycles GROUP BY status')) if has_cycles else None
+        attempt_rows=c.execute('SELECT attempted_at,status FROM cycles ORDER BY attempted_at LIMIT 10001').fetchall() if has_cycles else []
+        if len(attempt_rows)>10000:raise ValueError('Capture attempt cap exceeded')
+        attempts=dict(Counter(status for _,status in attempt_rows)) if has_cycles else None
     if len(raw)>100000:raise ValueError('Journal cap exceeded')
-    first={};near={};statuses=Counter()
-    for (encoded,) in raw:
+    records=[]
+    for issued,key,mode,encoded in raw:
         r=json.loads(encoded)
-        if r['model_sha']!=sha:raise ValueError('Mixed journal source')
+        if (r['issued'],r['item_key'],r['mode'],r['model_sha'])!=(issued,key,mode,sha):raise ValueError('Journal record identity mismatch')
+        if (r.get('physical_depletion_quantity'),r.get('arrival_target'),r.get('grace_seconds'))!=(0,30,10):raise ValueError('Journal stock contract mismatch')
+        records.append(r)
+    from research.full_roster_capture_review import review
+    from deploy.scripts.v163_readonly_event_first_preview import exact_roster
+    capture_diagnostics=review(records,attempt_rows,roster=sorted(exact_roster()),modes=MODES+(SPECIAL,))
+    first={};near={};statuses=Counter()
+    for r in sorted(records,key=lambda r:(r['issued'],r['item_key'],r['mode'])):
         identity=(r['item_key'],r['mode'],r['issued']//3600)
         first.setdefault(identity,r);statuses[r['status']]+=1
         if r['executable_before_next_recheck']:near.setdefault(identity,r)
@@ -250,7 +290,7 @@ def score(source,state,sha):
             result[key]=dict(c,known=known,success_fraction=c['SUCCESS']/known if known else None,
                 proposal_coverage=c['proposals']/c['hourly_opportunities'])
         return result
-    return dict(model_sha=sha,records=len(raw),truth_cutoff=cutoff,capture_attempt_statuses=attempts,first_hourly_frozen=counts(first),
+    return dict(model_sha=sha,records=len(raw),truth_cutoff=cutoff,capture_attempt_statuses=attempts,capture_diagnostics=capture_diagnostics,first_hourly_frozen=counts(first),
         first_hourly_near_term_eligible=counts(near),statuses=dict(statuses),actual_flights=False,
         limitation='Near-term eligibility is not actual execution. Frozen future plans require later reconfirmation; no calibrated probability or automatic promotion.')
 
@@ -278,12 +318,18 @@ def main():
                     r.get('hourly_opportunities',0),r.get('UNKNOWN',0),r.get('PENDING',0))
             print('First near-term advice per item/model/UTC-hour; sampled arrivals, NOT actual flights.')
             print('Cells: success/known eligible/hourly-opportunities unknown/pending.')
-            print('Item | specialist | physical-zero rate')
-            for key in sorted(exact_roster()):print(key+' | '+cell(key,SPECIAL)+' | '+cell(key,'rate_current_quarter'))
+            print('Item | specialist | physical-zero rate | specialist statuses (all captured rows)')
+            for key in sorted(exact_roster()):
+                statuses=result['capture_diagnostics']['models'][key+'|'+SPECIAL]['statuses']
+                print(key+' | '+cell(key,SPECIAL)+' | '+cell(key,'rate_current_quarter')+' | '+json.dumps(statuses,sort_keys=True))
             print('Japan: legacy specialist excluded; all eight physical-zero challenger models are tested:')
             for mode in MODES:print(mode+' | '+cell('jap:Xanax',mode))
             print(json.dumps(dict(records=result['records'],truth_cutoff=result['truth_cutoff'],model_sha=a.model_sha,
-                                  capture_attempt_statuses=result['capture_attempt_statuses'])))
+                                  capture_attempt_statuses=result['capture_attempt_statuses'],
+                                  complete24_row_batches=result['capture_diagnostics']['complete24_row_batches'],
+                                  incomplete_row_batches=result['capture_diagnostics']['incomplete_row_batches'],
+                                  observed_active_window_hours=result['capture_diagnostics']['active_window_observed_hours'],
+                                  hours_without_any_capture=len(result['capture_diagnostics']['active_hours_without_any_capture']))))
     else:
         result=capture(a.source,a.state,a.model_sha,duration=a.duration_seconds,once=a.action=='preflight',startup_wait=a.startup_wait_seconds)
         if a.action=='preflight' and result.get('status')!='ALL24_SPECIALIST_SHADOW_RECORDED':raise SystemExit(2)
