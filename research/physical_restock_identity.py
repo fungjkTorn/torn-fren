@@ -115,12 +115,19 @@ def audit(db, points, cutoff):
             r=match(rows,sorted({r[0] for r in polls}),gaps,issued=p['created_at'],
                 ordinal=p['prediction_number'],cutoff=cutoff,estimate=p.get('estimate_timestamp'),
                 window_start=p.get('window_start_timestamp'),window_end=p.get('window_end_timestamp'))
-            end=r.get('restock_by_epoch',cutoff)
-            sources={src for t,src in polls if p['created_at']-180<=t<=end}
-            if len(sources)>1 or None in sources:
-                r=dict(status='UNKNOWN',reason='POLL_PROVIDER_SWITCH_OR_MISSING')
-            elif r['status']=='RESOLVED' and sources != {rows[bisect_right([row[0] for row in rows],p['created_at'])-1][2]}:
-                r=dict(status='UNKNOWN',reason='POLL_ITEM_PROVIDER_MISMATCH')
+            # Preserve the first failed identity check. UNKNOWN labels have no
+            # target end; using cutoff for them incorrectly scans weeks past
+            # the failed boundary and masks the actual cause with a later switch.
+            if r['status']!='UNKNOWN':
+                end=r.get('restock_by_epoch',cutoff)
+                poll_epochs=[t for t,_ in polls]
+                pi=bisect_right(poll_epochs,p['created_at'])-1
+                before=poll_epochs[pi] if pi>=0 else p['created_at']
+                sources={src for t,src in polls if before<=t<=end}
+                if len(sources)>1 or None in sources:
+                    r=dict(status='UNKNOWN',reason='POLL_PROVIDER_SWITCH_OR_MISSING')
+                elif r['status']=='RESOLVED' and sources != {rows[bisect_right([row[0] for row in rows],p['created_at'])-1][2]}:
+                    r=dict(status='UNKNOWN',reason='POLL_ITEM_PROVIDER_MISMATCH')
             counts[r['status']]+=1
             if 'reason' in r:counts[r['reason']]+=1
             if 'window_result' in r:counts[r['window_result']]+=1

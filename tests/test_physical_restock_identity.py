@@ -70,6 +70,15 @@ class PhysicalIdentityTests(unittest.TestCase):
             out=archived_audit(db,cutoff=600,days=1)
             self.assertEqual(out['overall'],dict(RESOLVED=1,MISS=1))
             self.assertFalse(out['legacy_normal_cycle_identity_certified'])
+            # A later provider switch must not mask an earlier collection gap
+            # that already made target identity unresolvable.
+            db.execute('PRAGMA query_only=OFF')
+            db.execute('INSERT INTO collection_gaps VALUES(150,160)')
+            db.execute("UPDATE poll_heartbeats SET source='other' WHERE timestamp>=500")
+            db.commit()
+            db.execute('PRAGMA query_only=ON')
+            out=archived_audit(db,cutoff=600,days=1)
+            self.assertEqual(out['overall'],dict(UNKNOWN=1,COLLECTION_GAP=1))
 
 
 if __name__=='__main__':unittest.main()
