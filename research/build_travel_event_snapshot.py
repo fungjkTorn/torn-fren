@@ -22,6 +22,7 @@ from services.travel_window_policy import POLICIES
 from services.departure_recommendation import EXECUTION_POLICIES
 
 PATH_POLICIES=frozenset(('zero_path_recent70','zero_path_analog70','zero_path_analog80'))
+PHYSICAL_CLOCKS=frozenset(('restock_clock_median','restock_clock_ridge'))
 
 
 def path_recommendation(key, observations, polls, gaps, crosses, tracker, *,
@@ -59,9 +60,9 @@ def prepare(source, *, model_sha, assignments=None, now=None, allow_legacy_avail
         raise ValueError('assignment outside verified roster')
     for config in assignments.values():
         if (not isinstance(config,dict) or config.get('event_history') not in
-            ('all_history','recent_8','phase_analogs_18','true_zero_all') or config.get('flight_adapter') not in POLICIES):
+            ('all_history','recent_8','phase_analogs_18','true_zero_all')+tuple(PHYSICAL_CLOCKS) or config.get('flight_adapter') not in POLICIES):
             raise ValueError('invalid explicit model assignment')
-        if config['event_history']!='true_zero_all' and not allow_legacy_availability_baselines:
+        if config['event_history'] not in PHYSICAL_CLOCKS|{'true_zero_all'} and not allow_legacy_availability_baselines:
             raise ValueError('legacy availability clocks require explicit research-only opt-in')
         if 'departure_policy' in config and (config['departure_policy'] not in PATH_POLICIES|{'disabled'}
             or config['event_history']!='true_zero_all'):
@@ -102,7 +103,7 @@ def prepare(source, *, model_sha, assignments=None, now=None, allow_legacy_avail
             phase=model._ReplayPhases(crosses)
             config=assignments.get(key,{'event_history':'true_zero_all','flight_adapter':'median'})
             analog=PhaseAnalogs(crosses) if config['event_history']=='phase_analogs_18' else None
-            zero=ZeroCycles(crosses) if config['event_history']=='true_zero_all' else None
+            zero=ZeroCycles(crosses) if config['event_history'] in PHYSICAL_CLOCKS|{'true_zero_all'} else None
             for t,q,s in raw:
                 if type(t) is not int or type(q) is not int or q<0 or not s:
                     raise ValueError('invalid stock history')
@@ -110,9 +111,29 @@ def prepare(source, *, model_sha, assignments=None, now=None, allow_legacy_avail
                 if analog is not None: analog.add(obs)
                 if zero is not None: zero.add(obs)
             state=phase.asof()
-            forecast=(zero.forecast(key,asof=clock) if zero is not None else
-                      analog.forecast(key,state,asof=clock) if analog is not None else
-                      model.predict_events(key,state,asof=clock,recent_cycles=8 if config['event_history']=='recent_8' else None))
+            if config['event_history'] in PHYSICAL_CLOCKS:
+                # Explicit research challenger; uses precisely the same
+                # completed, pre-issue physical cycles as the historical
+                # restock-clock evaluator. No future source rows are passed.
+                from research.restock_event_clock import IntervalClock
+                observations=[model.OBS(*r) for r in raw]
+                clock_model=IntervalClock(observations,crosses,clock)
+                family=config['event_history'].removeprefix('restock_clock_')
+                forecast=clock_model.forecast(key,zero,clock,family)
+                if forecast.get('latest_training_end',clock)>clock:
+                    raise ValueError('restock clock used future training')
+                forecast['cycle_window']='true_zero_all'
+                forecast['depletion_stock_quantity']=0
+            else:
+                forecast=(zero.forecast(key,asof=clock) if zero is not None else
+                          analog.forecast(key,state,asof=clock) if analog is not None else
+                          model.predict_events(key,state,asof=clock,recent_cycles=8 if config['event_history']=='recent_8' else None))
+            # All item consumers use the same source identity, flight clock,
+            # last observed quantity, and physical event stream.
+            forecast=dict(forecast)
+            forecast.setdefault('flight_seconds',model.TRAVEL_SECONDS[country])
+            forecast.setdefault('observed_current_quantity',raw[-1][1] if raw else None)
+            forecast.setdefault('last_quantity_change_epoch',raw[-1][0] if raw else None)
             items[key]=forecast; policies[key]=config['flight_adapter']
             if 'departure_policy' in config:
                 recommendations[key]=path_recommendation(key,[model.OBS(*r) for r in raw],
