@@ -10,6 +10,7 @@ import os
 from pathlib import Path
 import sqlite3
 import statistics
+import shutil
 import time
 from urllib.request import build_opener,ProxyHandler
 from urllib.error import URLError,HTTPError
@@ -114,7 +115,11 @@ def recovery_inventory():
         folders.append(dict(name=p.name,git_checkout=(p/'.git').is_dir(),
             shallow_database_bytes=sum(f.stat().st_size for f in databases),
             shallow_database_count=len(databases)))
-    return dict(local_pages=pages,home_project_directories=folders,
+    files=[dict(name=p.name,bytes=p.stat().st_size) for p in sorted(Path.home().glob('torn-fren*'))[:200]
+           if p.is_file() and not p.is_symlink() and p.suffix in ('.sqlite','.db','.log','.json','.txt')]
+    space=shutil.disk_usage(Path.home())
+    return dict(local_pages=pages,home_project_directories=folders,home_project_files=files,
+        home_filesystem_bytes=dict(total=space.total,used=space.used,free=space.free),
         cleanup_performed=False,
         limitation='Shallow inventory only. No directory is declared safe to remove; inactive services/timers may still reference it. HTTP200 checks page reachability, not prediction correctness.')
 
