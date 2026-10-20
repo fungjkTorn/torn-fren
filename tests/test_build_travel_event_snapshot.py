@@ -106,6 +106,45 @@ class PublisherTests(unittest.TestCase):
             with self.assertRaises(ValueError):prepare(db,model_sha='a'*40,now=T+181)
             with self.assertRaises(ValueError):publish(snapshot,db,source=db)
 
+    def test_explicit_physical_interval_clock_challengers_share_all_24_item_snapshot(self):
+        """A causal model can be selected per item without replacing incumbents."""
+        from services.travel_read_model import build_board
+        assignments={
+            'mex:Jaguar Plushie':{'event_history':'restock_clock_ridge',
+                'flight_adapter':'median'},
+            'arg:Monkey Plushie':{'event_history':'restock_clock_median',
+                'flight_adapter':'late'},
+        }
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td)
+            source=fixtures.ContinuousTests().fixture(root)
+            original=source.read_bytes()
+            data=prepare(source,model_sha='b'*40,now=T,assignments=assignments)
+            self.assertEqual(set(data['items']),set(fixtures.m.model.exact_roster()))
+            self.assertEqual(len(data['items']),24)
+            for key,family in (('mex:Jaguar Plushie','ridge'),('arg:Monkey Plushie','median')):
+                forecast=data['items'][key]
+                self.assertEqual(forecast['model_name'],
+                                 'physical_restock_interval_'+family)
+                self.assertEqual(forecast['depletion_stock_quantity'],0)
+                self.assertEqual(forecast['observed_current_quantity'],0)
+                self.assertLessEqual(forecast.get('latest_training_end',T),T)
+                self.assertEqual(len(forecast['restock_events']),
+                                 len(forecast['true_restock_events']))
+                self.assertEqual(
+                    [e['predicted_restock_epoch'] for e in forecast['true_restock_events']],
+                    sorted(e['predicted_restock_epoch'] for e in forecast['true_restock_events']))
+            board=build_board(data,now=T)
+            self.assertEqual(board['item_count'],24)
+            self.assertEqual(next(r for r in board['rows'] if
+                r['item_key']=='mex:Jaguar Plushie')['event_model_name'],
+                'physical_restock_interval_ridge')
+            self.assertEqual(source.read_bytes(),original)
+        with self.assertRaises(ValueError):
+            prepare('unused',model_sha='b'*40,assignments={
+                'mex:Jaguar Plushie':{'event_history':'restock_clock_ridge',
+                    'flight_adapter':'median','departure_policy':'disabled'}})
+
     def test_unverified_assignments_and_source_revision_rejected(self):
         with self.assertRaises(ValueError):prepare('unused',model_sha='latest')
         with self.assertRaises(ValueError):prepare('unused',model_sha='a'*40,assignments={'jap:Xanax':{'event_history':'all_history','flight_adapter':'median'}})
