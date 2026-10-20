@@ -301,6 +301,8 @@ def main():
     p.add_argument('--model-sha',required=True);p.add_argument('--duration-seconds',type=int,default=28800)
     p.add_argument('--startup-wait-seconds',type=int,default=3600)
     p.add_argument('--compact',action='store_true')
+    p.add_argument('--frozen-compact',action='store_true',
+                   help='Print frozen future-forecast arrival scores, including plans not near-term eligible')
     a=p.parse_args();head=subprocess.check_output(['git','-C',str(ROOT),'rev-parse','HEAD'],text=True).strip()
     if a.action!='score' and head!=a.model_sha:raise ValueError('Pinned checkout differs')
     if not 60<=a.duration_seconds<=86400:raise ValueError('Bounded duration required')
@@ -308,16 +310,21 @@ def main():
     if a.action=='status':print(json.dumps(status(a.state,a.model_sha),sort_keys=True))
     elif a.action=='score':
         result=score(a.source,a.state,a.model_sha)
-        if not a.compact:print(json.dumps(result,sort_keys=True))
+        if not (a.compact or a.frozen_compact):print(json.dumps(result,sort_keys=True))
         else:
             from deploy.scripts.v163_readonly_event_first_preview import exact_roster
-            groups=result['first_hourly_near_term_eligible']
+            groups=result['first_hourly_frozen'] if a.frozen_compact else result['first_hourly_near_term_eligible']
             def cell(key,mode):
                 r=groups.get(key+'|'+mode,{})
                 return '%s/%s %s/%s %s/%s'%(r.get('SUCCESS',0),r.get('known',0),r.get('proposals',0),
                     r.get('hourly_opportunities',0),r.get('UNKNOWN',0),r.get('PENDING',0))
-            print('First near-term advice per item/model/UTC-hour; sampled arrivals, NOT actual flights.')
-            print('Cells: success/known eligible/hourly-opportunities unknown/pending.')
+            if a.frozen_compact:
+                print('First FROZEN forecast per item/model/UTC-hour; sampled arrival availability, NOT execution or restock-time accuracy.')
+                print('Includes future departures: later reconfirmation untested. Correct arrival alone does not establish a usable departure policy.')
+                print('Cells: success/known proposed/hourly-opportunities unknown/pending.')
+            else:
+                print('First near-term advice per item/model/UTC-hour; sampled arrivals, NOT actual flights.')
+                print('Cells: success/known eligible/hourly-opportunities unknown/pending.')
             print('Item | specialist | physical-zero rate | specialist statuses (all captured rows)')
             for key in sorted(exact_roster()):
                 statuses=result['capture_diagnostics']['models'][key+'|'+SPECIAL]['statuses']

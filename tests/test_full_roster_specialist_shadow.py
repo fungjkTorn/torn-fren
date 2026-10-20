@@ -1,4 +1,5 @@
 import json
+import io
 import os
 import sqlite3
 import subprocess
@@ -6,11 +7,29 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from contextlib import redirect_stdout
 from unittest.mock import patch
-from research.full_roster_specialist_shadow import normalize,specialist,store,score,tick,capture,status,capture_inputs,source_data
+from research.full_roster_specialist_shadow import normalize,specialist,store,score,tick,capture,status,capture_inputs,source_data,main
 
 
 class SpecialistShadowTests(unittest.TestCase):
+    def test_frozen_compact_prints_future_forecasts_not_zero_near_term_subset(self):
+        from deploy.scripts.v163_readonly_event_first_preview import exact_roster
+        groups={k+'|specialist_control':dict(SUCCESS=2,known=3,proposals=4,hourly_opportunities=5,UNKNOWN=1,PENDING=0)
+                for k in exact_roster()}
+        result=dict(first_hourly_frozen=groups,first_hourly_near_term_eligible={},
+            capture_diagnostics=dict(models={k+'|specialist_control':dict(statuses={}) for k in exact_roster()},
+                complete24_row_batches=1,incomplete_row_batches=[],active_window_observed_hours=1,active_hours_without_any_capture=[]),
+            records=216,truth_cutoff=1000,capture_attempt_statuses={})
+        for flag,expected in (('--frozen-compact',' | 2/3 4/5 1/0 | '),('--compact',' | 0/0 0/0 0/0 | ')):
+            output=io.StringIO()
+            with patch.object(sys,'argv',['shadow','score','--state','unused','--model-sha','pin',flag]), \
+                 patch('research.full_roster_specialist_shadow.subprocess.check_output',return_value='new-scorer-pin'), \
+                 patch('research.full_roster_specialist_shadow.score',return_value=result),redirect_stdout(output):
+                main()
+            self.assertIn('chi:Panda Plushie'+expected,output.getvalue())
+            if flag=='--frozen-compact':self.assertIn('FROZEN forecast',output.getvalue())
+
     def test_batch_capture_matches_individual_readers_without_source_writes(self):
         from deploy.scripts.v163_readonly_event_first_preview import exact_roster
         keys=sorted(exact_roster())
