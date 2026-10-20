@@ -2,13 +2,21 @@ import unittest
 import tempfile
 from pathlib import Path
 
-from research.restock_event_clock import IntervalClock,departure,model,item_benchmark
+from research.restock_event_clock import IntervalClock,departure,model,item_benchmark,selected_target_error
 from research.true_zero_cycles import ZeroCycles
 
 T=1790985600
 
 
 class EventClockTests(unittest.TestCase):
+    def test_selected_later_event_is_not_matched_to_nearest_actual_drop(self):
+        choice=dict(event_index=2,predicted_restock_epoch=1002)
+        result=selected_target_error(choice,[1000,2000],500,lambda a,b:False)
+        self.assertEqual(result['actual_restock'],2000)
+        self.assertEqual(result['absolute_error_seconds'],998)
+        self.assertEqual(selected_target_error(choice,[1000],500,lambda a,b:False)['status'],'PENDING')
+        self.assertEqual(selected_target_error(choice,[1000,2000],500,lambda a,b:True)['status'],'UNKNOWN_CONTINUITY')
+
     def test_provider_switch_within_positive_phase_does_not_train_complete_cycle(self):
         rows=[model.OBS(T-30,0,'a'),model.OBS(T,200,'a'),model.OBS(T+100,180,'b'),
               model.OBS(T+200,0,'b'),model.OBS(T+1000,200,'b')]

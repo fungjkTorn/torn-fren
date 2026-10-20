@@ -47,7 +47,8 @@ def departure(forecast, *, issued, flight, conservative=False):
         dep=max(issued,start-flight)
         if dep<=issued+WAIT and dep+flight>=start and dep+flight+10<end:
             return dict(departure=dep,event_index=index,landing=dep+flight,
-                        arrival_plus_10=dep+flight+10,stock_window_start=start,stock_window_end=end)
+                        arrival_plus_10=dep+flight+10,stock_window_start=start,stock_window_end=end,
+                        predicted_restock_epoch=w['predicted_restock_epoch'])
     return dict(departure=None,event_index=None,landing=None,arrival_plus_10=None)
 
 
@@ -124,10 +125,22 @@ class IntervalClock:
         return base
 
 
-def item_benchmark(source,key,*,days=6):
+def selected_target_error(choice,physical,issued,crosses):
+    """Score the selected chronological event, never the nearest actual drop."""
+    index=choice['event_index']
+    if index==0:return dict(status='CURRENT_STOCK')
+    j=bisect.bisect_right(physical,issued)+index-1
+    if j>=len(physical):return dict(status='PENDING')
+    actual=physical[j]
+    if crosses(issued,actual):return dict(status='UNKNOWN_CONTINUITY')
+    return dict(status='SCORED',event_index=index,actual_restock=actual,
+                absolute_error_seconds=abs(choice['predicted_restock_epoch']-actual))
+
+
+def item_benchmark(source,key,*,days=6,asof=None):
     from research.japan_xanax.renewal_shadow import source_data
     from research.departure_reconfirmation import evaluate_utc,compare_cohorts
-    rows,polls,crosses,evidence,cutoff=source_data(source,item_key=key)
+    rows,polls,crosses,evidence,cutoff=source_data(source,now=asof,item_key=key)
     observations=[model.OBS(*r) for r in rows]
     observation_times=[o.epoch for o in observations]
     crosses=continuous_source(observations,crosses)
@@ -139,6 +152,7 @@ def item_benchmark(source,key,*,days=6):
     # All cohorts get their full eight-hour follow-up and mature arrival truth.
     stop=end+WAIT+STEP
     plans={m+'_'+p:[] for m in MODES for p in ('expected','bounded')};plans['leave_now']=[]
+    selected={m:{} for m in plans if m!='leave_now'}
     timing={m:[] for m in MODES};cursor=0;statuses={m:Counter() for m in MODES}
     for issued in range(start,stop+1,STEP):
         while cursor<len(observations) and observations[cursor].epoch<=issued:
@@ -162,6 +176,7 @@ def item_benchmark(source,key,*,days=6):
                 choice=departure(f,issued=issued,flight=flight,conservative=kind=='bounded')
                 dep=choice['departure'] if healthy and f['status']=='EVENT_TIMELINE_FORECAST_AVAILABLE' else None
                 plans[mode+'_'+kind].append((issued,max(issued+15,dep) if dep is not None else None,age))
+                if dep is not None:selected[mode+'_'+kind][issued]=choice
             # Fixed first-issue/hour forecast, ranked before evaluating truth.
             if issued<=end and issued%3600==0:
                 events=f.get('true_restock_events',f.get('restock_events',[]))
@@ -171,7 +186,7 @@ def item_benchmark(source,key,*,days=6):
     # No observed target timestamps or stock outcome labels enter planning.
     # Strict ordinal next-event label; never select the nearest matching drop.
     physical=[b.epoch for a,b in zip(observations,observations[1:])
-        if a.quantity==0<b.quantity and a.source==b.source and not crosses(a.epoch,b.epoch)]
+        if a.epoch<b.epoch and a.quantity==0<b.quantity and a.source==b.source and not crosses(a.epoch,b.epoch)]
     restock={}
     for mode,records in timing.items():
         errors=[];counts=Counter();targets=set()
@@ -215,6 +230,25 @@ def item_benchmark(source,key,*,days=6):
         cohorts[mode]=[]
         summaries[mode]=evaluate_utc(values,cutoff=cutoff,flight_seconds=flight,
             score=evidence.score,start_before=end,cohorts=cohorts[mode])
+    selected_timing={}
+    for mode,lookup in selected.items():
+        cases=[]
+        for c in cohorts[mode]:
+            if c['wait'] is None:continue
+            dep=c['start']+c['wait'];q=(dep//STEP)*STEP
+            choice=lookup.get(q)
+            if choice is None:raise ValueError('Missing departure-time event identity')
+            cases.append(dict(start=c['start'],arrival_outcome=c['outcome'],
+                **selected_target_error(choice,physical,q,crosses)))
+        selected_timing[mode]={}
+        for label,predicate in (('earlier_development',lambda t:t<split),('later_validation',lambda t:t>=split)):
+            values=[c for c in cases if predicate(c['start'])]
+            errors=[c['absolute_error_seconds'] for c in values if c['status']=='SCORED']
+            selected_timing[mode][label]=dict(status_counts=dict(Counter(c['status'] for c in values)),
+                event_indices=dict(Counter(str(c['event_index']) for c in values if c['status']=='SCORED')),
+                scored=len(errors),distinct_target_restocks=len({c['actual_restock'] for c in values if c['status']=='SCORED'}),
+                mean_absolute_error_minutes=sum(errors)/len(errors)/60 if errors else None,
+                within_5_minutes=sum(e<=300 for e in errors))
     slices={}
     for label,predicate in (('earlier_development',lambda t:t<split),('later_validation',lambda t:t>=split)):
         selected={m:[r for r in records if predicate(r['start'])] for m,records in cohorts.items()}
@@ -228,7 +262,7 @@ def item_benchmark(source,key,*,days=6):
                 mean_wait_minutes=sum(waits)/len(waits)/60 if waits else None,
                 matched_vs_now=compare_cohorts(selected['leave_now'],rec))
     return dict(item_key=key,cutoff=cutoff,cohort_start=start,cohort_end=end,chronological_split=split,
-        restock_timing=restock,departure=summaries,chronological_slices=slices,
+        restock_timing=restock,selected_event_timing=selected_timing,departure=summaries,chronological_slices=slices,
         status_counts={m:dict(c) for m,c in statuses.items()},physical_depletion_quantity=0,
         buying_threshold=30,arrival_plus_10=True,production_promotion=False,
         note='Historical correlated hourly cohorts; sampled poll truth, not provider-certified game events. No model routing selected.')
@@ -238,13 +272,14 @@ def main():
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('--source',required=True);p.add_argument('--out',required=True)
     p.add_argument('--model-sha',required=True);p.add_argument('--item-key',action='append')
+    p.add_argument('--asof',type=int)
     a=p.parse_args();out=Path(a.out);out.mkdir(parents=True,exist_ok=False)
     keys=sorted(a.item_key or model.exact_roster())
     if len(set(keys))!=len(keys) or not set(keys)<=set(model.exact_roster()):raise ValueError('Invalid roster')
     request=dict(model_sha=a.model_sha,items=keys,days=6,variants=MODES,automatic_promotion=False)
     (out/'request.json').write_text(json.dumps(request,indent=2)+'\n')
     for key in keys:
-        began=time.monotonic();r=item_benchmark(a.source,key)
+        began=time.monotonic();r=item_benchmark(a.source,key,asof=a.asof)
         r['seconds']=time.monotonic()-began
         (out/(key.replace(':','-').replace(' ','_')+'.json')).write_text(json.dumps(r,indent=2)+'\n')
         print(json.dumps(dict(item_key=key,seconds=r['seconds'],restock_timing=r['restock_timing'])),flush=True)
