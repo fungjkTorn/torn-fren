@@ -56,6 +56,8 @@ on:
       - 'research/per_item_readiness.py'
       - 'services/travel_window_policy.py'
       - 'services/travel_read_model.py'
+      - 'services/travel_decision_contract_v166.py'
+      - 'tests/test_travel_decision_contract_v166.py'
       - 'services/departure_recommendation.py'
       - 'web/app.py'
       - 'web/static/index.html'
