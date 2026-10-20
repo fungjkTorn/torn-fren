@@ -244,6 +244,7 @@ def item_benchmark(source,key,*,days=6,asof=None):
         restock[mode]=dict(counts,scored=len(errors),distinct_target_restocks=len(targets),
             mean_absolute_error_minutes=sum(e for t,e,a in errors)/len(errors)/60 if errors else None,
             median_absolute_error_minutes=quantile([e for t,e,a in errors],.5)/60 if errors else None,
+            within_15_seconds=sum(e<=15 for t,e,a in errors),within_60_seconds=sum(e<=60 for t,e,a in errors),
             within_5_minutes=sum(e<=300 for t,e,a in errors),within_10_minutes=sum(e<=600 for t,e,a in errors))
         restock[mode]['chronological_slices']={}
         for label,predicate in (('earlier_development',lambda t:t<split),('later_validation',lambda t:t>=split)):
@@ -285,7 +286,8 @@ def item_benchmark(source,key,*,days=6,asof=None):
                 event_indices=dict(Counter(str(c['event_index']) for c in values if c['status']=='SCORED')),
                 scored=len(errors),distinct_target_restocks=len({c['actual_restock'] for c in values if c['status']=='SCORED'}),
                 mean_absolute_error_minutes=sum(errors)/len(errors)/60 if errors else None,
-                within_5_minutes=sum(e<=300 for e in errors))
+                within_15_seconds=sum(e<=15 for e in errors),within_60_seconds=sum(e<=60 for e in errors),
+                within_5_minutes=sum(e<=300 for e in errors),within_10_minutes=sum(e<=600 for e in errors))
     slices={}
     for label,predicate in (('earlier_development',lambda t:t<split),('later_validation',lambda t:t>=split)):
         selected={m:[r for r in records if predicate(r['start'])] for m,records in cohorts.items()}
@@ -311,13 +313,18 @@ def main():
     p.add_argument('--source',required=True);p.add_argument('--out',required=True)
     p.add_argument('--model-sha',required=True);p.add_argument('--item-key',action='append')
     p.add_argument('--asof',type=int)
-    a=p.parse_args();out=Path(a.out);out.mkdir(parents=True,exist_ok=False)
+    p.add_argument('--days',type=int,default=6,help='Bounded mature historical days, 1..6')
+    a=p.parse_args()
+    if not 1<=a.days<=6:raise ValueError('days must be between 1 and 6')
+    out=Path(a.out);out.mkdir(parents=True,exist_ok=False)
     keys=sorted(a.item_key or model.exact_roster())
     if len(set(keys))!=len(keys) or not set(keys)<=set(model.exact_roster()):raise ValueError('Invalid roster')
-    request=dict(model_sha=a.model_sha,items=keys,days=6,variants=MODES,automatic_promotion=False)
+    request=dict(model_sha=a.model_sha,items=keys,days=a.days,variants=MODES,automatic_promotion=False,
+        restock_error_timestamp='first_positive_observation_epoch_not_exact_game_event',
+        source_mode='read_only_sanitized_or_owner_collector')
     (out/'request.json').write_text(json.dumps(request,indent=2)+'\n')
     for key in keys:
-        began=time.monotonic();r=item_benchmark(a.source,key,asof=a.asof)
+        began=time.monotonic();r=item_benchmark(a.source,key,days=a.days,asof=a.asof)
         r['seconds']=time.monotonic()-began
         (out/(key.replace(':','-').replace(' ','_')+'.json')).write_text(json.dumps(r,indent=2)+'\n')
         print(json.dumps(dict(item_key=key,seconds=r['seconds'],restock_timing=r['restock_timing'])),flush=True)
