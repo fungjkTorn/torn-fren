@@ -11,12 +11,12 @@ import math
 from pathlib import Path
 import time
 
-from research.restock_predictability_audit import cycles_from_rows, cycle_predictions, quantile
+from research.restock_predictability_audit import cycles_from_rows, cycle_predictions, quantile, features
 from research.true_zero_cycles import ZeroCycles, model
 
 STEP=300
 WAIT=28800
-MODES=('phase_empirical','interval_median','interval_ridge')
+MODES=('phase_empirical','interval_median','interval_ridge','phase_recursive_ridge')
 
 
 def continuous_source(rows,crosses):
@@ -67,7 +67,7 @@ class IntervalClock:
         self.crosses=crosses
         self.last_training_end=None
 
-    def forecast(self,key,tracker,issued,family):
+    def forecast(self,key,tracker,issued,family,*,first_event=None,recursive=False):
         if family not in ('median','ridge'):raise ValueError('Unknown fixed clock')
         if tracker.last is not None and tracker.last.epoch>issued:raise ValueError('Future tracker state')
         base=dict(item_key=key,asof_epoch=issued,status='INSUFFICIENT_CLOCK_HISTORY',
@@ -85,7 +85,7 @@ class IntervalClock:
         ratios=[math.log(t['duration']/f[family]) for t,f in past]
         totals=[max(1,round(fit[family]*math.exp(r))) for r in ratios]
         age=issued-active['start'];survivors=[d for d in totals if d>age]
-        if not survivors:return dict(base,status='CLOCK_OVERRAN_CALIBRATION_HISTORY')
+        if not survivors and first_event is None:return dict(base,status='CLOCK_OVERRAN_CALIBRATION_HISTORY')
         available=tracker.available_durations[-64:]
         purchasing=(len(available)>=3 and quantile(tracker.restock_quantities[-64:],.5)>=30)
         # Endpoints, current state and training labels all precede this issue.
@@ -107,7 +107,14 @@ class IntervalClock:
                 base['current_stock_window']=dict(predicted_restock_epoch=issued,restock_late_epoch=issued,
                     predicted_stock_below_30_epoch=issued+min(quantile(remaining,.5),quantile(physical_remaining,.5)),
                     early_stock_end_epoch=issued+min(quantile(remaining,.25),quantile(physical_remaining,.25)))
-        first={q:active['start']+quantile(survivors,q) for q in (.25,.5,.75)}
+        if first_event is not None:
+            first={.25:first_event['restock_early_epoch'],.5:first_event['predicted_restock_epoch'],
+                   .75:first_event['restock_late_epoch']}
+        else:first={q:active['start']+quantile(survivors,q) for q in (.25,.5,.75)}
+        # Projected features remain separate from the immutable training trials.
+        projected_history=[t for t in self.trials if t['outcome']=='CLOSED' and t['end']<=issued]
+        previous_birth=active['start']
+        previous_quantity=active['quantity']
         periods=[t['duration'] for t,f in past]
         for index in range(64):
             if first[.5]>issued+WAIT:break
@@ -120,8 +127,26 @@ class IntervalClock:
                 event.update(predicted_stock_below_30_epoch=first[.5]+min(quantile(available,.5),quantile(physical,.5)),
                     early_stock_end_epoch=first[.25]+min(quantile(available,.25),quantile(physical,.25)))
                 base['restock_events'].append(event)
-            first={q:first[q]+quantile(periods,q) for q in (.25,.5,.75)}
+            next_periods=periods
+            if recursive:
+                duration=first[.5]-previous_birth
+                observed_zero=active.get('zero_epoch') if index==0 else None
+                stocked=(observed_zero-previous_birth if observed_zero is not None and observed_zero<=issued
+                         else min(duration-1,quantile([t['stock_seconds'] for t,f in past],.5)))
+                projected_history.append(dict(duration=duration,stock_seconds=max(1,stocked),
+                    empty_seconds=max(1,duration-stocked),quantity=previous_quantity))
+                quantity=quantile(tracker.restock_quantities[-64:],.5)
+                x=features(projected_history,first[.5],quantity,tracker.last.source)
+                projected_fit=cycle_predictions(self.trials,issued,x)
+                if projected_fit is not None:
+                    if projected_fit['latest_training_end']>issued:raise ValueError('Future recursive training')
+                    next_periods=[max(1,round(projected_fit[family]*math.exp(r))) for r in ratios]
+                previous_birth=first[.5];previous_quantity=quantity
+            first={q:first[q]+quantile(next_periods,q) for q in (.25,.5,.75)}
         if not purchasing:base['status']='INSUFFICIENT_SEPARATE_PURCHASE_WINDOW_HISTORY'
+        for event,next_event in zip(base['restock_events'],base['restock_events'][1:]):
+            event['predicted_stock_below_30_epoch']=min(event['predicted_stock_below_30_epoch'],next_event['predicted_restock_epoch']-1)
+            event['early_stock_end_epoch']=min(event['early_stock_end_epoch'],next_event['restock_early_epoch']-1)
         return base
 
 
@@ -154,6 +179,7 @@ def item_benchmark(source,key,*,days=6,asof=None):
     plans={m+'_'+p:[] for m in MODES for p in ('expected','bounded')};plans['leave_now']=[]
     selected={m:{} for m in plans if m!='leave_now'}
     timing={m:[] for m in MODES};cursor=0;statuses={m:Counter() for m in MODES}
+    recursive_usage=Counter()
     for issued in range(start,stop+1,STEP):
         while cursor<len(observations) and observations[cursor].epoch<=issued:
             tracker.add(observations[cursor]);cursor+=1
@@ -170,6 +196,17 @@ def item_benchmark(source,key,*,days=6,asof=None):
                 remaining=[d-issued+a['phase_onset'] for d in available if d>issued-a['phase_onset']]
                 if remaining:current['early_stock_end_epoch']=issued+quantile(remaining,.25)
         streams.update({'interval_'+f:clock.forecast(key,tracker,issued,f) for f in ('median','ridge')})
+        physical_events=streams['phase_empirical'].get('true_restock_events',[])
+        hybrid=(clock.forecast(key,tracker,issued,'ridge',first_event=physical_events[0],recursive=True)
+                if physical_events else {})
+        if hybrid.get('status')!='EVENT_TIMELINE_FORECAST_AVAILABLE':
+            hybrid=dict(streams['phase_empirical'],recursive_clock_status=hybrid.get('status','NO_FIRST_EVENT'),
+                        recursive_clock_used=False)
+        else:
+            hybrid['recursive_clock_used']=True
+            hybrid['current_stock_window']=streams['phase_empirical'].get('current_stock_window')
+        streams['phase_recursive_ridge']=hybrid
+        recursive_usage['used' if hybrid['recursive_clock_used'] else 'phase_fallback']+=1
         for mode,f in streams.items():
             statuses[mode][f['status']]+=1
             for kind in ('expected','bounded'):
@@ -264,6 +301,7 @@ def item_benchmark(source,key,*,days=6,asof=None):
     return dict(item_key=key,cutoff=cutoff,cohort_start=start,cohort_end=end,chronological_split=split,
         restock_timing=restock,selected_event_timing=selected_timing,departure=summaries,chronological_slices=slices,
         status_counts={m:dict(c) for m,c in statuses.items()},physical_depletion_quantity=0,
+        recursive_clock_usage=dict(recursive_usage),
         buying_threshold=30,arrival_plus_10=True,production_promotion=False,
         note='Historical correlated hourly cohorts; sampled poll truth, not provider-certified game events. No model routing selected.')
 

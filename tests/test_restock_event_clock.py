@@ -84,6 +84,19 @@ class EventClockTests(unittest.TestCase):
         self.assertEqual(original['physical_depletion_quantity'],0)
         self.assertEqual(tracker.last.quantity,200)
 
+    def test_recursive_projection_preserves_first_physical_event_and_past_training(self):
+        rows,cutoff=self.fixture();issued=rows[301].epoch+100
+        clock=IntervalClock(rows,lambda a,b:False,cutoff)
+        _,tracker=self.forecast(rows,issued,cutoff)
+        first=tracker.forecast('mex:Jaguar Plushie',asof=issued)['true_restock_events'][0]
+        original=clock.forecast('mex:Jaguar Plushie',tracker,issued,'ridge',first_event=first,recursive=True)
+        self.assertEqual(original['true_restock_events'][0]['predicted_restock_epoch'],first['predicted_restock_epoch'])
+        self.assertGreater(len(original['true_restock_events']),1)
+        changed=[r if r.epoch<=issued else model.OBS(r.epoch,0,r.source) for r in rows]
+        altered=IntervalClock(changed,lambda a,b:False,cutoff).forecast('mex:Jaguar Plushie',tracker,issued,
+            'ridge',first_event=first,recursive=True)
+        self.assertEqual(original,altered)
+
     def test_residual_stock_below30_does_not_reset_restock_anchor(self):
         rows,cutoff=self.fixture()
         # Choose an actual restock (three observations per completed cycle).
