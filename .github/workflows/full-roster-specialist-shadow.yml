@@ -13,6 +13,8 @@ on:
       - 'tests/test_v88_poll_state_forward_report.py'
       - 'research/v137_original_v2_stock_at_arrival_audit.py'
       - 'research/restock_event_clock.py'
+      - 'services/travel_decision_contract_v166.py'
+      - 'tests/test_travel_decision_contract_v166.py'
       - 'tests/test_restock_event_clock.py'
       - 'research/saved_timeline_audit.py'
       - 'tests/test_v2_generator_departure_window.py'
@@ -35,6 +37,8 @@ on:
       - 'tests/test_v88_poll_state_forward_report.py'
       - 'research/v137_original_v2_stock_at_arrival_audit.py'
       - 'research/restock_event_clock.py'
+      - 'services/travel_decision_contract_v166.py'
+      - 'tests/test_travel_decision_contract_v166.py'
       - 'tests/test_restock_event_clock.py'
       - 'research/saved_timeline_audit.py'
       - 'tests/test_v2_generator_departure_window.py'
@@ -70,4 +74,5 @@ jobs:
         run: >-
           python -m unittest tests.test_restock_event_clock
           tests.test_restock_predictability_audit tests.test_true_zero_cycles
-          tests.test_departure_reconfirmation -q
+          tests.test_departure_reconfirmation
+          tests.test_travel_decision_contract_v166 -q
