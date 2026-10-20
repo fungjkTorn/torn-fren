@@ -155,3 +155,32 @@ new training labels, production route, raw stock export or gameplay changes.
 Candidate scope is explicit in the report. Tests include earlier equal-score
 cluster admission and lower-score earlier cluster rejection. 36 local checks
 passed. A fixed one-item historical replay is being prepared, not a live canary.
+
+## Physical restock event clock and chronological reachability, 2026-10-20
+
+User clarified required sequence: predict next physical drop, assess travel
+reachability, then evaluate later drops in order. Implemented a research path
+in restock_event_clock.py using three fixed event clocks: existing physical
+phase empirical baseline, completed interval median, and existing prequential
+interval ridge. Reuses physical-zero cycles and birth-time fits; no unfinished
+cycle labels. Ridge first-event uncertainty is from completed prequential
+residuals; later cycles use completed empirical intervals with widening bounds.
+This is not an arbitrary future-arrival-score optimizer.
+
+Purchase availability is trained separately from physical restock timing.
+Forecasts retain true restock events even without enough purchase-window
+history. First chronological reachable window is selected; current observed
+stock is considered separately. Landing time is departure+flight, and stock
+must remain through landing+10. No subtraction of grace to land before a
+predicted drop. Fixed expected-window and bounded-window policies expose the
+coverage/accuracy tradeoff without changing a threshold after scoring.
+
+Historical benchmark freezes first hourly next-drop forecasts for timing error,
+uses ordinal NEXT physical event (not nearest-to-prediction matching), and
+replays five-minute rechecks for UTC-hourly departure cohorts. Six mature days
+are divided chronologically into earlier/later halves. Both timing error and
+purchase availability outcomes are reported; no automatic per-item promotion.
+Global poll truth is not certified upstream game freshness; cohorts correlate.
+Zero-first clocks, no future mutation, earliest reachability, +10 boundary,
+current stock, separate 30-stock loss, and full read-only integration:22tests pass.
+No production routes, model defaults or websites changed.
