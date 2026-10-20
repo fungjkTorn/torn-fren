@@ -131,3 +131,27 @@ and query-only archive integration. No inference sweep, live recorder, service
 change, routing change, or deletion performed. Future departure changes still
 need historical validation with these corrected labels; no model improvement
 or deployment claimed.
+
+## Historical departure replay started, 2026-10-20
+
+Reused immutable derived artifact f84ecf1dee518ab92984e2390d9826baf73afafbddb59eae7173b9ae7dd823ac.
+Replayed all 37 five-minute visitor starts in its existing 09:00–12:00 UTC
+Oct18 development window, each with a fixed eight-hour deadline and current
+model/source reconfirmation. This adds no independent validation period.
+Native policies for Camel, Nessie and Fox reached zero departures. Peony
+front-of-winning-band:35 successes,2 unknown (16 distinct departure epochs),
+mean wait99.84min. Camel front:17 successes,13 unknown,7 abstentions, only2
+distinct departures, mean wait259.75min. Nessie front:37 abstentions.
+Fox front:6 failures,31 abstentions,1 distinct departure; three native errors
+disqualify a clean Fox comparison.
+
+Specific bounded hypothesis: the template planner chooses a winning contiguous
+near-max cluster by mean score/width and uses its center; this can discard an
+earlier equally supported cluster. Research-only all_supported=True exposes the
+UNION of existing near-max (.04 margin) template candidates to front/retention
+policies, while preserving and parity-checking original native selection.
+Only Nessie can enable this flag. No fit gate/score threshold relaxation,
+new training labels, production route, raw stock export or gameplay changes.
+Candidate scope is explicit in the report. Tests include earlier equal-score
+cluster admission and lower-score earlier cluster rejection. 36 local checks
+passed. A fixed one-item historical replay is being prepared, not a live canary.

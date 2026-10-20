@@ -53,6 +53,30 @@ class RetentionTests(unittest.TestCase):
 
 
 class NativeBandTests(unittest.TestCase):
+    def test_all_supported_keeps_native_but_exposes_earlier_equal_score_window(self):
+        import numpy as np
+        from types import SimpleNamespace
+        planner=SimpleNamespace(plan=lambda q:(q+1500,1.,{}))
+        values=dict(delays=np.array([0,300,1200,1500,1800]),scores=np.ones(5))
+        with patch('research.template_window_study.curve',return_value=values):
+            original=template_band(planner,3000)
+            earlier=template_band(planner,3000,all_supported=True)
+        self.assertEqual(original.native,earlier.native)
+        self.assertEqual(min(dict(original.points)),4200)
+        self.assertEqual(min(dict(earlier.points)),3000)
+        self.assertEqual(Policy(3000,'front_original_band').update(earlier,0),3015)
+
+    def test_all_supported_does_not_relax_original_score_margin(self):
+        import numpy as np
+        from types import SimpleNamespace
+        planner=SimpleNamespace(plan=lambda q:(q+1500,1.,{}))
+        values=dict(delays=np.array([0,300,1200,1500,1800]),scores=np.array([.8,.8,1.,1.,1.]))
+        with patch('research.template_window_study.curve',return_value=values):
+            earlier=template_band(planner,3000,all_supported=True)
+        self.assertEqual(min(dict(earlier.points)),4200)
+        with self.assertRaisesRegex(ValueError,'bounded to Nessie'):
+            native_band('unused','uae:Camel Plushie',3000,all_supported=True)
+
     def test_camel_whole_bank_matches_original_slow_winner(self):
         from research.template_window_study import GuardedTimeline
         from research.plushie_champions.common import DAY, TemplatePlanner

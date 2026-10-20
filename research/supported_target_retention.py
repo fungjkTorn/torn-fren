@@ -77,7 +77,7 @@ class Policy:
         return max(q + 15, self.target) if self.target is not None else None
 
 
-def template_band(planner, issued):
+def template_band(planner, issued, *, all_supported=False):
     from research.template_window_study import curve
     import numpy as np
     native = int(planner.plan(issued)[0])
@@ -91,7 +91,8 @@ def template_band(planner, issued):
                                       len(g), -int(delays[g[0]])))
     if issued + int(delays[group[len(group)//2]]) != native:
         raise ValueError('Original template center parity failed')
-    return Band(issued, native, tuple((issued + int(delays[i]), float(scores[i])) for i in group))
+    selected = ids if all_supported else group
+    return Band(issued, native, tuple((issued + int(delays[i]), float(scores[i])) for i in selected))
 
 
 def analog_band(planner, issued):
@@ -149,7 +150,7 @@ def observe_v20_plan(call):
 KEYS = ('uae:Camel Plushie', 'uni:Nessie Plushie', 'uni:Red Fox Plushie', 'chi:Peony')
 
 
-def native_band(db, key, issued):
+def native_band(db, key, issued, *, all_supported=False):
     """Requires an issue-truncated causal DB, never the outcome database."""
     import sqlite3
     from contextlib import closing
@@ -157,6 +158,8 @@ def native_band(db, key, issued):
     from types import SimpleNamespace
     if key not in KEYS:
         raise ValueError('Unsupported native route')
+    if all_supported and key != 'uni:Nessie Plushie':
+        raise ValueError('All-supported comparison is bounded to Nessie')
     if type(issued) is not int or issued % STEP:
         raise ValueError('Native experiment requires grid-aligned issue')
     with closing(sqlite3.connect(Path(db).resolve().as_uri() + '?mode=ro', uri=True)) as c:
@@ -188,7 +191,7 @@ def native_band(db, key, issued):
         ctx = SimpleNamespace(timelines={(country, item): Timeline(c, gs, ge, country, item)})
         if key == 'uni:Nessie Plushie':
             return template_band(FastTemplatePlanner(ctx, country, item, lags=(1,),
-                lookback=7200, shift_range=3600, minfit=.5), issued)
+                lookback=7200, shift_range=3600, minfit=.5), issued,all_supported=all_supported)
         bank = []
         for lags, look, shift in EXPERTS:
             p = FastTemplatePlanner(ctx, country, item, lags=lags, lookback=look, shift_range=shift)

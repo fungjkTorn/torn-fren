@@ -70,11 +70,11 @@ def forbidden(*a,**k):raise RuntimeError('HTTP forbidden in causal retention inf
 provider.get_country_stock=forbidden
 sys.modules['services.yata_api']=provider
 from research.supported_target_retention import native_band
-print(json.dumps(asdict(native_band(sys.argv[1],sys.argv[2],int(sys.argv[3])))))
+print(json.dumps(asdict(native_band(sys.argv[1],sys.argv[2],int(sys.argv[3]),all_supported=len(sys.argv)>4 and sys.argv[4]=='1')))))
 '''
 
 
-def collect_item(source, out, key, starts, timeout):
+def collect_item(source, out, key, starts, timeout, *, all_supported=False):
     from research.causal_replay_slice import CausalReplaySlice
     from research.japan_xanax.renewal_shadow import source_data
     from research.plushie_champions.common import TRAVEL_SECONDS
@@ -101,8 +101,9 @@ def collect_item(source, out, key, starts, timeout):
             if fresh:
                 mirror.advance(q)
                 try:
-                    child = subprocess.run([sys.executable, '-B', '-c', CHILD,
-                        str(work/'causal.sqlite'), key, str(q)], check=True,
+                    child_args=[sys.executable, '-B', '-c', CHILD,str(work/'causal.sqlite'),key,str(q)]
+                    if all_supported:child_args.append('1')
+                    child = subprocess.run(child_args, check=True,
                         capture_output=True, text=True, timeout=timeout)
                     data = json.loads(child.stdout.strip().splitlines()[-1])
                     band = Band(data['issued'], data['native'], tuple(tuple(p) for p in data['points']))
@@ -134,6 +135,7 @@ def collect_item(source, out, key, starts, timeout):
         inference_status_counts=dict(counts), seconds=time.monotonic()-began,
         worker_errors=counts['NATIVE_TIMEOUT']+counts['NATIVE_ERROR'],
         original_curve_parity_checked_each_issue=True,
+        candidate_scope='ALL_ORIGINAL_NEAR_MAX_CLUSTERS' if all_supported else 'ORIGINAL_WINNING_CLUSTER',
         physical_depletion_quantity=0, arrival_quantity=30, grace_seconds=10,
         raw_scores_calibrated=False, automatic_promotion=False, release_approved=False,
         limitation='Historical development comparison; correlated cohorts and shared arrivals. Compute failures are explicit and disqualify clean model comparisons.')
