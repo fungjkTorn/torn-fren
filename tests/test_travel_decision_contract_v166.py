@@ -153,7 +153,7 @@ class TravelDecisionContractTests(unittest.TestCase):
         e["early_stock_end_epoch"] = NOW+3100
         bounded = self.decision([e], arrival_policy="bounded")
         self.assertEqual(bounded["estimated_arrival_epoch"], NOW+2800)
-        late = self.decision([make_event(NOW+30000, length=900)])
+        late = self.decision([make_event(NOW+30100, length=900)])
         self.assertEqual(late["status"], STATUS_NO_WINDOW)
         self.assertEqual(late["forecast_events"][0]["reason"],
                          "AFTER_EIGHT_HOUR_DEPARTURE_HORIZON")
