@@ -19,6 +19,14 @@ WAIT=28800
 MODES=('phase_empirical','interval_median','interval_ridge')
 
 
+def continuous_source(rows,crosses):
+    switches=[b.epoch for a,b in zip(rows,rows[1:]) if a.source!=b.source]
+    def invalid(start,end):
+        i=bisect.bisect_right(switches,start)
+        return crosses(start,end) or i<len(switches) and switches[i]<=end
+    return invalid
+
+
 def departure(forecast, *, issued, flight, conservative=False):
     """Select FIRST reachable event; require stock at landing through +10s.
 
@@ -51,6 +59,7 @@ class IntervalClock:
     Future projected cycles are not represented as observed training records.
     """
     def __init__(self,rows,crosses,cutoff):
+        crosses=continuous_source(rows,crosses)
         self.trials,_=cycles_from_rows(rows,crosses,cutoff)
         self.starts=[t['start'] for t in self.trials]
         self.fits=[cycle_predictions(self.trials,t['start'],t['feature']) for t in self.trials]
@@ -121,10 +130,12 @@ def item_benchmark(source,key,*,days=6):
     rows,polls,crosses,evidence,cutoff=source_data(source,item_key=key)
     observations=[model.OBS(*r) for r in rows]
     observation_times=[o.epoch for o in observations]
+    crosses=continuous_source(observations,crosses)
     clock=IntervalClock(observations,crosses,cutoff)
     tracker=ZeroCycles(crosses);flight=model.TRAVEL_SECONDS[key.split(':')[0]]
     end=((cutoff-flight-WAIT-190-STEP)//STEP)*STEP
     start=end-days*86400+STEP
+    split=start+(days//2)*86400
     # All cohorts get their full eight-hour follow-up and mature arrival truth.
     stop=end+WAIT+STEP
     plans={m+'_'+p:[] for m in MODES for p in ('expected','bounded')};plans['leave_now']=[]
@@ -177,17 +188,33 @@ def item_benchmark(source,key,*,days=6):
             hi=bisect.bisect_right(observation_times,actual)
             if lo<0 or len({o.source for o in observations[lo:hi]})!=1:
                 counts['unknown_provider']+=1;continue
-            errors.append(abs(r['predicted']-actual));targets.add(actual)
+            errors.append((r['issued'],abs(r['predicted']-actual),actual));targets.add(actual)
         restock[mode]=dict(counts,scored=len(errors),distinct_target_restocks=len(targets),
-            mean_absolute_error_minutes=sum(errors)/len(errors)/60 if errors else None,
-            median_absolute_error_minutes=quantile(errors,.5)/60 if errors else None,
-            within_5_minutes=sum(e<=300 for e in errors),within_10_minutes=sum(e<=600 for e in errors))
+            mean_absolute_error_minutes=sum(e for t,e,a in errors)/len(errors)/60 if errors else None,
+            median_absolute_error_minutes=quantile([e for t,e,a in errors],.5)/60 if errors else None,
+            within_5_minutes=sum(e<=300 for t,e,a in errors),within_10_minutes=sum(e<=600 for t,e,a in errors))
+        restock[mode]['chronological_slices']={}
+        for label,predicate in (('earlier_development',lambda t:t<split),('later_validation',lambda t:t>=split)):
+            values=[(t,e,a) for t,e,a in errors if predicate(t)]
+            restock[mode]['chronological_slices'][label]=dict(scored=len(values),
+                distinct_target_restocks=len({a for t,e,a in values}),
+                mean_absolute_error_minutes=sum(e for t,e,a in values)/len(values)/60 if values else None)
+        restock[mode]['resolved_errors']={t:e for t,e,a in errors}
+    reference=restock['phase_empirical']['resolved_errors']
+    for mode,r in restock.items():
+        paired=set(reference)&set(r['resolved_errors'])
+        r['matched_vs_phase_empirical']={}
+        for label,predicate in (('all',lambda t:True),('earlier_development',lambda t:t<split),('later_validation',lambda t:t>=split)):
+            times=[t for t in paired if predicate(t)]
+            r['matched_vs_phase_empirical'][label]=dict(pairs=len(times),
+                baseline_mae_minutes=sum(reference[t] for t in times)/len(times)/60 if times else None,
+                challenger_mae_minutes=sum(r['resolved_errors'][t] for t in times)/len(times)/60 if times else None)
+    for r in restock.values():del r['resolved_errors']
     summaries={};cohorts={}
     for mode,values in plans.items():
         cohorts[mode]=[]
         summaries[mode]=evaluate_utc(values,cutoff=cutoff,flight_seconds=flight,
             score=evidence.score,start_before=end,cohorts=cohorts[mode])
-    split=start+(days//2)*86400
     slices={}
     for label,predicate in (('earlier_development',lambda t:t<split),('later_validation',lambda t:t>=split)):
         selected={m:[r for r in records if predicate(r['start'])] for m,records in cohorts.items()}

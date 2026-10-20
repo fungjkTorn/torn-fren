@@ -9,6 +9,13 @@ T=1790985600
 
 
 class EventClockTests(unittest.TestCase):
+    def test_provider_switch_within_positive_phase_does_not_train_complete_cycle(self):
+        rows=[model.OBS(T-30,0,'a'),model.OBS(T,200,'a'),model.OBS(T+100,180,'b'),
+              model.OBS(T+200,0,'b'),model.OBS(T+1000,200,'b')]
+        clock=IntervalClock(rows,lambda a,b:False,T+1000)
+        self.assertEqual(clock.trials[0]['outcome'],'UNKNOWN')
+        self.assertEqual(clock.trials[0]['invalidated_at'],T+100)
+
     def test_full_historical_path_is_readonly_and_keeps_both_metrics(self):
         from test_continuous_departure_replay import ContinuousTests
         with tempfile.TemporaryDirectory() as td:
