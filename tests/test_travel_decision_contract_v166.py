@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import unittest
 
+from services.travel_window_policy import project_policy
+
 from services.travel_decision_contract_v166 import (
     build_item_travel_decision, STATUS_ABSTAIN, STATUS_ACTIVE,
     STATUS_NO_WINDOW, STATUS_STALE, STATUS_WAIT,
@@ -163,6 +165,38 @@ class TravelDecisionContractTests(unittest.TestCase):
         self.assertEqual(report["status"], STATUS_STALE)
         self.assertEqual(len(report["forecast_events"]), 1)
         self.assertIsNone(report["estimated_departure_epoch"])
+
+    def test_all_window_policies_use_actual_landing_plus_grace(self):
+        event = make_event(NOW+2600, length=900)
+        event["early_stock_end_epoch"] = NOW+3100
+        forecast = make_forecast([event])
+        for policy in ("median", "quarter", "midpoint", "late", "current_quarter"):
+            with self.subTest(policy=policy):
+                decision = project_policy(forecast, now=NOW, poll_age_seconds=12, kind=policy)
+                dep = decision["estimated_departure_epoch"]
+                self.assertIsNotNone(dep)
+                arrival = decision["estimated_arrival_epoch"]
+                self.assertEqual(arrival, dep + 1200)
+                self.assertGreaterEqual(arrival, event["predicted_restock_epoch"])
+                self.assertLess(arrival + 10, event["predicted_stock_below_30_epoch"])
+                self.assertEqual(decision["estimated_arrival_plus_grace_epoch"], arrival+10)
+
+    def test_buffered_late_policy_rejects_missing_bounded_window(self):
+        forecast = make_forecast([make_event(NOW+2600, length=900)])
+        decision = project_policy(forecast, now=NOW, poll_age_seconds=12, kind="late")
+        self.assertEqual(decision["status"], "NO_REACHABLE_BUFFERED_WINDOW")
+        self.assertIsNone(decision["estimated_departure_epoch"])
+        self.assertEqual(len(decision["forecast_events"]), 1)
+
+    def test_all_policies_retain_unreachable_restocks_when_buy_model_abstains(self):
+        forecast = make_forecast([], status="INSUFFICIENT_SEPARATE_PURCHASE_WINDOW_HISTORY")
+        forecast["true_restock_events"] = [make_event(NOW+2600)]
+        for policy in ("median", "quarter", "midpoint", "late", "current_quarter"):
+            with self.subTest(policy=policy):
+                decision = project_policy(forecast, now=NOW, poll_age_seconds=12, kind=policy)
+                self.assertEqual(decision["status"], STATUS_ABSTAIN)
+                self.assertIsNone(decision["estimated_departure_epoch"])
+                self.assertEqual(len(decision["forecast_events"]), 1)
 
     def test_rejects_inconsistent_or_unbounded_historical_forecasts(self):
         with self.assertRaises(ValueError):
