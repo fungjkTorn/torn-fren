@@ -26,12 +26,13 @@ class TimelineAuditTests(unittest.TestCase):
             with sqlite3.connect(source) as c:
                 c.executescript("CREATE TABLE stock_history(country,item_name,timestamp,quantity);INSERT INTO stock_history VALUES('uni','Nessie Plushie',0,100);")
             before=(journal.read_bytes(),source.read_bytes());printed=io.StringIO()
-            with patch('sys.argv',['audit','--journal',str(journal),'--source',str(source),'--model-sha','pin','--out',str(out)]), \
+            with patch('sys.argv',['audit','--journal',str(journal),'--source',str(source),'--model-sha','pin','--out',str(out),'--with-physical-identity']), \
                  patch('research.saved_timeline_audit.Path.home',return_value=home), \
                  patch('research.saved_timeline_audit.recovery_inventory',return_value=dict(local_pages=[],home_project_directories=[])),redirect_stdout(printed):
                 main()
             self.assertIn('AUDIT_REPORT_SAVED',printed.getvalue())
             self.assertEqual(json.loads(out.read_text())['original_v2_archived']['status'],'ORIGINAL_V2_FORECAST_AUDIT_TABLES_NOT_PRESENT')
+            self.assertEqual(json.loads(out.read_text())['physical_identity']['status'],'UNAVAILABLE')
             self.assertEqual((journal.read_bytes(),source.read_bytes()),before)
 
     def test_future_timing_is_distinct_from_five_minute_source_expiry(self):

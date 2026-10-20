@@ -38,6 +38,7 @@ MAX_STATE_AGE_SECONDS = 24 * 3600
 # A heartbeat certifies our fetch/save, not the country-specific provider age.
 # Treat very old delta states as unknown rather than recycling week-old stock.
 PENDING_BUFFER = 180
+OBSERVATION_VERSION = 'poll-state-v2-continuous-bracket'
 
 
 def observation(conn, country, item, arrival, asof):
@@ -64,7 +65,8 @@ def observation(conn, country, item, arrival, asof):
     if pre is None or post is None:
         return "NO_POLL_BRACKET", None, {}
     before = int(pre[0]); after = int(post[0])
-    metadata = {"pre_poll_lag_s":arrival-before,
+    metadata = {"observation_version":OBSERVATION_VERSION,
+                "pre_poll_lag_s":arrival-before,
                 "post_poll_lag_s":after-(arrival+GRACE),
                 "pre_provider":pre[1],"post_provider":post[1]}
     if (arrival-before > MAX_BRACKET_SECONDS
@@ -106,6 +108,27 @@ def observation(conn, country, item, arrival, asof):
     earlier, later = (q>=THRESHOLD for q,_ in states)
     if earlier != later:
         return "THRESHOLD_TRANSITION_BRACKET",None,metadata
+    # Matching endpoints do not establish continuity: an item can sell out
+    # and refill (or change providers and switch back) inside this bracket.
+    # Such evidence is ambiguous, not a success or a known miss.
+    interior = conn.execute(
+        """SELECT quantity,source FROM stock_history
+           WHERE country=? AND item_name=? AND timestamp>? AND timestamp<=?
+           ORDER BY timestamp,id""", (country,item,before,after)
+    )
+    for quantity, source in interior:
+        if source != pre[1]:
+            return "STOCK_STATE_PROVIDER_MISMATCH",None,metadata
+        if (int(quantity)>=THRESHOLD) != earlier:
+            return "THRESHOLD_TRANSITION_BRACKET",None,metadata
+    switched = conn.execute(
+        """SELECT 1 FROM poll_heartbeats
+           WHERE mode='poll-cycle' AND success=1 AND timestamp>? AND timestamp<?
+             AND (source IS NULL OR source!=?) LIMIT 1""",
+        (before,after,pre[1])
+    ).fetchone()
+    if switched:
+        return "PROVIDER_SWITCH",None,metadata
     return ("POLL_STATE_PROXY_SUCCESS",True,metadata) if earlier else (
         "POLL_STATE_PROXY_MISS",False,metadata)
 
@@ -166,6 +189,7 @@ def report(*, ledger=V75, stock=SOURCE, days=1, limit=MAX_PROXY_EVENTS,
     scored=counts["POLL_STATE_PROXY_SUCCESS"]+counts["POLL_STATE_PROXY_MISS"]
     return {
         "status":"V88_POLL_STATE_FORWARD_RESEARCH_REPORT",
+        "observation_version":OBSERVATION_VERSION,
         "read_only":True,
         "research_only":True,
         "exact_10s_accuracy_certified":False,

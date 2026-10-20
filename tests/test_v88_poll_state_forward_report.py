@@ -108,6 +108,49 @@ class HeartbeatStateTests(unittest.TestCase):
         self.assertEqual(report["proxy_scorable"],0)
         self.assertEqual(report["outcomes"]["KNOWN_COLLECTION_GAP"],1)
 
+    def test_sellout_and_refill_between_stocked_endpoints_is_unknown(self):
+        with sqlite3.connect(self.stockdb) as c:
+            self.stock(c,ISSUED-50,100)
+            self.stock(c,ARR+2,0)
+            self.stock(c,ARR+8,90)
+        report=self.run_report()
+        self.assertEqual(report["proxy_scorable"],0)
+        self.assertEqual(report["outcomes"]["THRESHOLD_TRANSITION_BRACKET"],1)
+
+    def test_brief_available_excursion_between_empty_endpoints_is_unknown(self):
+        with sqlite3.connect(self.stockdb) as c:
+            self.stock(c,ISSUED-50,0)
+            self.stock(c,ARR+2,100)
+            self.stock(c,ARR+8,0)
+        report=self.run_report()
+        self.assertEqual(report["proxy_scorable"],0)
+        self.assertEqual(report["outcomes"]["THRESHOLD_TRANSITION_BRACKET"],1)
+
+    def test_item_provider_switch_back_inside_bracket_is_unknown(self):
+        with sqlite3.connect(self.stockdb) as c:
+            self.stock(c,ISSUED-50,100)
+            self.stock(c,ARR+2,90)
+            c.execute("UPDATE stock_history SET source='prometheus' WHERE timestamp=?",(ARR+2,))
+            self.stock(c,ARR+8,80)
+        report=self.run_report()
+        self.assertEqual(report["proxy_scorable"],0)
+        self.assertEqual(report["outcomes"]["STOCK_STATE_PROVIDER_MISMATCH"],1)
+
+    def test_poll_provider_switch_back_inside_bracket_is_unknown(self):
+        with sqlite3.connect(self.stockdb) as c:
+            self.stock(c,ISSUED-50,100)
+            self.heartbeat(c,ARR+2,'prometheus')
+        report=self.run_report()
+        self.assertEqual(report["proxy_scorable"],0)
+        self.assertEqual(report["outcomes"]["PROVIDER_SWITCH"],1)
+
+    def test_same_threshold_quantity_changes_remain_scorable(self):
+        with sqlite3.connect(self.stockdb) as c:
+            self.stock(c,ISSUED-50,100)
+            self.stock(c,ARR+2,60)
+            self.stock(c,ARR+8,30)
+        self.assertEqual(self.run_report()["proxy_success"],1)
+
     def test_provider_change_is_unknown(self):
         with sqlite3.connect(self.stockdb) as c:
             self.stock(c,ISSUED-50,100)

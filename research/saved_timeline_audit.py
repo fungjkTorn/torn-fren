@@ -130,6 +130,8 @@ def main():
     p.add_argument('--source',default='/opt/torn-fren/data/stock_history.db')
     p.add_argument('--out',required=True);p.add_argument('--days',type=int,default=30)
     p.add_argument('--with-stock-score',action='store_true')
+    p.add_argument('--with-physical-identity',action='store_true',
+                   help='Independently compare explicit Pn ordinals to all physical restocks')
     a=p.parse_args()
     if not 1<=a.days<=90:p.error('days must be 1..90')
     out=Path(a.out).expanduser().resolve()
@@ -172,6 +174,17 @@ def main():
         except (OSError,ValueError,sqlite3.Error) as e:result['original_v2_stock_score']=dict(status='UNAVAILABLE',error_type=type(e).__name__,reason=str(e)[:180])
         checkpoint()
         print('ORIGINAL_V2_STOCK_SCORE',json.dumps({k:v for k,v in result['original_v2_stock_score'].items() if k in ('status','overall','missing_tables')}),flush=True)
+    if a.with_physical_identity:
+        from research.physical_restock_identity import archived_audit
+        try:
+            with closing(sqlite3.connect(Path(a.source).resolve().as_uri()+'?mode=ro',uri=True)) as db:
+                db.execute('PRAGMA query_only=ON')
+                db.execute('BEGIN')
+                result['physical_identity']=archived_audit(db,cutoff=result['generated_at'],days=a.days)
+        except (OSError,ValueError,sqlite3.Error) as e:
+            result['physical_identity']=dict(status='UNAVAILABLE',error_type=type(e).__name__,reason=str(e)[:180])
+        checkpoint()
+        print('PHYSICAL_IDENTITY',json.dumps(result['physical_identity']),flush=True)
     print('AUDIT_REPORT_SAVED',out,flush=True)
 
 

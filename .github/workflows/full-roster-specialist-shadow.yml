@@ -7,6 +7,11 @@ on:
       - 'research/full_roster_capture_review.py'
       - 'services/prediction_v2_live.py'
       - 'services/v2_departure_window.py'
+      - 'research/physical_restock_identity.py'
+      - 'tests/test_physical_restock_identity.py'
+      - 'research/v88_poll_state_forward_report.py'
+      - 'tests/test_v88_poll_state_forward_report.py'
+      - 'research/v137_original_v2_stock_at_arrival_audit.py'
       - 'research/saved_timeline_audit.py'
       - 'tests/test_v2_generator_departure_window.py'
       - 'tests/test_saved_timeline_audit.py'
@@ -22,6 +27,11 @@ on:
       - 'research/full_roster_capture_review.py'
       - 'services/prediction_v2_live.py'
       - 'services/v2_departure_window.py'
+      - 'research/physical_restock_identity.py'
+      - 'tests/test_physical_restock_identity.py'
+      - 'research/v88_poll_state_forward_report.py'
+      - 'tests/test_v88_poll_state_forward_report.py'
+      - 'research/v137_original_v2_stock_at_arrival_audit.py'
       - 'research/saved_timeline_audit.py'
       - 'tests/test_v2_generator_departure_window.py'
       - 'tests/test_saved_timeline_audit.py'
@@ -47,4 +57,5 @@ jobs:
           python -m unittest tests.test_v2_generator_departure_window
           tests.test_saved_timeline_audit tests.test_v143_v2_window_web_parity
           tests.test_v2_beta_departure_bridge tests.test_v2_beta_history_preview
-          tests.test_v134_original_graph_v2_audit tests.test_v137_original_v2_stock_at_arrival_audit -q
+          tests.test_v134_original_graph_v2_audit tests.test_v137_original_v2_stock_at_arrival_audit
+          tests.test_physical_restock_identity tests.test_v88_poll_state_forward_report -q

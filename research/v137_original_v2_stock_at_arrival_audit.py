@@ -47,7 +47,7 @@ from pathlib import Path
 
 from research.plushie_champions.common import TRAVEL_SECONDS
 from research.v60_private_snapshot_probe import approved_collector_source
-from research.v88_poll_state_forward_report import observation
+from research.v88_poll_state_forward_report import observation, OBSERVATION_VERSION
 from research.v128_full24_earliest_shadow import COLLECTOR, exact_roster
 
 MAX_DAYS = 90
@@ -371,6 +371,7 @@ def audit(*, collector=COLLECTOR, asof=None, days=30, limit=MAX_ROWS,
             ),
         },
         "same_v88_poll_state_proxy_as_v75_v128": True,
+        "observation_version": OBSERVATION_VERSION if scorer is observation else 'CUSTOM_SCORER',
         "stock_at_least_30_threshold": 30,
         "actual_gameplay_flights_or_purchases_verified": False,
         "country_provider_freshness_verified": False,

@@ -86,3 +86,48 @@ report restock error, usable departure coverage, arrival success/known,
 unknowns, actual waiting and postponed/missed opportunities together. Live
 checks are for measured delivery/refresh behavior that history alone cannot
 establish. No automatic model promotion follows from a small frozen score.
+
+## Owner report inspected and scoring corrections, 2026-10-20
+
+The owner supplied the complete saved JSON report, SHA256
+`718ad8ae9024577dcc202cb829d36e53d28074d9b323b4401f820f13833d70f2`
+(311111 bytes); its exact compressed copy is retained in the private repository.
+It contains 7560 captured rows and all 24 target items have about 36.8–37.0
+days between first and last stock observations. Span does not certify continuity.
+
+Archived V2's matched reconstructed earliest UI advice was 65.72% stocked versus
+62.89% leave-now on 2439 matched cases. These OLD results are not specialist
+results, independent flights, or release qualification. The previously quoted
+37.53% restock-window hits / 118.73 minute MAE reuse legacy stored labels.
+Legacy matching is to completed NON-TINY cycles, not every physical restock;
+projection groups are different populations. Extreme UK Xanax errors and sparse
+flower archive samples require label/coverage investigation before ranking models.
+
+### Concrete correction
+V88 formerly checked only stock at the two poll endpoints. A transient sellout
+and refill inside the bracket could incorrectly count as success; a brief stocked
+interval between empty endpoints could incorrectly count as a known miss.
+The checker now scans all intervening item deltas and poll providers. Threshold
+excursions or provider switches that return to the original endpoint state are
+UNKNOWN. Ordinary quantity changes on the same side of 30 remain scorable.
+V88/V137 expose `poll-state-v2-continuous-bracket` to distinguish corrected results.
+No corrected aggregate percentages have been computed on the owner's source yet.
+
+### Independent physical event diagnostic
+`research/physical_restock_identity.py` counts explicit 0->positive events,
+including small refills. It freezes the first active item/hour forecast, uses
+the explicitly saved Pn ordinal, never matches by nearest predicted timestamp,
+preserves an observation-time bracket, and rejects ambiguous provider/coverage
+or issue-straddling boundaries. This is a separate physical-ordinal diagnostic:
+legacy normal-cycle Pn semantics are NOT certified or silently relabeled.
+Optional `--with-physical-identity` on the existing saved-timeline audit records
+the diagnostic without updating archive labels. It requires the owner source:
+the sanitized runner snapshot lacks the archive/provider evidence needed here.
+
+Local validation: 38 tests passed across V88, V115, V134, V137, saved-timeline
+audit and physical identity, including sellout/refill, provider switch-and-return,
+small refills, residual 1..29 stock, uncertain boundaries, frozen first issuance,
+and query-only archive integration. No inference sweep, live recorder, service
+change, routing change, or deletion performed. Future departure changes still
+need historical validation with these corrected labels; no model improvement
+or deployment claimed.
