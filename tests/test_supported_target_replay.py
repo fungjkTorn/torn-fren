@@ -5,7 +5,7 @@ import tempfile
 from types import SimpleNamespace
 from unittest.mock import patch
 from research.supported_target_retention import WAIT, STEP, MODES
-from research.supported_target_replay import schedule, score_records, collect_item
+from research.supported_target_replay import schedule, score_records, collect_item, CHILD
 
 
 def tick(q, native, points, age=0):
@@ -13,6 +13,9 @@ def tick(q, native, points, age=0):
 
 
 class ReplayTests(unittest.TestCase):
+    def test_actual_isolated_child_compiles_before_runner_launch(self):
+        compile(CHILD,'native-replay-child','exec')
+
     def test_collection_finishes_all_causal_inference_before_exporting_labels(self):
         calls=[];queries=tuple(range(0,WAIT+2*STEP,STEP))
         class Mirror:

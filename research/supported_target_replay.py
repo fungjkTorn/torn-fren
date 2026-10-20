@@ -70,7 +70,8 @@ def forbidden(*a,**k):raise RuntimeError('HTTP forbidden in causal retention inf
 provider.get_country_stock=forbidden
 sys.modules['services.yata_api']=provider
 from research.supported_target_retention import native_band
-print(json.dumps(asdict(native_band(sys.argv[1],sys.argv[2],int(sys.argv[3]),all_supported=len(sys.argv)>4 and sys.argv[4]=='1')))))
+band=native_band(sys.argv[1],sys.argv[2],int(sys.argv[3]),all_supported=len(sys.argv)>4 and sys.argv[4]=='1')
+print(json.dumps(asdict(band)))
 '''
 
 
