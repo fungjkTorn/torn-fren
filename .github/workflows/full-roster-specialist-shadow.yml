@@ -5,6 +5,11 @@ on:
       - 'research/full_roster_specialist_shadow.py'
       - 'tests/test_full_roster_specialist_shadow.py'
       - 'research/full_roster_capture_review.py'
+      - 'services/prediction_v2_live.py'
+      - 'services/v2_departure_window.py'
+      - 'research/saved_timeline_audit.py'
+      - 'tests/test_v2_generator_departure_window.py'
+      - 'tests/test_saved_timeline_audit.py'
       - 'tests/test_full_roster_capture_review.py'
       - 'research/causal_replay_slice.py'
       - 'research/fixed_roster_release_check.py'
@@ -15,6 +20,11 @@ on:
       - 'research/full_roster_specialist_shadow.py'
       - 'tests/test_full_roster_specialist_shadow.py'
       - 'research/full_roster_capture_review.py'
+      - 'services/prediction_v2_live.py'
+      - 'services/v2_departure_window.py'
+      - 'research/saved_timeline_audit.py'
+      - 'tests/test_v2_generator_departure_window.py'
+      - 'tests/test_saved_timeline_audit.py'
       - 'tests/test_full_roster_capture_review.py'
       - 'research/causal_replay_slice.py'
       - 'research/fixed_roster_release_check.py'
@@ -29,5 +39,12 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - run: python -m pip install numpy==1.26.4
+      - run: python -m pip install numpy==1.26.4 requests fastapi python-dotenv
       - run: python -m unittest tests.test_full_roster_specialist_shadow tests.test_full_roster_capture_review tests.test_causal_replay_slice tests.test_canary_model_inventory tests.test_fixed_roster_release_check tests.test_matched_champion_audit tests.test_departure_reconfirmation
+
+      - name: Verify V2 generator, graph windows and saved-timeline audit
+        run: >-
+          python -m unittest tests.test_v2_generator_departure_window
+          tests.test_saved_timeline_audit tests.test_v143_v2_window_web_parity
+          tests.test_v2_beta_departure_bridge tests.test_v2_beta_history_preview
+          tests.test_v134_original_graph_v2_audit tests.test_v137_original_v2_stock_at_arrival_audit -q
