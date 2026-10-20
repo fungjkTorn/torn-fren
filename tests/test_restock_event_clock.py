@@ -1,8 +1,10 @@
 import unittest
 import tempfile
 from pathlib import Path
+from unittest.mock import patch
+import json
 
-from research.restock_event_clock import IntervalClock,departure,model,item_benchmark,selected_target_error
+from research.restock_event_clock import IntervalClock,departure,model,item_benchmark,selected_target_error,main
 from research.true_zero_cycles import ZeroCycles
 
 T=1790985600
@@ -34,6 +36,29 @@ class EventClockTests(unittest.TestCase):
             self.assertIn('interval_ridge_expected',r['departure'])
             self.assertIn('leave_now',r['chronological_slices']['later_validation'])
             self.assertFalse(r['production_promotion'])
+            self.assertIn('within_15_seconds',r['restock_timing']['interval_ridge'])
+            self.assertIn('within_60_seconds',r['restock_timing']['interval_ridge'])
+            self.assertIn('within_15_seconds',r['selected_event_timing']['interval_ridge_expected']['later_validation'])
+
+    def test_historical_cli_is_explicitly_bounded_and_source_pinned(self):
+        with tempfile.TemporaryDirectory() as td:
+            folder=Path(td)
+            args=['restock_event_clock','--source','/unused/read-only.sqlite',
+                  '--model-sha','f'*40,'--item-key','mex:Jaguar Plushie',
+                  '--days','1','--out',str(folder/'run')]
+            with patch('sys.argv',args), patch(
+                    'research.restock_event_clock.item_benchmark',
+                    return_value={'restock_timing':{}}) as bench:
+                main()
+            bench.assert_called_once_with(
+                '/unused/read-only.sqlite','mex:Jaguar Plushie',days=1,asof=None)
+            request=json.loads((folder/'run'/'request.json').read_text())
+            self.assertEqual(request['days'],1)
+            self.assertFalse(request['automatic_promotion'])
+            self.assertIn('first_positive_observation',request['restock_error_timestamp'])
+            with patch('sys.argv',args[:args.index('1')]+['9','--out',str(folder/'bad')]):
+                with self.assertRaises(ValueError):main()
+            self.assertFalse((folder/'bad').exists())
 
     def fixture(self):
         rows=[model.OBS(T-30,0,'a')];epoch=T
