@@ -122,6 +122,10 @@ def export(source,roster,output,*,asof=None,days=45,
     try:
         with closing(sqlite3.connect(src.as_uri()+"?mode=ro",uri=True,timeout=15)) as reader:
             reader.execute("PRAGMA query_only=ON")
+            # ORDER BY on collector history can need a SQLite temporary
+            # b-tree. Keep it in bounded RAM rather than attempting to open
+            # a temp DB inside the systemd service's restricted mount view.
+            reader.execute("PRAGMA temp_store=MEMORY")
             reader.execute("BEGIN")
             with closing(sqlite3.connect(temp,timeout=15)) as dest:
                 dest.executescript(DDL)
