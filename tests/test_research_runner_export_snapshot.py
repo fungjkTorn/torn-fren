@@ -125,6 +125,44 @@ class SnapshotTests(unittest.TestCase):
                     mod.export(src,roster,path,asof=100300,days=14)
             self.assertEqual(path.read_bytes(),previous)
 
+    def test_heartbeat_provider_label_is_preserved_without_any_private_fields(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            src,roster,dst=fixture(tmp)
+            with sqlite3.connect(src) as cx:
+                cx.execute("ALTER TABLE poll_heartbeats ADD COLUMN source TEXT")
+                cx.execute("UPDATE poll_heartbeats SET source='yata'")
+            original=src.read_bytes()
+            mod.export(src,roster,dst/"provider.db",asof=100300,days=14)
+            self.assertEqual(src.read_bytes(),original)
+            with sqlite3.connect(dst/"provider.db") as cx:
+                self.assertEqual(cx.execute(
+                    "SELECT source FROM poll_heartbeats ORDER BY timestamp").fetchall(),
+                    [('yata',),('yata',)])
+                self.assertEqual(cx.execute(
+                    "SELECT value FROM research_metadata "
+                    "WHERE key='heartbeat_provider_field_present'").fetchone()[0],
+                    'true')
+                cols={x[1] for x in cx.execute(
+                    "PRAGMA table_info(poll_heartbeats)")}
+                self.assertEqual(cols,{"timestamp","mode","success","source"})
+                self.assertNotIn('internal_agent_secret',cols)
+            raw=(dst/"provider.db").read_bytes()
+            self.assertNotIn(b"HEARTBEAT_SECRET",raw)
+            self.assertNotIn(b"SENSITIVE_DO_NOT_COPY",raw)
+
+    def test_legacy_no_heartbeat_provider_cannot_be_fabricated(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            src,roster,dst=fixture(tmp)
+            mod.export(src,roster,dst/"no_provider.db",asof=100300,days=14)
+            with sqlite3.connect(dst/"no_provider.db") as cx:
+                self.assertEqual(cx.execute(
+                    "SELECT source FROM poll_heartbeats").fetchall(),
+                    [(None,),(None,)])
+                self.assertEqual(cx.execute(
+                    "SELECT value FROM research_metadata "
+                    "WHERE key='heartbeat_provider_field_present'").fetchone()[0],
+                    'false')
+
     def test_snapshot_replaces_atomically_without_writing_collector(self):
         with tempfile.TemporaryDirectory() as tmp:
             src,roster,dst=fixture(tmp)
