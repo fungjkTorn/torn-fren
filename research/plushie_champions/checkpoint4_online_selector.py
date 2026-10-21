@@ -7,7 +7,7 @@ WINNING_WINDOWS={'Monkey Plushie':2,'Chamois Plushie':3}
 TARGETS={'monkey':('arg','Monkey Plushie'),'chamois':('swi','Chamois Plushie')}
 
 def replay_target(db:str,country:str,item:str):
-    ctx=ResearchContext.build(db);tl=ctx.timelines[(country,item)];travel=TRAVEL_SECONDS[country];starts=valid_starts(ctx,country,item);hold=starts[int(.75*len(starts)):]
+    ctx=ResearchContext.build(db,readonly=True);tl=ctx.timelines[(country,item)];travel=TRAVEL_SECONDS[country];starts=valid_starts(ctx,country,item);hold=starts[int(.75*len(starts)):]
     planners={e:TemplatePlanner(ctx,country,item,lags=e[0],lookback=e[1],shift_range=e[2]).plan for e in EXPERTS}
     outcome={e:{} for e in EXPERTS}; resolved={e:{} for e in EXPERTS}
     for e,p in planners.items():
