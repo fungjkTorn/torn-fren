@@ -21,3 +21,7 @@ __pycache__/
 *.pyc
 .venv/
 venv/
+
+# Local PC six-core offline research: never commit stock history or outcome artifacts
+historical_pc_data/
+historical_pc_results/

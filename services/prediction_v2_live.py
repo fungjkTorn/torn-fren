@@ -27,6 +27,7 @@ from services.medium_model_lab import (
     analyze_advanced_item,
 )
 from services.prediction_v2_preflight import build_prediction_v2_preflight
+from services.v2_departure_window import departure_window
 
 
 _PROFILE_CACHE = {}
@@ -530,6 +531,7 @@ def _make_prediction(
     recent20=None,
     recent10=None,
     now=None,
+    expected_stock_lifetime=None,
 ):
     now = time.time() if now is None else now
     arrival = (
@@ -543,15 +545,7 @@ def _make_prediction(
         else None
     )
 
-    usable = True
-    if leave_by is not None and leave_by <= now:
-        usable = False
-    if window_end is not None and travel_seconds is not None:
-        latest_possible_leave = window_end - travel_seconds
-        if latest_possible_leave <= now:
-            usable = False
-
-    return {
+    prediction = {
         "prediction_number": number,
         "estimate_timestamp": _safe_int(estimate),
         "window_start_timestamp": _safe_int(window_start),
@@ -567,8 +561,15 @@ def _make_prediction(
         "arrival_success_rate": success_rate,
         "recent20_arrival_success_rate": recent20,
         "recent10_arrival_success_rate": recent10,
-        "usable_for_departure": bool(usable),
+        "usable_for_departure": False,
     }
+    if estimate is not None and expected_stock_lifetime:
+        prediction['target_depletion_timestamp']=_safe_int(estimate+expected_stock_lifetime)
+        prediction['expected_stock_lifetime_seconds']=_safe_int(expected_stock_lifetime)
+    window=departure_window(prediction)
+    prediction['usable_for_departure']=bool(window and now<=window['latest_departure_epoch'])
+    prediction['latest_safe_leave_timestamp']=_safe_int(window['latest_departure_epoch']) if window else None
+    return prediction
 
 
 def _annotate_arrival_source(prediction, profile):
@@ -582,7 +583,7 @@ def _annotate_arrival_source(prediction, profile):
 
 
 
-def _annotate_target_depletion(predictions, median_lifetime):
+def _annotate_target_depletion(predictions, median_lifetime, *, now=None):
     """
     Add the expected sellout time for each forecasted restock cycle.
 
@@ -598,6 +599,7 @@ def _annotate_target_depletion(predictions, median_lifetime):
         return predictions
 
     lifetime = float(median_lifetime)
+    now=time.time() if now is None else now
     for prediction in predictions or []:
         estimate = prediction.get("estimate_timestamp")
         if estimate is None:
@@ -606,6 +608,9 @@ def _annotate_target_depletion(predictions, median_lifetime):
         target_depletion = float(estimate) + lifetime
         prediction["target_depletion_timestamp"] = _safe_int(target_depletion)
         prediction["expected_stock_lifetime_seconds"] = _safe_int(lifetime)
+        window=departure_window(prediction)
+        prediction['usable_for_departure']=bool(window and now<=window['latest_departure_epoch'])
+        prediction['latest_safe_leave_timestamp']=_safe_int(window['latest_departure_epoch']) if window else None
 
         arrival = prediction.get("recommended_arrival_timestamp")
         if arrival is not None:
@@ -762,6 +767,7 @@ def _project_future_chain(
             recent20=None,
             recent10=None,
             now=now,
+            expected_stock_lifetime=median_lifetime,
         )
         nxt = _annotate_arrival_source(nxt, profile)
         nxt["projection_depth"] = projection_depth
@@ -1056,6 +1062,7 @@ def _build_live_prediction_v2_impl(country, item_name, now_timestamp=None, force
             recent20=profile["recent20_success_rate"],
             recent10=profile["recent10_success_rate"],
             now=now,
+            expected_stock_lifetime=median_lifetime,
         )
         p1 = _annotate_arrival_source(p1, profile)
         base["prediction_1"] = p1
@@ -1076,7 +1083,7 @@ def _build_live_prediction_v2_impl(country, item_name, now_timestamp=None, force
             start_number=1,
             first_is_projected=False,
         )
-        _annotate_target_depletion(chain, median_lifetime)
+        _annotate_target_depletion(chain, median_lifetime,now=now)
         _apply_empirical_horizon_confidence(country, item_name, chain)
         base["predictions"] = chain
         base["prediction_1"] = chain[0] if chain else None
@@ -1182,6 +1189,7 @@ def _build_live_prediction_v2_impl(country, item_name, now_timestamp=None, force
             recent20=None,
             recent10=None,
             now=now,
+            expected_stock_lifetime=median_lifetime,
         )
         p1["estimated_depletion_timestamp"] = _safe_int(estimated_depletion)
         p1["estimated_active_lifetime_seconds"] = _safe_int(active_lifetime)
@@ -1200,7 +1208,7 @@ def _build_live_prediction_v2_impl(country, item_name, now_timestamp=None, force
             start_number=1,
             first_is_projected=True,
         )
-        _annotate_target_depletion(chain, median_lifetime)
+        _annotate_target_depletion(chain, median_lifetime,now=now)
         _apply_empirical_horizon_confidence(country, item_name, chain)
         base["predictions"] = chain
         base["prediction_1"] = chain[0] if chain else None
@@ -1274,6 +1282,12 @@ def build_live_prediction_v2(
         now_timestamp=now_timestamp,
         force_profile=force_profile,
     )
+
+    # A model computation has its OWN issuance. This is not the HTTP
+    # response-check timestamp, which can refresh without a model refit.
+    # Preserve this timestamp through /api/history prediction caching.
+    # Historical replay callers must not construe it as a past as-of issue.
+    result["forecast_model_computed_at"] = int(time.time())
 
     if record_audit:
         try:

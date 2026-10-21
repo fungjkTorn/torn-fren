@@ -1,0 +1,10 @@
+--- a/services/history_service.py
++++ b/services/history_service.py
+@@ -9,0 +10 @@
++from services import country_freshness
+@@ -82,0 +84,3 @@
++            for country_clock_statement in country_freshness.DDL.split(';'):
++                if country_clock_statement.strip():
++                    conn.execute(country_clock_statement)
+@@ -843,0 +848 @@
++        country_freshness.record(conn,country,country_data,source,timestamp)

@@ -17,6 +17,7 @@ import argparse
 import json
 import sqlite3
 from pathlib import Path
+from research.v38_readonly_retry import read_with_retry
 
 # Standalone canary helper: do not import research-only V24 replay from main.
 # The existing V24 replay module is not part of the public V2 website path.
@@ -30,10 +31,37 @@ OLD_NATIVE = {
 def _install_frozen_readonly_history(history_service, db):
     """Replace legacy history access only inside the isolated child process."""
     path=Path(db).resolve(strict=True)
+    class RetryingReadOnlyConnection(history_service._ClosingConnection):
+        """Retry only transient SELECT/PRAGMA failures, not mutations.
+
+        SQLite can open the main DB successfully but fail while accessing
+        WAL/SHM on first SELECT. Only the isolated research child gets this
+        adapter. Keep V58 deterministic connection closure.
+        """
+        def execute(self, sql, parameters=(), /):
+            statement=str(sql).lstrip().split(None,1)
+            verb=statement[0].upper() if statement else ""
+            if verb not in {"SELECT","WITH","PRAGMA"}:
+                return sqlite3.Connection.execute(self,sql,parameters)
+            return read_with_retry(
+                lambda: sqlite3.Connection.execute(self,sql,parameters),
+                delays=(0.15,0.35,0.65),
+            )
     def read_only_connect():
-        connection=sqlite3.connect(path.as_uri()+"?mode=ro",uri=True,timeout=30)
-        connection.execute("PRAGMA query_only=ON")
-        return connection
+        # Preserve the original 30-second SQLite lock timeout and hard
+        # mode=ro/query_only guarantees. Retry CANTOPEN/BUSY/LOCKED only.
+        def open_once():
+            connection=sqlite3.connect(
+                path.as_uri()+"?mode=ro",uri=True,timeout=30,
+                factory=RetryingReadOnlyConnection,
+            )
+            try:
+                connection.execute("PRAGMA query_only=ON")
+                return connection
+            except BaseException:
+                connection.close()
+                raise
+        return read_with_retry(open_once,delays=(0.15,0.35,0.65))
     history_service.DB_PATH=path
     history_service._connect=read_only_connect
     history_service.init_db=lambda:None
@@ -47,27 +75,29 @@ VALID_COUNTRIES={"mex","cay","can","haw","uni","arg","swi","jap","chi","uae","so
 
 def inspect_live_source(db: str | Path, now: int, freshness=LIVE_FRESHNESS_SECONDS) -> dict:
     db=Path(db).resolve(strict=True)
-    with sqlite3.connect(db.as_uri()+"?mode=ro",uri=True) as con:
-        # Source is a living collector DB, not an offline lookback onto the future.
-        maximum=con.execute("SELECT MAX(timestamp) FROM stock_history").fetchone()[0]
-        if maximum is None:
-            return {"status":"NO_OBSERVATIONS"}
-        if int(maximum)>now:
-            return {"status":"FUTURE_RECORDS_PRESENT","latest_observation":int(maximum)}
-        hb=con.execute("""SELECT MAX(timestamp) FROM poll_heartbeats
-                           WHERE mode='poll-cycle' AND success=1""").fetchone()[0]
-        if hb is None or hb>now or now-hb>freshness:
-            return {"status":"COLLECTOR_STALE_OR_NO_HEARTBEAT",
-                    "last_successful_heartbeat":int(hb) if hb is not None else None}
-        # Inclusive boundaries: recovery timestamp itself is not a valid cycle label.
-        gaps=con.execute("""SELECT start_timestamp,end_timestamp FROM collection_gaps
-                            WHERE start_timestamp <= ? AND
-                            COALESCE(end_timestamp,9223372036854775807)>=? LIMIT 1""",
-                         (int(now),int(hb))).fetchone()
-        if gaps is not None:
-            return {"status":"COLLECTION_GAP_CROSSES_RECENT_POLL"}
-    return {"status":"FRESH","last_successful_heartbeat":int(hb),
-            "latest_observation":int(maximum)}
+    def read_source_once():
+        with sqlite3.connect(db.as_uri()+"?mode=ro",uri=True) as con:
+            # Source is a living collector DB, not an offline lookback onto the future.
+            maximum=con.execute("SELECT MAX(timestamp) FROM stock_history").fetchone()[0]
+            if maximum is None:
+                return {"status":"NO_OBSERVATIONS"}
+            if int(maximum)>now:
+                return {"status":"FUTURE_RECORDS_PRESENT","latest_observation":int(maximum)}
+            hb=con.execute("""SELECT MAX(timestamp) FROM poll_heartbeats
+                               WHERE mode='poll-cycle' AND success=1""").fetchone()[0]
+            if hb is None or hb>now or now-hb>freshness:
+                return {"status":"COLLECTOR_STALE_OR_NO_HEARTBEAT",
+                        "last_successful_heartbeat":int(hb) if hb is not None else None}
+            # Inclusive boundaries: recovery timestamp itself is not a valid cycle label.
+            gaps=con.execute("""SELECT start_timestamp,end_timestamp FROM collection_gaps
+                                WHERE start_timestamp <= ? AND
+                                COALESCE(end_timestamp,9223372036854775807)>=? LIMIT 1""",
+                             (int(now),int(hb))).fetchone()
+            if gaps is not None:
+                return {"status":"COLLECTION_GAP_CROSSES_RECENT_POLL"}
+        return {"status":"FRESH","last_successful_heartbeat":int(hb),
+                "latest_observation":int(maximum)}
+    return read_with_retry(read_source_once)
 
 
 def frozen_single_tick(

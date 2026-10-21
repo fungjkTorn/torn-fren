@@ -1,0 +1,14 @@
+--- a/web/app.py
++++ b/web/app.py
+@@ -470,8 +470,9 @@
+                 "source": "PRECOMPUTED_READ_ONLY_SIDECAR", "latest": latest}
+     if os.environ.get("TORN_FREN_V87_EXPERIMENTAL24_PREVIEW") == "1":
+         from web.v87_experimental24_overlay import overlay_response
+-        return overlay_response(response, key=key, now=now)
+-    return response
++        response = overlay_response(response, key=key, now=now)
++    from web.shared_experimental_overlay import overlay_response as shared_departure_overlay
++    return shared_departure_overlay(response, now=now, key=key)
+ 
+ 
+ @app.get("/experimental")

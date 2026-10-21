@@ -1,0 +1,199 @@
+import unittest
+import tempfile
+from pathlib import Path
+from unittest.mock import patch
+import json
+
+from research.restock_event_clock import IntervalClock,departure,model,item_benchmark,selected_target_error,main
+from research.true_zero_cycles import ZeroCycles
+
+T=1790985600
+
+
+class EventClockTests(unittest.TestCase):
+    def test_signed_restocks_early_vs_late_and_real_landing_offset(self):
+        earlier=selected_target_error(
+            dict(event_index=2,predicted_restock_epoch=1900,landing=1950),
+            [1000,2000],500,lambda a,b:False)
+        self.assertEqual(earlier["signed_prediction_minus_observed_seconds"],-100)
+        self.assertEqual(earlier["arrival_minus_observed_restock_seconds"],-50)
+        later=selected_target_error(
+            dict(event_index=2,predicted_restock_epoch=2100,landing=2250),
+            [1000,2000],500,lambda a,b:False)
+        self.assertEqual(later["signed_prediction_minus_observed_seconds"],100)
+        self.assertEqual(later["arrival_minus_observed_restock_seconds"],250)
+
+    def test_selected_later_event_is_not_matched_to_nearest_actual_drop(self):
+        choice=dict(event_index=2,predicted_restock_epoch=1002)
+        result=selected_target_error(choice,[1000,2000],500,lambda a,b:False)
+        self.assertEqual(result['actual_restock'],2000)
+        self.assertEqual(result['absolute_error_seconds'],998)
+        self.assertEqual(selected_target_error(choice,[1000],500,lambda a,b:False)['status'],'PENDING')
+        self.assertEqual(selected_target_error(choice,[1000,2000],500,lambda a,b:True)['status'],'UNKNOWN_CONTINUITY')
+
+    def test_provider_switch_within_positive_phase_does_not_train_complete_cycle(self):
+        rows=[model.OBS(T-30,0,'a'),model.OBS(T,200,'a'),model.OBS(T+100,180,'b'),
+              model.OBS(T+200,0,'b'),model.OBS(T+1000,200,'b')]
+        clock=IntervalClock(rows,lambda a,b:False,T+1000)
+        self.assertEqual(clock.trials[0]['outcome'],'UNKNOWN')
+        self.assertEqual(clock.trials[0]['invalidated_at'],T+100)
+
+    def test_full_historical_path_is_readonly_and_keeps_both_metrics(self):
+        from test_continuous_departure_replay import ContinuousTests
+        with tempfile.TemporaryDirectory() as td:
+            source=ContinuousTests().fixture(Path(td));before=source.read_bytes()
+            r=item_benchmark(source,'mex:Jaguar Plushie',days=1)
+            self.assertEqual(source.read_bytes(),before)
+            self.assertIn('interval_ridge',r['restock_timing'])
+            self.assertIn('interval_ridge_expected',r['departure'])
+            self.assertIn('leave_now',r['chronological_slices']['later_validation'])
+            self.assertFalse(r['production_promotion'])
+            self.assertIn('mean_signed_prediction_minus_observed_minutes',
+                          r['restock_timing']['phase_empirical'])
+            self.assertIn('within_5_minutes_fraction',
+                          r['restock_timing']['phase_empirical'])
+            self.assertIn('first_issued_distinct_within_5_minutes',
+                          r['restock_timing']['phase_empirical'])
+            split=r['selected_event_timing']['phase_empirical_expected']['later_validation']
+            self.assertIn('current_stock_departures_success_fraction',split)
+            self.assertIn('future_restock_departures_success_fraction',split)
+            self.assertIn('mean_landing_minus_observed_restock_minutes',split)
+            self.assertEqual(r['metric_definitions']['verified_game_event_second'],False)
+            self.assertIn('within_15_seconds',r['restock_timing']['interval_ridge'])
+            self.assertIn('within_60_seconds',r['restock_timing']['interval_ridge'])
+            self.assertIn('within_15_seconds',r['selected_event_timing']['interval_ridge_expected']['later_validation'])
+
+    def test_lag_grid_replayed_on_same_historical_item_and_issued_cohorts(self):
+        from test_continuous_departure_replay import ContinuousTests
+        with tempfile.TemporaryDirectory() as td:
+            source=ContinuousTests().fixture(Path(td))
+            before=source.read_bytes()
+            result=item_benchmark(source,'mex:Jaguar Plushie',days=1,
+                                   arrival_lags=(0,60,180,300))
+            self.assertEqual(source.read_bytes(),before)
+            self.assertEqual(result['arrival_lags_evaluated_seconds'],
+                             [0,60,180,300])
+            later=result['chronological_slices']['later_validation']
+            self.assertIn('phase_empirical_expected_lag180',later)
+            self.assertIn('phase_empirical_bounded_lag300',later)
+            self.assertEqual(later['phase_empirical_expected_lag180']['starts'],
+                             later['phase_empirical_expected']['starts'])
+            self.assertEqual(later['phase_empirical_expected_lag180']['starts'],
+                             later['leave_now']['starts'])
+
+    def test_historical_cli_is_explicitly_bounded_and_source_pinned(self):
+        with tempfile.TemporaryDirectory() as td:
+            folder=Path(td)
+            args=['restock_event_clock','--source','/unused/read-only.sqlite',
+                  '--model-sha','f'*40,'--item-key','mex:Jaguar Plushie',
+                  '--days','1','--out',str(folder/'run')]
+            with patch('sys.argv',args), patch(
+                    'research.restock_event_clock.item_benchmark',
+                    return_value={'restock_timing':{}}) as bench:
+                main()
+            bench.assert_called_once_with(
+                '/unused/read-only.sqlite','mex:Jaguar Plushie',days=1,asof=None)
+            request=json.loads((folder/'run'/'request.json').read_text())
+            self.assertEqual(request['days'],1)
+            self.assertFalse(request['automatic_promotion'])
+            self.assertIn('first_positive_observation',request['restock_error_timestamp'])
+            with patch('sys.argv',args[:args.index('1')]+['31','--out',str(folder/'bad')]):
+                with self.assertRaises(ValueError):main()
+            self.assertFalse((folder/'bad').exists())
+
+    def fixture(self):
+        rows=[model.OBS(T-30,0,'a')];epoch=T
+        for i in range(140):
+            rows.extend(model.OBS(epoch+d,n,'a') for d,n in ((0,200),(600,20),(900,0)))
+            epoch+=(3600,5400,4500)[i%3]
+        return rows,epoch
+
+    def forecast(self,rows,issued,cutoff):
+        clock=IntervalClock(rows,lambda a,b:False,cutoff)
+        tracker=ZeroCycles(lambda a,b:False)
+        for r in rows:
+            if r.epoch<=issued:tracker.add(r)
+        return clock.forecast('mex:Jaguar Plushie',tracker,issued,'ridge'),tracker
+
+    def test_earliest_reachable_event_keeps_unreachable_next_drop(self):
+        events=[dict(predicted_restock_epoch=t,predicted_stock_below_30_epoch=t+100) for t in (1200,2000)]
+        forecast=dict(restock_events=events)
+        chosen=departure(forecast,issued=1000,flight=500)
+        self.assertEqual(chosen['event_index'],2)
+        self.assertEqual(chosen['departure'],1500)
+        self.assertEqual(chosen['landing'],2000)
+        self.assertEqual(forecast['restock_events'],events)
+
+    def test_plus10_is_after_actual_landing_not_subtracted_from_departure(self):
+        forecast=dict(restock_events=[dict(predicted_restock_epoch=2000,predicted_stock_below_30_epoch=2010)])
+        self.assertIsNone(departure(forecast,issued=1000,flight=500)['departure'])
+        forecast['restock_events'][0]['predicted_stock_below_30_epoch']=2011
+        self.assertEqual(departure(forecast,issued=1000,flight=500)['departure'],1500)
+
+    def test_offset_grid_targets_future_physical_restock_not_existing_stock(self):
+        forecast=dict(restock_events=[
+            dict(predicted_restock_epoch=1200,predicted_stock_below_30_epoch=1290),
+            dict(predicted_restock_epoch=2200,predicted_stock_below_30_epoch=2750)])
+        first=departure(forecast,issued=1000,flight=500)
+        self.assertEqual(first['event_index'],2)
+        self.assertEqual(first['landing'],2200)
+        delayed=departure(forecast,issued=1000,flight=500,arrival_lag_seconds=180)
+        self.assertEqual(delayed['event_index'],2)
+        self.assertEqual(delayed['departure'],1880)
+        self.assertEqual(delayed['landing'],2380)
+        self.assertEqual(delayed['arrival_plus_10'],2390)
+        self.assertEqual(delayed['predicted_restock_epoch'],2200)
+        current=dict(current_stock_window=dict(predicted_restock_epoch=1000,
+            predicted_stock_below_30_epoch=2000))
+        self.assertEqual(departure(current,issued=1000,flight=500,
+            arrival_lag_seconds=300)['departure'],1000)
+        with self.assertRaises(ValueError):
+            departure(forecast,issued=1000,flight=500,arrival_lag_seconds=901)
+        with self.assertRaises(ValueError):
+            departure(forecast,issued=1000,flight=500,arrival_lag_seconds=-1)
+
+    def test_current_stock_and_uncertainty_window(self):
+        f=dict(current_stock_window=dict(predicted_restock_epoch=1000,predicted_stock_below_30_epoch=1800,
+            restock_late_epoch=1000,early_stock_end_epoch=1700))
+        self.assertEqual(departure(f,issued=1000,flight=500)['event_index'],0)
+        self.assertEqual(departure(f,issued=1000,flight=500,conservative=True)['departure'],1000)
+        f['current_stock_window']['early_stock_end_epoch']=1500
+        self.assertIsNone(departure(f,issued=1000,flight=500,conservative=True)['departure'])
+
+    def test_future_mutation_does_not_change_issued_event_timeline(self):
+        rows,cutoff=self.fixture();issued=rows[301].epoch+100
+        original,tracker=self.forecast(rows,issued,cutoff)
+        changed=[r if r.epoch<=issued else model.OBS(r.epoch,0,r.source) for r in rows]
+        altered,_=self.forecast(changed,issued,cutoff)
+        self.assertEqual(original,altered)
+        self.assertEqual(original['status'],'EVENT_TIMELINE_FORECAST_AVAILABLE')
+        self.assertLessEqual(original['latest_training_end'],issued)
+        self.assertTrue(original['true_restock_events'])
+        self.assertEqual(original['physical_depletion_quantity'],0)
+        self.assertEqual(tracker.last.quantity,200)
+
+    def test_recursive_projection_preserves_first_physical_event_and_past_training(self):
+        rows,cutoff=self.fixture();issued=rows[301].epoch+100
+        clock=IntervalClock(rows,lambda a,b:False,cutoff)
+        _,tracker=self.forecast(rows,issued,cutoff)
+        first=tracker.forecast('mex:Jaguar Plushie',asof=issued)['true_restock_events'][0]
+        original=clock.forecast('mex:Jaguar Plushie',tracker,issued,'ridge',first_event=first,recursive=True)
+        self.assertEqual(original['true_restock_events'][0]['predicted_restock_epoch'],first['predicted_restock_epoch'])
+        self.assertGreater(len(original['true_restock_events']),1)
+        changed=[r if r.epoch<=issued else model.OBS(r.epoch,0,r.source) for r in rows]
+        altered=IntervalClock(changed,lambda a,b:False,cutoff).forecast('mex:Jaguar Plushie',tracker,issued,
+            'ridge',first_event=first,recursive=True)
+        self.assertEqual(original,altered)
+
+    def test_residual_stock_below30_does_not_reset_restock_anchor(self):
+        rows,cutoff=self.fixture()
+        # Choose an actual restock (three observations per completed cycle).
+        birth=rows[301].epoch
+        before,_=self.forecast(rows,birth+100,cutoff)
+        after,tracker=self.forecast(rows,birth+650,cutoff)
+        self.assertEqual(tracker.last.quantity,20)
+        self.assertEqual(before['anchor_restock_epoch'],after['anchor_restock_epoch'])
+        self.assertIsNone(after['current_stock_window'])
+
+
+if __name__=='__main__':unittest.main()

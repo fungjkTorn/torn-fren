@@ -1,0 +1,447 @@
+"""Physical restock clocks -> chronological stock windows -> flight decisions.
+
+Research only. Uses existing prequential interval regressions, rather than
+optimizing arbitrary future arrival bins. No fitting uses an unfinished cycle.
+"""
+import argparse
+import bisect
+from collections import Counter
+import json
+import math
+from pathlib import Path
+import time
+
+from research.restock_predictability_audit import cycles_from_rows, cycle_predictions, quantile, features
+from research.true_zero_cycles import ZeroCycles, model
+
+STEP=300
+WAIT=28800
+MODES=('phase_empirical','interval_median','interval_ridge','phase_recursive_ridge')
+
+
+def continuous_source(rows,crosses):
+    switches=[b.epoch for a,b in zip(rows,rows[1:]) if a.source!=b.source]
+    def invalid(start,end):
+        i=bisect.bisect_right(switches,start)
+        return crosses(start,end) or i<len(switches) and switches[i]<=end
+    return invalid
+
+
+def departure(forecast, *, issued, flight, conservative=False, arrival_lag_seconds=0):
+    """Select FIRST reachable event; require stock at landing through +10s.
+
+    The next item drop remains first in the forecast even when unreachable.
+    A future departure is tentative and must be rechecked on the next issue.
+    """
+    if (type(arrival_lag_seconds) is not int or
+        not 0<=arrival_lag_seconds<=900):
+        raise ValueError('arrival-lag candidate must be 0..900 seconds')
+    windows=[]
+    if forecast.get('current_stock_window'):
+        windows.append((0,forecast['current_stock_window']))
+    windows.extend((i+1,w) for i,w in enumerate(forecast.get('restock_events',[])))
+    for index,w in windows:
+        if conservative:
+            start=w.get('restock_late_epoch')
+            end=w.get('early_stock_end_epoch')
+            if start is None or end is None:continue
+        else:
+            start=w['predicted_restock_epoch'];end=w['predicted_stock_below_30_epoch']
+        # Delay only future restock landings. Existing stocked inventory
+        # is already observed at issue time and should not be slowed.
+        target=start+(arrival_lag_seconds if index>0 else 0)
+        dep=max(issued,target-flight)
+        if dep<=issued+WAIT and dep+flight>=target and dep+flight+10<end:
+            return dict(departure=dep,event_index=index,landing=dep+flight,
+                        arrival_plus_10=dep+flight+10,stock_window_start=start,stock_window_end=end,
+                        predicted_restock_epoch=w['predicted_restock_epoch'])
+    return dict(departure=None,event_index=None,landing=None,arrival_plus_10=None)
+
+
+class IntervalClock:
+    """Last observed physical restock anchors the first event, never stock=30.
+
+    First interval uses an existing birth-time fit plus past prequential errors.
+    Later cycles use completed empirical intervals, with widening event bounds.
+    Future projected cycles are not represented as observed training records.
+    """
+    def __init__(self,rows,crosses,cutoff):
+        crosses=continuous_source(rows,crosses)
+        self.trials,_=cycles_from_rows(rows,crosses,cutoff)
+        self.starts=[t['start'] for t in self.trials]
+        self.fits=[cycle_predictions(self.trials,t['start'],t['feature']) for t in self.trials]
+        self.crosses=crosses
+        self.last_training_end=None
+
+    def forecast(self,key,tracker,issued,family,*,first_event=None,recursive=False):
+        if family not in ('median','ridge'):raise ValueError('Unknown fixed clock')
+        if tracker.last is not None and tracker.last.epoch>issued:raise ValueError('Future tracker state')
+        base=dict(item_key=key,asof_epoch=issued,status='INSUFFICIENT_CLOCK_HISTORY',
+            restock_events=[],true_restock_events=[],current_stock_window=None,physical_depletion_quantity=0,
+            arrival_stock_threshold=30,calibrated_success_probability=None,
+            model_name='physical_restock_interval_'+family,first_event_is_next_physical_drop=True)
+        i=bisect.bisect_right(self.starts,issued)-1
+        if i<0:return base
+        active=self.trials[i];fit=self.fits[i]
+        if (fit is None or active.get('invalidated_at',issued+1)<=issued
+                or tracker.last is None or issued-tracker.last.epoch>86400):return base
+        past=[(t,f) for t,f in zip(self.trials,self.fits)
+              if t['outcome']=='CLOSED' and t['end']<=issued and f is not None][-64:]
+        if len(past)<8:return base
+        ratios=[math.log(t['duration']/f[family]) for t,f in past]
+        totals=[max(1,round(fit[family]*math.exp(r))) for r in ratios]
+        age=issued-active['start'];survivors=[d for d in totals if d>age]
+        if not survivors and first_event is None:return dict(base,status='CLOCK_OVERRAN_CALIBRATION_HISTORY')
+        available=tracker.available_durations[-64:]
+        purchasing=(len(available)>=3 and quantile(tracker.restock_quantities[-64:],.5)>=30)
+        # Endpoints, current state and training labels all precede this issue.
+        latest=max(t['end'] for t,f in past)
+        if latest>issued or fit['latest_training_end']>active['start']:
+            raise ValueError('Future clock training label')
+        base.update(status='EVENT_TIMELINE_FORECAST_AVAILABLE',anchor_restock_epoch=active['start'],
+            latest_training_end=latest,fit_latest_training_end=fit['latest_training_end'],
+            calibration_cycles=len(past),conditioned_survivors=len(survivors))
+        # Separate purchase-availability phase, with no change to physical clock.
+        a=tracker.availability.asof()
+        if purchasing and tracker.last.quantity>=30 and a.get('phase_onset') is not None:
+            remaining=[d-(issued-a['phase_onset']) for d in available if d>issued-a['phase_onset']]
+            physical_state=tracker.physical.asof()
+            onset=physical_state.get('phase_onset')
+            physical_remaining=([d-(issued-onset) for d in physical_state['stocked_durations']
+                if d>issued-onset] if onset is not None else [])
+            if remaining and physical_remaining:
+                base['current_stock_window']=dict(predicted_restock_epoch=issued,restock_late_epoch=issued,
+                    predicted_stock_below_30_epoch=issued+min(quantile(remaining,.5),quantile(physical_remaining,.5)),
+                    early_stock_end_epoch=issued+min(quantile(remaining,.25),quantile(physical_remaining,.25)))
+        if first_event is not None:
+            first={.25:first_event['restock_early_epoch'],.5:first_event['predicted_restock_epoch'],
+                   .75:first_event['restock_late_epoch']}
+        else:first={q:active['start']+quantile(survivors,q) for q in (.25,.5,.75)}
+        # Projected features remain separate from the immutable training trials.
+        projected_history=[t for t in self.trials if t['outcome']=='CLOSED' and t['end']<=issued]
+        previous_birth=active['start']
+        previous_quantity=active['quantity']
+        periods=[t['duration'] for t,f in past]
+        for index in range(64):
+            if first[.5]>issued+WAIT:break
+            event=dict(event_index=index+1,
+                predicted_restock_epoch=first[.5],restock_early_epoch=first[.25],
+                restock_late_epoch=first[.75])
+            base['true_restock_events'].append(dict(event))
+            if purchasing:
+                physical=tracker.physical.asof()['stocked_durations'][-64:]
+                event.update(predicted_stock_below_30_epoch=first[.5]+min(quantile(available,.5),quantile(physical,.5)),
+                    early_stock_end_epoch=first[.25]+min(quantile(available,.25),quantile(physical,.25)))
+                base['restock_events'].append(event)
+            next_periods=periods
+            if recursive:
+                duration=first[.5]-previous_birth
+                observed_zero=active.get('zero_epoch') if index==0 else None
+                stocked=(observed_zero-previous_birth if observed_zero is not None and observed_zero<=issued
+                         else min(duration-1,quantile([t['stock_seconds'] for t,f in past],.5)))
+                projected_history.append(dict(duration=duration,stock_seconds=max(1,stocked),
+                    empty_seconds=max(1,duration-stocked),quantity=previous_quantity))
+                quantity=quantile(tracker.restock_quantities[-64:],.5)
+                x=features(projected_history,first[.5],quantity,tracker.last.source)
+                projected_fit=cycle_predictions(self.trials,issued,x)
+                if projected_fit is not None:
+                    if projected_fit['latest_training_end']>issued:raise ValueError('Future recursive training')
+                    next_periods=[max(1,round(projected_fit[family]*math.exp(r))) for r in ratios]
+                previous_birth=first[.5];previous_quantity=quantity
+            first={q:first[q]+quantile(next_periods,q) for q in (.25,.5,.75)}
+        if not purchasing:base['status']='INSUFFICIENT_SEPARATE_PURCHASE_WINDOW_HISTORY'
+        for event,next_event in zip(base['restock_events'],base['restock_events'][1:]):
+            event['predicted_stock_below_30_epoch']=min(event['predicted_stock_below_30_epoch'],next_event['predicted_restock_epoch']-1)
+            event['early_stock_end_epoch']=min(event['early_stock_end_epoch'],next_event['restock_early_epoch']-1)
+        return base
+
+
+def selected_target_error(choice,physical,issued,crosses):
+    """Score the selected chronological event, never the nearest actual drop."""
+    index=choice['event_index']
+    if index==0:return dict(status='CURRENT_STOCK')
+    j=bisect.bisect_right(physical,issued)+index-1
+    if j>=len(physical):return dict(status='PENDING')
+    actual=physical[j]
+    if crosses(issued,actual):return dict(status='UNKNOWN_CONTINUITY')
+    signed=choice['predicted_restock_epoch']-actual
+    landing=choice.get('landing')
+    return dict(status='SCORED',event_index=index,actual_restock=actual,
+                absolute_error_seconds=abs(signed),
+                signed_prediction_minus_observed_seconds=signed,
+                arrival_minus_observed_restock_seconds=(
+                    landing-actual if landing is not None else None))
+
+
+def item_benchmark(source,key,*,days=6,asof=None,arrival_lags=(0,)):
+    from research.japan_xanax.renewal_shadow import source_data
+    from research.departure_reconfirmation import evaluate_utc,compare_cohorts
+    if (not isinstance(arrival_lags,(tuple,list)) or
+        not 1<=len(arrival_lags)<=6 or
+        len(set(arrival_lags))!=len(arrival_lags) or
+        any(type(lag) is not int or not 0<=lag<=900 for lag in arrival_lags) or
+        0 not in arrival_lags):
+        raise ValueError('bounded as-issued arrival offsets must include zero')
+    rows,polls,crosses,evidence,cutoff=source_data(source,now=asof,item_key=key)
+    observations=[model.OBS(*r) for r in rows]
+    observation_times=[o.epoch for o in observations]
+    crosses=continuous_source(observations,crosses)
+    clock=IntervalClock(observations,crosses,cutoff)
+    tracker=ZeroCycles(crosses);flight=model.TRAVEL_SECONDS[key.split(':')[0]]
+    end=((cutoff-flight-WAIT-190-STEP)//STEP)*STEP
+    start=end-days*86400+STEP
+    # Strictly chronological first half / later half; never train a winner on later observations.
+    split=start+(days//2)*86400
+    # All cohorts get their full eight-hour follow-up and mature arrival truth.
+    stop=end+WAIT+STEP
+    def policy_name(mode,kind,lag):
+        return mode+'_'+kind+(('_lag'+str(lag)) if lag else '')
+    plans={policy_name(m,p,lag):[] for m in MODES
+           for p in ('expected','bounded') for lag in arrival_lags}
+    plans['leave_now']=[]
+    selected={m:{} for m in plans if m!='leave_now'}
+    timing={m:[] for m in MODES};cursor=0;statuses={m:Counter() for m in MODES}
+    recursive_usage=Counter()
+    for issued in range(start,stop+1,STEP):
+        while cursor<len(observations) and observations[cursor].epoch<=issued:
+            tracker.add(observations[cursor]);cursor+=1
+        pi=bisect.bisect_right(polls,issued)-1;age=issued-polls[pi] if pi>=0 else None
+        healthy=age is not None and 0<=age+15<=180 and not crosses(issued,issued)
+        streams={'phase_empirical':tracker.forecast(key,asof=issued)}
+        available=tracker.available_durations[-64:]
+        if available:
+            for event in streams['phase_empirical'].get('restock_events',[]):
+                event['early_stock_end_epoch']=event['restock_early_epoch']+quantile(available,.25)
+            current=streams['phase_empirical'].get('current_stock_window')
+            a=tracker.availability.asof()
+            if current and a.get('phase_onset') is not None:
+                remaining=[d-issued+a['phase_onset'] for d in available if d>issued-a['phase_onset']]
+                if remaining:current['early_stock_end_epoch']=issued+quantile(remaining,.25)
+        streams.update({'interval_'+f:clock.forecast(key,tracker,issued,f) for f in ('median','ridge')})
+        physical_events=streams['phase_empirical'].get('true_restock_events',[])
+        hybrid=(clock.forecast(key,tracker,issued,'ridge',first_event=physical_events[0],recursive=True)
+                if physical_events else {})
+        if hybrid.get('status')!='EVENT_TIMELINE_FORECAST_AVAILABLE':
+            hybrid=dict(streams['phase_empirical'],recursive_clock_status=hybrid.get('status','NO_FIRST_EVENT'),
+                        recursive_clock_used=False)
+        else:
+            hybrid['recursive_clock_used']=True
+            hybrid['current_stock_window']=streams['phase_empirical'].get('current_stock_window')
+        streams['phase_recursive_ridge']=hybrid
+        recursive_usage['used' if hybrid['recursive_clock_used'] else 'phase_fallback']+=1
+        for mode,f in streams.items():
+            statuses[mode][f['status']]+=1
+            for kind in ('expected','bounded'):
+                for lag in arrival_lags:
+                    name=policy_name(mode,kind,lag)
+                    choice=departure(f,issued=issued,flight=flight,
+                        conservative=kind=='bounded',arrival_lag_seconds=lag)
+                    dep=choice['departure'] if healthy and f['status']=='EVENT_TIMELINE_FORECAST_AVAILABLE' else None
+                    plans[name].append((issued,max(issued+15,dep) if dep is not None else None,age))
+                    if dep is not None:selected[name][issued]=choice
+            # Fixed first-issue/hour forecast, ranked before evaluating truth.
+            if issued<=end and issued%3600==0:
+                events=f.get('true_restock_events',f.get('restock_events',[]))
+                timing[mode].append(dict(issued=issued,predicted=events[0]['predicted_restock_epoch'] if events else None,
+                    healthy=healthy,training_end=f.get('latest_training_end')))
+        plans['leave_now'].append((issued,issued+15 if healthy else None,age))
+    # No observed target timestamps or stock outcome labels enter planning.
+    # Strict ordinal next-event label; never select the nearest matching drop.
+    physical=[b.epoch for a,b in zip(observations,observations[1:])
+        if a.epoch<b.epoch and a.quantity==0<b.quantity and a.source==b.source and not crosses(a.epoch,b.epoch)]
+    restock={}
+    for mode,records in timing.items():
+        errors=[];counts=Counter();targets=set()
+        for r in records:
+            counts['hourly_issues']+=1
+            if not r['healthy'] or r['predicted'] is None:counts['abstain']+=1;continue
+            j=bisect.bisect_right(physical,r['issued'])
+            if j>=len(physical):counts['pending']+=1;continue
+            actual=physical[j]
+            if crosses(r['issued'],actual):counts['unknown_gap']+=1;continue
+            # Do not certify intervals containing a provider switch, even if
+            # physical states happen to agree on both sides of the switch.
+            lo=bisect.bisect_right(observation_times,r['issued'])-1
+            hi=bisect.bisect_right(observation_times,actual)
+            if lo<0 or len({o.source for o in observations[lo:hi]})!=1:
+                counts['unknown_provider']+=1;continue
+            signed=r['predicted']-actual
+            errors.append((r['issued'],abs(signed),actual,signed));targets.add(actual)
+        first_per_target={}
+        for issued,absolute,actual,signed in errors:
+            first_per_target.setdefault(actual,(issued,absolute,signed))
+        restock[mode]=dict(counts,scored=len(errors),distinct_target_restocks=len(targets),
+            mean_absolute_error_minutes=sum(e for t,e,a,s in errors)/len(errors)/60 if errors else None,
+            median_absolute_error_minutes=quantile([e for t,e,a,s in errors],.5)/60 if errors else None,
+            mean_signed_prediction_minus_observed_minutes=(
+                sum(s for t,e,a,s in errors)/len(errors)/60 if errors else None),
+            predicted_early_issues=sum(s<0 for t,e,a,s in errors),
+            predicted_late_issues=sum(s>0 for t,e,a,s in errors),
+            within_15_seconds=sum(e<=15 for t,e,a,s in errors),
+            within_60_seconds=sum(e<=60 for t,e,a,s in errors),
+            within_5_minutes=sum(e<=300 for t,e,a,s in errors),
+            within_10_minutes=sum(e<=600 for t,e,a,s in errors),
+            within_5_minutes_fraction=(
+                sum(e<=300 for t,e,a,s in errors)/len(errors) if errors else None),
+            within_10_minutes_fraction=(
+                sum(e<=600 for t,e,a,s in errors)/len(errors) if errors else None),
+            first_issued_distinct_physical_events=len(first_per_target),
+            first_issued_distinct_within_5_minutes=sum(v[1]<=300 for v in first_per_target.values()),
+            first_issued_distinct_within_10_minutes=sum(v[1]<=600 for v in first_per_target.values()),
+            signed_error_basis='prediction minus first observed positive change; negative=predicted early; exact game second unknown')
+        restock[mode]['chronological_slices']={}
+        for label,predicate in (('earlier_development',lambda t:t<split),('later_validation',lambda t:t>=split)):
+            values=[(t,e,a,s) for t,e,a,s in errors if predicate(t)]
+            first_target={}
+            for t,e,a,s in values:
+                first_target.setdefault(a,(e,s))
+            restock[mode]['chronological_slices'][label]=dict(scored=len(values),
+                distinct_target_restocks=len(first_target),
+                mean_absolute_error_minutes=sum(e for t,e,a,s in values)/len(values)/60 if values else None,
+                mean_signed_prediction_minus_observed_minutes=(
+                    sum(s for t,e,a,s in values)/len(values)/60 if values else None),
+                predicted_early_issues=sum(s<0 for t,e,a,s in values),
+                predicted_late_issues=sum(s>0 for t,e,a,s in values),
+                within_5_minutes=sum(e<=300 for t,e,a,s in values),
+                within_10_minutes=sum(e<=600 for t,e,a,s in values),
+                within_5_minutes_fraction=(
+                    sum(e<=300 for t,e,a,s in values)/len(values) if values else None),
+                within_10_minutes_fraction=(
+                    sum(e<=600 for t,e,a,s in values)/len(values) if values else None),
+                distinct_first_issued_within_5_minutes=sum(e<=300 for e,s in first_target.values()),
+                distinct_first_issued_within_10_minutes=sum(e<=600 for e,s in first_target.values()))
+        restock[mode]['resolved_errors']={t:e for t,e,a,s in errors}
+    reference=restock['phase_empirical']['resolved_errors']
+    for mode,r in restock.items():
+        paired=set(reference)&set(r['resolved_errors'])
+        r['matched_vs_phase_empirical']={}
+        for label,predicate in (('all',lambda t:True),('earlier_development',lambda t:t<split),('later_validation',lambda t:t>=split)):
+            times=[t for t in paired if predicate(t)]
+            r['matched_vs_phase_empirical'][label]=dict(pairs=len(times),
+                baseline_mae_minutes=sum(reference[t] for t in times)/len(times)/60 if times else None,
+                challenger_mae_minutes=sum(r['resolved_errors'][t] for t in times)/len(times)/60 if times else None)
+    for r in restock.values():del r['resolved_errors']
+    summaries={};cohorts={}
+    for mode,values in plans.items():
+        cohorts[mode]=[]
+        summaries[mode]=evaluate_utc(values,cutoff=cutoff,flight_seconds=flight,
+            score=evidence.score,start_before=end,cohorts=cohorts[mode])
+    selected_timing={}
+    for mode,lookup in selected.items():
+        cases=[]
+        for c in cohorts[mode]:
+            if c['wait'] is None:continue
+            dep=c['start']+c['wait'];q=(dep//STEP)*STEP
+            choice=lookup.get(q)
+            if choice is None:raise ValueError('Missing departure-time event identity')
+            cases.append(dict(start=c['start'],arrival_outcome=c['outcome'],
+                arrival_epoch=dep+flight,departure_epoch=dep,
+                **selected_target_error(choice,physical,q,crosses)))
+        selected_timing[mode]={}
+        for label,predicate in (('earlier_development',lambda t:t<split),('later_validation',lambda t:t>=split)):
+            values=[c for c in cases if predicate(c['start'])]
+            errors=[c['absolute_error_seconds'] for c in values if c['status']=='SCORED']
+            scored=[c for c in values if c['status']=='SCORED']
+            signed=[c['signed_prediction_minus_observed_seconds'] for c in scored]
+            arrivals=[c['arrival_minus_observed_restock_seconds'] for c in scored
+                      if c['arrival_minus_observed_restock_seconds'] is not None]
+            known_current=[c for c in values if c['status']=='CURRENT_STOCK'
+                           and c['arrival_outcome'] in ('SUCCESS','FAILURE')]
+            known_future=[c for c in scored if c['arrival_outcome'] in ('SUCCESS','FAILURE')]
+            def known_hit_count(cases):
+                return sum(v['arrival_outcome']=='SUCCESS' for v in cases)
+            selected_timing[mode][label]=dict(
+                status_counts=dict(Counter(c['status'] for c in values)),
+                event_indices=dict(Counter(str(c['event_index']) for c in scored)),
+                scored=len(errors),distinct_target_restocks=len({c['actual_restock'] for c in scored}),
+                mean_absolute_error_minutes=sum(errors)/len(errors)/60 if errors else None,
+                mean_signed_prediction_minus_observed_minutes=(
+                    sum(signed)/len(signed)/60 if signed else None),
+                predicted_early_issues=sum(s<0 for s in signed),
+                predicted_late_issues=sum(s>0 for s in signed),
+                mean_landing_minus_observed_restock_minutes=(
+                    sum(arrivals)/len(arrivals)/60 if arrivals else None),
+                simulated_arrivals_before_observed_restock=sum(v<0 for v in arrivals),
+                simulated_arrivals_after_or_at_observed_restock=sum(v>=0 for v in arrivals),
+                current_stock_departures_known=len(known_current),
+                current_stock_departures_success=known_hit_count(known_current),
+                current_stock_departures_success_fraction=(
+                    known_hit_count(known_current)/len(known_current)
+                    if known_current else None),
+                future_restock_departures_known=len(known_future),
+                future_restock_departures_success=known_hit_count(known_future),
+                future_restock_departures_success_fraction=(
+                    known_hit_count(known_future)/len(known_future)
+                    if known_future else None),
+                within_15_seconds=sum(e<=15 for e in errors),
+                within_60_seconds=sum(e<=60 for e in errors),
+                within_5_minutes=sum(e<=300 for e in errors),
+                within_10_minutes=sum(e<=600 for e in errors),
+                within_5_minutes_fraction=(
+                    sum(e<=300 for e in errors)/len(errors) if errors else None),
+                within_10_minutes_fraction=(
+                    sum(e<=600 for e in errors)/len(errors) if errors else None))
+    slices={}
+    for label,predicate in (('earlier_development',lambda t:t<split),('later_validation',lambda t:t>=split)):
+        selected={m:[r for r in records if predicate(r['start'])] for m,records in cohorts.items()}
+        slices[label]={}
+        for mode,rec in selected.items():
+            counts=Counter(r['outcome'] for r in rec);known=counts['SUCCESS']+counts['FAILURE']
+            waits=[r['wait'] for r in rec if r['wait'] is not None]
+            slices[label][mode]=dict(counts,starts=len(rec),scored=known,
+                success_fraction=counts['SUCCESS']/known if known else None,
+                departure_coverage=len(waits)/len(rec) if rec else None,
+                mean_wait_minutes=sum(waits)/len(waits)/60 if waits else None,
+                matched_vs_now=compare_cohorts(selected['leave_now'],rec))
+    return dict(item_key=key,cutoff=cutoff,cohort_start=start,cohort_end=end,chronological_split=split,
+        restock_timing=restock,selected_event_timing=selected_timing,departure=summaries,chronological_slices=slices,
+        status_counts={m:dict(c) for m,c in statuses.items()},physical_depletion_quantity=0,
+        recursive_clock_usage=dict(recursive_usage),
+        buying_threshold=30,arrival_plus_10=True,
+        arrival_lags_evaluated_seconds=list(arrival_lags),
+        metric_definitions=dict(
+            restock_accuracy='fraction of scored hourly first-next-physical-restock predictions within signed timing tolerance; distinct earliest-issued restock counts separate',
+            restock_signed_minutes='forecast restock epoch minus first observed positive epoch; negative prediction is early',
+            flight_success='SUCCESS/(SUCCESS+FAILURE) in poll-backed simulated flights at landing plus 10s, unknown excluded; paired coverage also required',
+            selected_landing_signed_minutes='simulated landing minus first observed chosen physical restock; negative arrived before restock',
+            current_stock='departure to already observed stocked window is explicitly tracked separately from a future restock',
+            ordinal='target physical restock ordinal fixed before observing outcome; no nearest-event hindsight',
+            verified_game_event_second=False,observed_actual_player_flight=False),
+        production_promotion=False,
+        note='Historical correlated hourly cohorts; sampled poll truth, not provider-certified game events. No model routing selected.')
+
+
+def main():
+    p=argparse.ArgumentParser(description=__doc__)
+    p.add_argument('--source',required=True);p.add_argument('--out',required=True)
+    p.add_argument('--model-sha',required=True);p.add_argument('--item-key',action='append')
+    p.add_argument('--asof',type=int)
+    p.add_argument('--arrival-lag',type=int,action='append',
+        help='Research only: target 0..900s after predicted FUTURE restock; repeat up to six (must include 0)')
+    p.add_argument('--days',type=int,default=6,help='Bounded mature historical days, 1..30')
+    a=p.parse_args()
+    if not 1<=a.days<=30:raise ValueError('days must be between 1 and 30')
+    lags=tuple(a.arrival_lag or [0])
+    if (not 1<=len(lags)<=6 or len(set(lags))!=len(lags) or 0 not in lags or
+        any(type(v) is not int or not 0<=v<=900 for v in lags)):
+        raise ValueError('lag grid must be unique, max six, 0..900 seconds and include 0')
+    out=Path(a.out);out.mkdir(parents=True,exist_ok=False)
+    keys=sorted(a.item_key or model.exact_roster())
+    if len(set(keys))!=len(keys) or not set(keys)<=set(model.exact_roster()):raise ValueError('Invalid roster')
+    request=dict(model_sha=a.model_sha,items=keys,days=a.days,variants=MODES,
+        arrival_lags_seconds=list(lags),automatic_promotion=False,
+        restock_error_timestamp='first_positive_observation_epoch_not_exact_game_event',
+        source_mode='read_only_sanitized_or_owner_collector')
+    (out/'request.json').write_text(json.dumps(request,indent=2)+'\n')
+    for key in keys:
+        began=time.monotonic()
+        if a.arrival_lag is None:
+            r=item_benchmark(a.source,key,days=a.days,asof=a.asof)
+        else:
+            r=item_benchmark(a.source,key,days=a.days,asof=a.asof,arrival_lags=lags)
+        r['seconds']=time.monotonic()-began
+        (out/(key.replace(':','-').replace(' ','_')+'.json')).write_text(json.dumps(r,indent=2)+'\n')
+        print(json.dumps(dict(item_key=key,seconds=r['seconds'],restock_timing=r['restock_timing'])),flush=True)
+
+
+if __name__=='__main__':main()

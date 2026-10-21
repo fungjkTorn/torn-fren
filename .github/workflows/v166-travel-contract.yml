@@ -1,0 +1,22 @@
+name: V166 shared multi-page travel decision contract
+on:
+  push:
+    branches: [research/v38-full-roster-live-prep-20261009]
+    paths:
+      - 'services/travel_decision_contract_v166.py'
+      - 'tests/test_travel_decision_contract_v166.py'
+      - '.github/workflows/v166-travel-contract.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  flight-windows:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate all page-compatible player travel plans
+        run: python -m unittest discover -s tests -p 'test_travel_decision_contract_v166.py' -v

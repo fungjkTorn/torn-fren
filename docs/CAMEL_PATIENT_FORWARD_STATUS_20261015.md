@@ -1,0 +1,13 @@
+# Camel patient validation operational status
+
+The seven-day numerical tree experiment used source9525422fff28521536d8a5bc6ceab9b7fe510269, run38829022013, verified artifact12017050676. It found a Camel patient-strategy lead, not a universal/default replacement. See TREE_ARRIVAL_RESULTS_20261015.md for all four variants and their failures.
+
+Separate future validation is now committed in private controls390ed3d46a6bc4a3c03fe01d4e33cd50f9186701, request camel_tree_forward_v1.json, source eba6f87c3df16b32ff13fa2da31da58286463be7. That source adds paired reporting/validation support while keeping numerical tree and analog code unchanged. SourceCI38830531928 passed138 tests, Chromium UI and all three compatibility workflows. Private controls check38830848168 passed.
+
+The VM accepted the new protocol. Immediate artifact12016394338 from run38830848169, ZIP1065bytes, SHA256b7d43b9b10ec1d2b436bbc29cb80e31dfe3c4c54947d685a1739316c53b45f5f verified. Camel gate should_run=false at snapshot1792110328, correctly waiting on truth-ready1792240690. Protocol digest3388df12ce45440e6d9864507c6e0bf343190b84c9c88af5978f1cec95742cbd. Chamois gate also correctlyfalse, original source4088bd00f7a6c6d310fccabad04cd58014087389 and truth-ready1792235050 unchanged. Private preview / and /api/live returnedHTTP200.
+
+Camel issues15October21:30EDT→16October21:30EDT. Earliest mature snapshotSaturday17October08:38:10EDT plus snapshot/runner lag. Primary stable-tree peak versus earlier inventory-flow peak; secondary fast aligned50 comparator. Keep all raw counts, matched outcomes, coverage, waits and sensitivities. One24h reconstruction cannot establish long-term consistency. No automatic promotion or production change.
+
+The existing serialized scheduler handles this independently of the original and Chamois protocols, with no newcron. Original full-roster source87f4c6ee34f6ee598cbcc7daf93b9355f46bbd04 and Friday16October09:55:10EDT earliest maturity remain unchanged. Routine approved sourcea73adb6d786e0e7e710fcc99ec8c70e9e8319885 unchanged. Six original/Chamois gate, evaluation and completion steps were compared exactly and preserved.
+
+Compact report upload added in1b83e0eb21464b50a98621fc2fb941e62477c10e succeeded in routine run38829599382. Verified compact artifact12016434330 is691352bytes versus337241455bytes for the corresponding journal-bearing artifact. Reports remain available without downloading the issue journals; full evidence is retained. This also exposed a legacy-readiness coverage limitation, documented in FOCUSED_BENCHMARK_COVERAGE_AUDIT_20261015.md. The gate labels are not a complete assessment of all24 arrival specialists.

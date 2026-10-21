@@ -1,0 +1,11 @@
+[Unit]
+Description=Torn V82 isolated Lion/Panda research comparison every five minutes
+
+[Timer]
+OnCalendar=*-*-* *:04/5:00
+AccuracySec=10s
+Persistent=no
+Unit=torn-fren-v82-pair-forward.service
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,22 @@
+name: Canary arrival journal and evidence
+on:
+  push:
+    branches: [research/v38-full-roster-live-prep-20261009]
+    paths:
+      - 'research/canary_arrival_audit.py'
+      - 'tests/test_canary_arrival_audit.py'
+      - '.github/workflows/canary-arrival-audit.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  journal-evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install numpy==1.26.4
+      - run: python -m unittest discover -s tests -p test_canary_arrival_audit.py -v

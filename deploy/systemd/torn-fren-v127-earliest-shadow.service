@@ -1,0 +1,31 @@
+[Unit]
+Description=Torn Fren V127 isolated Red Fox and Nessie first-credible shadow capture
+After=local-fs.target
+ConditionPathExists=/opt/torn-fren/data/stock_history.db
+ConditionPathExists=/home/ubuntu/torn-fren-private-models/v127_stage/pinned/v127_shadow_launcher.py
+
+[Service]
+Type=oneshot
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/home/ubuntu/torn-fren-v38-probe
+Environment=PYTHONDONTWRITEBYTECODE=1
+Environment=PYTHONUNBUFFERED=1
+Environment=OPENBLAS_NUM_THREADS=1
+Environment=OMP_NUM_THREADS=1
+Environment=MKL_NUM_THREADS=1
+ExecStart=/usr/bin/flock -n /var/lib/torn-fren-v38/v127_earliest_shadow.lock /home/ubuntu/torn-fren-v38-probe/.venv/bin/python /home/ubuntu/torn-fren-private-models/v127_stage/pinned/v127_shadow_launcher.py --record
+Nice=19
+IOSchedulingClass=idle
+CPUQuota=15%
+MemoryMax=512M
+TimeoutStartSec=120
+NoNewPrivileges=yes
+PrivateTmp=yes
+PrivateNetwork=yes
+ProtectSystem=strict
+ProtectHome=read-only
+ReadOnlyPaths=/opt/torn-fren/data
+ReadWritePaths=/var/lib/torn-fren-v38
+UMask=0077
+TasksMax=24

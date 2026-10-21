@@ -1,0 +1,150 @@
+name: Full24 specialist shadow safeguards
+on:
+  push:
+    paths:
+      - 'research/full_roster_specialist_shadow.py'
+      - 'tests/test_full_roster_specialist_shadow.py'
+      - 'research/full_roster_capture_review.py'
+      - 'services/prediction_v2_live.py'
+      - 'services/v2_departure_window.py'
+      - 'research/physical_restock_identity.py'
+      - 'tests/test_physical_restock_identity.py'
+      - 'research/v88_poll_state_forward_report.py'
+      - 'tests/test_v88_poll_state_forward_report.py'
+      - 'research/v137_original_v2_stock_at_arrival_audit.py'
+      - 'research/restock_event_clock.py'
+      - 'research/historical_restocks_all24.py'
+      - 'scripts/run_pc_historical_sixcore.py'
+      - 'scripts/audit_incumbent_sources.py'
+      - 'scripts/run_pc_original_specialists.py'
+      - 'tests/test_pc_original_specialists.py'
+      - 'research/plushie_champions/**'
+      - 'deploy/research_runner/export_snapshot.py'
+      - 'deploy/research_runner/tune_snapshot_for_forward.sh'
+      - 'deploy/research_runner/install_forward_snapshot_lane.sh'
+      - 'deploy/research_runner/audit_vm_retention_readonly.sh'
+      - 'tests/test_research_runner_export_snapshot.py'
+      - 'tests/test_research_runner_bootstrap_contract.py'
+      - 'scripts/find_missing_specialists_pc.py'
+      - 'tests/test_find_missing_specialists_pc.py'
+      - 'scripts/copy_vm_history_to_pc.ps1'
+      - 'tests/test_pc_historical_sixcore.py'
+      - 'tests/test_historical_restocks_all24.py'
+      - 'research/physical_event_forward.py'
+      - 'tests/test_physical_event_forward.py'
+      - 'services/travel_decision_contract_v166.py'
+      - 'services/travel_window_policy.py'
+      - 'research/build_travel_event_snapshot.py'
+      - 'tests/test_build_travel_event_snapshot.py'
+      - 'tests/test_travel_decision_contract_v166.py'
+      - 'tests/test_restock_event_clock.py'
+      - 'research/saved_timeline_audit.py'
+      - 'tests/test_v2_generator_departure_window.py'
+      - 'tests/test_saved_timeline_audit.py'
+      - 'tests/test_full_roster_capture_review.py'
+      - 'research/causal_replay_slice.py'
+      - 'research/fixed_roster_release_check.py'
+      - 'tests/test_causal_replay_slice.py'
+      - '.github/workflows/full-roster-specialist-shadow.yml'
+  pull_request:
+    paths:
+      - 'research/full_roster_specialist_shadow.py'
+      - 'tests/test_full_roster_specialist_shadow.py'
+      - 'research/full_roster_capture_review.py'
+      - 'services/prediction_v2_live.py'
+      - 'services/v2_departure_window.py'
+      - 'research/physical_restock_identity.py'
+      - 'tests/test_physical_restock_identity.py'
+      - 'research/v88_poll_state_forward_report.py'
+      - 'tests/test_v88_poll_state_forward_report.py'
+      - 'research/v137_original_v2_stock_at_arrival_audit.py'
+      - 'research/restock_event_clock.py'
+      - 'research/historical_restocks_all24.py'
+      - 'scripts/run_pc_historical_sixcore.py'
+      - 'scripts/audit_incumbent_sources.py'
+      - 'scripts/run_pc_original_specialists.py'
+      - 'tests/test_pc_original_specialists.py'
+      - 'research/plushie_champions/**'
+      - 'deploy/research_runner/export_snapshot.py'
+      - 'deploy/research_runner/tune_snapshot_for_forward.sh'
+      - 'deploy/research_runner/install_forward_snapshot_lane.sh'
+      - 'deploy/research_runner/audit_vm_retention_readonly.sh'
+      - 'tests/test_research_runner_export_snapshot.py'
+      - 'tests/test_research_runner_bootstrap_contract.py'
+      - 'scripts/find_missing_specialists_pc.py'
+      - 'tests/test_find_missing_specialists_pc.py'
+      - 'scripts/copy_vm_history_to_pc.ps1'
+      - 'tests/test_pc_historical_sixcore.py'
+      - 'tests/test_historical_restocks_all24.py'
+      - 'research/physical_event_forward.py'
+      - 'tests/test_physical_event_forward.py'
+      - 'services/travel_decision_contract_v166.py'
+      - 'services/travel_window_policy.py'
+      - 'research/build_travel_event_snapshot.py'
+      - 'tests/test_build_travel_event_snapshot.py'
+      - 'tests/test_travel_decision_contract_v166.py'
+      - 'tests/test_restock_event_clock.py'
+      - 'research/saved_timeline_audit.py'
+      - 'tests/test_v2_generator_departure_window.py'
+      - 'tests/test_saved_timeline_audit.py'
+      - 'tests/test_full_roster_capture_review.py'
+      - 'research/causal_replay_slice.py'
+      - 'research/fixed_roster_release_check.py'
+      - 'tests/test_causal_replay_slice.py'
+permissions:
+  contents: read
+jobs:
+  safeguards:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install numpy==1.26.4 requests fastapi python-dotenv
+      - run: python -m unittest tests.test_full_roster_specialist_shadow tests.test_full_roster_capture_review tests.test_causal_replay_slice tests.test_canary_model_inventory tests.test_fixed_roster_release_check tests.test_matched_champion_audit tests.test_departure_reconfirmation
+
+      - name: Verify V2 generator, graph windows and saved-timeline audit
+        run: >-
+          python -m unittest tests.test_v2_generator_departure_window
+          tests.test_saved_timeline_audit tests.test_v143_v2_window_web_parity
+          tests.test_v2_beta_departure_bridge tests.test_v2_beta_history_preview
+          tests.test_v134_original_graph_v2_audit tests.test_v137_original_v2_stock_at_arrival_audit
+          tests.test_physical_restock_identity tests.test_v88_poll_state_forward_report -q
+
+      - name: Verify physical restock clocks and earliest reachable departure
+        env:
+          PYTHONPATH: '.:tests'
+        run: >-
+          python -m unittest tests.test_restock_event_clock
+          tests.test_restock_predictability_audit tests.test_true_zero_cycles
+          tests.test_departure_reconfirmation
+          tests.test_travel_decision_contract_v166
+          tests.test_build_travel_event_snapshot
+          tests.test_physical_event_forward
+          tests.test_historical_restocks_all24
+          tests.test_pc_historical_sixcore
+          tests.test_find_missing_specialists_pc
+          tests.test_pc_original_specialists
+          tests.test_research_runner_export_snapshot
+          tests.test_research_runner_bootstrap_contract -q
+
+  pc-offline-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Parse Windows snapshot-copy PowerShell without network or execution
+        shell: pwsh
+        run: |
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            (Join-Path $PWD "scripts/copy_vm_history_to_pc.ps1"),
+            [ref]$tokens, [ref]$errors) | Out-Null
+          if ($errors.Count -ne 0) { throw ($errors | Out-String) }
+      - run: python -m pip install numpy==1.26.4
+      - name: Validate Windows six-core research runner offline
+        run: python -m unittest tests.test_pc_historical_sixcore tests.test_find_missing_specialists_pc tests.test_pc_original_specialists -q

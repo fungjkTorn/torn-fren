@@ -1,0 +1,77 @@
+name: Full roster renewal shadow safeguards
+on:
+  push:
+    branches: [research/v38-full-roster-live-prep-20261009]
+    paths:
+      - 'research/japan_xanax/renewal_shadow.py'
+      - 'tests/test_renewal_shadow.py'
+      - 'research/shadow_scorecard.py'
+      - 'tests/test_shadow_scorecard.py'
+      - 'research/japan_xanax/coverage_challengers.py'
+      - 'tests/test_japan_coverage_challengers.py'
+      - 'research/japan_xanax/recent_regime.py'
+      - 'tests/test_japan_recent_regime.py'
+      - 'research/japan_xanax/departure_stability.py'
+      - 'tests/test_japan_departure_stability.py'
+      - 'research/japan_xanax/forecast_gap_audit.py'
+      - 'tests/test_japan_forecast_gap_audit.py'
+      - 'research/japan_xanax/zero_handoff.py'
+      - 'tests/test_japan_zero_handoff.py'
+      - 'research/japan_xanax/handoff_shadow.py'
+      - 'tests/test_japan_handoff_shadow.py'
+      - 'research/japan_xanax/target_trace.py'
+      - 'research/japan_xanax/cadence_replay.py'
+      - 'tests/test_japan_target_trace.py'
+      - 'tests/test_japan_cadence_replay.py'
+      - 'research/japan_xanax/common_random_replay.py'
+      - 'tests/test_japan_common_random.py'
+      - 'research/japan_xanax/exact_renewal.py'
+      - 'tests/test_japan_exact_renewal.py'
+      - 'research/japan_xanax/training_audit.py'
+      - 'tests/test_japan_training_audit.py'
+      - 'research/japan_xanax/half_phase_renewal.py'
+      - 'tests/test_japan_half_phase_renewal.py'
+      - 'research/japan_xanax/training_handoff.py'
+      - 'tests/test_japan_training_handoff.py'
+      - 'deploy/scripts/country_clock_preflight.py'
+      - 'tests/test_country_clock_preflight.py'
+      - 'deploy/scripts/prepare_country_clock_patch.py'
+      - 'tests/test_prepare_country_clock_patch.py'
+      - 'deploy/scripts/activate_country_clocks.py'
+      - 'deploy/patches/country-clock-20261018/**'
+      - 'tests/test_activate_country_clocks.py'
+      - 'research/japan_xanax/clock_continuity_audit.py'
+      - 'tests/test_japan_clock_continuity_audit.py'
+      - '.github/workflows/renewal-shadow.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  shadow-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install numpy==1.26.4
+      - run: OPENBLAS_NUM_THREADS=1 python -m unittest discover -s tests -p test_renewal_shadow.py -v
+      - run: OPENBLAS_NUM_THREADS=1 python -m unittest discover -s tests -p test_shadow_scorecard.py -v
+      - run: OPENBLAS_NUM_THREADS=1 python -m unittest discover -s tests -p test_japan_coverage_challengers.py -v
+      - run: OPENBLAS_NUM_THREADS=1 python -m unittest discover -s tests -p test_japan_recent_regime.py -v
+      - run: OPENBLAS_NUM_THREADS=1 python -m unittest discover -s tests -p test_japan_departure_stability.py -v
+      - run: OPENBLAS_NUM_THREADS=1 python -m unittest discover -s tests -p test_japan_forecast_gap_audit.py -v
+      - run: OPENBLAS_NUM_THREADS=1 python -m unittest discover -s tests -p test_japan_zero_handoff.py -v
+      - run: OPENBLAS_NUM_THREADS=1 python -m unittest discover -s tests -p test_japan_handoff_shadow.py -v
+      - run: OPENBLAS_NUM_THREADS=1 python -m unittest discover -s tests -p test_japan_target_trace.py -v
+      - run: OPENBLAS_NUM_THREADS=1 python -m unittest discover -s tests -p test_japan_cadence_replay.py -v
+      - run: OPENBLAS_NUM_THREADS=1 python -m unittest discover -s tests -p test_japan_common_random.py -v
+      - run: OPENBLAS_NUM_THREADS=1 python -m unittest discover -s tests -p test_japan_exact_renewal.py -v
+      - run: OPENBLAS_NUM_THREADS=1 python -m unittest discover -s tests -p test_japan_training_audit.py -v
+      - run: OPENBLAS_NUM_THREADS=1 python -m unittest discover -s tests -p test_japan_half_phase_renewal.py -v
+      - run: OPENBLAS_NUM_THREADS=1 python -m unittest discover -s tests -p test_japan_training_handoff.py -v
+      - run: python -m unittest discover -s tests -p test_country_clock_preflight.py -v
+      - run: python -m unittest discover -s tests -p test_prepare_country_clock_patch.py -v
+      - run: python -m unittest discover -s tests -p test_activate_country_clocks.py -v
+      - run: OPENBLAS_NUM_THREADS=1 python -m unittest discover -s tests -p test_japan_clock_continuity_audit.py -v

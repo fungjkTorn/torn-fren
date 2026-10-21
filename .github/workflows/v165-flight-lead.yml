@@ -1,0 +1,23 @@
+name: V165 frozen flight-lead research safeguards
+on:
+  push:
+    branches: [research/v38-full-roster-live-prep-20261009]
+    paths:
+      - 'deploy/scripts/v165_readonly_flight_lead_replay.py'
+      - 'tests/test_v165_readonly_flight_lead_replay.py'
+      - '.github/workflows/v165-flight-lead.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  flight-lead-causal-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install --disable-pip-version-check --no-input numpy==1.26.4
+      - name: Causal frozen 5-minute lead / read-only SQLite fixtures
+        run: python -m unittest discover -s tests -p 'test_v165_readonly_flight_lead_replay.py' -v

@@ -1,0 +1,379 @@
+name: V85 Japan isolated forward research
+on:
+  push:
+    branches: [research/v38-full-roster-live-prep-20261009]
+    paths:
+      - '.github/workflows/v85-japan-forward.yml'
+      - 'research/v84_japan_forward_canary.py'
+      - 'research/v86_japan_forward_report.py'
+      - 'tests/test_v84_japan_forward_canary.py'
+      - 'tests/test_v86_japan_forward_report.py'
+      - 'research/v87_experimental24_overlay.py'
+      - 'tests/test_v87_experimental24_overlay.py'
+      - 'research/v88_poll_state_forward_report.py'
+      - 'tests/test_v88_poll_state_forward_report.py'
+      - 'research/v89_pending_horizon_diagnostic.py'
+      - 'tests/test_v89_pending_horizon_diagnostic.py'
+      - 'research/v91_travel_decision_contract.py'
+      - 'tests/test_v91_travel_decision_contract.py'
+      - 'tests/test_v92_stress_decision_engine.py'
+      - 'research/v93_arrival_observation_policy.py'
+      - 'tests/test_v93_arrival_observation_policy.py'
+      - 'tests/test_v96_sqlite_forward_replay_benchmark.py'
+      - 'research/v97_experimental_dashboard_state.py'
+      - 'tests/test_v97_experimental_dashboard_state.py'
+      - 'research/v98_ready_vs_watch_forward_audit.py'
+      - 'tests/test_v98_ready_vs_watch_forward_audit.py'
+      - 'research/v99_issued_stock_vs_forecast_audit.py'
+      - 'tests/test_v99_issued_stock_vs_forecast_audit.py'
+      - 'research/v100_future_watch_reconfirmation_audit.py'
+      - 'tests/test_v100_future_watch_reconfirmation_audit.py'
+      - 'research/v101_watch_to_actionable_audit.py'
+      - 'tests/test_v101_watch_to_actionable_audit.py'
+      - 'research/v102_restock_departure_bridge.py'
+      - 'tests/test_v102_restock_departure_bridge.py'
+      - 'research/v103_champion_score_curves.py'
+      - 'tests/test_v103_champion_score_curves.py'
+      - 'research/v104_real_champion_earliest_replay.py'
+      - 'tests/test_v104_real_champion_earliest_replay.py'
+      - 'research/v105_dynamic_champion_earliest_replay.py'
+      - 'tests/test_v105_dynamic_champion_earliest_replay.py'
+      - 'research/v106_risk_budget_earliest_replay.py'
+      - 'tests/test_v106_risk_budget_earliest_replay.py'
+      - 'research/v107_explicit_restock_cycle_baseline.py'
+      - 'tests/test_v107_explicit_restock_cycle_baseline.py'
+      - 'research/v108_explicit_cycle_dynamic_replay.py'
+      - 'tests/test_v108_explicit_cycle_dynamic_replay.py'
+      - 'research/v109_raw_restock_transition_event_audit.py'
+      - 'tests/test_v109_raw_restock_transition_event_audit.py'
+      - 'research/v110_multicycle_restock_horizon_audit.py'
+      - 'tests/test_v110_multicycle_restock_horizon_audit.py'
+      - 'research/v111_arrival_proxy_evidence_audit.py'
+      - 'tests/test_v111_arrival_proxy_evidence_audit.py'
+      - 'research/v112_matched_immediate_vs_restock_flight_audit.py'
+      - 'tests/test_v112_matched_immediate_vs_restock_flight_audit.py'
+      - 'research/v113_phase_offset_departure_comparison.py'
+      - 'tests/test_v113_phase_offset_departure_comparison.py'
+      - 'research/v114_matched_poll_heartbeat_flight_audit.py'
+      - 'tests/test_v114_matched_poll_heartbeat_flight_audit.py'
+      - 'research/v115_targeted_v88_forward_evidence.py'
+      - 'tests/test_v115_targeted_v88_forward_evidence.py'
+      - 'research/v116_attributed_hourly_forward_audit.py'
+      - 'tests/test_v116_attributed_hourly_forward_audit.py'
+      - 'research/v117_first_executable_replan_audit.py'
+      - 'tests/test_v117_first_executable_replan_audit.py'
+      - 'research/v118_watch_convergence_diagnostic.py'
+      - 'tests/test_v118_watch_convergence_diagnostic.py'
+      - 'research/v119_stable_commitment_vs_fresh_replay.py'
+      - 'tests/test_v119_stable_commitment_vs_fresh_replay.py'
+      - 'research/v120_commitment_departure_reconfirmation.py'
+      - 'tests/test_v120_commitment_departure_reconfirmation.py'
+      - 'research/v121_nessie_native_vs_earliest_forward_proxy.py'
+      - 'tests/test_v121_nessie_native_vs_earliest_forward_proxy.py'
+      - 'research/v122_nessie_selector_discrimination_audit.py'
+      - 'tests/test_v122_nessie_selector_discrimination_audit.py'
+      - 'research/v123_empirical_phase_survival_challenger.py'
+      - 'tests/test_v123_empirical_phase_survival_challenger.py'
+      - 'research/v124_prospective_survival_shadow.py'
+      - 'tests/test_v124_prospective_survival_shadow.py'
+      - 'research/v125_earliest_credible_shadow.py'
+      - 'tests/test_v125_earliest_credible_shadow.py'
+      - 'research/v126_unknown_onset_sensitivity.py'
+      - 'tests/test_v126_unknown_onset_sensitivity.py'
+      - 'tests/test_v127_optional_shadow_timer.py'
+      - 'research/v128_full24_earliest_shadow.py'
+      - 'tests/test_v128_full24_earliest_shadow.py'
+      - 'research/v129_full24_forward_report.py'
+      - 'tests/test_v129_full24_forward_report.py'
+      - 'research/v130_phase_pinned_mc_challenger.py'
+      - 'tests/test_v130_phase_pinned_mc_challenger.py'
+      - 'research/v131_multiledger_historical_arrival_audit.py'
+      - 'tests/test_v131_multiledger_historical_arrival_audit.py'
+      - 'research/v132_departure_timing_quality_audit.py'
+      - 'tests/test_v132_departure_timing_quality_audit.py'
+      - 'research/v133_private_departure_panel.py'
+      - 'tests/test_v133_private_departure_panel.py'
+      - 'research/v134_original_graph_v2_audit.py'
+      - 'tests/test_v134_original_graph_v2_audit.py'
+      - 'research/v135_morning_departure_brief.py'
+      - 'tests/test_v135_morning_departure_brief.py'
+      - 'deploy/scripts/v136_run_leave_quality_morning.sh'
+      - 'tests/test_v136_run_leave_quality_morning.py'
+      - 'tests/test_v128_full24_operator.py'
+      - 'deploy/scripts/v128_shadow_launcher.py'
+      - 'deploy/scripts/v128_full24_operator.sh'
+      - 'deploy/systemd/torn-fren-v128-full24-shadow.service'
+      - 'deploy/systemd/torn-fren-v128-full24-shadow.timer'
+      - 'deploy/scripts/v127_shadow_launcher.py'
+      - 'deploy/scripts/v127_earliest_shadow_operator.sh'
+      - 'deploy/systemd/torn-fren-v127-earliest-shadow.service'
+      - 'deploy/systemd/torn-fren-v127-earliest-shadow.timer'
+      - 'deploy/scripts/v87_web24_preview.sh'
+      - 'research/v140_existing_experimental_beta_board.py'
+      - 'tests/test_v140_existing_experimental_beta_board.py'
+      - 'research/v141_v2_feasible_departure_window.py'
+      - 'tests/test_v141_v2_feasible_departure_window.py'
+      - 'deploy/scripts/v142_inspect_existing_experimental.sh'
+      - 'tests/test_v142_inspect_existing_experimental.py'
+      - 'web/static/index.html'
+      - 'web/app.py'
+      - 'tests/test_v143_v2_window_web_parity.py'
+      - 'tests/test_beta_departure_freshness.py'
+      - 'research/v2_beta_departure_bridge.py'
+      - 'tests/test_v2_beta_departure_bridge.py'
+      - 'research/v2_native_specialist_adapter.py'
+      - 'tests/test_v2_native_specialist_adapter.py'
+      - 'services/prediction_v2_live.py'
+      - 'web/app.py'
+      - 'tests/test_v2_beta_history_preview.py'
+      - 'research/v139_beta_evidence_summary.py'
+      - 'tests/test_v139_beta_evidence_summary.py'
+      - 'research/v144_restock_coverage_diagnostic.py'
+      - 'tests/test_v144_restock_coverage_diagnostic.py'
+      - 'research/v145_provider_continuous_phases.py'
+      - 'tests/test_v145_provider_continuous_phases.py'
+      - 'research/v146_v145_same_issue_replay.py'
+      - 'tests/test_v146_v145_same_issue_replay.py'
+      - 'deploy/scripts/v146_replay_v145_from_existing_stage.sh'
+      - 'research/v147_deployed_24_view_preview_patch.py'
+      - 'tests/test_v147_deployed_24_view_preview_patch.py'
+      - 'research/v148_observed_earliest_stock_cycle.py'
+      - 'tests/test_v148_observed_earliest_stock_cycle.py'
+      - 'research/v149_v146_compact_report.py'
+      - 'tests/test_v149_v146_compact_report.py'
+      - 'research/v150_stock_window_failure_diagnostic.py'
+      - 'tests/test_v150_stock_window_failure_diagnostic.py'
+      - 'research/v151_stable_earliest_departure.py'
+      - 'tests/test_v151_stable_earliest_departure.py'
+      - 'research/v152_first_restock_timing_evidence.py'
+      - 'tests/test_v152_first_restock_timing_evidence.py'
+      - 'research/v153_recent_completed_restock_baseline.py'
+      - 'tests/test_v153_recent_completed_restock_baseline.py'
+      - 'research/v156_item_cycle_profile_router.py'
+      - 'tests/test_v156_item_cycle_profile_router.py'
+      - 'research/v157_prequential_stock_survival_router.py'
+      - 'tests/test_v157_prequential_stock_survival_router.py'
+      - 'research/v158_flight_horizon_router.py'
+      - 'tests/test_v158_flight_horizon_router.py'
+      - 'research/v159_issue_phase_episode_audit.py'
+      - 'tests/test_v159_issue_phase_episode_audit.py'
+      - 'research/v160_prospective_v151_shadow.py'
+      - 'research/v161_prospective_v151_forward_report.py'
+      - 'tests/test_v160_prospective_v151_shadow.py'
+      - 'tests/test_v161_prospective_v151_forward_report.py'
+      - 'deploy/scripts/v161_forward_24item_scorecard.py'
+      - 'tests/test_v161_forward_24item_scorecard.py'
+      - 'deploy/scripts/v162_readonly_restock_vs_forecast_audit.py'
+      - 'tests/test_v162_readonly_restock_vs_forecast_audit.py'
+      - 'deploy/scripts/v163_readonly_event_first_preview.py'
+      - 'tests/test_v163_readonly_event_first_preview.py'
+      - 'deploy/scripts/v160_forward24_operator.sh'
+      - 'deploy/scripts/v160_forward_shadow_launcher.py'
+      - 'deploy/systemd/torn-fren-v160-forward24.service'
+      - 'deploy/systemd/torn-fren-v160-forward24.timer'
+      - 'tests/test_v160_forward_operator.py'
+      - 'deploy/scripts/v160_private_beta_board.py'
+      - 'tests/test_v160_private_beta_board.py'
+      - 'deploy/scripts/v160_single_item_recheck.py'
+      - 'tests/test_v160_single_item_recheck.py'
+      - 'deploy/scripts/v160_private_beta_operator.sh'
+      - 'deploy/scripts/v160_beta_safe_upgrade.sh'
+      - 'deploy/scripts/v160_beta_decision_and_recheck_upgrade.sh'
+      - 'deploy/scripts/v160_beta_http_readiness.py'
+      - 'tests/test_v160_beta_http_readiness.py'
+      - 'deploy/systemd/torn-fren-v160-beta-board.service'
+      - 'tests/test_v160_private_beta_operator.py'
+      - 'deploy/scripts/v85_japan_forward_timer.sh'
+      - 'deploy/systemd/torn-fren-v85-japan-forward.service'
+      - 'deploy/systemd/torn-fren-v85-japan-forward.timer'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  forward-isolation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install existing and research dependencies
+        run: python -m pip install -r requirements.txt -r research/plushie_champions/requirements-research.txt
+      - name: Verify Japan V84 live inference safety tests
+        run: python -m unittest discover -s tests -p 'test_v84_japan_forward_canary.py' -v
+      - name: Verify Japan V86 report count and proxy accuracy safety
+        run: python -m unittest discover -s tests -p 'test_v86_japan_forward_report.py' -v
+      - name: Verify the three-item website preview adapter remains read-only and non-actionable
+        run: python -m unittest discover -s tests -p 'test_v87_experimental24_overlay.py' -v
+      - name: Verify V88 collector-heartbeat forward scoring regression
+        run: python -m unittest discover -s tests -p 'test_v88_poll_state_forward_report.py' -v
+      - name: Verify V89 pending classification and recommendation stability audit
+        run: python -m unittest discover -s tests -p 'test_v89_pending_horizon_diagnostic.py' -v
+      - name: Verify V91 item-aware decision policy contract
+        run: python -m unittest discover -s tests -p 'test_v91_travel_decision_contract.py' -v
+      - name: Stress test V92 11k-option research selection
+        run: python -m unittest discover -s tests -p 'test_v92_stress_decision_engine.py' -v
+      - name: Verify V93 rate-limited country-fresh arrival observation design
+        run: python -m unittest discover -s tests -p 'test_v93_arrival_observation_policy.py' -v
+      - name: Benchmark V96 1000 indexed SQLite forward arrival replays
+        run: python -m unittest discover -s tests -p 'test_v96_sqlite_forward_replay_benchmark.py' -v
+      - name: Verify V97 screenshot-status and provisional travel labels
+        run: python -m unittest discover -s tests -p 'test_v97_experimental_dashboard_state.py' -v
+      - name: Verify V98 complete forward issue cohort, ready/watches kept separate
+        run: python -m unittest discover -s tests -p 'test_v98_ready_vs_watch_forward_audit.py' -v
+      - name: Verify V99 pre-issuance stocked-vs-forecast causality
+        run: python -m unittest discover -s tests -p 'test_v99_issued_stock_vs_forecast_audit.py' -v
+      - name: Verify V100 no-lookahead long-watch reconfirmation audit
+        run: python -m unittest discover -s tests -p 'test_v100_future_watch_reconfirmation_audit.py' -v
+      - name: Verify V101 historical watch-to-executable conversion and no lookahead
+        run: python -m unittest discover -s tests -p 'test_v101_watch_to_actionable_audit.py' -v
+      - name: Verify V102 restock-window departure and existing model score-curve bridge
+        run: python -m unittest discover -s tests -p 'test_v102_restock_departure_bridge.py' -v
+      - name: V103 actual champion model score-curve parity and earliest candidate selection
+        run: python -m unittest discover -s tests -p 'test_v103_champion_score_curves.py' -v
+      - name: V104 no-lookahead earliest vs champion historical query comparators
+        run: python -m unittest discover -s tests -p 'test_v104_real_champion_earliest_replay.py' -v
+      - name: V105 real champion dynamic 5m replanning, shared score curve and parity
+        run: python -m unittest discover -s tests -p 'test_v105_dynamic_champion_earliest_replay.py' -v
+      - name: V106 verify dynamic champion parity and score-preserving earliest departure budgets
+        run: python -m unittest discover -s tests -p 'test_v106_risk_budget_earliest_replay.py' -v
+      - name: V107 causal restock and depletion event timing and flight-window tests
+        run: python -m unittest discover -s tests -p 'test_v107_explicit_restock_cycle_baseline.py' -v
+      - name: V108 explicit restock cycle dynamic flight-time calculation and safe withdrawals
+        run: python -m unittest discover -s tests -p 'test_v108_explicit_cycle_dynamic_replay.py' -v
+      - name: V109 validate raw event-level no-lookahead restock and depletion forecast errors
+        run: python -m unittest discover -s tests -p 'test_v109_raw_restock_transition_event_audit.py' -v
+      - name: V110 validate distinct 1-4 restock events, collector censorship and 106-minute flight target
+        run: python -m unittest discover -s tests -p 'test_v110_multicycle_restock_horizon_audit.py' -v
+      - name: V111 separate strict bracketed arrival proxy from stale and source-switched observations
+        run: python -m unittest discover -s tests -p 'test_v111_arrival_proxy_evidence_audit.py' -v
+      - name: V112 same-anchor model-vs-immediate paired evidence and uncertain arrival bounds
+        run: python -m unittest discover -s tests -p 'test_v112_matched_immediate_vs_restock_flight_audit.py' -v
+      - name: V113 verify predeclared event offset decision points against identical immediate-flight baseline
+        run: python -m unittest discover -s tests -p 'test_v113_phase_offset_departure_comparison.py' -v
+      - name: V114 poll-heartbeat reconstructed stock arrival parity against V113 immediate baseline
+        run: python -m unittest discover -s tests -p 'test_v114_matched_poll_heartbeat_flight_audit.py' -v
+      - name: V115 bounded SQL item pushdown without raising V88 all-roster safety limit
+        run: python -m unittest discover -s tests -p 'test_v115_targeted_v88_forward_evidence.py' -v
+      - name: V116 attributable first-issued hourly item snapshots and matched counterfactual validation
+        run: python -m unittest discover -s tests -p 'test_v116_attributed_hourly_forward_audit.py' -v
+      - name: V117 simulated V75 five-minute replans resolve to first executable issue, censor unconverted watches
+        run: python -m unittest discover -s tests -p 'test_v117_first_executable_replan_audit.py' -v
+      - name: V118 diagnose rolling departure watches vs fixed convergence and missing research ticks
+        run: python -m unittest discover -s tests -p 'test_v118_watch_convergence_diagnostic.py' -v
+      - name: V119 frozen asof same-cohort triple confirmation vs fresh and immediate replay
+        run: python -m unittest discover -s tests -p 'test_v119_stable_commitment_vs_fresh_replay.py' -v
+      - name: V120 confirm frozen stable candidate persists to departure using as-issued ticks
+        run: python -m unittest discover -s tests -p 'test_v120_commitment_departure_reconfirmation.py' -v
+      - name: V121 early high-score Nessie replay with asof maturity, V88 outcome proxy and unchanged original selector
+        run: python -m unittest discover -s tests -p 'test_v121_nessie_native_vs_earliest_forward_proxy.py' -v
+      - name: V122 diagnose binary template score and zero lift over immediate arrival on frozen V121 cohort
+        run: python -m unittest discover -s tests -p 'test_v122_nessie_selector_discrimination_audit.py' -v
+      - name: V123 empirical multi-cycle survival from depletion - no-lookahead and matched stock proxy
+        run: python -m unittest discover -s tests -p 'test_v123_empirical_phase_survival_challenger.py' -v
+      - name: V124 verify opt-in prospective one-shot shadow defaults to no-write, only private event-idempotent sidecar
+        run: python -m unittest discover -s tests -p 'test_v124_prospective_survival_shadow.py' -v
+      - name: V125 two-phase earliest-arrival confidence and isolated issued-five-minute shadow capture
+        run: python -m unittest discover -s tests -p 'test_v125_earliest_credible_shadow.py' -v
+      - name: V126 source-phase onset uncertainty remains provisional and defaults no-write
+        run: python -m unittest discover -s tests -p 'test_v126_unknown_onset_sensitivity.py' -v
+      - name: V127 ensure isolated opt-in five-minute recorder stays disabled on preview
+        run: python -m unittest discover -s tests -p 'test_v127_optional_shadow_timer.py' -v
+      - name: V128 exact 24 roster source-pinned empirical UK parity and isolated sidecar verification
+        run: python -m unittest discover -s tests -p 'test_v128_full24_earliest_shadow.py' -v
+      - name: V128 validate guarded full 24 item research-only operator and independent timer
+        run: python -m unittest discover -s tests -p 'test_v128_full24_operator.py' -v
+      - name: V129 validate full 24 forward proxy report and mature matched first-hour starts
+        run: python -m unittest discover -s tests -p 'test_v129_full24_forward_report.py' -v
+      - name: V130 isolate 24-item Monte Carlo score reissue jitter via phase-pinned deterministic scenarios
+        run: python -m unittest discover -s tests -p 'test_v130_phase_pinned_mc_challenger.py' -v
+      - name: V131 old V75 first-issue-hour stock-at-arrival versus matched immediate and new V128 maturity
+        run: python -m unittest discover -s tests -p 'test_v131_multiledger_historical_arrival_audit.py' -v
+      - name: V132 actual value of early departure timing with watch versus execute and phase-matched forecast drift
+        run: python -m unittest discover -s tests -p 'test_v132_departure_timing_quality_audit.py' -v
+      - name: V133 private research departure UI contract preserves original graph, expires stale and does not claim GO
+        run: python -m unittest discover -s tests -p 'test_v133_private_departure_panel.py' -v
+      - name: V134 read archived original website Prediction V2 arrival-cycle and restock-window truth without changing source
+        run: python -m unittest discover -s tests -p 'test_v134_original_graph_v2_audit.py' -v
+      - name: V135 one-shot overnight brief separate old graph V2 cycle forecast from V75 and V128 stock proxies
+        run: python -m unittest discover -s tests -p 'test_v135_morning_departure_brief.py' -v
+      - name: V136 check pinned one-time morning stock-at-arrival audit operator has no service writes
+        run: python -m unittest discover -s tests -p 'test_v136_run_leave_quality_morning.py' -v
+      - name: V137 compare original V2 earliest displayed departure against direct >=30 arrival proxy
+        run: python -m unittest discover -s tests -p 'test_v137_original_v2_stock_at_arrival_audit.py' -v
+      - name: V138 keep original V2 cycle metrics separate from direct >=30 arrival truth
+        run: python -m unittest discover -s tests -p 'test_v138_enhanced_departure_evidence_brief.py' -v
+      - name: V139 verify enhanced one-shot VM operator stays pinned and read-only
+        run: python -m unittest discover -s tests -p 'test_v139_run_enhanced_departure_morning.py' -v
+      - name: V140 preserve existing experimental UI models and attach safe V128 beta view contract
+        run: python -m unittest discover -s tests -p 'test_v140_existing_experimental_beta_board.py' -v
+      - name: V141 reject original V2 impossible departure windows and unverified stock threshold
+        run: python -m unittest discover -s tests -p 'test_v141_v2_feasible_departure_window.py' -v
+      - name: V142 read-only deployed experimental UI and exact 24-row inspection safety
+        run: python -m unittest discover -s tests -p 'test_v142_inspect_existing_experimental.py' -v
+      - name: V143 verify original V2 Python+browser JavaScript window parity and future-cycle rollover
+        run: python -m unittest discover -s tests -p 'test_v143_v2_window_web_parity.py' -v
+      - name: Verify dual-view offline, expiry and baseline isolation regressions
+        run: python -m unittest discover -s tests -p 'test_beta_departure_freshness.py' -v
+      - name: Verify V2 first reachable multi-cycle flight timeline and separate specialist contract
+        run: python -m unittest discover -s tests -p 'test_v2_beta_departure_bridge.py' -v
+      - name: Validate existing 16 native V18-V20 arrival plans as provisional without inventing restock times
+        run: python -m unittest discover -s tests -p 'test_v2_native_specialist_adapter.py' -v
+      - name: Verify default-off V2 shared timeline in existing history API with frozen model issue
+        run: python -m unittest discover -s tests -p 'test_v2_beta_history_preview.py' -v
+      - name: Verify historical V139 evidence has stable 24-item denominators and no false beta success labels
+        run: python -m unittest discover -s tests -p 'test_v139_beta_evidence_summary.py' -v
+      - name: Diagnose 24h observed restock crossings versus V128 abstentions read-only
+        run: python -m unittest discover -s tests -p 'test_v144_restock_coverage_diagnostic.py' -v
+      - name: Test provider-continuous fully observed stock phases without lookahead
+        run: python -m unittest discover -s tests -p 'test_v145_provider_continuous_phases.py' -v
+      - name: Verify V146 as-issued V145 replay preserves old cohort, per-item quotas, source-stamp and censored outcomes
+        run: python -m unittest discover -s tests -p 'test_v146_v145_same_issue_replay.py' -v
+      - name: Verify bounded read-only private VM replay operator syntax
+        run: bash -n deploy/scripts/v146_replay_v145_from_existing_stage.sh
+      - name: Validate exact-source deployed experimental countdown preview without mutating both existing views
+        run: python -m unittest discover -s tests -p 'test_v147_deployed_24_view_preview_patch.py' -v
+      - name: First reachable restock cycle over 11 flight durations and 30min replenishment cadence
+        run: python -m unittest discover -s tests -p 'test_v148_observed_earliest_stock_cycle.py' -v
+      - name: Compact real-VM issue replay output without hiding unresolved denominators
+        run: python -m unittest discover -s tests -p 'test_v149_v146_compact_report.py' -v
+      - name: Diagnose Japan no-window cross-quantile uncertainty without actionable false positives
+        run: python -m unittest discover -s tests -p 'test_v150_stock_window_failure_diagnostic.py' -v
+      - name: Stable V151 whole-cycle earliest-arrival scoring on real observed period fixtures
+        run: python -m unittest discover -s tests -p 'test_v151_stable_earliest_departure.py' -v
+      - name: Verify first completed restock 1m 5m 15m timing audit excludes gaps and ambiguous sources
+        run: python -m unittest discover -s tests -p 'test_v152_first_restock_timing_evidence.py' -v
+      - name: V153 recent complete-cycle restock timing regime and no future leakage tests
+        run: python -m unittest discover -s tests -p 'test_v153_recent_completed_restock_baseline.py' -v
+      - name: Per-item stock/depletion horizon routing with no future outcomes or arbitrary global winners
+        run: python -m unittest discover -s tests -p 'test_v156_item_cycle_profile_router.py' -v
+      - name: Prequential V157 complete low/high stock survival decisions never use future outcomes
+        run: python -m unittest discover -s tests -p 'test_v157_prequential_stock_survival_router.py' -v
+      - name: Check V158 prequential actual-flight multi-cycle arrival horizon with heldout episodes
+        run: python -m unittest discover -s tests -p 'test_v158_flight_horizon_router.py' -v
+      - name: V159 verify repeated hourly issue cohorts are not independent stock episodes
+        run: python -m unittest discover -s tests -p 'test_v159_issue_phase_episode_audit.py' -v
+      - name: V160 V161 prospective private shadow issuance and forward-only matched arrival evidence
+        run: |
+          python -m unittest discover -s tests -p 'test_v160_prospective_v151_shadow.py' -v
+          python -m unittest discover -s tests -p 'test_v161_prospective_v151_forward_report.py' -v
+          python -m unittest discover -s tests -p 'test_v161_forward_24item_scorecard.py' -v
+          python -m unittest discover -s tests -p 'test_v162_readonly_restock_vs_forecast_audit.py' -v
+          python -m unittest discover -s tests -p 'test_v163_readonly_event_first_preview.py' -v
+      - name: V160 isolated operator and private research timer safeguards
+        run: python -m unittest discover -s tests -p 'test_v160_forward_operator.py' -v
+      - name: Verify user-usable loopback 24-item V160 live beta
+        run: python -m unittest discover -s tests -p 'test_v160_private_beta_board.py' -v
+      - name: Verify read-only on-demand single-item fresh rechecks
+        run: python -m unittest discover -s tests -p 'test_v160_single_item_recheck.py' -v
+      - name: Verify private beta service isolation and opt-in operator
+        run: python -m unittest discover -s tests -p 'test_v160_private_beta_operator.py' -v
+      - name: Verify startup race retry and confirmed old-page rollback
+        run: python -m unittest discover -s tests -p 'test_v160_beta_http_readiness.py' -v
+      - name: Verify Japan implementation compiles
+        run: python -m py_compile research/v84_japan_forward_canary.py research/v86_japan_forward_report.py research/v87_experimental24_overlay.py research/v88_poll_state_forward_report.py research/v89_pending_horizon_diagnostic.py research/v91_travel_decision_contract.py research/v93_arrival_observation_policy.py research/v97_experimental_dashboard_state.py research/v98_ready_vs_watch_forward_audit.py research/v99_issued_stock_vs_forecast_audit.py research/v100_future_watch_reconfirmation_audit.py research/v101_watch_to_actionable_audit.py research/v102_restock_departure_bridge.py research/v103_champion_score_curves.py research/v104_real_champion_earliest_replay.py research/v105_dynamic_champion_earliest_replay.py research/v106_risk_budget_earliest_replay.py research/v107_explicit_restock_cycle_baseline.py research/v108_explicit_cycle_dynamic_replay.py research/v109_raw_restock_transition_event_audit.py research/v110_multicycle_restock_horizon_audit.py research/v111_arrival_proxy_evidence_audit.py research/v112_matched_immediate_vs_restock_flight_audit.py research/v113_phase_offset_departure_comparison.py research/v114_matched_poll_heartbeat_flight_audit.py research/v115_targeted_v88_forward_evidence.py research/v116_attributed_hourly_forward_audit.py research/v117_first_executable_replan_audit.py research/v118_watch_convergence_diagnostic.py research/v119_stable_commitment_vs_fresh_replay.py research/v120_commitment_departure_reconfirmation.py research/v121_nessie_native_vs_earliest_forward_proxy.py research/v122_nessie_selector_discrimination_audit.py research/v123_empirical_phase_survival_challenger.py research/v124_prospective_survival_shadow.py research/v125_earliest_credible_shadow.py research/v126_unknown_onset_sensitivity.py research/v128_full24_earliest_shadow.py research/v129_full24_forward_report.py research/v130_phase_pinned_mc_challenger.py research/v131_multiledger_historical_arrival_audit.py research/v132_departure_timing_quality_audit.py research/v133_private_departure_panel.py research/v134_original_graph_v2_audit.py research/v135_morning_departure_brief.py research/v137_original_v2_stock_at_arrival_audit.py research/v138_enhanced_departure_evidence_brief.py research/v140_existing_experimental_beta_board.py research/v141_v2_feasible_departure_window.py research/v2_beta_departure_bridge.py research/v2_native_specialist_adapter.py
+      - name: Validate guarded opt-in service installer syntax
+        run: bash -n deploy/scripts/v85_japan_forward_timer.sh deploy/scripts/v87_web24_preview.sh deploy/scripts/v139_run_enhanced_departure_morning.sh deploy/scripts/v142_inspect_existing_experimental.sh
