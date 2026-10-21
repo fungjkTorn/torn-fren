@@ -92,6 +92,8 @@ class ProspectiveEventTest(unittest.TestCase):
         self.assertEqual(report["issued_item_rows"], 24)
         self.assertEqual(report["first_issued_item_hours"], 24)
         self.assertEqual(r["first_physical_resolved"], 1)
+        self.assertEqual(r["distinct_first_physical_restocks"], 1)
+        self.assertEqual(r["distinct_restock_possible_within_15s"], 1)
         self.assertEqual(r["chosen_physical_resolved"], 1)
         self.assertEqual(r["restock_possible_within_15s"], 1)
         self.assertNotIn("restock_certain_within_15s", r)
