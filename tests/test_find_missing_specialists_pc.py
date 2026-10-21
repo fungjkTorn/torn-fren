@@ -20,7 +20,7 @@ class SourceFinderTest(unittest.TestCase):
             (other/"rf_localgrid.py").write_text("ignore")
             before=camel.read_bytes()
             results=scan([home],check_git=False)
-            self.assertIn(str(camel),
+            self.assertIn(str(camel.resolve()),
                 results["by_item"]["uae:Camel Plushie"]["exact_name_hits"])
             self.assertEqual(results["by_item"]["uni:Red Fox Plushie"]["exact_name_hits"],[])
             self.assertEqual(camel.read_bytes(),before)
