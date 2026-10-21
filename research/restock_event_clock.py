@@ -173,6 +173,7 @@ def item_benchmark(source,key,*,days=6,asof=None):
     tracker=ZeroCycles(crosses);flight=model.TRAVEL_SECONDS[key.split(':')[0]]
     end=((cutoff-flight-WAIT-190-STEP)//STEP)*STEP
     start=end-days*86400+STEP
+    # Strictly chronological first half / later half; never train a winner on later observations.
     split=start+(days//2)*86400
     # All cohorts get their full eight-hour follow-up and mature arrival truth.
     stop=end+WAIT+STEP
@@ -313,9 +314,9 @@ def main():
     p.add_argument('--source',required=True);p.add_argument('--out',required=True)
     p.add_argument('--model-sha',required=True);p.add_argument('--item-key',action='append')
     p.add_argument('--asof',type=int)
-    p.add_argument('--days',type=int,default=6,help='Bounded mature historical days, 1..6')
+    p.add_argument('--days',type=int,default=6,help='Bounded mature historical days, 1..30')
     a=p.parse_args()
-    if not 1<=a.days<=6:raise ValueError('days must be between 1 and 6')
+    if not 1<=a.days<=30:raise ValueError('days must be between 1 and 30')
     out=Path(a.out);out.mkdir(parents=True,exist_ok=False)
     keys=sorted(a.item_key or model.exact_roster())
     if len(set(keys))!=len(keys) or not set(keys)<=set(model.exact_roster()):raise ValueError('Invalid roster')
