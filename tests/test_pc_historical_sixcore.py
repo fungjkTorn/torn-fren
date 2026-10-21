@@ -60,13 +60,35 @@ class PcHistoricalTests(unittest.TestCase):
                 "chronological_slices":{"later_validation":{
                     "phase_empirical_expected":entry,"leave_now":entry}}}
         rows=pc.score_rows("mex:Jaguar Plushie",report)
-        self.assertEqual(len(rows),18)
+        self.assertEqual(len(rows),2)
         r=next(x for x in rows if x["split"]=="later_validation"
                and x["policy"]=="phase_empirical_expected")
         self.assertEqual(r["restock_distinct_targets"],3)
         self.assertEqual(r["model_only_hits"],3)
         self.assertEqual(r["leave_now_only_hits"],1)
         self.assertEqual(r["flight_success_fraction"],0.75)
+
+    def test_new_lagged_policy_tape_is_separate_and_correctly_named(self):
+        item="uni:Red Fox Plushie"
+        event={"starts":72,"scored":54,"success_fraction":0.777,
+               "departure_coverage":0.86,"mean_wait_minutes":14.0,
+               "matched_vs_now":{"matched_resolved":48,
+                   "challenger_only_success":12,"baseline_only_success":4}}
+        report={"restock_timing":{"interval_ridge":{"chronological_slices":{
+                   "later_validation":{"scored":18,"distinct_target_restocks":17,
+                                        "mean_absolute_error_minutes":8.0}}}},
+                "chronological_slices":{"earlier_development":{},
+                    "later_validation":{"interval_ridge_expected_lag180":event}}}
+        rows=pc.score_rows(item,report)
+        self.assertEqual(len(rows),1)
+        self.assertEqual(rows[0]["restock_model"],"interval_ridge")
+        self.assertEqual(rows[0]["arrival_lag_seconds"],180)
+        self.assertEqual(rows[0]["restock_distinct_targets"],17)
+        with tempfile.TemporaryDirectory() as td:
+            command=pc.commands_for(item,source=Path(td)/"history.db",sha="a"*40,
+                days=30,target=Path(td)/"out",arrival_lags=(0,60,180,300,600))
+            self.assertEqual(command.count("--arrival-lag"),5)
+            self.assertEqual(command[-2:],["--arrival-lag","600"])
 
     def test_summary_cannot_claim_complete_when_any_item_fails(self):
         with tempfile.TemporaryDirectory() as td:
