@@ -89,6 +89,28 @@ class EventClockTests(unittest.TestCase):
         forecast['restock_events'][0]['predicted_stock_below_30_epoch']=2011
         self.assertEqual(departure(forecast,issued=1000,flight=500)['departure'],1500)
 
+    def test_offset_grid_targets_future_physical_restock_not_existing_stock(self):
+        forecast=dict(restock_events=[
+            dict(predicted_restock_epoch=1200,predicted_stock_below_30_epoch=1290),
+            dict(predicted_restock_epoch=2200,predicted_stock_below_30_epoch=2750)])
+        first=departure(forecast,issued=1000,flight=500)
+        self.assertEqual(first['event_index'],2)
+        self.assertEqual(first['landing'],2200)
+        delayed=departure(forecast,issued=1000,flight=500,arrival_lag_seconds=180)
+        self.assertEqual(delayed['event_index'],2)
+        self.assertEqual(delayed['departure'],1880)
+        self.assertEqual(delayed['landing'],2380)
+        self.assertEqual(delayed['arrival_plus_10'],2390)
+        self.assertEqual(delayed['predicted_restock_epoch'],2200)
+        current=dict(current_stock_window=dict(predicted_restock_epoch=1000,
+            predicted_stock_below_30_epoch=2000))
+        self.assertEqual(departure(current,issued=1000,flight=500,
+            arrival_lag_seconds=300)['departure'],1000)
+        with self.assertRaises(ValueError):
+            departure(forecast,issued=1000,flight=500,arrival_lag_seconds=901)
+        with self.assertRaises(ValueError):
+            departure(forecast,issued=1000,flight=500,arrival_lag_seconds=-1)
+
     def test_current_stock_and_uncertainty_window(self):
         f=dict(current_stock_window=dict(predicted_restock_epoch=1000,predicted_stock_below_30_epoch=1800,
             restock_late_epoch=1000,early_stock_end_epoch=1700))
