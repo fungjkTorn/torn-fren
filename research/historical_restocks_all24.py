@@ -192,6 +192,14 @@ def main():
         started=time.monotonic()
         try:
             reports[key]=replay_item(args.source,key,days=args.days,asof=args.asof)
+            # Every completed item survives a bounded runner timeout. The
+            # partial output NEVER claims a full-roster result or promotion.
+            checkpoint=output.with_name(output.stem+".partial.json")
+            checkpoint.write_text(json.dumps(dict(kind="HISTORICAL_PARTIAL",
+                model_sha=args.model_sha,days=args.days,requested_items=keys,
+                completed_items=len(reports),items=reports,
+                roster_complete=False,production_modified=False),
+                sort_keys=True)+"\n")
             print("HISTORICAL_ITEM",key,round(time.monotonic()-started,2),
                   reports[key]["departure"]["scored"],flush=True)
         except (ValueError,RuntimeError,sqlite3.DatabaseError) as exc:
