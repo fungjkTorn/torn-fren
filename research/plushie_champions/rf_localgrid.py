@@ -5,7 +5,7 @@ from common import ResearchContext, AnalogPlanner, dynamic_replay, valid_starts,
 COUNTRY='uni'; ITEM='Red Fox Plushie'; WINNING_CONFIG={'k':18,'global_regime_weight':0.5}
 
 def replay(db:str):
-    ctx=ResearchContext.build(db);tl=ctx.timelines[(COUNTRY,ITEM)];starts=valid_starts(ctx,COUNTRY,ITEM)
+    ctx=ResearchContext.build(db,readonly=True);tl=ctx.timelines[(COUNTRY,ITEM)];starts=valid_starts(ctx,COUNTRY,ITEM)
     sp=int(.75*len(starts)); train,hold=starts[:sp],starts[sp:]; vi=int(len(train)*.70); val=train[vi:]
     planner=AnalogPlanner(ctx,COUNTRY,ITEM,WINNING_CONFIG['k'],WINNING_CONFIG['global_regime_weight'],cutoff=hold[0])
     vr=dynamic_replay(tl,planner.plan,val,TRAVEL_SECONDS[COUNTRY]);hr=dynamic_replay(tl,planner.plan,hold,TRAVEL_SECONDS[COUNTRY])
