@@ -53,6 +53,23 @@ class HistoricalAll24Tests(unittest.TestCase):
                  for row in rows]
         self.assertEqual(first,predict(mutated))
 
+    def test_failing_item_is_reported_without_claiming_complete_roster(self):
+        import json
+        with tempfile.TemporaryDirectory() as td:
+            out=Path(td)/"failed-historical.json"
+            argv=["historical_restocks_all24","--source","/not-read",
+                  "--output",str(out),"--model-sha","a"*40,
+                  "--days","1","--item-key","mex:Jaguar Plushie"]
+            with patch("sys.argv",argv), patch(
+                    "research.historical_restocks_all24.replay_item",
+                    side_effect=ValueError("synthetic bad item")):
+                main()
+            report=json.loads(out.read_text())
+            self.assertEqual(report["run_status"],"PARTIAL_NO_PROMOTION")
+            self.assertEqual(report["completed_items"],0)
+            self.assertIn("mex:Jaguar Plushie",report["failed_items"])
+            self.assertFalse(report["automatic_model_promotion"])
+
     def test_rejects_unapproved_scans(self):
         with self.assertRaises(ValueError):
             replay_item("/missing","invented:fake",days=1)
