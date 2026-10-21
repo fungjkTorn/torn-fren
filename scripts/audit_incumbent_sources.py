@@ -48,6 +48,12 @@ def inventory(external_root=None):
             repository_file_present=checked_exists,
             previously_marked_source_verified=bool(entry.get("source_verified")),
             recovered_other_checkout_paths=found,
+            separate_research_variant_paths=(
+                ["research/japan_xanax/renewal_shadow.py"]
+                if key=="jap:Xanax" and
+                (ROOT/"research/japan_xanax/renewal_shadow.py").is_file()
+                else []),
+            separate_variant_is_original_incumbent=False,
             restock_clock_baseline_instead_of_incumbent=False,
             incumbent_historical_replay_verified=False,
             incumbent_physical_restock_accuracy_measured=False,
@@ -68,6 +74,7 @@ def main():
     for key,item in rows.items():
         flag="CHECKOUT_SOURCE" if item["repository_file_present"] else (
              "OLDER_PC_SOURCE" if item["recovered_other_checkout_paths"] else
+             "SEPARATE_RESEARCH_VARIANT_ONLY" if item["separate_research_variant_paths"] else
              "SOURCE_NOT_YET_LOCATED")
         print(key+" | "+str(item["model_family"])+"/"+str(item["config_name"])+
               " | "+flag)
