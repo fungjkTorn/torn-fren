@@ -42,6 +42,7 @@ CREATE TABLE collection_gaps(
 );
 CREATE INDEX idx_gap_start ON collection_gaps(start_timestamp);
 CREATE TABLE poll_heartbeats(
+    id INTEGER PRIMARY KEY,
     timestamp INTEGER NOT NULL,
     mode TEXT NOT NULL,
     success INTEGER NOT NULL,
