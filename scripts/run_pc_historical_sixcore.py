@@ -30,7 +30,7 @@ import time
 
 BASE = Path(__file__).resolve().parents[1]
 MAX_WORKERS = 6
-MAX_DAYS = 6
+MAX_DAYS = 30
 ROSTER_PATH = BASE / "research" / "v38_roster.json"
 MODES = ("phase_empirical", "interval_median", "interval_ridge",
          "phase_recursive_ridge")
@@ -270,7 +270,7 @@ def main(argv=None):
     if not 1 <= args.workers <= MAX_WORKERS:
         p.error("Use 1 to 6 CPU workers")
     if not 1 <= args.days <= MAX_DAYS:
-        p.error("Use 1 to 6 historical days")
+        p.error("Use 1 to 30 historical days")
     if not 30 <= args.timeout_per_item <= 7200:
         p.error("Per-item timeout must be 30..7200 seconds")
     source, metadata = verify_local_source(args.source)
