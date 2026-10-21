@@ -35,6 +35,12 @@ def inventory(external_root=None):
         source=entry.get("source_path")
         checked=ROOT/source if source else None
         checked_exists=bool(checked and checked.is_file())
+        relocated=(ROOT/"research"/"plushie_champions"/Path(source).name
+                   if source and not checked_exists else None)
+        relocated_exists=bool(relocated and relocated.is_file())
+        located_source_path=(source if checked_exists else
+            str(relocated.relative_to(ROOT)).replace("\\\\","/")
+            if relocated_exists else None)
         # Only EXACT declared basename (not an arbitrary code search hit).
         found=[]
         if recovered_root is not None and source:
@@ -45,7 +51,9 @@ def inventory(external_root=None):
         out[key]=dict(model_family=entry.get("model_family"),
             config_name=entry.get("config_name"),
             recorded_source_path=source,
-            repository_file_present=checked_exists,
+            repository_file_present=bool(checked_exists or relocated_exists),
+            repository_resolved_source_path=located_source_path,
+            historical_recorded_path_outdated=bool(relocated_exists),
             previously_marked_source_verified=bool(entry.get("source_verified")),
             recovered_other_checkout_paths=found,
             separate_research_variant_paths=(
