@@ -78,15 +78,25 @@ class HistoricalAll24Tests(unittest.TestCase):
 
     def test_no_advance_leakage_in_example_reconfirmations(self):
         seen=[]
-        plans=[(t,t+200,1) for t in range(3600,7500,300)]
+        # Predictions held for 200 seconds fail the 180-second freshness
+        # check, even though they're inside the next five-minute interval.
+        times=range(3600,7500,300)
+        stale=[(t,t+200,1) for t in times]
         # Only the freshest issue may authorize immediate departure.
         def score(at):
             seen.append(at)
             return "SUCCESS","POLL_BACKED_DELTA_STATE",dict(
                 pre_quantity=50,post_quantity=48,pre_poll=at-2,
                 post_poll=at+12,item_provider="yata")
+        rejected=illustrative_flight_evidence(
+            stale,score=score,flight_seconds=1020,
+            cutoff=50000,start_before=7200)
+        self.assertEqual(rejected["outcome_examples"],{})
+        self.assertEqual(seen,[])
+        # A 100-second departure is fresh, and is scored later.
+        fresh=[(t,t+100,1) for t in times]
         proof=illustrative_flight_evidence(
-            plans,score=score,flight_seconds=1020,
+            fresh,score=score,flight_seconds=1020,
             cutoff=50000,start_before=7200)
         self.assertEqual(set(proof["outcome_examples"]),{"SUCCESS"})
         self.assertEqual(len(seen),2)
