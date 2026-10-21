@@ -44,7 +44,8 @@ CREATE INDEX idx_gap_start ON collection_gaps(start_timestamp);
 CREATE TABLE poll_heartbeats(
     timestamp INTEGER NOT NULL,
     mode TEXT NOT NULL,
-    success INTEGER NOT NULL
+    success INTEGER NOT NULL,
+    source TEXT
 );
 CREATE INDEX idx_poll_time ON poll_heartbeats(timestamp);
 CREATE TABLE research_metadata(
@@ -173,13 +174,25 @@ def export(source,roster,output,*,asof=None,days=45,
                              AND COALESCE(end_timestamp,9223372036854775807)>=?
                            ORDER BY start_timestamp""",(clock,start))
                 )
+                # Preserve provider identifiers when present so an independent
+                # post-issue physical-zero scorer can verify source continuity.
+                # This is a provider LABEL only, never an API key or player ID.
+                # If an older collector lacks heartbeat.source, leave it NULL;
+                # the scorer must report UNKNOWN rather than fabricate provider
+                # continuity from item history.
+                heartbeat_columns={col[1] for col in
+                    reader.execute("PRAGMA table_info(poll_heartbeats)")}
+                has_heartbeat_source="source" in heartbeat_columns
+                heartbeat_source_column=("source" if has_heartbeat_source
+                                         else "NULL AS source")
                 dest.executemany(
-                    "INSERT INTO poll_heartbeats VALUES(?,?,?)",
+                    "INSERT INTO poll_heartbeats(timestamp,mode,success,source) VALUES(?,?,?,?)",
                     reader.execute(
-                        """SELECT timestamp,mode,success FROM poll_heartbeats
-                           WHERE timestamp BETWEEN ? AND ?
-                             AND mode='poll-cycle' AND success=1
-                           ORDER BY timestamp""",(start,clock))
+                        "SELECT timestamp,mode,success,"+heartbeat_source_column+
+                        """ FROM poll_heartbeats
+                            WHERE timestamp BETWEEN ? AND ?
+                              AND mode='poll-cycle' AND success=1
+                            ORDER BY timestamp""",(start,clock))
                 )
                 has_clocks=reader.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='country_stock_observations'").fetchone() is not None
                 country_rows=0
@@ -216,6 +229,7 @@ def export(source,roster,output,*,asof=None,days=45,
                     "sanitized_stock_only":"true",
                     "country_clock_schema_available":str(has_clocks).lower(),
                     "country_clock_rows":str(country_rows),
+                    "heartbeat_provider_field_present":str(has_heartbeat_source).lower(),
                 }
                 dest.executemany(
                     "INSERT INTO research_metadata(key,value) VALUES(?,?)",
