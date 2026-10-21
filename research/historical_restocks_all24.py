@@ -38,6 +38,61 @@ def _metric(values):
     return round(sum(values)/len(values),2) if values else None
 
 
+def illustrative_flight_evidence(plans,*,score,flight_seconds,cutoff,start_before):
+    """One locked historical arrival example per observed outcome category.
+
+    Reproduces evaluate_utc's fixed UTC-hour starts, 5-minute replanning,
+    finite departure freshness, and eight-hour deadline. Actual quantities
+    enter ONLY through score(), after the entire forecast tape is built.
+    Examples are first chronologically observed per category, not random
+    samples and not evidence for rates or independent-restock confidence.
+    """
+    examples={}
+    offset=next((i for i,p in enumerate(plans[:12]) if p[0]%3600==0),len(plans))
+    for i in range(offset,len(plans),12):
+        start=plans[i][0]
+        if start>start_before:break
+        deadline=start+WAIT
+        for issued,depart,age in plans[i:]:
+            if issued>deadline:break
+            if (depart is None or not issued<=depart<issued+STEP
+                    or depart>deadline):
+                continue
+            if depart>cutoff:break
+            if age is None or not 0<=age+depart-issued<=SOURCE_AGE:
+                continue
+            arrival=depart+flight_seconds
+            status,reason,meta=score(arrival)
+            if status not in examples:
+                meta=meta or {}
+                examples[status]=dict(
+                    starting_decision_epoch=start,
+                    last_reconfirmation_epoch=issued,
+                    simulated_departure_epoch=depart,
+                    simulated_landing_epoch=arrival,
+                    arrival_plus_10_epoch=arrival+GRACE,
+                    simulated_wait_minutes=round((depart-start)/60,2),
+                    result=status,
+                    observation_reason=reason,
+                    nearest_successful_poll_before_landing_epoch=meta.get("pre_poll"),
+                    nearest_successful_poll_after_grace_epoch=meta.get("post_poll"),
+                    historical_quantity_at_pre_poll=meta.get("pre_quantity"),
+                    historical_quantity_at_post_poll=meta.get("post_quantity"),
+                    observed_provider=meta.get("item_provider"),
+                    observed_quantity_is_not_exact_landing_second=True,
+                    actual_player_flight=False)
+            break
+    return dict(
+        selection="FIRST_UTC_HOURLY_COHORT_WITH_EACH_OUTCOME_NOT_REPRESENTATIVE",
+        outcome_examples=examples,
+        stock_evidence="CHANGE_ONLY_QUANTITY_CARRIED_TO_SUCCESSFUL_POLL_BRACKETS",
+        source_observations_truncated_for_model=True,
+        future_observations_used_only_to_score=True,
+        max_wait_hours=8,
+        replan_cadence_seconds=STEP,
+        grace_seconds=GRACE)
+
+
 def replay_item(source,key,*,days=1,asof=None):
     """One causally generated five-minute tape; score only after tape closes."""
     if type(days) is not int or not 1<=days<=MAX_DAYS:
@@ -86,6 +141,11 @@ def replay_item(source,key,*,days=1,asof=None):
     planned,cohorts=results(plans)
     now_result,now_cohorts=results(baseline)
     paired=compare_cohorts(now_cohorts,cohorts)
+    # Human-inspectable arrivals and stock counts. This grading step occurs
+    # strictly after the full causal forecast tape has been created.
+    evidence_examples=illustrative_flight_evidence(
+        plans,score=evidence.score,flight_seconds=flight,
+        cutoff=cutoff,start_before=end)
     by_slice={}
     for label,pred in (
             ("earlier",lambda t:t<start+days*86400//2),
@@ -165,6 +225,7 @@ def replay_item(source,key,*,days=1,asof=None):
             mean_max_error_minutes=_metric([v/60 for v in maxerr]),
             earlier=restock_slice(train),later_untuned=restock_slice(later)),
         departure=planned,leave_now=now_result,matched_vs_now=paired,
+        flight_evidence_examples=evidence_examples,
         chronological_slices=by_slice,issue_statuses=dict(reason_counts),
         no_future_training=True,actual_player_flights=False,
         provider_certified=False,auto_promoted=False,
