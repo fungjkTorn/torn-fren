@@ -22,7 +22,7 @@ SERVICE=torn-fren-research-forward-snapshot.service
 SERVICE_PATH=/etc/systemd/system/$SERVICE
 TIMER_PATH=/etc/systemd/system/$TIMER
 REPO=/home/ubuntu/torn-fren-v38-probe
-EXPORTER_SHA=28f430bfd9c7fd06b4f420cee38ff6ab84d1de58
+EXPORTER_SHA=d2fc563c29cb800bf9cadb70e7953865f0190851
 PINNED_PATH=deploy/research_runner/export_snapshot.py
 test -r "$SRC" && test -r "$ROSTER" && test -r "$BASE/stock_history_research.db" || {
   echo "STOP: missing source, roster, or old research archive"; exit 1; }
