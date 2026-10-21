@@ -13,6 +13,8 @@ on:
       - 'tests/test_v88_poll_state_forward_report.py'
       - 'research/v137_original_v2_stock_at_arrival_audit.py'
       - 'research/restock_event_clock.py'
+      - 'research/historical_restocks_all24.py'
+      - 'tests/test_historical_restocks_all24.py'
       - 'research/physical_event_forward.py'
       - 'tests/test_physical_event_forward.py'
       - 'services/travel_decision_contract_v166.py'
@@ -42,6 +44,8 @@ on:
       - 'tests/test_v88_poll_state_forward_report.py'
       - 'research/v137_original_v2_stock_at_arrival_audit.py'
       - 'research/restock_event_clock.py'
+      - 'research/historical_restocks_all24.py'
+      - 'tests/test_historical_restocks_all24.py'
       - 'research/physical_event_forward.py'
       - 'tests/test_physical_event_forward.py'
       - 'services/travel_decision_contract_v166.py'
@@ -87,4 +91,5 @@ jobs:
           tests.test_departure_reconfirmation
           tests.test_travel_decision_contract_v166
           tests.test_build_travel_event_snapshot
-          tests.test_physical_event_forward -q
+          tests.test_physical_event_forward
+          tests.test_historical_restocks_all24 -q
