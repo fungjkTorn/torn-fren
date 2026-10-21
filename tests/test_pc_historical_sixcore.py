@@ -89,7 +89,7 @@ class PcHistoricalTests(unittest.TestCase):
         with self.assertRaises(SystemExit):
             pc.main(["--source","/notfound.db","--workers","7"])
         with self.assertRaises(SystemExit):
-            pc.main(["--source","/notfound.db","--days","7"])
+            pc.main(["--source","/notfound.db","--days","31"])
 
 
 if __name__ == "__main__":
