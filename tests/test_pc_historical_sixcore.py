@@ -67,6 +67,13 @@ class PcHistoricalTests(unittest.TestCase):
         self.assertEqual(r["model_only_hits"],3)
         self.assertEqual(r["leave_now_only_hits"],1)
         self.assertEqual(r["flight_success_fraction"],0.75)
+        self.assertEqual(r["incumbent_family"],"V18")
+        self.assertEqual(r["incumbent_config"],"dyn3")
+        self.assertFalse(r["incumbent_evaluated_in_this_tournament"])
+        self.assertIn("restock_accuracy_within_5m",r)
+        self.assertIn("restock_mean_signed_minutes",r)
+        self.assertIn("future_restock_flight_success_fraction",r)
+        self.assertIn("current_stock_flight_success_fraction",r)
 
     def test_new_lagged_policy_tape_is_separate_and_correctly_named(self):
         item="uni:Red Fox Plushie"
