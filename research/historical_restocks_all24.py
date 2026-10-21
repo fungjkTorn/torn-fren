@@ -106,7 +106,12 @@ def replay_item(source,key,*,days=1,asof=None):
     with closing(sqlite3.connect(uri,uri=True,timeout=12)) as db:
         db.execute("PRAGMA query_only=ON")
         t0=min(r["issued"] for r in hourly) if hourly else start
-        polldata=db.execute("""SELECT timestamp,source FROM poll_heartbeats
+        # Older collectors and synthetic fixtures may lack poll-level
+        # provider metadata. Such episodes are UNKNOWN for physical-event
+        # identity, not scored as if the provider continuity were proven.
+        columns={r[1] for r in db.execute("PRAGMA table_info(poll_heartbeats)")}
+        provider_sql="source" if "source" in columns else "NULL AS source"
+        polldata=db.execute(f"""SELECT timestamp,{provider_sql} FROM poll_heartbeats
             WHERE mode='poll-cycle' AND success=1 AND timestamp>=?
               AND timestamp<=? ORDER BY timestamp,id LIMIT 400001""",
             (t0-180,cutoff)).fetchall()
