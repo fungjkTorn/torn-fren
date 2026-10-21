@@ -16,6 +16,7 @@ from __future__ import annotations
 import argparse
 import csv
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from contextlib import closing
 from datetime import datetime, timezone
 import hashlib
 import json
@@ -77,7 +78,7 @@ def verify_local_source(source):
         raise ValueError("Provide a local SQLite history .db/.sqlite/.sqlite3 file")
     if source.stat().st_size < 4096:
         raise ValueError("SQLite file is empty/too small")
-    with sqlite3.connect(source.as_uri() + "?mode=ro", uri=True, timeout=12) as db:
+    with closing(sqlite3.connect(source.as_uri() + "?mode=ro", uri=True, timeout=12)) as db:
         db.execute("PRAGMA query_only=ON")
         tables = {r[0] for r in db.execute(
             "SELECT name FROM sqlite_master WHERE type='table'")}
