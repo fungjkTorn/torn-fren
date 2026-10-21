@@ -319,6 +319,7 @@ def score(*, sidecar, collector, now=None, days=2, max_rows=MAX_ROWS,
                     c["landing_" + state.lower()] += 1
                 else:
                     c["landing_proxy_hit" if hit else "landing_proxy_miss"] += 1
+                    c[("originally_actionable" if depart < p.get("valid_until_epoch", 0) else "requires_reconfirmation") + ("_landing_hit" if hit else "_landing_miss")] += 1
                     b_state, b_hit, _ = arrival_scorer(
                         source, country, name, issued + (arrival - depart), cutoff)
                     if b_hit is not None:
