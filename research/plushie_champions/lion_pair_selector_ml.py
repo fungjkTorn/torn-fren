@@ -9,7 +9,7 @@ EXPERT_A={'k':14,'global_regime_weight':0.35}; EXPERT_B={'k':18,'global_regime_w
 WINNING_CONFIG={'expert_a':EXPERT_A,'expert_b':EXPERT_B,'selector':'logistic class_weight=balanced max_iter=2000'}
 
 def replay(db:str):
-    ctx=ResearchContext.build(db);tl=ctx.timelines[(COUNTRY,ITEM)];travel=TRAVEL_SECONDS[COUNTRY];starts=valid_starts(ctx,COUNTRY,ITEM)
+    ctx=ResearchContext.build(db,readonly=True);tl=ctx.timelines[(COUNTRY,ITEM)];travel=TRAVEL_SECONDS[COUNTRY];starts=valid_starts(ctx,COUNTRY,ITEM)
     sp=int(len(starts)*.75);train,hold=starts[:sp],starts[sp:];vi=int(len(train)*.70);early,val=train[:vi],train[vi:]
     pa=AnalogPlanner(ctx,COUNTRY,ITEM,EXPERT_A['k'],EXPERT_A['global_regime_weight'],cutoff=val[0]);pb=AnalogPlanner(ctx,COUNTRY,ITEM,EXPERT_B['k'],EXPERT_B['global_regime_weight'],cutoff=val[0])
     oAe,pAe=fixed_expert_outcomes(tl,pa.plan,early,travel);oBe,pBe=fixed_expert_outcomes(tl,pb.plan,early,travel)
