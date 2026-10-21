@@ -98,6 +98,16 @@ CHECK_PROVIDER
 # Only after verified temporary export: safely replace root-owned sanitizer.
 cp -- "$EXPORTER" "$BACKUP"
 sudo install -o root -g root -m 0644 "$CANDIDATE" "$EXPORTER"
+# If the independent exporter was already busy, wait for it to become
+# inactive; systemctl start must run the new code (not be a no-op).
+for i in $(seq 1 100); do
+  if ! systemctl is-active --quiet "$UNIT"; then break; fi
+  sleep 2
+done
+if systemctl is-active --quiet "$UNIT"; then
+  sudo install -o root -g root -m 0644 "$BACKUP" "$EXPORTER"
+  echo "STOP: exporter stayed busy; original executable restored"; exit 1
+fi
 if ! sudo systemctl start "$UNIT"; then
   sudo install -o root -g root -m 0644 "$BACKUP" "$EXPORTER"
   echo "STOP: full exporter trial failed; previous executable restored"; exit 1
@@ -106,7 +116,7 @@ if [[ "$(systemctl show "$UNIT" -p Result --value)" != success ]]; then
   sudo install -o root -g root -m 0644 "$BACKUP" "$EXPORTER"
   echo "STOP: full exporter did not complete; previous executable restored"; exit 1
 fi
-python3 -B - "$SANITIZED" <<'VERIFY_EXPORT'
+if ! python3 -B - "$SANITIZED" <<'VERIFY_EXPORT'
 import sqlite3,sys
 from pathlib import Path
 p=Path(sys.argv[1]).resolve(strict=True)
@@ -118,6 +128,11 @@ with sqlite3.connect(p.as_uri()+"?mode=ro",uri=True) as cx:
     assert cx.execute("SELECT COUNT(*) FROM poll_heartbeats WHERE source IS NOT NULL").fetchone()[0]>0
 print("PASS: full 45-day sanitized snapshot now retains provider evidence")
 VERIFY_EXPORT
+then
+  sudo install -o root -g root -m 0644 "$BACKUP" "$EXPORTER"
+  echo "STOP: full export provider verification failed; original executable restored"
+  exit 1
+fi
 sudo install -d -o root -g root -m 0755 "$(dirname "$OVERRIDE")"
 # Refuse to clobber an existing unexpected override; idempotent if exact.
 TEMPLATE=$(mktemp)
