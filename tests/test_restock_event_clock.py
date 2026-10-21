@@ -11,6 +11,18 @@ T=1790985600
 
 
 class EventClockTests(unittest.TestCase):
+    def test_signed_restocks_early_vs_late_and_real_landing_offset(self):
+        earlier=selected_target_error(
+            dict(event_index=2,predicted_restock_epoch=1900,landing=1950),
+            [1000,2000],500,lambda a,b:False)
+        self.assertEqual(earlier["signed_prediction_minus_observed_seconds"],-100)
+        self.assertEqual(earlier["arrival_minus_observed_restock_seconds"],-50)
+        later=selected_target_error(
+            dict(event_index=2,predicted_restock_epoch=2100,landing=2250),
+            [1000,2000],500,lambda a,b:False)
+        self.assertEqual(later["signed_prediction_minus_observed_seconds"],100)
+        self.assertEqual(later["arrival_minus_observed_restock_seconds"],250)
+
     def test_selected_later_event_is_not_matched_to_nearest_actual_drop(self):
         choice=dict(event_index=2,predicted_restock_epoch=1002)
         result=selected_target_error(choice,[1000,2000],500,lambda a,b:False)
@@ -36,6 +48,17 @@ class EventClockTests(unittest.TestCase):
             self.assertIn('interval_ridge_expected',r['departure'])
             self.assertIn('leave_now',r['chronological_slices']['later_validation'])
             self.assertFalse(r['production_promotion'])
+            self.assertIn('mean_signed_prediction_minus_observed_minutes',
+                          r['restock_timing']['phase_empirical'])
+            self.assertIn('within_5_minutes_fraction',
+                          r['restock_timing']['phase_empirical'])
+            self.assertIn('first_issued_distinct_within_5_minutes',
+                          r['restock_timing']['phase_empirical'])
+            split=r['selected_event_timing']['phase_empirical_expected']['later_validation']
+            self.assertIn('current_stock_departures_success_fraction',split)
+            self.assertIn('future_restock_departures_success_fraction',split)
+            self.assertIn('mean_landing_minus_observed_restock_minutes',split)
+            self.assertEqual(r['metric_definitions']['verified_game_event_second'],False)
             self.assertIn('within_15_seconds',r['restock_timing']['interval_ridge'])
             self.assertIn('within_60_seconds',r['restock_timing']['interval_ridge'])
             self.assertIn('within_15_seconds',r['selected_event_timing']['interval_ridge_expected']['later_validation'])
