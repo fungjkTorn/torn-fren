@@ -157,6 +157,13 @@ def build_item_travel_decision(
     # Current observed >=30 phase is a separate opportunity, NOT a restock.
     current = forecast.get("current_stock_window")
     current_offer = None
+    # Some legacy research families can emit a partial placeholder for the
+    # observed current window. It has no safe timing geometry and must never
+    # become a departure recommendation. Physical future events remain intact.
+    if isinstance(current, dict) and (
+            current.get("predicted_restock_epoch") is None or
+            current.get("predicted_stock_below_30_epoch") is None):
+        current = None
     if current is not None:
         if not isinstance(current, dict):
             raise ValueError("invalid current purchase window")
