@@ -144,7 +144,15 @@ class SnapshotTests(unittest.TestCase):
                     'true')
                 cols={x[1] for x in cx.execute(
                     "PRAGMA table_info(poll_heartbeats)")}
-                self.assertEqual(cols,{"timestamp","mode","success","source"})
+                self.assertEqual(cols,{"id","timestamp","mode","success","source"})
+                # Exact SELECT used by the original prospective
+                # restock scorer must work with the sanitized schema.
+                self.assertEqual(cx.execute(
+                    "SELECT timestamp,source FROM poll_heartbeats "
+                    "WHERE mode='poll-cycle' AND success=1 "
+                    "AND timestamp>=? AND timestamp<=? "
+                    "ORDER BY timestamp,id LIMIT ?",(100000,100300,100)).fetchall(),
+                    [(100000,'yata'),(100200,'yata')])
                 self.assertNotIn('internal_agent_secret',cols)
             raw=(dst/"provider.db").read_bytes()
             self.assertNotIn(b"HEARTBEAT_SECRET",raw)
