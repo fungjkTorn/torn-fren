@@ -40,6 +40,24 @@ class EventClockTests(unittest.TestCase):
             self.assertIn('within_60_seconds',r['restock_timing']['interval_ridge'])
             self.assertIn('within_15_seconds',r['selected_event_timing']['interval_ridge_expected']['later_validation'])
 
+    def test_lag_grid_replayed_on_same_historical_item_and_issued_cohorts(self):
+        from test_continuous_departure_replay import ContinuousTests
+        with tempfile.TemporaryDirectory() as td:
+            source=ContinuousTests().fixture(Path(td))
+            before=source.read_bytes()
+            result=item_benchmark(source,'mex:Jaguar Plushie',days=1,
+                                   arrival_lags=(0,60,180,300))
+            self.assertEqual(source.read_bytes(),before)
+            self.assertEqual(result['arrival_lags_evaluated_seconds'],
+                             [0,60,180,300])
+            later=result['chronological_slices']['later_validation']
+            self.assertIn('phase_empirical_expected_lag180',later)
+            self.assertIn('phase_empirical_bounded_lag300',later)
+            self.assertEqual(later['phase_empirical_expected_lag180']['starts'],
+                             later['phase_empirical_expected']['starts'])
+            self.assertEqual(later['phase_empirical_expected_lag180']['starts'],
+                             later['leave_now']['starts'])
+
     def test_historical_cli_is_explicitly_bounded_and_source_pinned(self):
         with tempfile.TemporaryDirectory() as td:
             folder=Path(td)
