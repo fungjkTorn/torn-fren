@@ -100,3 +100,22 @@ jobs:
           tests.test_physical_event_forward
           tests.test_historical_restocks_all24
           tests.test_pc_historical_sixcore -q
+
+  pc-offline-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Parse Windows snapshot-copy PowerShell without network or execution
+        shell: pwsh
+        run: |
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            (Join-Path $PWD "scripts/copy_vm_history_to_pc.ps1"),
+            [ref]$tokens, [ref]$errors) | Out-Null
+          if ($errors.Count -ne 0) { throw ($errors | Out-String) }
+      - name: Validate Windows six-core research runner offline
+        run: python -m unittest tests.test_pc_historical_sixcore -q
