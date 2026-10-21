@@ -11,6 +11,19 @@ from scripts import run_pc_historical_sixcore as pc
 
 
 class PcHistoricalTests(unittest.TestCase):
+    def test_existing_pinned_specialists_are_inventory_not_tested_champions(self):
+        from scripts.audit_incumbent_sources import inventory
+        rows=inventory()
+        self.assertEqual(len(rows),24)
+        self.assertEqual(rows["uae:Camel Plushie"]["model_family"],
+                         "template_probability_selector")
+        self.assertEqual(rows["uni:Nessie Plushie"]["model_family"],
+                         "recent_phase_template")
+        self.assertFalse(rows["jap:Xanax"]["repository_file_present"])
+        for item in rows.values():
+            self.assertFalse(item["incumbent_historical_replay_verified"])
+            self.assertFalse(item["incumbent_flight_survival_measured"])
+
     def test_roster_is_exact_24_with_all_medication_specialties(self):
         roster=pc.exact_roster()
         self.assertEqual(len(roster),24)
