@@ -83,6 +83,34 @@ class PcOriginalSpecialistsTests(TestCase):
             self.assertEqual(again["status"],"CACHED")
             self.assertEqual(again["summary"]["original_holdout"]["hits"],2)
 
+    def test_monkey_chamois_training_pruning_keeps_every_holdout_choice(self):
+        # The original winner considers only starts in the preceding 2/3 days.
+        # Verify exact per-holdout scoring inputs, not merely pruned length.
+        code = """
+from checkpoint4_online_selector import holdout_required_starts,DAY
+starts=[float(i*1800) for i in range(45*48)]
+for days in (2,3):
+    hold, needed=holdout_required_starts(starts,days)
+    assert hold==starts[int(.75*len(starts)):]
+    assert len(needed)<len(starts)
+    for s in hold:
+        cut=s-days*DAY
+        baseline=[h for h in starts if cut<=h<s]
+        optimized=[h for h in needed if cut<=h<s]
+        assert baseline==optimized
+        for expert in range(24):
+            outcomes={h:(int(h)//1800+expert)%2 for h in starts}
+            resolved={h:h+1800 for h in starts}
+            original=[outcomes[h] for h in baseline if resolved[h]<s]
+            new=[outcomes[h] for h in optimized if resolved[h]<s]
+            assert original==new
+print('LOSSLESS_HOLDOUT_TRAINING_PRUNING_OK')
+"""
+        proc=subprocess.run([sys.executable,"-B","-c",code],
+            cwd=original.DIR,capture_output=True,text=True,timeout=30)
+        self.assertEqual(proc.returncode,0,proc.stderr)
+        self.assertIn("LOSSLESS_HOLDOUT_TRAINING_PRUNING_OK",proc.stdout)
+
     def test_bounds_apply_before_sqlite_open(self):
         with self.assertRaises(SystemExit):
             original.main(["--source","missing.db","--output","dummy","--workers","7"])
