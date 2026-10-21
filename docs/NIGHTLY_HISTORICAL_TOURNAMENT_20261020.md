@@ -1,84 +1,126 @@
-# Nightly restock-first historical replay — October 20, 2026
+# TORN-FREN overnight split: Windows PC history, isolated VM forward
 
-**Owner goal:** predict each chronological physical zero-to-positive restock,
-select the first reachable flight while at least 30 units survive through
-arrival +10s, and improve specialist accuracy for plushies and Japan Xanax.
+**Corrected 2026-10-20:** The owner wants six LOCAL PC CPU cores doing
+historical backtesting overnight. The VM should keep recording prospective,
+as-issued predictions and evaluating matured forward outcomes; it should
+NOT run a competing automatically scheduled nightly historical tournament.
 
-## Bounded overnight execution
+The private `nightly-historical-all24.yml` workflow has therefore had its
+`schedule` and `push` triggers REMOVED. It is manual-only fallback and
+does not consume the VM overnight. The existing separate
+`forecast-research.yml` and V160/V161 research / canary services were not
+disabled or restarted; their actual successful forward batches still need
+verification. The sanitized VM snapshot can lag (one observed sample was
+219 seconds old), so a skipped forward capture is not a model failure.
 
-Private scheduled workflow:
-`fungjkTorn/torn-fren-research-private/.github/workflows/nightly-historical-all24.yml`.
+## One-time Windows PC setup
 
-* Every night at **05:15 UTC** (01:15 EDT, 00:15 EST).
-* The job executes on the existing **isolated research-only VM runner**,
-  using the 24-item sanitized stock-history snapshot, **not** the production
-  database. It checks the research metadata and verifies no read access to
-  the live collector.
-* Historical baseline: `python -m research.historical_restocks_all24`,
-  exactly 2 historical days of 5-minute decisions, 24 pinned item keys,
-  with actual 8-hour flight-maturity cutoff and UTC hourly
-  five-minute-reconfirmation cohorts. A 65-minute timeout bounds
-  this step; per-item partial checkpoints are retained.
-* Historical challenger: existing `research.restock_event_clock` modes
-  `phase_empirical`, `interval_median`, `interval_ridge`, and
-  `phase_recursive_ridge` on up to eight weak/priority items including
-  Japan Xanax. Each gets a 135-second timeout; all four model variants
-  are evaluated on the same 1-day period per item when they finish.
-* The job is low priority (`nice -n 19`), with numerical libraries
-  limited to one thread. GitHub job timeout 110 minutes, independent
-  GitHub workflow concurrency serializes nightly runs. No web or
-  collector restart, API traffic, in-game automation, cleanup, model
-  promotion, or production deployment.
-* Initial workflow push runs a two-item Jaguar/Japan integration smoke,
-  rather than consuming a full overnight budget before the scheduled time.
-* Existing private V160/V161 and other prospective forward tests remain
-  separately scheduled. Historical evaluation is **not** a replacement
-  for true as-issued forward measurements.
+From PowerShell, use an existing checkout of public repository
+`fungjkTorn/torn-fren`, **branch**
+`research/v38-full-roster-live-prep-20261009`, or clone it:
 
-## Leakage / validity rules
+```powershell
+cd "$env:USERPROFILE\Desktop"
+git clone --branch research/v38-full-roster-live-prep-20261009 https://github.com/fungjkTorn/torn-fren.git torn-fren-pc
+cd .\torn-fren-pc
+py -3.12 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install numpy==1.26.4 requests fastapi python-dotenv
+```
 
-All model issuance runs exclusively on item history and poll health
-observed by that historical tick. Five-minute recommendations are replaced
-by the newest issue before the simulated departure, and source evidence
-expires at 180 seconds. Unreachable first physical restocks remain part
-of the event identity; no nearest-later-event matching.
+If the PC has an existing cloned research branch, `git pull` instead
+of cloning a second repository. Do not use an older V78 checkout or checkout
+an unverified different branch and claim identical model results.
 
-Evaluation happens **after all forecasts are generated** and uses
-poll-backed quantity observations with explicit unknown and
-pending classifications. Physical timing is scored against the correct
-chronological 0->positive event using independent poll brackets where
-provider continuity can be established. The 2-day baseline includes an
-earlier/later temporal split, without optimizing on the later portion.
-Repeated hourly recommendations against one underlying restock are
-correlated, not independent observations. Stock-at-arrival is a proxy,
-not confirmation of a player's actual Torn flight, purchase, or fresh
-country YATA observation.
+Get a **consistent copy of the sanitized research-only historical stock
+database** onto your PC:
 
-## Read results
+```powershell
+.\scripts\copy_vm_history_to_pc.ps1
+```
 
-- Private `reports/latest_nightly_historical.json`: safe, aggregate
-  per-item historical timing, simulated flight coverage/success,
-  matched leave-now metrics where present, and a source run ID.
-- GitHub Action artifact `torn-fren-nightly-historical-metrics`:
-  per-item aggregate report, earlier/later split, bounded challenger
-  comparison, and partial results after resource timeouts.
-- A GitHub-hosted `publish-nightly-historical.yml` completion listener
-  copies **only aggregate** results to the private report. No raw
-  stock database, personal API key, or travel history leaves the runner.
+This script uses the already known VM SSH key location on the user's PC.
+It sends Python's SQLite online backup routine via SSH and
+`sudo -n python3 -`, reads ONLY
+`/var/lib/torn-fren-research/stock_history_research.db` via SQLite
+`mode=ro`, verifies the 24-item sanitized metadata, transfers a
+disposable snapshot to `historical_pc_data/stock_history_research.db`,
+then removes only the temporary VM transfer copy. If the key path/IP
+differs, use `-SshKey` and `-VmHost` parameters. The transfer does not
+restart any service, change production collector data, or upload a DB
+to GitHub. It does briefly use VM disk/CPU while making the copy.
 
-If a night is cancelled, has inadequate older historical cycles, hits
-resource limits, or provides no model forecasts, the output must say so.
-A missing output is **not** success, and training on the later validation
-period is not allowed. Don't publish or select winners automatically.
+**Smoke before unattended overnight:**
 
-## What should improve after real scores exist
+```powershell
+.\.venv\Scripts\python.exe .\scripts\run_pc_historical_sixcore.py --source .\historical_pc_data\stock_history_research.db --smoke --workers 2
+```
 
-Sort models on the *same item and same test period* by physically correct
-restock error, distinct-restock coverage, true earliest-reachable departure,
-survival through arrival +10s, unnecessary waiting and matched
-depart-now improvement. First prioritize Camel, Nessie, Red Fox, Monkey,
-Panda, Wolverine and Japan Xanax. Preserve the original V2 graph, the
-experimental all-items board and Travel Decisions.
+**Full overnight on the PC, 6 cores:**
 
-Next model selection must be evidence-driven, with untouched later data
-and separate forward confirmation. No production changes without approval.
+```powershell
+.\.venv\Scripts\python.exe .\scripts\run_pc_historical_sixcore.py --source .\historical_pc_data\stock_history_research.db --workers 6 --days 6 --output .\historical_pc_results\overnight-24
+```
+
+Keep Windows **awake and plugged in**; a sleeping PC cannot finish the
+work. Re-run the same command with the same `--output` to resume
+successful item reports, without deleting partial logs. Use a new
+`--output` directory if the source DB or code commit changes.
+
+## What six CPU processes test
+
+`scripts/run_pc_historical_sixcore.py` is a light orchestrator around
+the **existing** `research.restock_event_clock` as-issued 5-minute
+historical replay. Each independent subprocess evaluates one of the
+exact 24 item keys and can be distributed over six CPU cores. Every item
+compares:
+
+- **Four physical restock clock models**:
+  `phase_empirical`, `interval_median`, `interval_ridge`,
+  `phase_recursive_ridge`.
+- **Two flight-window policies each**: expected and conservative bounded.
+- The matched `leave_now` control, plus first reachable future restock
+  event, stock >=30 at landing through +10s, estimated waiting time, source
+  expiry / reissue decisions, and physical restock timing error.
+- Chronological development and later validation portions, in the same
+  item and forecast periods. Late validation is descriptive, not
+  automatically used to promote models.
+
+This is the first **clock tournament**, not a full replication of all
+old individual plushie specialist policies, the private V151 paired
+candidate, or every Japan-specific model. Later comparisons can add those
+competitors on matching frozen test periods once this complete baseline
+is measured. Never claim all specialists have been tested if they have not.
+
+Outputs in `historical_pc_results/overnight-24/`:
+
+- `scores.csv`: per-item, per-policy and per-time-slice timing, departure
+  coverage, simulated arrival success, paired leave-now outcomes.
+- `summary.json`: completed/failed item counts, model/source SHA256,
+  immutable report provenance and resource status.
+- `items/<item>/result.json`: full per-item model report and statuses.
+- `items/<item>/attempt_*/`: saved output/logs for failed or
+  interrupted tasks, never silently represented as success.
+
+Data quality: successful global heartbeat and change-only stock records
+produce **poll-based outcome proxies**. They do not certify actual player
+flights, fresh per-country provider observations or exact game event
+seconds. Multiple hourly cohorts can share one physical restock. Source
+SQLite is never opened for writing, and its file SHA256 is verified after
+the run. The controller refuses output folders with mismatched
+source/model SHA. Both data and results are `.gitignore`d. The script
+cannot deploy anything to Torn production.
+
+## VM continues true forward work
+
+The VM retains its prospective five-minute schedules and existing
+source collectors and specialists; **no second historical overnight
+timer runs**. Continue checking `reports/latest_physical_event_forward_status.json`
+in the private research repository for *real* as-issued 24-item batches
+and matured outcomes. Distinguish no data / stale snapshot / timeouts
+from accuracy misses. A shorter research-copy refresh would improve
+forward capture coverage, but changing production collectors or ACLs
+requires a separate reviewed step; do not bypass permissions.
+
+The aim is to use the PC to optimize and compare historical models,
+then verify any winner using truly future-issued VM observations.
+No automatic model promotion or production site deployment.
