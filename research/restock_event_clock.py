@@ -27,12 +27,15 @@ def continuous_source(rows,crosses):
     return invalid
 
 
-def departure(forecast, *, issued, flight, conservative=False):
+def departure(forecast, *, issued, flight, conservative=False, arrival_lag_seconds=0):
     """Select FIRST reachable event; require stock at landing through +10s.
 
     The next item drop remains first in the forecast even when unreachable.
     A future departure is tentative and must be rechecked on the next issue.
     """
+    if (type(arrival_lag_seconds) is not int or
+        not 0<=arrival_lag_seconds<=900):
+        raise ValueError('arrival-lag candidate must be 0..900 seconds')
     windows=[]
     if forecast.get('current_stock_window'):
         windows.append((0,forecast['current_stock_window']))
@@ -44,8 +47,11 @@ def departure(forecast, *, issued, flight, conservative=False):
             if start is None or end is None:continue
         else:
             start=w['predicted_restock_epoch'];end=w['predicted_stock_below_30_epoch']
-        dep=max(issued,start-flight)
-        if dep<=issued+WAIT and dep+flight>=start and dep+flight+10<end:
+        # Delay only future restock landings. Existing stocked inventory
+        # is already observed at issue time and should not be slowed.
+        target=start+(arrival_lag_seconds if index>0 else 0)
+        dep=max(issued,target-flight)
+        if dep<=issued+WAIT and dep+flight>=target and dep+flight+10<end:
             return dict(departure=dep,event_index=index,landing=dep+flight,
                         arrival_plus_10=dep+flight+10,stock_window_start=start,stock_window_end=end,
                         predicted_restock_epoch=w['predicted_restock_epoch'])
@@ -162,9 +168,15 @@ def selected_target_error(choice,physical,issued,crosses):
                 absolute_error_seconds=abs(choice['predicted_restock_epoch']-actual))
 
 
-def item_benchmark(source,key,*,days=6,asof=None):
+def item_benchmark(source,key,*,days=6,asof=None,arrival_lags=(0,)):
     from research.japan_xanax.renewal_shadow import source_data
     from research.departure_reconfirmation import evaluate_utc,compare_cohorts
+    if (not isinstance(arrival_lags,(tuple,list)) or
+        not 1<=len(arrival_lags)<=6 or
+        len(set(arrival_lags))!=len(arrival_lags) or
+        any(type(lag) is not int or not 0<=lag<=900 for lag in arrival_lags) or
+        0 not in arrival_lags):
+        raise ValueError('bounded as-issued arrival offsets must include zero')
     rows,polls,crosses,evidence,cutoff=source_data(source,now=asof,item_key=key)
     observations=[model.OBS(*r) for r in rows]
     observation_times=[o.epoch for o in observations]
@@ -177,7 +189,11 @@ def item_benchmark(source,key,*,days=6,asof=None):
     split=start+(days//2)*86400
     # All cohorts get their full eight-hour follow-up and mature arrival truth.
     stop=end+WAIT+STEP
-    plans={m+'_'+p:[] for m in MODES for p in ('expected','bounded')};plans['leave_now']=[]
+    def policy_name(mode,kind,lag):
+        return mode+'_'+kind+(('_lag'+str(lag)) if lag else '')
+    plans={policy_name(m,p,lag):[] for m in MODES
+           for p in ('expected','bounded') for lag in arrival_lags}
+    plans['leave_now']=[]
     selected={m:{} for m in plans if m!='leave_now'}
     timing={m:[] for m in MODES};cursor=0;statuses={m:Counter() for m in MODES}
     recursive_usage=Counter()
@@ -211,10 +227,13 @@ def item_benchmark(source,key,*,days=6,asof=None):
         for mode,f in streams.items():
             statuses[mode][f['status']]+=1
             for kind in ('expected','bounded'):
-                choice=departure(f,issued=issued,flight=flight,conservative=kind=='bounded')
-                dep=choice['departure'] if healthy and f['status']=='EVENT_TIMELINE_FORECAST_AVAILABLE' else None
-                plans[mode+'_'+kind].append((issued,max(issued+15,dep) if dep is not None else None,age))
-                if dep is not None:selected[mode+'_'+kind][issued]=choice
+                for lag in arrival_lags:
+                    name=policy_name(mode,kind,lag)
+                    choice=departure(f,issued=issued,flight=flight,
+                        conservative=kind=='bounded',arrival_lag_seconds=lag)
+                    dep=choice['departure'] if healthy and f['status']=='EVENT_TIMELINE_FORECAST_AVAILABLE' else None
+                    plans[name].append((issued,max(issued+15,dep) if dep is not None else None,age))
+                    if dep is not None:selected[name][issued]=choice
             # Fixed first-issue/hour forecast, ranked before evaluating truth.
             if issued<=end and issued%3600==0:
                 events=f.get('true_restock_events',f.get('restock_events',[]))
@@ -305,7 +324,9 @@ def item_benchmark(source,key,*,days=6,asof=None):
         restock_timing=restock,selected_event_timing=selected_timing,departure=summaries,chronological_slices=slices,
         status_counts={m:dict(c) for m,c in statuses.items()},physical_depletion_quantity=0,
         recursive_clock_usage=dict(recursive_usage),
-        buying_threshold=30,arrival_plus_10=True,production_promotion=False,
+        buying_threshold=30,arrival_plus_10=True,
+        arrival_lags_evaluated_seconds=list(arrival_lags),
+        production_promotion=False,
         note='Historical correlated hourly cohorts; sampled poll truth, not provider-certified game events. No model routing selected.')
 
 
@@ -314,18 +335,29 @@ def main():
     p.add_argument('--source',required=True);p.add_argument('--out',required=True)
     p.add_argument('--model-sha',required=True);p.add_argument('--item-key',action='append')
     p.add_argument('--asof',type=int)
+    p.add_argument('--arrival-lag',type=int,action='append',
+        help='Research only: target 0..900s after predicted FUTURE restock; repeat up to six (must include 0)')
     p.add_argument('--days',type=int,default=6,help='Bounded mature historical days, 1..30')
     a=p.parse_args()
     if not 1<=a.days<=30:raise ValueError('days must be between 1 and 30')
+    lags=tuple(a.arrival_lag or [0])
+    if (not 1<=len(lags)<=6 or len(set(lags))!=len(lags) or 0 not in lags or
+        any(type(v) is not int or not 0<=v<=900 for v in lags)):
+        raise ValueError('lag grid must be unique, max six, 0..900 seconds and include 0')
     out=Path(a.out);out.mkdir(parents=True,exist_ok=False)
     keys=sorted(a.item_key or model.exact_roster())
     if len(set(keys))!=len(keys) or not set(keys)<=set(model.exact_roster()):raise ValueError('Invalid roster')
-    request=dict(model_sha=a.model_sha,items=keys,days=a.days,variants=MODES,automatic_promotion=False,
+    request=dict(model_sha=a.model_sha,items=keys,days=a.days,variants=MODES,
+        arrival_lags_seconds=list(lags),automatic_promotion=False,
         restock_error_timestamp='first_positive_observation_epoch_not_exact_game_event',
         source_mode='read_only_sanitized_or_owner_collector')
     (out/'request.json').write_text(json.dumps(request,indent=2)+'\n')
     for key in keys:
-        began=time.monotonic();r=item_benchmark(a.source,key,days=a.days,asof=a.asof)
+        began=time.monotonic()
+        if a.arrival_lag is None:
+            r=item_benchmark(a.source,key,days=a.days,asof=a.asof)
+        else:
+            r=item_benchmark(a.source,key,days=a.days,asof=a.asof,arrival_lags=lags)
         r['seconds']=time.monotonic()-began
         (out/(key.replace(':','-').replace(' ','_')+'.json')).write_text(json.dumps(r,indent=2)+'\n')
         print(json.dumps(dict(item_key=key,seconds=r['seconds'],restock_timing=r['restock_timing'])),flush=True)
