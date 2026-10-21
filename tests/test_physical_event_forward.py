@@ -127,6 +127,20 @@ class ProspectiveEventTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             freeze(s)
 
+    def test_publication_is_actual_issue_not_slow_forecast_start(self):
+        b = freeze(snapshot(), published_epoch=1010)
+        self.assertEqual(b["issued_epoch"], 1010)
+        self.assertEqual(b["forecast_asof_epoch"], 1000)
+        row = b["rows"]["mex:Item 0"]
+        self.assertEqual(row["issued_epoch"], 1010)
+        self.assertEqual(row["source_poll_age_seconds"], 15)
+        self.assertEqual(row["issue_latency_seconds"], 10)
+        self.assertEqual(row["departure_epoch"], 1400)
+        with self.assertRaises(ValueError):
+            freeze(snapshot(), published_epoch=1200)
+        with self.assertRaises(ValueError):
+            freeze(snapshot(), published_epoch=999)
+
     def test_read_only_collector_separation(self):
         record(freeze(snapshot()), self.ledger)
         with self.assertRaises(ValueError):
