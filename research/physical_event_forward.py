@@ -191,6 +191,15 @@ def score(*, sidecar, collector, now=None, days=2, max_rows=MAX_ROWS,
         raise ValueError("invalid audit cutoff")
     if Path(sidecar).resolve(strict=True) == Path(collector).resolve(strict=True):
         raise ValueError("collector must be separate from issue sidecar")
+    requested_cutoff = cutoff
+    # A sanitized snapshot may be 30 minutes old. Never score hypothetical
+    # outcomes through wall time when no successful poll evidence exists.
+    with closing(_ro(collector)) as evidence:
+        latest = evidence.execute("""SELECT MAX(timestamp) FROM poll_heartbeats
+            WHERE mode='poll-cycle' AND success=1""").fetchone()[0]
+        if latest is None:
+            raise ValueError("no successful source poll evidence")
+        cutoff = min(cutoff, int(latest))
     with closing(_ro(sidecar)) as db:
         raw = db.execute(
             """SELECT item_key,issued_epoch,payload_json FROM issued_events
@@ -315,7 +324,9 @@ def score(*, sidecar, collector, now=None, days=2, max_rows=MAX_ROWS,
     return {
         "status": "PHYSICAL_RESTOCK_PROSPECTIVE_RESEARCH_AUDIT",
         "issued_item_rows": len(raw), "first_issued_item_hours": len(first),
-        "asof_epoch": cutoff, "policy_id": POLICY, "research_only": True,
+        "asof_epoch": cutoff, "requested_asof_epoch": requested_cutoff,
+        "source_evidence_lag_seconds": requested_cutoff - cutoff,
+        "policy_id": POLICY, "research_only": True,
         "source_read_only": True, "actual_player_flights_observed": False,
         "per_country_provider_freshness_certified": False,
         "exact_game_restock_seconds_certified": False,
