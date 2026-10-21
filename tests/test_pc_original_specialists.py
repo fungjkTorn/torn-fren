@@ -1,5 +1,7 @@
 """Original six-core specialist launcher reproduces archived algorithms safely."""
 import json
+import subprocess
+import sys
 import tempfile
 from pathlib import Path
 from subprocess import CompletedProcess
@@ -11,6 +13,25 @@ from scripts.audit_incumbent_sources import inventory
 
 
 class PcOriginalSpecialistsTests(TestCase):
+    def test_documented_direct_and_module_invocations_both_start(self):
+        # The direct PowerShell command failed for the owner with
+        # ModuleNotFoundError: No module named 'scripts'. Exercise *both*
+        # entry points in independent Python subprocesses on Windows and Linux.
+        root=Path(__file__).resolve().parents[1]
+        script=root/"scripts"/"run_pc_original_specialists.py"
+        commands=(
+            [sys.executable,"-B",str(script),"--help"],
+            [sys.executable,"-B","-m","scripts.run_pc_original_specialists","--help"],
+        )
+        for cmd in commands:
+            with self.subTest(mode=cmd[2]):
+                process=subprocess.run(cmd,cwd=root,capture_output=True,
+                                       text=True,timeout=30,check=False)
+                self.assertEqual(process.returncode,0,
+                    process.stderr[-2000:])
+                self.assertIn("--source",process.stdout)
+                self.assertIn("--workers",process.stdout)
+
     def test_all_seven_original_specialist_paths_are_in_current_checkout(self):
         self.assertEqual(len(original.JOBS),7)
         for key in original.JOBS:
