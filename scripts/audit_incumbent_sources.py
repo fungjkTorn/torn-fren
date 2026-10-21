@@ -39,7 +39,7 @@ def inventory(external_root=None):
                    if source and not checked_exists else None)
         relocated_exists=bool(relocated and relocated.is_file())
         located_source_path=(source if checked_exists else
-            str(relocated.relative_to(ROOT)).replace("\\\\","/")
+            relocated.relative_to(ROOT).as_posix()
             if relocated_exists else None)
         # Only EXACT declared basename (not an arbitrary code search hit).
         found=[]
