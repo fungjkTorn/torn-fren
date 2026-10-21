@@ -13,7 +13,7 @@ ROOT=Path(__file__).resolve().parents[1]/"deploy"/"research_runner"
 class ResearchRunnerContracts(unittest.TestCase):
     def test_shell_scripts_syntax_and_never_target_production(self):
         for name in ("install_snapshot_exporter.sh","harden_private_runner.sh","diagnose_isolation.sh","complete_isolation_acl.sh","prepare_private_runner_user.sh","install_and_harden_registered_runner.sh","tune_snapshot_for_forward.sh",
-                     "install_forward_snapshot_lane.sh"):
+                     "install_forward_snapshot_lane.sh","audit_vm_retention_readonly.sh"):
             file=ROOT/name
             cmd=subprocess.run(["bash","-n",str(file)],capture_output=True,text=True)
             self.assertEqual(cmd.returncode,0,cmd.stderr)
@@ -49,6 +49,13 @@ class ResearchRunnerContracts(unittest.TestCase):
         self.assertNotIn('sudo systemctl restart "$OLD_TIMER"',lane)
         self.assertNotIn("systemctl restart torn-fren-v160",lane)
         self.assertNotIn("rm -rf",lane)
+        storage=(ROOT/"audit_vm_retention_readonly.sh").read_text()
+        self.assertIn("INVENTORY_COMPLETE_NO_DELETES",storage)
+        self.assertIn("sites-enabled",storage)
+        self.assertIn("systemctl list-timers",storage)
+        self.assertNotIn("rm -rf",storage)
+        self.assertNotIn("systemctl stop",storage)
+        self.assertNotIn("systemctl restart",storage)
         acl=(ROOT/"complete_isolation_acl.sh").read_text()
         self.assertIn('setfacl -m u:tornresearch:---',acl)
         self.assertIn('setfacl -x u:tornresearch',acl)
