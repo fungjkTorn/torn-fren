@@ -56,7 +56,7 @@ class EventClockTests(unittest.TestCase):
             self.assertEqual(request['days'],1)
             self.assertFalse(request['automatic_promotion'])
             self.assertIn('first_positive_observation',request['restock_error_timestamp'])
-            with patch('sys.argv',args[:args.index('1')]+['9','--out',str(folder/'bad')]):
+            with patch('sys.argv',args[:args.index('1')]+['31','--out',str(folder/'bad')]):
                 with self.assertRaises(ValueError):main()
             self.assertFalse((folder/'bad').exists())
 
