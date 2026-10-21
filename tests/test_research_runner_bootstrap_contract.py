@@ -12,7 +12,7 @@ ROOT=Path(__file__).resolve().parents[1]/"deploy"/"research_runner"
 
 class ResearchRunnerContracts(unittest.TestCase):
     def test_shell_scripts_syntax_and_never_target_production(self):
-        for name in ("install_snapshot_exporter.sh","harden_private_runner.sh","diagnose_isolation.sh","complete_isolation_acl.sh","prepare_private_runner_user.sh","install_and_harden_registered_runner.sh"):
+        for name in ("install_snapshot_exporter.sh","harden_private_runner.sh","diagnose_isolation.sh","complete_isolation_acl.sh","prepare_private_runner_user.sh","install_and_harden_registered_runner.sh","tune_snapshot_for_forward.sh"):
             file=ROOT/name
             cmd=subprocess.run(["bash","-n",str(file)],capture_output=True,text=True)
             self.assertEqual(cmd.returncode,0,cmd.stderr)
@@ -21,6 +21,17 @@ class ResearchRunnerContracts(unittest.TestCase):
             self.assertNotIn("systemctl stop torn-fren-v160",script)
             self.assertNotIn("systemctl restart torn-fren-v160",script)
             self.assertNotIn("systemctl restart torn-fren-v38",script)
+        fast=(ROOT/"tune_snapshot_for_forward.sh").read_text()
+        self.assertIn('sudo systemctl restart "$TIMER"',fast)
+        self.assertNotIn('sudo systemctl restart "$UNIT"',fast)
+        self.assertNotIn('systemctl restart torn-fren-v160',fast)
+        self.assertNotIn('sudo systemctl restart torn-fren-',fast)
+        self.assertIn('OnUnitInactiveSec=2min',fast)
+        self.assertIn('AccuracySec=10s',fast)
+        self.assertIn('--days 14',fast)
+        self.assertIn('heartbeat_provider_field_present',fast)
+        self.assertIn('sudo install -o root -g root -m 0644 "$BACKUP" "$EXPORTER"',fast)
+        self.assertIn('DRY_RUN_OK',fast)
         acl=(ROOT/"complete_isolation_acl.sh").read_text()
         self.assertIn('setfacl -m u:tornresearch:---',acl)
         self.assertIn('setfacl -x u:tornresearch',acl)
