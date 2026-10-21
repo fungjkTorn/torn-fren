@@ -40,6 +40,7 @@ class PcHistoricalTests(unittest.TestCase):
                 db.execute("CREATE TABLE collection_gaps(start_timestamp INTEGER)")
                 db.execute("CREATE TABLE poll_heartbeats(timestamp INTEGER,mode TEXT,success INTEGER)")
                 db.execute("INSERT INTO poll_heartbeats VALUES(12345,'poll-cycle',1)")
+                db.commit()
             before=pc.hash_source(path)
             found,meta=pc.verify_local_source(path)
             self.assertEqual(found,path.resolve())
