@@ -41,9 +41,16 @@ cd "$env:USERPROFILE\Desktop\torn-fren-pc"
 git fetch origin
 git switch research/v38-full-roster-live-prep-20261009
 git pull --ff-only origin research/v38-full-roster-live-prep-20261009
-.\.venv\Scripts\python.exe -m pip install scikit-learn==1.5.2
+.\.venv\Scripts\python.exe -m pip install numpy==1.26.4 scikit-learn==1.5.2
+.\.venv\Scripts\python.exe -m pip check
 .\.venv\Scripts\python.exe .\scripts\audit_incumbent_sources.py
 ```
+
+Run the launcher as a Python module or directly from `scripts/`; both
+entry points are covered by a Windows subprocess regression test. Earlier
+instructions used direct execution but omitted a package-import fallback,
+which caused `ModuleNotFoundError: No module named 'scripts'`.
+This has been fixed without requiring any `PYTHONPATH` edits.
 
 **Smallest original-model smoke**:
 
