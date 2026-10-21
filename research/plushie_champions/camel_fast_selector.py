@@ -7,7 +7,7 @@ EXPERTS=[(lags,look,shift) for lags in ((1,),(2,),(7,),(1,2),(1,7),(1,2,7)) for 
 WINNING_CONFIG={'expert_bank':'24 template experts','selector':'highest current recommended-plan probability'}
 
 def replay(db:str):
-    ctx=ResearchContext.build(db);tl=ctx.timelines[(COUNTRY,ITEM)];travel=TRAVEL_SECONDS[COUNTRY];starts=valid_starts(ctx,COUNTRY,ITEM);hold=starts[int(.75*len(starts)):]
+    ctx=ResearchContext.build(db,readonly=True);tl=ctx.timelines[(COUNTRY,ITEM)];travel=TRAVEL_SECONDS[COUNTRY];starts=valid_starts(ctx,COUNTRY,ITEM);hold=starts[int(.75*len(starts)):]
     planners={e:TemplatePlanner(ctx,COUNTRY,ITEM,lags=e[0],lookback=e[1],shift_range=e[2]).plan for e in EXPERTS}
     hits=recs=0
     for s in hold:
