@@ -40,7 +40,8 @@ CSV_FIELDS = ("item", "policy", "restock_model", "split", "starts",
               "mean_wait_minutes", "matched_leave_now", "model_only_hits",
               "leave_now_only_hits", "restock_hourly_scored",
               "restock_distinct_targets", "restock_mean_error_minutes",
-              "restock_within_60s", "restock_within_10m", "notes")
+              "restock_within_60s", "restock_within_10m",
+    "arrival_lag_seconds", "notes")
 
 
 def exact_roster():
@@ -103,11 +104,14 @@ def slug(item):
     return re.sub(r"[^A-Za-z0-9_-]+", "_", item.replace(":", "__")).strip("_")
 
 
-def commands_for(item, *, source, sha, days, target):
-    return ([sys.executable, "-m", "research.restock_event_clock",
-             "--source", str(source), "--out", str(target),
-             "--model-sha", sha, "--days", str(days),
-             "--item-key", item])
+def commands_for(item, *, source, sha, days, target, arrival_lags=(0,)):
+    cmd = [sys.executable, "-m", "research.restock_event_clock",
+           "--source", str(source), "--out", str(target),
+           "--model-sha", sha, "--days", str(days), "--item-key", item]
+    if tuple(arrival_lags)!=(0,):
+        for lag in arrival_lags:
+            cmd.extend(("--arrival-lag",str(lag)))
+    return cmd
 
 
 def _paths(root, item):
@@ -115,24 +119,25 @@ def _paths(root, item):
     return folder, folder / "result.json"
 
 
-def _valid_result(record, *, item, sha, days):
+def _valid_result(record, *, item, sha, days, arrival_lags=(0,)):
     if not isinstance(record, dict):
         return False
     return (record.get("item_key") == item
             and record.get("_local_model_sha") == sha
             and record.get("_local_days") == days
+            and tuple(record.get("_local_lags",(0,)))==tuple(arrival_lags)
             and record.get("production_promotion") is False
             and isinstance(record.get("restock_timing"), dict)
             and isinstance(record.get("chronological_slices"), dict))
 
 
-def _task(item, *, source, root, sha, days, timeout):
+def _task(item, *, source, root, sha, days, timeout, arrival_lags=(0,)):
     folder, archive = _paths(root, item)
     folder.mkdir(parents=True, exist_ok=True)
     if archive.exists():
         try:
             stored = json.loads(archive.read_text(encoding="utf-8"))
-            if _valid_result(stored, item=item, sha=sha, days=days):
+            if _valid_result(stored, item=item, sha=sha, days=days, arrival_lags=arrival_lags):
                 return dict(item=item, status="CACHED", result=stored,
                             elapsed_seconds=0)
         except (ValueError, OSError):
@@ -152,7 +157,7 @@ def _task(item, *, source, root, sha, days, timeout):
                 "PYTHONUNBUFFERED": "1"})
     started = time.monotonic()
     cmd = commands_for(item, source=source, sha=sha,
-                       days=days, target=attempt)
+                       days=days, target=attempt, arrival_lags=arrival_lags)
     try:
         proc = subprocess.run(cmd, cwd=BASE, env=env,
                               capture_output=True, text=True, errors="replace",
@@ -168,7 +173,9 @@ def _task(item, *, source, root, sha, days, timeout):
         payload = json.loads(report_file.read_text(encoding="utf-8"))
         payload["_local_model_sha"] = sha
         payload["_local_days"] = days
-        if not _valid_result(payload, item=item, sha=sha, days=days):
+        payload["_local_lags"] = list(arrival_lags)
+        if not _valid_result(payload, item=item, sha=sha, days=days,
+                             arrival_lags=arrival_lags):
             raise ValueError("Unexpected or incomplete item metrics")
         tmp = archive.with_suffix(".json.next")
         tmp.write_text(json.dumps(payload, sort_keys=True) + "\n", encoding="utf-8")
@@ -193,9 +200,13 @@ def score_rows(item, report):
     out = []
     for split in ("earlier_development", "later_validation"):
         policies = slices.get(split, {})
-        for name in list(p + "_" + w for p in MODES for w in WINDOWS) + ["leave_now"]:
+        for name in sorted(policies):
             entry = policies.get(name, {})
-            family = name.rsplit("_", 1)[0] if name != "leave_now" else "LEAVE_NOW"
+            family=("LEAVE_NOW" if name=="leave_now" else
+                name.split("_expected",1)[0] if "_expected" in name else
+                name.split("_bounded",1)[0])
+            lag_part=name.rsplit("_lag",1)[-1] if "_lag" in name else "0"
+            lag=int(lag_part) if lag_part.isdigit() else 0
             rt = timing.get(family, {}).get("chronological_slices", {}).get(split, {})
             paired = entry.get("matched_vs_now") or {}
             out.append(dict(item=item, policy=name, restock_model=family,
@@ -216,6 +227,7 @@ def score_rows(item, report):
                 restock_within_10m=(timing.get(family, {})
                                    .get("within_10_minutes") if split == "later_validation"
                                    else None),
+                arrival_lag_seconds=lag,
                 notes="CORRELATED_UTC_HOURLY_SAMPLED_POLL_PROXIES"))
     return out
 
@@ -262,6 +274,8 @@ def main(argv=None):
     p.add_argument("--workers", type=int, default=6)
     p.add_argument("--days", type=int, default=6)
     p.add_argument("--timeout-per-item", type=int, default=3600)
+    p.add_argument("--arrival-lag", type=int, action="append",
+                   help="Repeat explicit landing-lag experiment seconds, starting with 0")
     p.add_argument("--smoke", action="store_true",
                    help="Only Jaguar and Japan Xanax, one day")
     p.add_argument("--item-key", action="append",
@@ -273,6 +287,11 @@ def main(argv=None):
         p.error("Use 1 to 30 historical days")
     if not 30 <= args.timeout_per_item <= 7200:
         p.error("Per-item timeout must be 30..7200 seconds")
+    lags=tuple(args.arrival_lag if args.arrival_lag is not None else
+               (0,60,180,300,600))
+    if (not 1<=len(lags)<=6 or len(set(lags))!=len(lags) or
+        0 not in lags or any(type(x) is not int or not 0<=x<=900 for x in lags)):
+        p.error("Provide 1..6 unique landing offsets from 0..900 seconds including 0")
     source, metadata = verify_local_source(args.source)
     sha = git_sha()
     roster = exact_roster()
@@ -293,6 +312,7 @@ def main(argv=None):
     fingerprint_path = root / "input_manifest.json"
     source_sha = hash_source(source)
     fingerprint = dict(model_sha=sha, source_sha256=source_sha, days=args.days,
+                       arrival_lags_seconds=list(lags),
                        requested_items=requested,source_meta=metadata)
     if fingerprint_path.exists():
         old = json.loads(fingerprint_path.read_text(encoding="utf-8"))
@@ -303,7 +323,7 @@ def main(argv=None):
                                               indent=2)+"\n", encoding="utf-8")
     print("LOCAL RESEARCH SOURCE:", source)
     print("MODEL:", sha, "ITEMS:", len(requested),
-          "DAYS:", args.days, "WORKERS:", args.workers, flush=True)
+          "DAYS:", args.days, "WORKERS:", args.workers, "LAGS:", lags, flush=True)
     print("RESULTS:", root, flush=True)
     if args.smoke:
         print("SMOKE MODE: two items, one historical day", flush=True)
@@ -311,7 +331,8 @@ def main(argv=None):
     start = time.monotonic()
     with ThreadPoolExecutor(max_workers=args.workers) as pool:
         tasks = {pool.submit(_task, item, source=source, root=root, sha=sha,
-                             days=args.days, timeout=args.timeout_per_item): item
+                             days=args.days, timeout=args.timeout_per_item,
+                             arrival_lags=lags): item
                  for item in requested}
         for future in as_completed(tasks):
             item = tasks[future]
