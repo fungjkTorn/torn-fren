@@ -164,8 +164,13 @@ def selected_target_error(choice,physical,issued,crosses):
     if j>=len(physical):return dict(status='PENDING')
     actual=physical[j]
     if crosses(issued,actual):return dict(status='UNKNOWN_CONTINUITY')
+    signed=choice['predicted_restock_epoch']-actual
+    landing=choice.get('landing')
     return dict(status='SCORED',event_index=index,actual_restock=actual,
-                absolute_error_seconds=abs(choice['predicted_restock_epoch']-actual))
+                absolute_error_seconds=abs(signed),
+                signed_prediction_minus_observed_seconds=signed,
+                arrival_minus_observed_restock_seconds=(
+                    landing-actual if landing is not None else None))
 
 
 def item_benchmark(source,key,*,days=6,asof=None,arrival_lags=(0,)):
@@ -260,19 +265,52 @@ def item_benchmark(source,key,*,days=6,asof=None,arrival_lags=(0,)):
             hi=bisect.bisect_right(observation_times,actual)
             if lo<0 or len({o.source for o in observations[lo:hi]})!=1:
                 counts['unknown_provider']+=1;continue
-            errors.append((r['issued'],abs(r['predicted']-actual),actual));targets.add(actual)
+            signed=r['predicted']-actual
+            errors.append((r['issued'],abs(signed),actual,signed));targets.add(actual)
+        first_per_target={}
+        for issued,absolute,actual,signed in errors:
+            first_per_target.setdefault(actual,(issued,absolute,signed))
         restock[mode]=dict(counts,scored=len(errors),distinct_target_restocks=len(targets),
-            mean_absolute_error_minutes=sum(e for t,e,a in errors)/len(errors)/60 if errors else None,
-            median_absolute_error_minutes=quantile([e for t,e,a in errors],.5)/60 if errors else None,
-            within_15_seconds=sum(e<=15 for t,e,a in errors),within_60_seconds=sum(e<=60 for t,e,a in errors),
-            within_5_minutes=sum(e<=300 for t,e,a in errors),within_10_minutes=sum(e<=600 for t,e,a in errors))
+            mean_absolute_error_minutes=sum(e for t,e,a,s in errors)/len(errors)/60 if errors else None,
+            median_absolute_error_minutes=quantile([e for t,e,a,s in errors],.5)/60 if errors else None,
+            mean_signed_prediction_minus_observed_minutes=(
+                sum(s for t,e,a,s in errors)/len(errors)/60 if errors else None),
+            predicted_early_issues=sum(s<0 for t,e,a,s in errors),
+            predicted_late_issues=sum(s>0 for t,e,a,s in errors),
+            within_15_seconds=sum(e<=15 for t,e,a,s in errors),
+            within_60_seconds=sum(e<=60 for t,e,a,s in errors),
+            within_5_minutes=sum(e<=300 for t,e,a,s in errors),
+            within_10_minutes=sum(e<=600 for t,e,a,s in errors),
+            within_5_minutes_fraction=(
+                sum(e<=300 for t,e,a,s in errors)/len(errors) if errors else None),
+            within_10_minutes_fraction=(
+                sum(e<=600 for t,e,a,s in errors)/len(errors) if errors else None),
+            first_issued_distinct_physical_events=len(first_per_target),
+            first_issued_distinct_within_5_minutes=sum(v[1]<=300 for v in first_per_target.values()),
+            first_issued_distinct_within_10_minutes=sum(v[1]<=600 for v in first_per_target.values()),
+            signed_error_basis='prediction minus first observed positive change; negative=predicted early; exact game second unknown')
         restock[mode]['chronological_slices']={}
         for label,predicate in (('earlier_development',lambda t:t<split),('later_validation',lambda t:t>=split)):
-            values=[(t,e,a) for t,e,a in errors if predicate(t)]
+            values=[(t,e,a,s) for t,e,a,s in errors if predicate(t)]
+            first_target={}
+            for t,e,a,s in values:
+                first_target.setdefault(a,(e,s))
             restock[mode]['chronological_slices'][label]=dict(scored=len(values),
-                distinct_target_restocks=len({a for t,e,a in values}),
-                mean_absolute_error_minutes=sum(e for t,e,a in values)/len(values)/60 if values else None)
-        restock[mode]['resolved_errors']={t:e for t,e,a in errors}
+                distinct_target_restocks=len(first_target),
+                mean_absolute_error_minutes=sum(e for t,e,a,s in values)/len(values)/60 if values else None,
+                mean_signed_prediction_minus_observed_minutes=(
+                    sum(s for t,e,a,s in values)/len(values)/60 if values else None),
+                predicted_early_issues=sum(s<0 for t,e,a,s in values),
+                predicted_late_issues=sum(s>0 for t,e,a,s in values),
+                within_5_minutes=sum(e<=300 for t,e,a,s in values),
+                within_10_minutes=sum(e<=600 for t,e,a,s in values),
+                within_5_minutes_fraction=(
+                    sum(e<=300 for t,e,a,s in values)/len(values) if values else None),
+                within_10_minutes_fraction=(
+                    sum(e<=600 for t,e,a,s in values)/len(values) if values else None),
+                distinct_first_issued_within_5_minutes=sum(e<=300 for e,s in first_target.values()),
+                distinct_first_issued_within_10_minutes=sum(e<=600 for e,s in first_target.values()))
+        restock[mode]['resolved_errors']={t:e for t,e,a,s in errors}
     reference=restock['phase_empirical']['resolved_errors']
     for mode,r in restock.items():
         paired=set(reference)&set(r['resolved_errors'])
@@ -297,17 +335,52 @@ def item_benchmark(source,key,*,days=6,asof=None,arrival_lags=(0,)):
             choice=lookup.get(q)
             if choice is None:raise ValueError('Missing departure-time event identity')
             cases.append(dict(start=c['start'],arrival_outcome=c['outcome'],
+                arrival_epoch=dep+flight,departure_epoch=dep,
                 **selected_target_error(choice,physical,q,crosses)))
         selected_timing[mode]={}
         for label,predicate in (('earlier_development',lambda t:t<split),('later_validation',lambda t:t>=split)):
             values=[c for c in cases if predicate(c['start'])]
             errors=[c['absolute_error_seconds'] for c in values if c['status']=='SCORED']
-            selected_timing[mode][label]=dict(status_counts=dict(Counter(c['status'] for c in values)),
-                event_indices=dict(Counter(str(c['event_index']) for c in values if c['status']=='SCORED')),
-                scored=len(errors),distinct_target_restocks=len({c['actual_restock'] for c in values if c['status']=='SCORED'}),
+            scored=[c for c in values if c['status']=='SCORED']
+            signed=[c['signed_prediction_minus_observed_seconds'] for c in scored]
+            arrivals=[c['arrival_minus_observed_restock_seconds'] for c in scored
+                      if c['arrival_minus_observed_restock_seconds'] is not None]
+            known_current=[c for c in values if c['status']=='CURRENT_STOCK'
+                           and c['arrival_outcome'] in ('SUCCESS','FAILURE')]
+            known_future=[c for c in scored if c['arrival_outcome'] in ('SUCCESS','FAILURE')]
+            def known_hit_count(cases):
+                return sum(v['arrival_outcome']=='SUCCESS' for v in cases)
+            selected_timing[mode][label]=dict(
+                status_counts=dict(Counter(c['status'] for c in values)),
+                event_indices=dict(Counter(str(c['event_index']) for c in scored)),
+                scored=len(errors),distinct_target_restocks=len({c['actual_restock'] for c in scored}),
                 mean_absolute_error_minutes=sum(errors)/len(errors)/60 if errors else None,
-                within_15_seconds=sum(e<=15 for e in errors),within_60_seconds=sum(e<=60 for e in errors),
-                within_5_minutes=sum(e<=300 for e in errors),within_10_minutes=sum(e<=600 for e in errors))
+                mean_signed_prediction_minus_observed_minutes=(
+                    sum(signed)/len(signed)/60 if signed else None),
+                predicted_early_issues=sum(s<0 for s in signed),
+                predicted_late_issues=sum(s>0 for s in signed),
+                mean_landing_minus_observed_restock_minutes=(
+                    sum(arrivals)/len(arrivals)/60 if arrivals else None),
+                simulated_arrivals_before_observed_restock=sum(v<0 for v in arrivals),
+                simulated_arrivals_after_or_at_observed_restock=sum(v>=0 for v in arrivals),
+                current_stock_departures_known=len(known_current),
+                current_stock_departures_success=known_hit_count(known_current),
+                current_stock_departures_success_fraction=(
+                    known_hit_count(known_current)/len(known_current)
+                    if known_current else None),
+                future_restock_departures_known=len(known_future),
+                future_restock_departures_success=known_hit_count(known_future),
+                future_restock_departures_success_fraction=(
+                    known_hit_count(known_future)/len(known_future)
+                    if known_future else None),
+                within_15_seconds=sum(e<=15 for e in errors),
+                within_60_seconds=sum(e<=60 for e in errors),
+                within_5_minutes=sum(e<=300 for e in errors),
+                within_10_minutes=sum(e<=600 for e in errors),
+                within_5_minutes_fraction=(
+                    sum(e<=300 for e in errors)/len(errors) if errors else None),
+                within_10_minutes_fraction=(
+                    sum(e<=600 for e in errors)/len(errors) if errors else None))
     slices={}
     for label,predicate in (('earlier_development',lambda t:t<split),('later_validation',lambda t:t>=split)):
         selected={m:[r for r in records if predicate(r['start'])] for m,records in cohorts.items()}
@@ -326,6 +399,14 @@ def item_benchmark(source,key,*,days=6,asof=None,arrival_lags=(0,)):
         recursive_clock_usage=dict(recursive_usage),
         buying_threshold=30,arrival_plus_10=True,
         arrival_lags_evaluated_seconds=list(arrival_lags),
+        metric_definitions=dict(
+            restock_accuracy='fraction of scored hourly first-next-physical-restock predictions within signed timing tolerance; distinct earliest-issued restock counts separate',
+            restock_signed_minutes='forecast restock epoch minus first observed positive epoch; negative prediction is early',
+            flight_success='SUCCESS/(SUCCESS+FAILURE) in poll-backed simulated flights at landing plus 10s, unknown excluded; paired coverage also required',
+            selected_landing_signed_minutes='simulated landing minus first observed chosen physical restock; negative arrived before restock',
+            current_stock='departure to already observed stocked window is explicitly tracked separately from a future restock',
+            ordinal='target physical restock ordinal fixed before observing outcome; no nearest-event hindsight',
+            verified_game_event_second=False,observed_actual_player_flight=False),
         production_promotion=False,
         note='Historical correlated hourly cohorts; sampled poll truth, not provider-certified game events. No model routing selected.')
 
