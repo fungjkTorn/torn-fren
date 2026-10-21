@@ -22,7 +22,7 @@ SERVICE=torn-fren-research-forward-snapshot.service
 SERVICE_PATH=/etc/systemd/system/$SERVICE
 TIMER_PATH=/etc/systemd/system/$TIMER
 REPO=/home/ubuntu/torn-fren-v38-probe
-EXPORTER_SHA=953760eaa1ee8d1813f516183f0d3f2b4aa9b19c
+EXPORTER_SHA=28f430bfd9c7fd06b4f420cee38ff6ab84d1de58
 PINNED_PATH=deploy/research_runner/export_snapshot.py
 test -r "$SRC" && test -r "$ROSTER" && test -r "$BASE/stock_history_research.db" || {
   echo "STOP: missing source, roster, or old research archive"; exit 1; }
@@ -68,6 +68,9 @@ with sqlite3.connect(p.as_uri()+"?mode=ro",uri=True) as c:
     assert m.get("heartbeat_provider_field_present")=="true"
     assert c.execute("SELECT COUNT(*) FROM poll_heartbeats WHERE source IS NOT NULL").fetchone()[0]>0
     assert c.execute("PRAGMA integrity_check").fetchone()[0]=="ok"
+    cols={r[1] for r in c.execute("PRAGMA table_info(poll_heartbeats)")}
+    assert "id" in cols and "source" in cols
+    c.execute("SELECT timestamp,source FROM poll_heartbeats WHERE mode='poll-cycle' AND success=1 ORDER BY timestamp,id LIMIT 1").fetchall()
 print("PASS: sanitized forward data and independent provider evidence")
 PREFLIGHT
 
@@ -159,6 +162,7 @@ with sqlite3.connect(p.as_uri()+"?mode=ro",uri=True) as c:
     assert int(time.time())-int(m["source_cutoff_epoch"])<160
     assert c.execute("SELECT COUNT(*) FROM poll_heartbeats WHERE source IS NOT NULL").fetchone()[0]>0
     assert c.execute("PRAGMA integrity_check").fetchone()[0]=="ok"
+    c.execute("SELECT timestamp,source FROM poll_heartbeats WHERE mode='poll-cycle' AND success=1 ORDER BY timestamp,id LIMIT 1").fetchall()
 print("PASS: independently sandboxed forward snapshot is fresh")
 VALIDATE
 sudo -u "$RUNNER" test -r "$OUT" || {
