@@ -14,6 +14,9 @@ on:
       - 'research/v137_original_v2_stock_at_arrival_audit.py'
       - 'research/restock_event_clock.py'
       - 'research/historical_restocks_all24.py'
+      - 'scripts/run_pc_historical_sixcore.py'
+      - 'scripts/copy_vm_history_to_pc.ps1'
+      - 'tests/test_pc_historical_sixcore.py'
       - 'tests/test_historical_restocks_all24.py'
       - 'research/physical_event_forward.py'
       - 'tests/test_physical_event_forward.py'
@@ -45,6 +48,9 @@ on:
       - 'research/v137_original_v2_stock_at_arrival_audit.py'
       - 'research/restock_event_clock.py'
       - 'research/historical_restocks_all24.py'
+      - 'scripts/run_pc_historical_sixcore.py'
+      - 'scripts/copy_vm_history_to_pc.ps1'
+      - 'tests/test_pc_historical_sixcore.py'
       - 'tests/test_historical_restocks_all24.py'
       - 'research/physical_event_forward.py'
       - 'tests/test_physical_event_forward.py'
@@ -92,4 +98,5 @@ jobs:
           tests.test_travel_decision_contract_v166
           tests.test_build_travel_event_snapshot
           tests.test_physical_event_forward
-          tests.test_historical_restocks_all24 -q
+          tests.test_historical_restocks_all24
+          tests.test_pc_historical_sixcore -q
