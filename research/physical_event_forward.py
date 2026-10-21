@@ -41,7 +41,7 @@ def _ro(path):
     return db
 
 
-def freeze(snapshot):
+def freeze(snapshot, *, published_epoch=None):
     """Capture exactly what the model said at one real issue time.
 
     No future observations, identity reassignment, or post-hoc model reruns.
@@ -57,6 +57,11 @@ def freeze(snapshot):
         type(poll_age) is not int or not 0 <= poll_age <= 180 or
         snapshot.get("production_model_promoted") is not False):
         raise ValueError("not a fresh unpromoted 24-item issue snapshot")
+    published = issued if published_epoch is None else published_epoch
+    if (type(published) is not int or published < issued or
+        published - issued >= 300 or poll_age + published - issued > 180):
+        raise ValueError("forecast was not fresh at actual publication")
+    effective_poll_age = poll_age + published - issued
     rows = {}
     for key, forecast in sorted(items.items()):
         if not isinstance(key, str) or key.count(":") != 1 or not isinstance(forecast, dict):
@@ -69,14 +74,17 @@ def freeze(snapshot):
         # The production-facing contract is deliberately deterministic and
         # retains both unreachable first restocks and the selected ordinal.
         decision = build_item_travel_decision(
-            forecast, now=issued, poll_age_seconds=poll_age,
+            forecast, now=published, poll_age_seconds=effective_poll_age,
         )
         if not decision["all_restock_events_preserved"]:
             raise ValueError("physical event identity was dropped")
         rows[key] = {
-            "item_key": key, "issued_epoch": issued, "policy_id": POLICY,
+            "item_key": key, "issued_epoch": published,
+            "forecast_asof_epoch": issued,
+            "issue_latency_seconds": published - issued,
+            "policy_id": POLICY,
             "source_model_sha": sha, "model_name": forecast.get("model_name"),
-            "source_poll_age_seconds": poll_age,
+            "source_poll_age_seconds": effective_poll_age,
             "physical_events": decision["forecast_events"],
             "selected_event_index": decision["selected_restock_event_index"],
             "decision_status": decision["status"],
@@ -89,7 +97,8 @@ def freeze(snapshot):
             "calibration_state": "UNCALIBRATED",
             "research_only": True, "actual_player_flight": False,
         }
-    return {"policy_id": POLICY, "issued_epoch": issued, "source_model_sha": sha,
+    return {"policy_id": POLICY, "issued_epoch": published,
+            "forecast_asof_epoch": issued, "source_model_sha": sha,
             "roster_count": 24, "research_only": True, "rows": rows}
 
 
@@ -366,12 +375,15 @@ def main():
         now = int(time.time())
         snapshot = prepare(args.source, model_sha=args.model_sha,
                            assignments=assignments, now=now)
-        batch = freeze(snapshot)
+        # Do not backdate a computed batch to the start of a slow model run.
+        # Publication and poll freshness are evaluated at actual readiness.
+        batch = freeze(snapshot, published_epoch=int(time.time()))
         if args.record:
             record(batch, args.sidecar)
         print(json.dumps({
             "status": "RECORDED_IMMUTABLE_ISSUE" if args.record else "NO_WRITE_PREVIEW",
-            "asof_epoch": now, "item_count": 24,
+            "asof_epoch": batch["issued_epoch"],
+            "forecast_asof_epoch": now, "item_count": 24,
             "physical_events": sum(len(r["physical_events"]) for r in batch["rows"].values()),
             "model_sha": args.model_sha, "collector_written": False,
             "production_promotion": False,
