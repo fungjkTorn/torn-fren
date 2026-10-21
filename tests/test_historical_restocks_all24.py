@@ -24,7 +24,7 @@ class HistoricalAll24Tests(unittest.TestCase):
             self.assertIn("later_untuned",result["physical"])
             self.assertIn("leave_now",result)
             self.assertIn("matched_vs_now",result)
-            self.assertIn("expired_before_departure_rechecks",result["departure"])
+            self.assertIn("chronological_start_day_slices",result["departure"])
             self.assertGreater(result["physical"]["first_hourly_issues"],0)
             self.assertGreater(result["departure"]["starts"],0)
             self.assertLessEqual(result["last_first_issue"]+28800+
