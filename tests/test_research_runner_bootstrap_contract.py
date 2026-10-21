@@ -12,7 +12,8 @@ ROOT=Path(__file__).resolve().parents[1]/"deploy"/"research_runner"
 
 class ResearchRunnerContracts(unittest.TestCase):
     def test_shell_scripts_syntax_and_never_target_production(self):
-        for name in ("install_snapshot_exporter.sh","harden_private_runner.sh","diagnose_isolation.sh","complete_isolation_acl.sh","prepare_private_runner_user.sh","install_and_harden_registered_runner.sh","tune_snapshot_for_forward.sh"):
+        for name in ("install_snapshot_exporter.sh","harden_private_runner.sh","diagnose_isolation.sh","complete_isolation_acl.sh","prepare_private_runner_user.sh","install_and_harden_registered_runner.sh","tune_snapshot_for_forward.sh",
+                     "install_forward_snapshot_lane.sh"):
             file=ROOT/name
             cmd=subprocess.run(["bash","-n",str(file)],capture_output=True,text=True)
             self.assertEqual(cmd.returncode,0,cmd.stderr)
@@ -32,6 +33,22 @@ class ResearchRunnerContracts(unittest.TestCase):
         self.assertIn('heartbeat_provider_field_present',fast)
         self.assertIn('sudo install -o root -g root -m 0644 "$BACKUP" "$EXPORTER"',fast)
         self.assertIn('DRY_RUN_OK',fast)
+        lane=(ROOT/"install_forward_snapshot_lane.sh").read_text()
+        self.assertIn("stock_history_forward.db",lane)
+        self.assertIn("stock_history_research.db",lane)
+        self.assertIn("OnUnitInactiveSec=90s",lane)
+        self.assertIn("CPUQuota=40%",lane)
+        self.assertIn("MemoryMax=640M",lane)
+        self.assertIn("TimeoutStartSec=120",lane)
+        self.assertIn("--days 14",lane)
+        self.assertIn("heartbeat_provider_field_present",lane)
+        self.assertIn('test ! -L "$SRC"',lane)
+        self.assertIn('sudo systemctl start "$SERVICE"',lane)
+        self.assertIn('sudo systemctl enable --now "$TIMER"',lane)
+        self.assertIn("DRY_RUN_OK",lane)
+        self.assertNotIn('sudo systemctl restart "$OLD_TIMER"',lane)
+        self.assertNotIn("systemctl restart torn-fren-v160",lane)
+        self.assertNotIn("rm -rf",lane)
         acl=(ROOT/"complete_isolation_acl.sh").read_text()
         self.assertIn('setfacl -m u:tornresearch:---',acl)
         self.assertIn('setfacl -x u:tornresearch',acl)
