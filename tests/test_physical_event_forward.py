@@ -141,6 +141,15 @@ class ProspectiveEventTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             freeze(snapshot(), published_epoch=999)
 
+    def test_real_24_item_fixture_roundtrip(self):
+        from research.build_travel_event_snapshot import prepare
+        import test_continuous_departure_replay as fixtures
+        with tempfile.TemporaryDirectory() as folder:
+            db = fixtures.ContinuousTests().fixture(Path(folder))
+            s = prepare(db, model_sha=SHA, now=fixtures.T)
+            b = freeze(s, published_epoch=fixtures.T + 10)
+            self.assertEqual(len(b["rows"]), 24)
+
     def test_read_only_collector_separation(self):
         record(freeze(snapshot()), self.ledger)
         with self.assertRaises(ValueError):
