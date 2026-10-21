@@ -103,4 +103,33 @@ threshold-30 survival and earliest-actionable departure against the V151
 paired/independent, specialist and leave-now baselines *on matching issued
 windows*. Track abstentions, source freshness, and real target restock
 identity per item. Retain Japan Xanax as a separate specialty track. Promote
-nothing automatically. 
+nothing automatically.
+
+### Aggregate status and provenance (private)
+
+Private research workflow `.github/workflows/publish-research-status.yml`
+runs on completion of the established research workflow. Its GitHub-hosted
+job is separately scoped and reads only the compact aggregate artifact; it
+does **not** run on the VM, read raw stock history, expose a collector token,
+or change a live service. It writes a bounded status summary at
+`reports/latest_physical_event_forward_status.json` on the **private**
+research repository, at most once per six hours when evidence is unchanged.
+The status references the actual GitHub source run and separates missing
+artifacts, cancelled workflows, stale-snapshot skips, incomplete attempts,
+and real issued/assessed batches. If a future run is cancelled, previously
+scored per-item aggregates may be retained with their original source run ID;
+they must never be represented as outcomes of the cancelled run.
+
+The issue status includes `source_age_at_gate_seconds`, allowing concrete
+diagnosis of the research copy's freshness. The scorer distinguishes
+`landing_proxy_hit` (hypothetical), `originally_actionable_landing_hit`,
+and `requires_reconfirmation_landing_hit`. Separately,
+`distinct_target_arrival_known` and hit/miss counts use **one**
+time-censored poll-state outcome per independently resolved selected physical
+restock, instead of treating hourly recaptures as independent successes.
+
+**Observed checkpoint:** the first accessible status file came from a
+**cancelled** parent run (ID 39521033423), with no metrics; therefore no
+real forward accuracy figure could be verified from that status. Await
+genuine immutable issue rows and matching matured physical/arrival evidence.
+
