@@ -2,6 +2,7 @@
 from pathlib import Path
 import json
 import sqlite3
+from contextlib import closing
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -34,7 +35,7 @@ class PcHistoricalTests(unittest.TestCase):
     def test_local_source_never_requires_vm_api_or_write_connection(self):
         with tempfile.TemporaryDirectory() as td:
             path=Path(td)/"sample.db"
-            with sqlite3.connect(path) as db:
+            with closing(sqlite3.connect(path)) as db:
                 db.execute("CREATE TABLE stock_history(timestamp INTEGER)")
                 db.execute("CREATE TABLE collection_gaps(start_timestamp INTEGER)")
                 db.execute("CREATE TABLE poll_heartbeats(timestamp INTEGER,mode TEXT,success INTEGER)")
