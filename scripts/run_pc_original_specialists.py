@@ -19,7 +19,13 @@ import sys
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-from scripts.run_pc_historical_sixcore import verify_local_source, hash_source, git_sha
+# Support both `python -m scripts.run_pc_original_specialists` and the
+# documented direct entry point `python scripts/run_pc_original_specialists.py`.
+# A direct script receives scripts/ (not the repo root) on sys.path.
+if __package__:
+    from .run_pc_historical_sixcore import verify_local_source, hash_source, git_sha
+else:
+    from run_pc_historical_sixcore import verify_local_source, hash_source, git_sha
 
 ROOT=Path(__file__).resolve().parents[1]
 DIR=ROOT/"research"/"plushie_champions"
