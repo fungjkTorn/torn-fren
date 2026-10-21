@@ -16,6 +16,8 @@ on:
       - 'research/historical_restocks_all24.py'
       - 'scripts/run_pc_historical_sixcore.py'
       - 'scripts/audit_incumbent_sources.py'
+      - 'scripts/find_missing_specialists_pc.py'
+      - 'tests/test_find_missing_specialists_pc.py'
       - 'scripts/copy_vm_history_to_pc.ps1'
       - 'tests/test_pc_historical_sixcore.py'
       - 'tests/test_historical_restocks_all24.py'
@@ -51,6 +53,8 @@ on:
       - 'research/historical_restocks_all24.py'
       - 'scripts/run_pc_historical_sixcore.py'
       - 'scripts/audit_incumbent_sources.py'
+      - 'scripts/find_missing_specialists_pc.py'
+      - 'tests/test_find_missing_specialists_pc.py'
       - 'scripts/copy_vm_history_to_pc.ps1'
       - 'tests/test_pc_historical_sixcore.py'
       - 'tests/test_historical_restocks_all24.py'
@@ -101,7 +105,8 @@ jobs:
           tests.test_build_travel_event_snapshot
           tests.test_physical_event_forward
           tests.test_historical_restocks_all24
-          tests.test_pc_historical_sixcore -q
+          tests.test_pc_historical_sixcore
+          tests.test_find_missing_specialists_pc -q
 
   pc-offline-windows:
     runs-on: windows-latest
@@ -120,4 +125,4 @@ jobs:
             [ref]$tokens, [ref]$errors) | Out-Null
           if ($errors.Count -ne 0) { throw ($errors | Out-String) }
       - name: Validate Windows six-core research runner offline
-        run: python -m unittest tests.test_pc_historical_sixcore -q
+        run: python -m unittest tests.test_pc_historical_sixcore tests.test_find_missing_specialists_pc -q
