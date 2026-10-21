@@ -41,6 +41,20 @@ CSV_FIELDS = ("item", "policy", "restock_model", "split", "starts",
               "leave_now_only_hits", "restock_hourly_scored",
               "restock_distinct_targets", "restock_mean_error_minutes",
               "restock_within_60s", "restock_within_10m",
+    "restock_accuracy_within_5m", "restock_accuracy_within_10m",
+    "restock_predicted_early_count", "restock_predicted_late_count",
+    "restock_mean_signed_minutes",
+    "chosen_restock_accuracy_within_10m",
+    "chosen_restock_mean_signed_minutes",
+    "landing_minus_actual_restock_minutes",
+    "landings_before_observed_restock",
+    "current_stock_flight_success_fraction",
+    "current_stock_flight_known",
+    "future_restock_flight_success_fraction",
+    "future_restock_flight_known",
+    "incumbent_family", "incumbent_config",
+    "incumbent_source_path", "incumbent_source_verified",
+    "incumbent_evaluated_in_this_tournament",
     "arrival_lag_seconds", "notes")
 
 
@@ -208,6 +222,15 @@ def score_rows(item, report):
             lag_part=name.rsplit("_lag",1)[-1] if "_lag" in name else "0"
             lag=int(lag_part) if lag_part.isdigit() else 0
             rt = timing.get(family, {}).get("chronological_slices", {}).get(split, {})
+            chosen=report.get("selected_event_timing",{}).get(name,{}).get(split,{})
+            registry=json.loads(ROSTER_PATH.read_text(encoding="utf-8"))["items"]
+            incumbent=registry.get(item)
+            if incumbent is None:
+                # Additional Xanax items were appended to V38 via V128.
+                incumbent={"model_family":"V19","config_name":(
+                    "dyn8" if item=="can:Xanax" else "dyn3"),
+                    "source_path":"services/plushie_flower_dynamic_planner_v19.py",
+                    "source_verified":True}
             paired = entry.get("matched_vs_now") or {}
             out.append(dict(item=item, policy=name, restock_model=family,
                 split=split, starts=entry.get("starts"),
@@ -227,6 +250,24 @@ def score_rows(item, report):
                 restock_within_10m=(timing.get(family, {})
                                    .get("within_10_minutes") if split == "later_validation"
                                    else None),
+                restock_accuracy_within_5m=rt.get("within_5_minutes_fraction"),
+                restock_accuracy_within_10m=rt.get("within_10_minutes_fraction"),
+                restock_predicted_early_count=rt.get("predicted_early_issues"),
+                restock_predicted_late_count=rt.get("predicted_late_issues"),
+                restock_mean_signed_minutes=rt.get("mean_signed_prediction_minus_observed_minutes"),
+                chosen_restock_accuracy_within_10m=chosen.get("within_10_minutes_fraction"),
+                chosen_restock_mean_signed_minutes=chosen.get("mean_signed_prediction_minus_observed_minutes"),
+                landing_minus_actual_restock_minutes=chosen.get("mean_landing_minus_observed_restock_minutes"),
+                landings_before_observed_restock=chosen.get("simulated_arrivals_before_observed_restock"),
+                current_stock_flight_success_fraction=chosen.get("current_stock_departures_success_fraction"),
+                current_stock_flight_known=chosen.get("current_stock_departures_known"),
+                future_restock_flight_success_fraction=chosen.get("future_restock_departures_success_fraction"),
+                future_restock_flight_known=chosen.get("future_restock_departures_known"),
+                incumbent_family=incumbent["model_family"],
+                incumbent_config=incumbent.get("config_name"),
+                incumbent_source_path=incumbent.get("source_path"),
+                incumbent_source_verified=incumbent.get("source_verified"),
+                incumbent_evaluated_in_this_tournament=False,
                 arrival_lag_seconds=lag,
                 notes="CORRELATED_UTC_HOURLY_SAMPLED_POLL_PROXIES"))
     return out
@@ -255,6 +296,8 @@ def write_summary(root, *, source, source_sha, sha, days, requested, outcomes):
                   item_status=short, performance_csv=str(csv_path),
                   production_modified=False, actual_player_flights=False,
                   source_written=False, automatic_model_promotion=False,
+                  incumbent_item_specific_models_evaluated=False,
+                  reason_incumbents_not_scored='Four generic physical clock baselines are NOT the pinned individual specialist champions',
                   note="Repeated UTC hourly cohorts share physical restocks. "
                   "Every forecast uses historical preissue observations only; "
                   "arrival stock is a sampled-poll proxy, not a verified game purchase.")
