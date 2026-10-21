@@ -213,6 +213,8 @@ def score(*, sidecar, collector, now=None, days=2, max_rows=MAX_ROWS,
         all_issues[key] += 1
         first.setdefault((key, issued // 3600), payload)
     by_item = defaultdict(Counter)
+    first_event_ids = defaultdict(set)
+    chosen_event_ids = defaultdict(set)
     for key in all_issues:
         by_item[key] = Counter()
     by_group = defaultdict(list)
@@ -240,12 +242,23 @@ def score(*, sidecar, collector, now=None, days=2, max_rows=MAX_ROWS,
                     status = observed["status"]
                     c["first_physical_" + status.lower()] += 1
                     if status == "RESOLVED":
-                        c["distinct_first_physical_epochs_set_placeholder"] += 0
+                        unique_target = observed["restock_by_epoch"]
+                        is_first_issue_for_target = unique_target not in first_event_ids[key]
+                        first_event_ids[key].add(unique_target)
+                        c["first_physical_scored_hours"] += 1
+                        if is_first_issue_for_target:
+                            c["distinct_first_physical_restocks"] += 1
                         for seconds in (15, 60, 300, 600):
-                            if observed["maximum_absolute_error_seconds"] <= seconds:
+                            certain = observed["maximum_absolute_error_seconds"] <= seconds
+                            possible = observed["minimum_absolute_error_seconds"] <= seconds
+                            if certain:
                                 c["restock_certain_within_" + str(seconds) + "s"] += 1
-                            if observed["minimum_absolute_error_seconds"] <= seconds:
+                                if is_first_issue_for_target:
+                                    c["distinct_restock_certain_within_" + str(seconds) + "s"] += 1
+                            if possible:
                                 c["restock_possible_within_" + str(seconds) + "s"] += 1
+                                if is_first_issue_for_target:
+                                    c["distinct_restock_possible_within_" + str(seconds) + "s"] += 1
                         c["restock_min_error_seconds_sum"] += observed["minimum_absolute_error_seconds"]
                         c["restock_max_error_seconds_sum"] += observed["maximum_absolute_error_seconds"]
                 else:
@@ -277,6 +290,8 @@ def score(*, sidecar, collector, now=None, days=2, max_rows=MAX_ROWS,
                         rows, polls, gaps, issued=issued, ordinal=index,
                         cutoff=cutoff, estimate=selected["predicted_restock_epoch"])
                     c["chosen_physical_" + outcome["status"].lower()] += 1
+                    if outcome["status"] == "RESOLVED":
+                        chosen_event_ids[key].add(outcome["restock_by_epoch"])
                 elif index == 0:
                     c["chosen_current_stock"] += 1
                 else:
@@ -292,6 +307,8 @@ def score(*, sidecar, collector, now=None, days=2, max_rows=MAX_ROWS,
                         c["matched_leave_now_pairs"] += 1
                         c["matched_recommendation_hits"] += int(hit)
                         c["matched_leave_now_hits"] += int(b_hit)
+    for key, c in by_item.items():
+        c["distinct_chosen_physical_restocks"] = len(chosen_event_ids[key])
     combined = Counter()
     for c in by_item.values():
         combined.update(c)
@@ -304,6 +321,7 @@ def score(*, sidecar, collector, now=None, days=2, max_rows=MAX_ROWS,
         "exact_game_restock_seconds_certified": False,
         "restock_time_basis": "POLL_BRACKET_MIN_MAX_ERROR_NOT_EXACT_GAME_TIME",
         "outcomes_are_independent_restocks": False,
+        "distinct_restock_metrics_first_asissued_per_observed_event": True,
         "first_event_is_next_physical_zero_to_positive": True,
         "unreconfirmed_future_departure_is_actionable": False,
         "summary": dict(combined),
