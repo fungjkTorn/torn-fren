@@ -6,7 +6,7 @@ COUNTRY='uni'; ITEM='Nessie Plushie'
 WINNING_CONFIG={'lookback_h':2,'lags':(1,),'shift_h':1,'minfit':0.5,'recency_pow':1.0,'selection_recent_train_fraction':0.15}
 
 def replay(db:str):
-    ctx=ResearchContext.build(db)
+    ctx=ResearchContext.build(db,readonly=True)
     tl=ctx.timelines[(COUNTRY,ITEM)]
     starts=valid_starts(ctx,COUNTRY,ITEM)
     cut=int(.75*len(starts)); train,hold=starts[:cut],starts[cut:]
