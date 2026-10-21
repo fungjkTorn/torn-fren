@@ -233,6 +233,7 @@ def score(*, sidecar, collector, now=None, days=2, max_rows=MAX_ROWS,
     by_item = defaultdict(Counter)
     first_event_ids = defaultdict(set)
     chosen_event_ids = defaultdict(set)
+    independently_scored_landings = defaultdict(set)
     for key in all_issues:
         by_item[key] = Counter()
     by_group = defaultdict(list)
@@ -319,6 +320,16 @@ def score(*, sidecar, collector, now=None, days=2, max_rows=MAX_ROWS,
                     c["landing_" + state.lower()] += 1
                 else:
                     c["landing_proxy_hit" if hit else "landing_proxy_miss"] += 1
+                    # Count one mature stock observation per selected,
+                    # independently identified actual physical restock.
+                    # Hourly recaptures are NOT independent stock events.
+                    if index > 0 and outcome["status"] == "RESOLVED":
+                        target = outcome["restock_by_epoch"]
+                        if target not in independently_scored_landings[key]:
+                            independently_scored_landings[key].add(target)
+                            c["distinct_target_arrival_known"] += 1
+                            c["distinct_target_arrival_hit" if hit else
+                              "distinct_target_arrival_miss"] += 1
                     c[("originally_actionable" if depart < p.get("valid_until_epoch", 0) else "requires_reconfirmation") + ("_landing_hit" if hit else "_landing_miss")] += 1
                     b_state, b_hit, _ = arrival_scorer(
                         source, country, name, issued + (arrival - depart), cutoff)
