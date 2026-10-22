@@ -12,6 +12,7 @@ import sys
 import time
 
 from research.v167_all24_live_policy_replay import ROUTES, MODEL_FREEZE_EPOCH
+from research.plushie_champions.common import TRAVEL_SECONDS
 
 ROOT=Path(__file__).resolve().parents[1]
 ITEMS=tuple(sorted(ROUTES))
@@ -59,6 +60,8 @@ def run_one(item,*,source,start,end,outdir,timeout):
             "arrival_success_fraction":payload.get("arrival_success_fraction"),
             "earliest_target_hit_fraction":payload.get("earliest_target_hit_fraction"),
             "proposal_coverage":payload.get("proposal_coverage"),
+            "execution_arrival_success_fraction":payload.get("execution_arrival_success_fraction"),
+            "execution_earliest_target_hit_fraction":payload.get("execution_earliest_target_hit_fraction"),
             "mean_departure_minus_oracle_seconds":payload.get("mean_departure_minus_oracle_seconds"),
             "mean_predicted_minus_actual_restock_seconds":payload.get("mean_predicted_minus_actual_restock_seconds"),
             "output":str(out)}
@@ -78,6 +81,12 @@ def save_summary(outdir,start,end,results):
                     num+=c.get("earliest_target_hit",0);den+=c.get("earliest_target_scored",0)
                 elif field=="coverage":
                     num+=c.get("proposals",0);den+=c.get("issues",0)
+                elif field=="execution_arrival":
+                    ec=payload.get("execution_counts",{})
+                    num+=ec.get("arrival_success",0);den+=ec.get("arrival_known",0)
+                elif field=="execution_earliest":
+                    ec=payload.get("execution_counts",{})
+                    num+=ec.get("earliest_target_hit",0);den+=ec.get("earliest_target_scored",0)
             except Exception:
                 continue
         return num/den if den else None
@@ -88,6 +97,8 @@ def save_summary(outdir,start,end,results):
         "portfolio_arrival_success_fraction":weighted("arrival",None),
         "portfolio_earliest_target_hit_fraction":weighted("earliest",None),
         "portfolio_proposal_coverage":weighted("coverage",None),
+        "portfolio_execution_arrival_success_fraction":weighted("execution_arrival",None),
+        "portfolio_execution_earliest_target_hit_fraction":weighted("execution_earliest",None),
         "results":dict(sorted(results.items())),
         "operating_contract":{
             "replan_seconds":300,
@@ -124,7 +135,7 @@ def main():
                              WHERE mode='poll-cycle' AND success=1""").fetchone()[0]
     if cutoff is None:raise ValueError("source has no successful heartbeat")
     # Mature only by max travel + grace; no forecast lookahead subtraction.
-    max_flight=60*60*6
+    max_flight=max(TRAVEL_SECONDS.values())
     end=a.end_epoch if a.end_epoch is not None else int(cutoff)-max_flight-60
     start=a.start_epoch if a.start_epoch is not None else end-a.days*86400
     start=max(start,MODEL_FREEZE_EPOCH)
