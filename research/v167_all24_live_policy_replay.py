@@ -395,7 +395,9 @@ def replay_item(*,source,key,start,end,workdir):
             telemetry=lifecycle_telemetry(causal_rows,gaps,issued)
             scored=score_decision(source,key,issued,dep,truth_cutoff)
             target_id=(target["event_index"],target["predicted_restock_epoch"]) if target else None
-            stable=(previous_target is not None and target_id==previous_target)
+            stable=(previous_target is not None and target_id is not None and
+                    target_id[0]==previous_target[0] and
+                    abs(target_id[1]-previous_target[1])<=900)
             records.append({
                 "item_key":key,"issued_epoch":issued,
                 "route_model":ROUTES[key]["primary"],
@@ -418,6 +420,41 @@ def replay_item(*,source,key,start,end,workdir):
         try:scratch.unlink()
         except OSError:pass
 
+    # Separate raw five-minute advice from what would become actionable.
+    # A departure is counted once when it falls inside the next replan slot and
+    # either the target was reconfirmed from the prior tick or it is current
+    # stock (event 0). This avoids treating repeated WAIT rows as flights.
+    executions=[]
+    seen_departures=set()
+    for r in records:
+        dep=r.get("recommended_departure_epoch")
+        target=r.get("selected_event")
+        if dep is None or target is None:
+            continue
+        issued=r["issued_epoch"]
+        actionable=(issued<=dep<issued+STEP and
+                    (r.get("target_stable_from_previous_replan")
+                     or target.get("event_index")==0))
+        if not actionable:
+            continue
+        rounded=dep//STEP
+        if rounded in seen_departures:
+            continue
+        seen_departures.add(rounded)
+        executions.append({
+            "issued_epoch":issued,
+            "departure_epoch":dep,
+            "arrival_epoch":r.get("arrival_epoch"),
+            "selected_event_index":target.get("event_index"),
+            "predicted_restock_epoch":target.get("predicted_restock_epoch"),
+            "arrival_state":r.get("arrival_state"),
+            "actual_target_status":r.get("actual_target_status"),
+            "actual_target_restock_epoch":r.get("actual_target_restock_epoch"),
+            "actual_target_depletion_epoch":r.get("actual_target_depletion_epoch"),
+            "departure_minus_oracle_seconds":r.get("departure_minus_oracle_seconds"),
+            "arrival_minus_actual_restock_seconds":r.get("arrival_minus_actual_restock_seconds"),
+        })
+
     c=Counter()
     dep_errors=[];restock_errors=[]
     for r in records:
@@ -439,17 +476,39 @@ def replay_item(*,source,key,start,end,workdir):
         c["stable_replans"]+=int(r["target_stable_from_previous_replan"])
         c["local_aligned"]+=int(r["local_model_aligned_to_selected_event"])
 
+    ec=Counter()
+    for e in executions:
+        ec["executions"]+=1
+        if e.get("arrival_state") in ("SUCCESS","FAILURE"):
+            ec["arrival_known"]+=1
+            ec["arrival_success"]+=int(e["arrival_state"]=="SUCCESS")
+        if e.get("actual_target_restock_epoch") is not None:
+            ec["earliest_target_scored"]+=1
+            arr=e["arrival_epoch"]+GRACE
+            ok=(arr>=e["actual_target_restock_epoch"] and
+                (e["actual_target_depletion_epoch"] is None or
+                 arr<e["actual_target_depletion_epoch"]))
+            ec["earliest_target_hit"]+=int(ok)
+
     return {
         "item_key":key,"route":ROUTES[key],"start":start,"end":end,
         "counts":dict(c),
         "arrival_success_fraction":c["arrival_success"]/c["arrival_known"] if c["arrival_known"] else None,
         "earliest_target_hit_fraction":c["earliest_target_hit"]/c["earliest_target_scored"] if c["earliest_target_scored"] else None,
         "proposal_coverage":c["proposals"]/c["issues"] if c["issues"] else None,
+        "execution_counts":dict(ec),
+        "execution_arrival_success_fraction":(
+            ec["arrival_success"]/ec["arrival_known"] if ec["arrival_known"] else None),
+        "execution_earliest_target_hit_fraction":(
+            ec["earliest_target_hit"]/ec["earliest_target_scored"]
+            if ec["earliest_target_scored"] else None),
+        "actionable_executions":executions,
         "mean_departure_minus_oracle_seconds":_mean(dep_errors),
         "median_departure_minus_oracle_seconds":statistics.median(dep_errors) if dep_errors else None,
         "mean_predicted_minus_actual_restock_seconds":_mean(restock_errors),
         "median_predicted_minus_actual_restock_seconds":statistics.median(restock_errors) if restock_errors else None,
         "records":records,
+        "latest_lifecycle_telemetry":records[-1]["lifecycle"] if records else None,
         "product_horizon_type":"EVENT_DRIVEN_FIRST_REACHABLE",
         "product_time_horizon_seconds":None,
         "defensive_max_events":MAX_EVENTS,
