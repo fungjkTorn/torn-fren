@@ -44,8 +44,7 @@ from research.v166_seven_specialist_earliest_replay import (
 from research.matched_champion_audit import native_plan
 from research.v145_provider_continuous_phases import provider_continuous_phases
 
-MAX_EVENTS=256
-MAX_LOOKAHEAD_DAYS=30
+MAX_EVENTS=512
 MIN_QTY=30
 
 # This is the current beta route we actually intend to test.
@@ -193,8 +192,12 @@ def _q(values,p):
     return values[max(0,min(len(values)-1,math.ceil(len(values)*p)-1))]
 
 
-def project_events(item,phases,asof,*,max_events=MAX_EVENTS,max_days=MAX_LOOKAHEAD_DAYS):
-    """Event-driven causal cycle projection, not an 8h departure horizon."""
+def project_events(item,phases,asof,*,max_events=MAX_EVENTS):
+    """Event-driven causal cycle projection with no product time horizon.
+
+    max_events is only a runaway-compute guard. It is not a time horizon and
+    does not suppress a reachable event merely because it is days away.
+    """
     high=list(phases.get("stocked_durations") or [])
     low=list(phases.get("depleted_durations") or [])
     phase=phases.get("phase")
@@ -221,11 +224,9 @@ def project_events(item,phases,asof,*,max_events=MAX_EVENTS,max_days=MAX_LOOKAHE
         first=asof+residual+low_med
 
     flight=TRAVEL_SECONDS[item.split(":",1)[0]]
-    guard=asof+max_days*86400
     events=[]
     restock=first
     for idx in range(max_events):
-        if restock>guard:break
         stocked_end=restock+high_med
         earliest_depart=max(asof,restock-flight-GRACE)
         arrival=earliest_depart+flight+GRACE
@@ -398,7 +399,7 @@ def replay_item(*,source,key,start,end,workdir):
         "product_horizon_type":"EVENT_DRIVEN_FIRST_REACHABLE",
         "product_time_horizon_seconds":None,
         "defensive_max_events":MAX_EVENTS,
-        "defensive_max_lookahead_days":MAX_LOOKAHEAD_DAYS,
+        "defensive_time_horizon_seconds":None,
         "production_modified":False,
     }
 
