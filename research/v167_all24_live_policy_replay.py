@@ -46,7 +46,7 @@ from research.v128_full24_earliest_shadow import _gap_index
 from deploy.scripts.v163_readonly_event_first_preview import predict_events as v163_predict_events
 from research.v167_event_candidate_scoring import CHAMPION_KIND, choose_event
 
-MAX_EVENTS=512
+MAX_EVENTS=64
 MIN_QTY=30
 
 # Current all-24 champion identity. These are the source-pinned models we
@@ -339,14 +339,13 @@ def routed_champion_plan(causal_db,key,issued,events):
         "diagnostic":result,
     }
 
-def score_decision(source,key,issued,departure,truth_cutoff):
+def score_decision(key,issued,departure,truth_cutoff,truth_rows,truth_gaps,evidence):
     flight=TRAVEL_SECONDS[key.split(":",1)[0]]
-    rows,gaps=_truth_rows(source,key,truth_cutoff)
-    target=_earliest_reachable_window(rows,gaps,issued,flight,truth_cutoff)
+    target=_earliest_reachable_window(
+        truth_rows,truth_gaps,issued,flight,truth_cutoff)
     result={"actual_target_status":target["status"]}
     if departure is None:return result
     arrival=departure+flight
-    evidence=source_data(source,now=truth_cutoff,item_key=key)[3]
     state=evidence.score(arrival)[0]
     result.update(arrival_epoch=arrival,arrival_state=state)
     if target["status"]=="EARLIEST_REACHABLE_FOUND":
@@ -370,6 +369,7 @@ def replay_item(*,source,key,start,end,workdir):
     scratch=Path(workdir)/(key.replace(":","__").replace(" ","_")+".sqlite")
     mirror=CausalMirror(source,scratch,start)
     truth_rows,truth_gaps=_truth_rows(source,key,truth_cutoff)
+    truth_evidence=source_data(source,now=truth_cutoff,item_key=key)[3]
     issue_rows,_,_,_,_=source_data(source,now=end,item_key=key)
     # use truth gap boundaries but only phases built from <=issue rows later
     records=[]
@@ -393,7 +393,8 @@ def replay_item(*,source,key,start,end,workdir):
             aligned=target is not None and dep is not None
 
             telemetry=lifecycle_telemetry(causal_rows,gaps,issued)
-            scored=score_decision(source,key,issued,dep,truth_cutoff)
+            scored=score_decision(
+                key,issued,dep,truth_cutoff,truth_rows,truth_gaps,truth_evidence)
             target_id=(target["event_index"],target["predicted_restock_epoch"]) if target else None
             stable=(previous_target is not None and target_id is not None and
                     target_id[0]==previous_target[0] and
