@@ -192,7 +192,7 @@ def _earliest_reachable_window(rows,gaps,issued,flight,truth_cutoff):
     return dict(status="NO_MATURE_REACHABLE_RESTOCK_IN_TRUTH")
 
 
-def _score_route(source,key,records,truth_cutoff):
+def _score_route(source,key,records,truth_cutoff,evidence):
     route=ROUTES[key]
     primary=route["primary"]
     result=Counter()
@@ -212,8 +212,8 @@ def _score_route(source,key,records,truth_cutoff):
             continue
         result["proposals"]+=1
         waits.append((dep-r["issued"])/60)
-        # Existing canonical poll-bracket arrival scorer.
-        evidence=source_data(source,now=truth_cutoff,item_key=key)[3]
+        # Existing canonical poll-bracket arrival scorer. Evidence is loaded
+        # once per item by score(), not once per proposal.
         arrival_state=evidence.score(arr)[0]
         result["arrival_"+arrival_state.lower()]+=1
 
@@ -246,11 +246,14 @@ def score(*,source,journal,model_sha):
     first=_load_first_hourly(journal,model_sha)
     # Freeze one truth clock for every item exactly as the existing scorer does.
     truth_cutoff=None
+    evidence_by_item={}
     for key in sorted(ROUTES):
-        cutoff=source_data(source,now=truth_cutoff,item_key=key)[4]
+        data=source_data(source,now=truth_cutoff,item_key=key)
+        cutoff=data[4]
         truth_cutoff=cutoff if truth_cutoff is None else truth_cutoff
         if cutoff!=truth_cutoff:
             raise ValueError("truth cutoff mismatch")
+        evidence_by_item[key]=data[3]
 
     items={}
     totals=Counter()
@@ -264,7 +267,7 @@ def score(*,source,journal,model_sha):
             # Use union of observed hours from any mode for abstain-only Japan.
             hours=sorted({h for (k,m,h) in first if k==key})
             recs=[dict(issued=h*3600) for h in hours]
-        c,waits,lags=_score_route(source,key,recs,truth_cutoff)
+        c,waits,lags=_score_route(source,key,recs,truth_cutoff,evidence_by_item[key])
         totals.update(c)
         known=c["arrival_success"]+c["arrival_failure"]
         event_known=(c["earliest_reachable_hit"]+c["earliest_too_early"]+
