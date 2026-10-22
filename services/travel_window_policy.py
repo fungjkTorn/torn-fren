@@ -7,7 +7,6 @@ to arrive before a physical restock. This is an uncalibrated research adapter.
 from services.travel_decision_contract_v166 import build_item_travel_decision
 
 POLICIES = frozenset(("median", "quarter", "midpoint", "late", "current_quarter"))
-MAX_WAIT_SECONDS = 28800
 
 
 def project_policy(forecast, *, now, poll_age_seconds, kind="median",
@@ -55,8 +54,8 @@ def project_policy(forecast, *, now, poll_age_seconds, kind="median",
         depart = max(now, target - flight)
         latest = end - flight - grace - 1
         landing = depart + flight
-        if (depart > now + MAX_WAIT_SECONDS or depart > latest or
-                not start <= landing or landing + grace >= end):
+        if (depart > latest or not start <= landing or
+                landing + grace >= end):
             continue
         return dict(
             decision, estimated_departure_epoch=depart,
