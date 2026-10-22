@@ -124,12 +124,22 @@ def main():
     p.add_argument("--workers",type=int,default=6)
     p.add_argument("--timeout-per-item",type=int,default=21600)
     p.add_argument("--item-key",action="append")
+    p.add_argument("--artifact-dir",type=Path,
+                   default=ROOT/"historical_pc_data"/"specialist_artifacts")
     a=p.parse_args()
     if not 1<=a.workers<=8:p.error("workers must be 1..8")
     if not 1<=a.days<=30:p.error("days must be 1..30")
 
     source=Path(a.source).expanduser().resolve(strict=True)
     outdir=a.output.expanduser().resolve();outdir.mkdir(parents=True,exist_ok=True)
+    artifact_dir=a.artifact_dir.expanduser().resolve()
+    required_artifacts=("panda_selector_artifact.json","lion_selector_artifact.json")
+    missing=[name for name in required_artifacts if not (artifact_dir/name).is_file()]
+    if missing:
+        raise ValueError(
+            "missing pinned specialist artifacts in "+str(artifact_dir)+": "+
+            ", ".join(missing))
+    os.environ["TORNFREN_SPECIALIST_ARTIFACTS"]=str(artifact_dir)
     with sqlite3.connect(source.as_uri()+"?mode=ro",uri=True) as db:
         cutoff=db.execute("""SELECT MAX(timestamp) FROM poll_heartbeats
                              WHERE mode='poll-cycle' AND success=1""").fetchone()[0]
@@ -148,6 +158,7 @@ def main():
     manifest={
         "source":str(source),"start":start,"end":end,"items":list(items),
         "workers":a.workers,
+        "artifact_dir":str(artifact_dir),
         "operating_contract":"EVENT_DRIVEN_FIRST_REACHABLE_NO_FIXED_TIME_HORIZON",
     }
     mf=outdir/"manifest.json"
