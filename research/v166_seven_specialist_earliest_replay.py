@@ -173,11 +173,15 @@ def specialist_plan(db,key,issued):
         from research.v81_pair_forward_comparison import PINS
         root=Path(__file__).resolve().parents[1]
         target="panda" if key.startswith("chi:") else "lion"
-        artifact=Path("/home/ubuntu/torn-fren-private-models")/(target+"_selector_artifact.json")
-        # On PC the reviewed artifacts may instead be copied under research artifacts.
+        artifact_root=Path(os.environ.get(
+            "TORNFREN_SPECIALIST_ARTIFACTS",
+            "/home/ubuntu/torn-fren-private-models"))
+        artifact=artifact_root/(target+"_selector_artifact.json")
         if not artifact.is_file():
             local=root/"historical_pc_data"/(target+"_selector_artifact.json")
             artifact=local if local.is_file() else artifact
+        if not artifact.is_file():
+            return dict(status="MISSING_PINNED_SELECTOR_ARTIFACT",departure=None)
         r=predict(db,target,issued,artifact,PINS[target])
         dep=r.get("research_departure_timestamp")
         return dict(status=r.get("candidate_status") or r.get("status"),departure=dep)
