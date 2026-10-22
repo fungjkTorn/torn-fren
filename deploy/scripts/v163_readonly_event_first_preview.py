@@ -46,7 +46,7 @@ from research.v60_private_snapshot_probe import read_heartbeat
 
 COLLECTOR=Path("/opt/torn-fren/data/stock_history.db")
 STEP=300
-MAX_HORIZON=28800
+MAX_HORIZON=None  # legacy compatibility only; no product time horizon
 MIN_QTY=30
 GRACE=10
 MAX_EVENTS=64
@@ -83,12 +83,11 @@ def _window(item,asof,start,stocked_duration,early_start,late_start,early_lifeti
     first=max(asof,start-flight-GRACE)
     arrival=first+flight+GRACE
     latest=end-flight-GRACE-1
-    expected=first if arrival>=start and first<=latest and first<=asof+MAX_HORIZON else None
+    expected=first if arrival>=start and first<=latest else None
     conservative_first=max(asof,late_start-flight-GRACE)
     conservative_latest=early_start+early_lifetime-flight-GRACE-1
     conservative=(conservative_first if
                   conservative_first<=conservative_latest
-                  and conservative_first<=asof+MAX_HORIZON
                   else None)
     return {
         "predicted_restock_epoch":start,
@@ -107,7 +106,7 @@ def _window(item,asof,start,stocked_duration,early_start,late_start,early_lifeti
     }
 
 
-def predict_events(item,phases,*,asof,horizon=MAX_HORIZON,
+def predict_events(item,phases,*,asof,horizon=None,
                    max_events=MAX_EVENTS,min_bounded=MIN_BOUNDED,
                    recent_cycles=None):
     """All modeled replenishments up to horizon, not just selected flights.
@@ -116,8 +115,9 @@ def predict_events(item,phases,*,asof,horizon=MAX_HORIZON,
     known ongoing phase/censoring age. Model future cycle uncertainty
     grows; these are *estimates*, with no calibrated forecast accuracy.
     """
-    if (type(asof) is not int or asof<=0 or type(horizon) is not int
-        or not 300<=horizon<=MAX_HORIZON or type(max_events) is not int
+    if (type(asof) is not int or asof<=0
+        or (horizon is not None and (type(horizon) is not int or horizon<300))
+        or type(max_events) is not int
         or not 1<=max_events<=MAX_EVENTS or
         type(min_bounded) is not int or not 1<=min_bounded<=20 or
         not isinstance(item,str) or item.count(":")!=1 or
@@ -188,9 +188,8 @@ def predict_events(item,phases,*,asof,horizon=MAX_HORIZON,
     events=[]
     for idx in range(max_events):
         median=next_restock["middle"]
-        if median>asof+horizon:
+        if horizon is not None and median>asof+horizon:
             break
-        remaining=max(0,asof+horizon-median)
         window=_window(
             item,asof,median,hi["middle"],next_restock["early"],
             next_restock["late"],hi["early"])
@@ -204,8 +203,6 @@ def predict_events(item,phases,*,asof,horizon=MAX_HORIZON,
         # the horizon, whether or not the user can travel to that event.
         next_restock={
             p:next_restock[p]+hi[p]+lo[p] for p in ("early","middle","late")}
-        if remaining<=0:
-            break
     common["restock_events"]=events
     common["forecast_event_count"]=len(events)
     common["currently_supported_departures"]=sum(
@@ -213,13 +210,15 @@ def predict_events(item,phases,*,asof,horizon=MAX_HORIZON,
     common["unreachable_restock_events"]=sum(
         event["expected_departure_epoch"] is None for event in events)
     common["event_horizon_seconds"]=horizon
+    common["event_horizon_type"]="EVENT_COUNT_ONLY" if horizon is None else "LEGACY_TIME_BOUND"
     common["bounded_event_list_truncated"]=(
-        len(events)==max_events and next_restock["middle"]<=asof+horizon)
+        len(events)==max_events and
+        (horizon is None or next_restock["middle"]<=asof+horizon))
     return common
 
 
 def forecast_all(*,source=COLLECTOR,asof=None,roster=None,
-                 horizon=MAX_HORIZON):
+                 horizon=None):
     now=int(time.time()) if asof is None else asof
     if type(now) is not int or now<=0:
         raise ValueError("invalid issue epoch")
