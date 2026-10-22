@@ -16,7 +16,8 @@ from types import SimpleNamespace
 import numpy as np
 
 from research.plushie_champions.common import (
-    AnalogPlanner, ResearchContext, TemplatePlanner, TRAVEL_SECONDS,
+    AnalogPlanner, ResearchContext, TemplatePlanner, TRAVEL_SECONDS, GRACE,
+    gap_overlap,
 )
 from research.v38_v18_single_tick import V18_APPROVED
 from research.v38_v19_single_tick import V19_APPROVED
@@ -231,7 +232,17 @@ def _camel_choice(db,key,issued,events):
 
 def _analog_with_delays(ctx,country,item,q,k,weight,candidates):
     planner=AnalogPlanner(ctx,country,item,k=k,global_weight=weight,cutoff=q)
-    planner.delays=np.array([d for d,_ in candidates],dtype=float)
+    delays=np.array([d for d,_ in candidates],dtype=float)
+    planner.delays=delays
+    # AnalogPlanner's original path_ok was built for the legacy 8h grid.
+    # Recompute it for the farthest event candidate so every historical
+    # analogue has its complete candidate-arrival outcome resolved <= issue.
+    max_delay=int(max(delays)) if len(delays) else 0
+    planner.maxfuture=max_delay+planner.travel+GRACE
+    planner.path_ok=np.array([
+        not gap_overlap(ctx.gs,ctx.ge,t,t+planner.maxfuture)
+        for t in ctx.grid
+    ])
     result=planner.plan(float(q))
     if result is None:return None
     dep=int(result[0])
