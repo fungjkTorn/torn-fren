@@ -66,6 +66,43 @@ class V166MirrorTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 m.advance(1100)
 
+    def test_mirror_accepts_source_without_surrogate_ids(self):
+        with tempfile.TemporaryDirectory() as td:
+            src=Path(td)/'source-noids.sqlite'; dst=Path(td)/'mirror.sqlite'
+            con=sqlite3.connect(src)
+            con.executescript("""
+            CREATE TABLE stock_history(
+              timestamp INTEGER,country TEXT,item_name TEXT,
+              quantity INTEGER,source TEXT);
+            CREATE TABLE poll_heartbeats(
+              timestamp INTEGER,mode TEXT,success INTEGER);
+            CREATE TABLE collection_gaps(
+              start_timestamp INTEGER,end_timestamp INTEGER);
+            """)
+            con.execute(
+                'INSERT INTO stock_history VALUES(?,?,?,?,?)',
+                (1000,'uni','Nessie Plushie',0,'p'))
+            con.execute(
+                'INSERT INTO poll_heartbeats VALUES(?,?,?)',
+                (1000,'poll-cycle',1))
+            con.execute(
+                'INSERT INTO collection_gaps VALUES(?,?)',
+                (900,1100))
+            con.commit();con.close()
+
+            CausalMirror(src,dst,1000)
+            con=sqlite3.connect(dst)
+            self.assertEqual(
+                1000,
+                con.execute('SELECT MAX(timestamp) FROM stock_history').fetchone()[0])
+            self.assertEqual(
+                1000,
+                con.execute('SELECT MAX(timestamp) FROM poll_heartbeats').fetchone()[0])
+            self.assertEqual(
+                'historical',
+                con.execute('SELECT reason FROM collection_gaps').fetchone()[0])
+            con.close()
+
 
 if __name__=="__main__":
     unittest.main()
