@@ -35,27 +35,33 @@ from research.plushie_champions.common import TRAVEL_SECONDS, STEP, GRACE
 from research.quantity_rate_cycles import QuantityRateCycles
 from deploy.scripts.v163_readonly_event_first_preview import OBS
 from research.v164_evidence_routed_earliest_restock import (
-    ROUTES as V164_ROUTES, _truth_rows, _clean_windows, _earliest_reachable_window,
+    _truth_rows, _clean_windows, _earliest_reachable_window,
 )
 from research.v166_seven_specialist_earliest_replay import (
     CausalMirror, specialist_plan as seven_specialist_plan,
     SEVEN, MODEL_FREEZE_EPOCH,
 )
-from research.matched_champion_audit import native_plan
 from research.v145_provider_continuous_phases import provider_continuous_phases
+from research.v128_full24_earliest_shadow import _gap_index
+from deploy.scripts.v163_readonly_event_first_preview import predict_events as v163_predict_events
+from research.v167_event_candidate_scoring import CHAMPION_KIND, choose_event
 
 MAX_EVENTS=512
 MIN_QTY=30
 
-# This is the current beta route we actually intend to test.
-# Japan Xanax is deliberately included with its best current challenger instead
-# of disappearing from the replay; it remains flagged weak until it proves out.
-ROUTES={k:dict(v) for k,v in V164_ROUTES.items()}
-ROUTES["jap:Xanax"]={
-    "primary":"rate_current_quarter",
-    "challenger":None,
-    "rationale":"best current available challenger; deployment readiness unproven",
+# Current all-24 champion identity. These are the source-pinned models we
+# spent prior research selecting; V167 tests them on one common live-policy
+# replay contract rather than replacing them from a short forward sample.
+ROUTES={
+    key:{
+        "primary":"champion",
+        "champion_kind":kind,
+        "rationale":"source-pinned incumbent champion on common V167 replay",
+    }
+    for key,kind in CHAMPION_KIND.items()
 }
+if len(ROUTES)!=24:
+    raise ValueError("V167 requires exact 24-item champion roster")
 
 
 def _ro(path):
@@ -250,6 +256,59 @@ def first_reachable(events):
     return next((e for e in events if e["reachable"]),None)
 
 
+def _forecast_to_candidates(forecast,issued):
+    """Normalize current stock + physical future events into candidate events."""
+    events=[]
+    current=forecast.get("current_stock_window")
+    if isinstance(current,dict):
+        dep=current.get("expected_departure_epoch")
+        end=current.get("predicted_stock_below_30_epoch")
+        if isinstance(dep,int) and isinstance(end,int):
+            events.append({
+                "event_index":0,
+                "current_stock":True,
+                "predicted_restock_epoch":issued,
+                "predicted_depletion_epoch":end,
+                "predicted_restock_early_epoch":issued,
+                "predicted_restock_late_epoch":issued,
+                "predicted_stocked_lifetime_seconds":max(0,end-issued),
+                "earliest_departure_epoch":dep,
+                "predicted_arrival_epoch":current.get("expected_arrival_epoch"),
+                "reachable":True,
+            })
+    for raw in forecast.get("restock_events") or []:
+        dep=raw.get("expected_departure_epoch")
+        events.append({
+            "event_index":int(raw.get("event_index") or len(events)+1),
+            "current_stock":False,
+            "predicted_restock_epoch":raw.get("predicted_restock_epoch"),
+            "predicted_depletion_epoch":raw.get("predicted_stock_below_30_epoch"),
+            "predicted_restock_early_epoch":raw.get("restock_early_epoch"),
+            "predicted_restock_late_epoch":raw.get("restock_late_epoch"),
+            "predicted_stocked_lifetime_seconds":raw.get("estimated_stocked_duration_seconds"),
+            "earliest_departure_epoch":dep,
+            "predicted_arrival_epoch":raw.get("expected_arrival_epoch"),
+            "reachable":dep is not None,
+        })
+    return events
+
+
+def event_timeline_for_issue(key,causal_rows,gaps,issued):
+    """Champion-independent physical event candidates, horizon-free."""
+    crosses=_gap_index(gaps,issued)
+    if key=="jap:Xanax":
+        tracker=QuantityRateCycles(crosses)
+        for row in causal_rows:
+            tracker.add(OBS(*row))
+        forecast=tracker.forecast(key,asof=issued)
+    else:
+        phases=provider_continuous_phases(
+            [OBS(*r) for r in causal_rows],asof=issued,gaps=gaps)
+        forecast=v163_predict_events(
+            key,phases,asof=issued,horizon=None,max_events=64)
+    return forecast,_forecast_to_candidates(forecast,issued)
+
+
 def generic_plan(source,key,issued,mode):
     rows,polls,crosses,_,cutoff=source_data(source,now=issued,item_key=key)
     h=History(crosses);rate=QuantityRateCycles(crosses)
@@ -268,17 +327,17 @@ def generic_plan(source,key,issued,mode):
     }
 
 
-def routed_local_plan(causal_db,source,key,issued):
-    mode=ROUTES[key]["primary"]
-    if mode=="specialist_control":
-        if key in SEVEN:
-            r=seven_specialist_plan(causal_db,key,issued)
-            return dict(model=mode,status=r.get("status"),departure=r.get("departure"))
-        r=native_plan(causal_db,key,issued,timeout=30)
-        return dict(model=mode,status=r.get("status"),departure=r.get("departure"))
-    r=generic_plan(source,key,issued,mode)
-    return dict(model=mode,status=r.get("status"),departure=r.get("departure"))
-
+def routed_champion_plan(causal_db,key,issued,events):
+    result=choose_event(causal_db,key,issued,events)
+    return {
+        "model":"champion",
+        "champion_kind":CHAMPION_KIND[key],
+        "status":result.get("status"),
+        "departure":result.get("departure"),
+        "selected_event_index":result.get("selected_event_index"),
+        "model_score":result.get("score"),
+        "diagnostic":result,
+    }
 
 def score_decision(source,key,issued,departure,truth_cutoff):
     flight=TRAVEL_SECONDS[key.split(":",1)[0]]
@@ -319,28 +378,19 @@ def replay_item(*,source,key,start,end,workdir):
         for issued in range(start,end+1,STEP):
             mirror.advance(issued)
             causal_rows=[r for r in issue_rows if r[0]<=issued]
-            # Build causal phase model from only visible rows.
             with closing(sqlite3.connect(scratch.as_uri()+"?mode=ro",uri=True)) as db:
                 db.execute("PRAGMA query_only=ON")
                 gaps=db.execute("SELECT start_timestamp,end_timestamp FROM collection_gaps ORDER BY start_timestamp").fetchall()
-            from research.v128_full24_earliest_shadow import _gap_index
-            phases=provider_continuous_phases(
-                [OBS(*r) for r in causal_rows],asof=issued,
-                gaps=gaps)
-            events=project_events(key,phases,issued)
-            target=first_reachable(events)
-            local=routed_local_plan(scratch,source,key,issued)
 
-            # Live policy target: first reachable projected event. Local model
-            # advice is retained as a refinement when it points into that event.
-            dep=target["earliest_departure_epoch"] if target else None
+            forecast,events=event_timeline_for_issue(
+                key,causal_rows,gaps,issued)
+            baseline_target=first_reachable(events)
+            local=routed_champion_plan(scratch,key,issued,events)
+            selected_index=local.get("selected_event_index")
+            target=next((e for e in events if e["event_index"]==selected_index),None)
+            dep=local.get("departure") if target is not None else None
             local_dep=local.get("departure")
-            aligned=False
-            if target and local_dep is not None:
-                local_arr=local_dep+TRAVEL_SECONDS[key.split(":",1)[0]]+GRACE
-                if target["predicted_restock_epoch"]<=local_arr<target["predicted_depletion_epoch"]:
-                    dep=local_dep
-                    aligned=True
+            aligned=target is not None and dep is not None
 
             telemetry=lifecycle_telemetry(causal_rows,gaps,issued)
             scored=score_decision(source,key,issued,dep,truth_cutoff)
@@ -349,7 +399,11 @@ def replay_item(*,source,key,start,end,workdir):
             records.append({
                 "item_key":key,"issued_epoch":issued,
                 "route_model":ROUTES[key]["primary"],
+                "champion_kind":CHAMPION_KIND[key],
                 "route_status":local.get("status"),
+                "champion_score":local.get("model_score"),
+                "event_forecast_status":forecast.get("status"),
+                "baseline_first_reachable_event":baseline_target,
                 "local_model_departure_epoch":local_dep,
                 "local_model_aligned_to_selected_event":aligned,
                 "selected_event":target,
