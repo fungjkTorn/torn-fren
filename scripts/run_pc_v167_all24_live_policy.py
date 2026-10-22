@@ -124,6 +124,8 @@ def main():
     p.add_argument("--workers",type=int,default=6)
     p.add_argument("--timeout-per-item",type=int,default=21600)
     p.add_argument("--item-key",action="append")
+    p.add_argument("--smoke",action="store_true",
+                   help="Run all selected items over only 30 historical minutes")
     p.add_argument("--artifact-dir",type=Path,
                    default=ROOT/"historical_pc_data"/"specialist_artifacts")
     a=p.parse_args()
@@ -148,6 +150,8 @@ def main():
     max_flight=max(TRAVEL_SECONDS.values())
     end=a.end_epoch if a.end_epoch is not None else int(cutoff)-max_flight-60
     start=a.start_epoch if a.start_epoch is not None else end-a.days*86400
+    if a.smoke and a.start_epoch is None:
+        start=end-1800
     start=max(start,MODEL_FREEZE_EPOCH)
     if end<=start:raise ValueError("no mature post-freeze replay window")
 
@@ -159,6 +163,7 @@ def main():
         "source":str(source),"start":start,"end":end,"items":list(items),
         "workers":a.workers,
         "artifact_dir":str(artifact_dir),
+        "smoke":bool(a.smoke),
         "operating_contract":"EVENT_DRIVEN_FIRST_REACHABLE_NO_FIXED_TIME_HORIZON",
     }
     mf=outdir/"manifest.json"
@@ -167,7 +172,8 @@ def main():
     mf.write_text(json.dumps(manifest,indent=2,sort_keys=True)+"\n",encoding="utf-8")
 
     print("V167 ALL24 LIVE POLICY REPLAY",len(items),"START",start,"END",end,
-          "STEP",300,"WORKERS",a.workers,"FIXED_HORIZON",None,flush=True)
+          "STEP",300,"WORKERS",a.workers,"FIXED_HORIZON",None,
+          "SMOKE",bool(a.smoke),flush=True)
     results={}
     with ThreadPoolExecutor(max_workers=a.workers) as pool:
         futs={pool.submit(run_one,item,source=source,start=start,end=end,
