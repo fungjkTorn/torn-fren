@@ -86,7 +86,6 @@ def build_item_travel_decision(
     events = []
     previous = 0
     selected = None
-    horizon_end = now + 28800
     for i, physical_event in enumerate(physical):
         if not isinstance(physical_event, dict):
             raise ValueError("invalid physical restock event")
@@ -112,15 +111,13 @@ def build_item_travel_decision(
         end = early_end if arrival_policy == "bounded" else stock_end
         depart = max(now, start - flight)
         latest = end - flight - grace_seconds - 1 if end is not None else None
-        reachable = (end is not None and start < end and depart <= horizon_end
-                     and depart <= latest and
+        reachable = (end is not None and start < end and depart <= latest and
                      start <= depart + flight and
                      depart + flight + grace_seconds < end)
         arrival = depart + flight if reachable else None
         reason = ("PURCHASE_WINDOW_NOT_ESTABLISHED" if stock_end is None else
                   "UNCERTAINTY_BOUNDS_DO_NOT_OVERLAP" if arrival_policy == "bounded"
                   and (end is None or start >= end) else
-                  "AFTER_EIGHT_HOUR_DEPARTURE_HORIZON" if depart > horizon_end else
                   "ESTIMATED_STOCKED_PHASE_REACHABLE" if reachable else
                   "NOT_REACHABLE_WITH_PLAYER_FLIGHT")
         record = {
@@ -201,7 +198,7 @@ def build_item_travel_decision(
     elif not model_available:
         status, reason = STATUS_ABSTAIN, str(forecast.get("status") or "MODEL_NO_FORECAST")
     elif selected is None:
-        status, reason = STATUS_NO_WINDOW, "NO_REACHABLE_RESTOCK_IN_FORECAST_HORIZON"
+        status, reason = STATUS_NO_WINDOW, "NO_REACHABLE_RESTOCK_IN_EVENT_LIST"
     elif selected["estimated_departure_start_epoch"] <= now:
         status, reason = STATUS_ACTIVE, "MODELED_STOCKED_PHASE_RECONFIRM_BEFORE_TRAVEL"
     else:
