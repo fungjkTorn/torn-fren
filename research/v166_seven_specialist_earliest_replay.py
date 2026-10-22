@@ -92,27 +92,48 @@ class CausalMirror:
             raise ValueError("causal mirror clock moved backwards")
         lower=-1 if self.clock is None else self.clock
         with closing(_ro(self.source)) as src, closing(sqlite3.connect(self.target)) as dst:
+            # Historical PC snapshots and the live collector do not have
+            # identical surrogate-id schemas. Copy only the logical columns
+            # needed by the research adapters and let the causal mirror assign
+            # its own row ids.
             stock=src.execute(
-                """SELECT id,timestamp,country,item_name,quantity,source
+                """SELECT timestamp,country,item_name,quantity,source
                    FROM stock_history WHERE timestamp>? AND timestamp<=?
-                   ORDER BY timestamp,id""",(lower,issued)).fetchall()
+                   ORDER BY timestamp""",(lower,issued)).fetchall()
             polls=src.execute(
-                """SELECT id,timestamp,mode,success FROM poll_heartbeats
-                   WHERE timestamp>? AND timestamp<=? ORDER BY timestamp,id""",
+                """SELECT timestamp,mode,success FROM poll_heartbeats
+                   WHERE timestamp>? AND timestamp<=? ORDER BY timestamp""",
                 (lower,issued)).fetchall()
+            gap_columns={
+                row[1] for row in src.execute(
+                    "PRAGMA table_info(collection_gaps)").fetchall()
+            }
+            reason_expr=("COALESCE(reason,'historical')" if "reason" in gap_columns
+                         else "'historical'")
             gaps=src.execute(
-                """SELECT id,start_timestamp,
-                          CASE WHEN end_timestamp IS NOT NULL AND end_timestamp<=?
-                               THEN end_timestamp ELSE NULL END,
-                          COALESCE(reason,'historical')
-                   FROM collection_gaps
-                   WHERE start_timestamp<=? ORDER BY start_timestamp,id""",
+                f"""SELECT start_timestamp,
+                           CASE WHEN end_timestamp IS NOT NULL AND end_timestamp<=?
+                                THEN end_timestamp ELSE NULL END,
+                           {reason_expr}
+                    FROM collection_gaps
+                    WHERE start_timestamp<=? ORDER BY start_timestamp""",
                 (issued,issued)).fetchall()
             with dst:
-                if stock: dst.executemany("INSERT OR IGNORE INTO stock_history VALUES(?,?,?,?,?,?)",stock)
-                if polls: dst.executemany("INSERT OR IGNORE INTO poll_heartbeats VALUES(?,?,?,?)",polls)
+                if stock:
+                    dst.executemany(
+                        """INSERT INTO stock_history
+                           (timestamp,country,item_name,quantity,source)
+                           VALUES(?,?,?,?,?)""",stock)
+                if polls:
+                    dst.executemany(
+                        """INSERT INTO poll_heartbeats(timestamp,mode,success)
+                           VALUES(?,?,?)""",polls)
                 dst.execute("DELETE FROM collection_gaps")
-                if gaps: dst.executemany("INSERT INTO collection_gaps VALUES(?,?,?,?)",gaps)
+                if gaps:
+                    dst.executemany(
+                        """INSERT INTO collection_gaps
+                           (start_timestamp,end_timestamp,reason)
+                           VALUES(?,?,?)""",gaps)
         self.clock=issued
 
 
