@@ -43,7 +43,7 @@ FLIGHT=TRAVEL_SECONDS[COUNTRY]
 MODEL_FREEZE_EPOCH=1791504000
 
 # Existing registry incumbent plus serious alternatives.
-V19_NAMES=("dyn1","dyn9","dyn10","dyn11","dyn12","dyn13")
+V19_NAMES=tuple(f"dyn{i}" for i in range(1,14))
 V20_NAMES=tuple(f"traj{i}" for i in range(1,15))
 GENERIC_NAMES=("true_zero_expected","true_zero_bounded",
                "quantity_rate_expected","quantity_rate_bounded",
@@ -81,8 +81,9 @@ def _event_candidates(rows,gaps,issued):
     return f,sorted(set(out))
 
 
-def _dynamic(causal_db,issued,events,generation,name):
-    if not events:return None
+def _dynamic_family(causal_db,issued,events,generation,names):
+    """Score all frozen configs in one engine/context load for this issue."""
+    if not events:return {name:None for name in names}
     from services import history_service
     _install_frozen_readonly_history(history_service,causal_db)
     if generation=="v19":
@@ -97,17 +98,20 @@ def _dynamic(causal_db,issued,events,generation,name):
         normalized=engine.normalize_gaps(history_service.get_collection_gaps())
         timeline=engine.Timeline(cleaned,cycles,30,gaps=normalized)
         deps,features=engine.completed_cycle_features(cycles,gaps=normalized)
-    cfg=next((x for x in engine.configs() if x.name==name),None)
-    if cfg is None:return None
+    cfgs={x.name:x for x in engine.configs()}
     points=engine.build_points(timeline,deps,features,600)
-    if len(points)<60:return None
+    if len(points)<60:return {name:None for name in names}
+    times=[x.t for x in points]
     delays=[d for d,_ in events]
-    p=engine.plan(float(issued),points,[x.t for x in points],timeline,
-                  deps,features,cfg,delays,FLIGHT,GRACE)
-    if p is None:return None
-    return int(p["departure_time"])
-
-
+    result={}
+    for name in names:
+        cfg=cfgs.get(name)
+        if cfg is None:
+            result[name]=None;continue
+        p=engine.plan(float(issued),points,times,timeline,deps,features,
+                      cfg,delays,FLIGHT,GRACE)
+        result[name]=int(p["departure_time"]) if p is not None else None
+    return result
 def _cycle_forecast(rows,gaps,issued,kind):
     crosses=_gap_index(gaps,issued)
     tracker=QuantityRateCycles(crosses) if kind.startswith("quantity_rate") else ZeroCycles(crosses)
@@ -126,17 +130,22 @@ def _cycle_forecast(rows,gaps,issued,kind):
     return d.get("estimated_departure_epoch")
 
 
-def _one_plan(causal_db,rows,gaps,issued,name):
+def issue_plans(causal_db,rows,gaps,issued,candidate_subset=None):
     forecast,events=_event_candidates(rows,gaps,issued)
-    if name.startswith("v19:"):
-        dep=_dynamic(causal_db,issued,events,"v19",name.split(":",1)[1])
-    elif name.startswith("v20:"):
-        dep=_dynamic(causal_db,issued,events,"v20",name.split(":",1)[1])
-    else:
-        dep=_cycle_forecast(rows,gaps,issued,name)
-    return dep,forecast
-
-
+    subset=set(CANDIDATES if candidate_subset is None else candidate_subset)
+    out={}
+    need_v19=[x.split(":",1)[1] for x in subset if x.startswith("v19:")]
+    need_v20=[x.split(":",1)[1] for x in subset if x.startswith("v20:")]
+    if need_v19:
+        values=_dynamic_family(causal_db,issued,events,"v19",need_v19)
+        out.update({"v19:"+k:v for k,v in values.items()})
+    if need_v20:
+        values=_dynamic_family(causal_db,issued,events,"v20",need_v20)
+        out.update({"v20:"+k:v for k,v in values.items()})
+    for name in subset:
+        if name in GENERIC_NAMES:
+            out[name]=_cycle_forecast(rows,gaps,issued,name)
+    return out,forecast
 def _score(dep,issued,truth_rows,truth_gaps,evidence,truth_cutoff):
     c=Counter()
     c["issues"]=1
@@ -158,11 +167,22 @@ def _score(dep,issued,truth_rows,truth_gaps,evidence,truth_cutoff):
     return c,None,None
 
 
-def replay(*,source,start,end,output):
+def _rank_summary(summary):
+    return (
+        summary["arrival_success_fraction"]
+        if summary["arrival_success_fraction"] is not None else -1,
+        summary["earliest_hit_fraction"]
+        if summary["earliest_hit_fraction"] is not None else -1,
+        summary["proposal_coverage"]
+        if summary["proposal_coverage"] is not None else -1,
+        summary["arrival_known"],
+    )
+
+
+def replay(*,source,start,end,output,screen_step=3600,finalists=4):
     source=Path(source).resolve(strict=True)
     if start<MODEL_FREEZE_EPOCH or end<=start:
         raise ValueError("invalid post-freeze window")
-    truth_cutoff=None
     with closing(sqlite3.connect(source.as_uri()+"?mode=ro",uri=True)) as db:
         db.execute("PRAGMA query_only=ON")
         truth_cutoff=db.execute(
@@ -172,103 +192,133 @@ def replay(*,source,start,end,output):
         raise ValueError("immature validation end")
 
     truth_rows,truth_gaps=_truth_rows(source,KEY,truth_cutoff)
-    polls,gaps=_polls_gaps(source,truth_cutoff)
+    polls,_=_polls_gaps(source,truth_cutoff)
     evidence=ArrivalEvidence(
         [OBS(*r) for r in truth_rows],polls,truth_gaps,truth_cutoff)
-
     issue_rows=[r for r in truth_rows if r[0]<=end]
-    issues=list(range(((start+STEP-1)//STEP)*STEP,end+1,STEP))
-    split_index=max(1,int(len(issues)*.60))
-    development=set(issues[:split_index])
-    validation=set(issues[split_index:])
-    stats={name:{"development":Counter(),"validation":Counter(),
-                 "dev_dep":[],"val_dep":[],"dev_arr":[],"val_arr":[]} for name in CANDIDATES}
+
+    # Stage A: broad frozen-config screen on hourly matched issue clocks.
+    screen_issues=list(range(
+        ((start+screen_step-1)//screen_step)*screen_step,end+1,screen_step))
+    split=max(1,int(len(screen_issues)*.60))
+    dev_issues=screen_issues[:split]
+    val_hourly=screen_issues[split:]
+    stats={name:Counter() for name in CANDIDATES}
+    dep_errors={name:[] for name in CANDIDATES}
+    arr_errors={name:[] for name in CANDIDATES}
 
     with tempfile.TemporaryDirectory(prefix="v168-sou-xanax-") as td:
-        mirror=CausalMirror(source,Path(td)/"causal.sqlite",issues[0])
-        for n,issued in enumerate(issues,1):
+        scratch=Path(td)/"causal.sqlite"
+        mirror=CausalMirror(source,scratch,dev_issues[0])
+        for n,issued in enumerate(dev_issues,1):
             mirror.advance(issued)
             visible=[r for r in issue_rows if r[0]<=issued]
-            with closing(sqlite3.connect((Path(td)/"causal.sqlite").as_uri()+"?mode=ro",uri=True)) as db:
+            with closing(sqlite3.connect(scratch.as_uri()+"?mode=ro",uri=True)) as db:
                 cgaps=db.execute(
                     "SELECT start_timestamp,end_timestamp FROM collection_gaps ORDER BY start_timestamp"
                 ).fetchall()
+            plans,_=issue_plans(scratch,visible,cgaps,issued)
             for name in CANDIDATES:
-                dep,_=_one_plan(Path(td)/"causal.sqlite",visible,cgaps,issued,name)
-                c,de,ae=_score(dep,issued,truth_rows,truth_gaps,evidence,truth_cutoff)
-                phase="development" if issued in development else "validation"
-                stats[name][phase].update(c)
-                if de is not None:stats[name]["dev_dep" if phase=="development" else "val_dep"].append(de)
-                if ae is not None:stats[name]["dev_arr" if phase=="development" else "val_arr"].append(ae)
+                sc,de,ae=_score(plans.get(name),issued,truth_rows,truth_gaps,evidence,truth_cutoff)
+                stats[name].update(sc)
+                if de is not None:dep_errors[name].append(de)
+                if ae is not None:arr_errors[name].append(ae)
             if n%12==0:
-                print(json.dumps({"status":"V168_PROGRESS","issues_done":n,"issues_total":len(issues)}),flush=True)
+                print(json.dumps({"status":"V168_SCREEN_PROGRESS",
+                                  "issues_done":n,"issues_total":len(dev_issues)}),flush=True)
 
-    def summarize(name,phase):
-        c=stats[name][phase]
-        known=c["arrival_success"]+c["arrival_failure"]
-        dep=stats[name]["dev_dep" if phase=="development" else "val_dep"]
-        arr=stats[name]["dev_arr" if phase=="development" else "val_arr"]
-        return {
-            "issues":c["issues"],"proposals":c["proposals"],
-            "proposal_coverage":c["proposals"]/c["issues"] if c["issues"] else None,
-            "arrival_known":known,
-            "arrival_success_fraction":c["arrival_success"]/known if known else None,
-            "earliest_scored":c["earliest_scored"],
-            "earliest_hit_fraction":c["earliest_hit"]/c["earliest_scored"] if c["earliest_scored"] else None,
-            "median_departure_minus_oracle_seconds":statistics.median(dep) if dep else None,
-            "median_arrival_minus_actual_restock_seconds":statistics.median(arr) if arr else None,
-            "counts":dict(c),
-        }
+        def summary(name,c,dep,arr):
+            known=c["arrival_success"]+c["arrival_failure"]
+            return {
+                "issues":c["issues"],"proposals":c["proposals"],
+                "proposal_coverage":c["proposals"]/c["issues"] if c["issues"] else None,
+                "arrival_known":known,
+                "arrival_success_fraction":c["arrival_success"]/known if known else None,
+                "earliest_scored":c["earliest_scored"],
+                "earliest_hit_fraction":c["earliest_hit"]/c["earliest_scored"] if c["earliest_scored"] else None,
+                "median_departure_minus_oracle_seconds":statistics.median(dep) if dep else None,
+                "median_arrival_minus_actual_restock_seconds":statistics.median(arr) if arr else None,
+                "counts":dict(c),
+            }
 
-    rows=[]
-    for name in CANDIDATES:
-        rows.append({"candidate":name,
-                     "development":summarize(name,"development"),
-                     "validation":summarize(name,"validation")})
+        dev_rows=[]
+        for name in CANDIDATES:
+            dev_rows.append({"candidate":name,"development":summary(
+                name,stats[name],dep_errors[name],arr_errors[name])})
+        ranked=sorted(dev_rows,key=lambda x:_rank_summary(x["development"]),reverse=True)
+        chosen=[x["candidate"] for x in ranked[:finalists]]
+        if "v19:dyn1" not in chosen:
+            chosen[-1]="v19:dyn1"
+        chosen=tuple(dict.fromkeys(chosen))
 
-    # Selection uses development only. Prefer arrival reliability, then earliest
-    # event correctness, then coverage. Validation is report-only.
-    def rank(row):
-        d=row["development"]
-        return (
-            d["arrival_success_fraction"] if d["arrival_success_fraction"] is not None else -1,
-            d["earliest_hit_fraction"] if d["earliest_hit_fraction"] is not None else -1,
-            d["proposal_coverage"] if d["proposal_coverage"] is not None else -1,
-            d["arrival_known"],
-        )
-    winner=max(rows,key=rank)
+        # Stage B: untouched later 40%, every five minutes, finalists only.
+        if not val_hourly:
+            raise ValueError("validation split empty")
+        val_start=val_hourly[0]
+        validation_issues=list(range(val_start,end+1,STEP))
+        vst={name:Counter() for name in chosen}
+        vdep={name:[] for name in chosen}
+        varr={name:[] for name in chosen}
+        mirror.advance(val_start)
+        for n,issued in enumerate(validation_issues,1):
+            mirror.advance(issued)
+            visible=[r for r in issue_rows if r[0]<=issued]
+            with closing(sqlite3.connect(scratch.as_uri()+"?mode=ro",uri=True)) as db:
+                cgaps=db.execute(
+                    "SELECT start_timestamp,end_timestamp FROM collection_gaps ORDER BY start_timestamp"
+                ).fetchall()
+            plans,_=issue_plans(scratch,visible,cgaps,issued,candidate_subset=chosen)
+            for name in chosen:
+                sc,de,ae=_score(plans.get(name),issued,truth_rows,truth_gaps,evidence,truth_cutoff)
+                vst[name].update(sc)
+                if de is not None:vdep[name].append(de)
+                if ae is not None:varr[name].append(ae)
+            if n%48==0:
+                print(json.dumps({"status":"V168_VALIDATION_PROGRESS",
+                                  "issues_done":n,"issues_total":len(validation_issues),
+                                  "finalists":chosen}),flush=True)
+
+    validation=[]
+    for name in chosen:
+        validation.append({"candidate":name,"validation":summary(
+            name,vst[name],vdep[name],varr[name])})
+    winner=max(validation,key=lambda x:_rank_summary(x["validation"]))
     result={
-        "status":"V168_SOUTH_AFRICA_XANAX_MATCHED_CAUSAL_VALIDATION",
+        "status":"V168_SOUTH_AFRICA_XANAX_TWO_STAGE_CAUSAL_VALIDATION",
         "item_key":KEY,"flight_seconds":FLIGHT,
         "start":start,"end":end,"truth_cutoff":truth_cutoff,
-        "issue_step_seconds":STEP,
-        "selection_split":"first_60_percent_development_last_40_percent_validation",
+        "screen_issue_step_seconds":screen_step,
+        "validation_issue_step_seconds":STEP,
+        "selection_rule":"broad screen first60pct; finalist validation last40pct every5m",
         "historical_incumbent":{
             "candidate":"v19:dyn1",
             "old_development_success_fraction":143/152,
             "old_hits":143,"old_starts":152,
         },
-        "selected_on_development":winner["candidate"],
-        "selected_validation":winner["validation"],
-        "candidates":rows,
+        "screen_ranking":ranked,
+        "finalists":list(chosen),
+        "validation":validation,
+        "winner_on_untouched_validation":winner["candidate"],
+        "winner_validation":winner["validation"],
         "actual_player_flights":False,
         "production_modified":False,
-        "validation_not_used_for_selection":True,
+        "validation_not_used_for_screen_selection":True,
     }
     Path(output).write_text(json.dumps(result,indent=2,sort_keys=True)+"\n",encoding="utf-8")
     print(json.dumps({
-        "winner":result["selected_on_development"],
-        "validation":result["selected_validation"],
+        "winner":result["winner_on_untouched_validation"],
+        "validation":result["winner_validation"],
+        "finalists":result["finalists"],
         "output":str(Path(output).resolve()),
     },sort_keys=True))
-
-
 def main():
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument("--source",required=True)
     p.add_argument("--start-epoch",type=int)
     p.add_argument("--end-epoch",type=int)
     p.add_argument("--days",type=int,default=7)
+    p.add_argument("--screen-step",type=int,default=3600)
+    p.add_argument("--finalists",type=int,default=4)
     p.add_argument("--output",required=True)
     a=p.parse_args()
     source=Path(a.source).resolve(strict=True)
@@ -278,7 +328,12 @@ def main():
                WHERE mode='poll-cycle' AND success=1""").fetchone()[0]
     end=a.end_epoch if a.end_epoch is not None else int(cutoff)-FLIGHT-GRACE-180
     start=a.start_epoch if a.start_epoch is not None else max(MODEL_FREEZE_EPOCH,end-a.days*86400)
-    replay(source=source,start=start,end=end,output=a.output)
+    if a.screen_step not in (1800,3600,7200):
+        raise SystemExit("screen-step must be 1800, 3600 or 7200")
+    if not 2<=a.finalists<=6:
+        raise SystemExit("finalists must be 2..6")
+    replay(source=source,start=start,end=end,output=a.output,
+           screen_step=a.screen_step,finalists=a.finalists)
 
 
 if __name__=="__main__":
