@@ -220,10 +220,13 @@ def plan_at_issue(name,rec,clock,flight):
         conservative=name in ("RECENT6","REGIME_AUTO"))
 
 
-def find_original_report(root,key,start,end):
+def find_original_report(root,key,start,end,south_report=None):
     p=Path(root).expanduser().resolve(strict=True)
     filename=key.replace(":","__").replace(" ","_")+".json"
-    options=list(p.rglob(filename))
+    if key=="sou:Xanax" and south_report is not None:
+        options=[Path(south_report).expanduser().resolve(strict=True)]
+    else:
+        options=list(p.rglob(filename))
     matches=[]
     for f in options:
         try:
@@ -364,6 +367,8 @@ def main():
     p.add_argument("--v169-root",required=True,
                    help="Folder containing the original 24 V169 reports and separate sou__Xanax")
     p.add_argument("--output",required=True)
+    p.add_argument("--south-africa-report",default=None,
+                   help="Original separately completed sou__Xanax.json (no copying)")
     p.add_argument("--start-epoch",type=int,default=START)
     p.add_argument("--end-epoch",type=int,default=END)
     p.add_argument("--item-key",action="append")
@@ -377,7 +382,9 @@ def main():
     out.parent.mkdir(parents=True,exist_ok=True)
     results={}
     for key in keys:
-        baseline=find_original_report(a.v169_root,key,a.start_epoch,a.end_epoch)
+        baseline=find_original_report(
+            a.v169_root,key,a.start_epoch,a.end_epoch,
+            south_report=a.south_africa_report)
         results[key]=replay_item(source,baseline,key,a.start_epoch,a.end_epoch)
         d=results[key]
         print(json.dumps({"item":key,"choice":d["chosen_using_development_only"],
