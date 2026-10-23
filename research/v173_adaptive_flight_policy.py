@@ -14,6 +14,7 @@ import bisect
 from collections import Counter
 from contextlib import closing
 import json
+import hashlib
 import math
 from pathlib import Path
 import sqlite3
@@ -444,14 +445,43 @@ def main():
     out=Path(a.output).expanduser().resolve()
     if out.exists():raise FileExistsError("preserve prior experiment; choose a new output")
     out.parent.mkdir(parents=True,exist_ok=True)
+    src_stat=source.stat()
+    run_code_hash=hashlib.sha256(Path(__file__).read_bytes()).hexdigest()[:12]
+    source_id=hashlib.sha256(
+        f"{source}:{src_stat.st_size}:{src_stat.st_mtime_ns}".encode()).hexdigest()[:12]
+    # Research checkpoints persist after every completed item. Safe to resume
+    # after interruption without repeating completed comparisons or swapping
+    # source databases. This is NOT a website or VM write.
+    partdir=out.parent/(out.stem+"_parts_"+source_id+"_"+run_code_hash)
+    partdir.mkdir(parents=True,exist_ok=True)
     results={}
-    for key in keys:
+    for index,key in enumerate(keys,1):
         baseline=find_original_report(
             a.v169_root,key,a.start_epoch,a.end_epoch,
             south_report=a.south_africa_report)
-        results[key]=replay_item(source,baseline,key,a.start_epoch,a.end_epoch)
+        baseline_fingerprint=hashlib.sha256(
+            json.dumps(baseline,sort_keys=True,separators=(",",":")).encode()
+        ).hexdigest()
+        checkpoint=partdir/(key.replace(":","__").replace(" ","_")+".json")
+        identity={"source_id":source_id,"code_id":run_code_hash,
+                  "baseline_sha256":baseline_fingerprint,
+                  "item_key":key,"start":a.start_epoch,"end":a.end_epoch}
+        if checkpoint.exists():
+            saved=json.loads(checkpoint.read_text(encoding="utf-8"))
+            if saved.get("identity")!=identity:
+                raise ValueError("checkpoint identity mismatch: "+str(checkpoint))
+            results[key]=saved["result"]
+            resumed=True
+        else:
+            results[key]=replay_item(source,baseline,key,a.start_epoch,a.end_epoch)
+            with checkpoint.open("x",encoding="utf-8") as handle:
+                json.dump({"identity":identity,"result":results[key]},handle,
+                          sort_keys=True)
+                handle.write("\n")
+            resumed=False
         d=results[key]
-        print(json.dumps({"item":key,"choice":d["chosen_using_development_only"],
+        print(json.dumps({"progress":f"{index}/{len(keys)}","item":key,
+            "resumed":resumed,"choice":d["chosen_using_development_only"],
             "incumbent_validation":d["incumbent_validation"]["arrival_success_fraction"],
             "challenger_validation":d["challenger_validation"]["arrival_success_fraction"]},
             sort_keys=True),flush=True)
@@ -473,6 +503,8 @@ def main():
         "selection_never_uses_validation_results":True,
         "candidate_results_correlated_by_repeated_decisions":True,
         "not_independent_restock_success_rates":True,
+        "per_item_checkpoint_directory":str(partdir),
+        "checkpoint_resumable":True,
         "production_modified":False,"results":results}
     out.write_text(json.dumps(result,indent=2,sort_keys=True)+"\n",encoding="utf-8")
     print("V173_COMPLETE",len(results),"OUTPUT",out,flush=True)
