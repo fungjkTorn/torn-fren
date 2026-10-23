@@ -325,6 +325,39 @@ def rank(d,windows=()):
             d["proposal_coverage"] or 0)
 
 
+def release_gate(name,incumbent,challenger,windows):
+    """Choose keep-or-propose one fixed development-selected challenger.
+
+    This is an offline recommendation, NOT automatic deployment. The final
+    chronological holdout is evaluated once, after all configuration choices
+    are locked. A promotion requires meaningful per-issue improvement while
+    retaining adequate on-landing reliability and comparable coverage.
+    """
+    if name=="V169_INCUMBENT":
+        return {"policy":"V169_INCUMBENT","decision":"KEEP_BASELINE_SELECTED",
+                "deploy_automatically":False}
+    suffix=f"landing_or_wait_{max(windows)}_seconds_success_per_issue" if windows else "success_per_issue"
+    a=incumbent.get(suffix);b=challenger.get(suffix)
+    if (a is None or b is None or
+        challenger.get("arrival_known",0)<30 or
+        challenger.get("executions",0)<30 or
+        challenger.get("proposal_coverage",0)<.25):
+        return {"policy":"V169_INCUMBENT","decision":"RETAIN_INSUFFICIENT_HOLDOUT",
+                "metric":suffix,"deploy_automatically":False}
+    n0=incumbent.get("arrival_success_fraction")
+    n1=challenger.get("arrival_success_fraction")
+    if n0 is None or n1 is None or n1<n0-.03:
+        return {"policy":"V169_INCUMBENT","decision":"RETAIN_STOCKED_ARRIVAL_RELIABILITY",
+                "metric":suffix,"deploy_automatically":False}
+    if b<a+.005 or challenger["proposal_coverage"]<.75*incumbent["proposal_coverage"]:
+        return {"policy":"V169_INCUMBENT","decision":"RETAIN_NO_MEANINGFUL_GAIN",
+                "metric":suffix,"holdout_metric_delta":round(b-a,6),
+                "deploy_automatically":False}
+    return {"policy":name,"decision":"CHALLENGER_CANDIDATE_FOR_LIVE_REVIEW",
+            "metric":suffix,"holdout_metric_delta":round(b-a,6),
+            "deploy_automatically":False}
+
+
 def replay_item(source,report,key,start,end):
     if report["item_key"]!=key or report["start"]!=start or report["end"]!=end:
         raise ValueError("as-issued baseline identity/window mismatch")
@@ -408,8 +441,11 @@ def replay_item(source,report,key,start,end):
     # One pre-registered selection using ONLY earlier 60%; no validation
     # winner tuning / retrospective threshold selection.
     chosen=max(STRATEGIES,key=lambda name:rank(reports["development"][name],windows))
+    gate=release_gate(chosen,reports["validation"]["V169_INCUMBENT"],
+                      reports["validation"][chosen],windows)
     return {
         "item_key":key,"chosen_using_development_only":chosen,
+        "recommended_release_policy":gate,
         "incumbent_validation":reports["validation"]["V169_INCUMBENT"],
         "challenger_validation":reports["validation"][chosen],
         "all_policies":reports,"regime_shift_issue_flags":flags,
@@ -482,6 +518,7 @@ def main():
         d=results[key]
         print(json.dumps({"progress":f"{index}/{len(keys)}","item":key,
             "resumed":resumed,"choice":d["chosen_using_development_only"],
+            "release_policy":d["recommended_release_policy"]["policy"],
             "incumbent_validation":d["incumbent_validation"]["arrival_success_fraction"],
             "challenger_validation":d["challenger_validation"]["arrival_success_fraction"]},
             sort_keys=True),flush=True)
@@ -501,6 +538,8 @@ def main():
         "drift_guard":"LAST6_VS_PRIOR18_MEDIAN_RATIO_OUTSIDE_0.78_TO_1.25",
         "past_outcomes_never_used_to_fit_same_issued_decision":True,
         "selection_never_uses_validation_results":True,
+        "holdout_used_once_for_retain_or_propose_gate":True,
+        "release_candidates_require_human_review_and_live_producer":True,
         "candidate_results_correlated_by_repeated_decisions":True,
         "not_independent_restock_success_rates":True,
         "per_item_checkpoint_directory":str(partdir),
