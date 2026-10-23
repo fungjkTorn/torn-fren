@@ -7,6 +7,7 @@ from unittest.mock import Mock
 from research.v173_adaptive_flight_policy import (
     CausalCycles, weighted_quantile, historical_openings,
     wait_window_grade, plan_at_issue, summary, rank, SPECIAL_WINDOWS,
+    fit_restock_bias, STRATEGIES,
 )
 
 
@@ -124,6 +125,59 @@ class V173CausalTests(unittest.TestCase):
         self.assertIsNone(c.high_start)
         self.assertFalse(c.viable_current(200,500,6))
         self.assertEqual(c.available_durations,[])
+
+    def test_calibrate_restock_bias_per_independent_event_and_no_future(self):
+        fit_end=100000
+        records=[]
+        for actual in (25000,36000,48000,60000):
+            for issued in (actual-2000,actual-1700,actual-1400):
+                records.append({
+                    "issued_epoch":issued,
+                    "selected_event":{"event_index":1,
+                                      "predicted_restock_epoch":actual-600},
+                    "actual_target_restock_epoch":actual,
+                })
+        # A giant, inaccurate post-fit event may NEVER affect calibration.
+        records.append({"issued_epoch":100100,
+                        "selected_event":{"event_index":1,
+                                          "predicted_restock_epoch":101000},
+                        "actual_target_restock_epoch":180000})
+        records.sort(key=lambda r:r["issued_epoch"])
+        fit=fit_restock_bias(records,fit_end,flight=1000)
+        self.assertEqual(fit["independent_events"],4)
+        self.assertEqual(fit["offset_seconds"],600)
+        self.assertTrue(fit["supported"])
+        self.assertEqual(fit["fit_before_epoch"],fit_end)
+
+    def test_each_item_gets_all_adjustments_and_universal_current_next_restock(self):
+        self.assertIn("V169_BIAS_ADJUSTED",STRATEGIES)
+        self.assertIn("CURRENT_STOCK_GUARD_BIAS",STRATEGIES)
+        rec={
+            "issued_epoch":31110,
+            "recommended_departure_epoch":31110,
+            "selected_event":{"event_index":0,
+                              "predicted_restock_epoch":31100},
+        }
+        for country in ("sou","mex","arg","uni"):
+            with self.subTest(country=country):
+                rows=[]
+                for i in range(10):
+                    base=1000+i*3000
+                    rows += [(base-100,0,"yata"),(base,500,"yata"),
+                             (base+300,10,"yata"),(base+350,0,"yata")]
+                rows += [(31000,0,"yata"),(31100,500,"yata")]
+                clock=CausalCycles(rows,lambda *_:False)
+                clock.advance(31110)
+                depart,target=plan_at_issue("CURRENT_STOCK_GUARD",rec,clock,600)
+                self.assertIsNotNone(target)
+                self.assertGreater(target,31110)
+                self.assertGreaterEqual(depart,31110)
+        event={"event_index":2,"predicted_restock_epoch":90000}
+        record={"issued_epoch":76000,"recommended_departure_epoch":77000,
+                "selected_event":event}
+        dep,target=plan_at_issue("V169_BIAS_ADJUSTED",record,None,600,
+                                 bias_seconds=600)
+        self.assertEqual((dep,target),(77600,90600))
 
     def test_causal_forecast_ignores_rows_after_issue(self):
         rows=[(0,0,"yata")]
