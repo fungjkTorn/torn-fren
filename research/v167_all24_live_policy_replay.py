@@ -336,18 +336,44 @@ def generic_plan(source,key,issued,mode):
 
 
 def routed_champion_plan(causal_db,key,issued,events,checkpoint_selection=None):
-    candidates=earliest_event_candidates(events,issued)
-    result=choose_event(
-        causal_db,key,issued,candidates,
-        checkpoint_selection=checkpoint_selection)
+    """Choose the earliest reachable event the champion can actually support."""
+    reachable=sorted(
+        [e for e in events if e.get("reachable")],
+        key=lambda e:(e.get("event_index",10**9),
+                      e.get("predicted_restock_epoch",10**18)))
+    attempts=[]
+    for rank,event in enumerate(reachable,1):
+        candidates=earliest_event_candidates([event],issued)
+        result=choose_event(
+            causal_db,key,issued,candidates,
+            checkpoint_selection=checkpoint_selection)
+        attempts.append({
+            "reachable_rank":rank,
+            "event_index":event.get("event_index"),
+            "status":result.get("status"),
+        })
+        if result.get("departure") is not None:
+            return {
+                "model":"champion",
+                "champion_kind":CHAMPION_KIND[key],
+                "status":result.get("status"),
+                "departure":result.get("departure"),
+                "selected_event_index":result.get("selected_event_index"),
+                "selected_reachable_rank":rank,
+                "model_score":result.get("score"),
+                "event_attempts":attempts,
+                "diagnostic":result,
+            }
     return {
         "model":"champion",
         "champion_kind":CHAMPION_KIND[key],
-        "status":result.get("status"),
-        "departure":result.get("departure"),
-        "selected_event_index":result.get("selected_event_index"),
-        "model_score":result.get("score"),
-        "diagnostic":result,
+        "status":attempts[-1]["status"] if attempts else "NO_REACHABLE_EVENTS",
+        "departure":None,
+        "selected_event_index":None,
+        "selected_reachable_rank":None,
+        "model_score":None,
+        "event_attempts":attempts,
+        "diagnostic":None,
     }
 
 def score_decision(key,issued,departure,truth_cutoff,truth_rows,truth_gaps,evidence):
@@ -422,6 +448,8 @@ def replay_item(*,source,key,start,end,workdir):
                 "route_model":ROUTES[key]["primary"],
                 "champion_kind":CHAMPION_KIND[key],
                 "route_status":local.get("status"),
+                "selected_reachable_rank":local.get("selected_reachable_rank"),
+                "event_attempts":local.get("event_attempts"),
                 "checkpoint_selector":checkpoint_selection,
                 "champion_score":local.get("model_score"),
                 "event_forecast_status":forecast.get("status"),
