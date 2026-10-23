@@ -47,6 +47,7 @@ from deploy.scripts.v163_readonly_event_first_preview import predict_events as v
 from research.v167_event_candidate_scoring import (
     CHAMPION_KIND, choose_event, earliest_event_candidates,
 )
+from research.v172_verified_arrival_target_score import grade_target_window
 from research.v169_incremental_checkpoint_selector import (
     IncrementalCheckpointSelector, TARGETS as CHECKPOINT_TARGETS,
 )
@@ -393,6 +394,14 @@ def score_decision(key,issued,departure,truth_cutoff,truth_rows,truth_gaps,evide
             departure_minus_oracle_seconds=departure-target["oracle_earliest_departure"],
             arrival_minus_actual_restock_seconds=arrival-target["restock"],
         )
+    grade,reason=grade_target_window(
+        arrival=arrival,state=state,
+        restock=target.get("restock") if target["status"]=="EARLIEST_REACHABLE_FOUND" else None,
+        depletion=target.get("depletion") if target["status"]=="EARLIEST_REACHABLE_FOUND" else None,
+        grace=GRACE,
+    )
+    result["verified_earliest_target_hit"]=grade
+    result["verified_earliest_target_evidence"]=reason
     return result
 
 
@@ -501,6 +510,8 @@ def replay_item(*,source,key,start,end,workdir):
             "actual_target_depletion_epoch":r.get("actual_target_depletion_epoch"),
             "departure_minus_oracle_seconds":r.get("departure_minus_oracle_seconds"),
             "arrival_minus_actual_restock_seconds":r.get("arrival_minus_actual_restock_seconds"),
+            "verified_earliest_target_hit":r.get("verified_earliest_target_hit"),
+            "verified_earliest_target_evidence":r.get("verified_earliest_target_evidence"),
         })
 
     c=Counter()
@@ -513,6 +524,9 @@ def replay_item(*,source,key,start,end,workdir):
         if r.get("arrival_state") in ("SUCCESS","FAILURE"):
             c["arrival_known"]+=1
             c["arrival_success"]+=int(r["arrival_state"]=="SUCCESS")
+        if r.get("verified_earliest_target_hit") is not None:
+            c["verified_earliest_target_scored"]+=1
+            c["verified_earliest_target_hit"]+=int(r["verified_earliest_target_hit"])
         if r.get("actual_target_restock_epoch") is not None:
             c["earliest_target_scored"]+=1
             arr=r["arrival_epoch"]+GRACE
@@ -530,6 +544,9 @@ def replay_item(*,source,key,start,end,workdir):
         if e.get("arrival_state") in ("SUCCESS","FAILURE"):
             ec["arrival_known"]+=1
             ec["arrival_success"]+=int(e["arrival_state"]=="SUCCESS")
+        if e.get("verified_earliest_target_hit") is not None:
+            ec["verified_earliest_target_scored"]+=1
+            ec["verified_earliest_target_hit"]+=int(e["verified_earliest_target_hit"])
         if e.get("actual_target_restock_epoch") is not None:
             ec["earliest_target_scored"]+=1
             arr=e["arrival_epoch"]+GRACE
@@ -542,14 +559,24 @@ def replay_item(*,source,key,start,end,workdir):
         "item_key":key,"route":ROUTES[key],"start":start,"end":end,
         "counts":dict(c),
         "arrival_success_fraction":c["arrival_success"]/c["arrival_known"] if c["arrival_known"] else None,
-        "earliest_target_hit_fraction":c["earliest_target_hit"]/c["earliest_target_scored"] if c["earliest_target_scored"] else None,
+        "earliest_target_hit_fraction":(
+            c["verified_earliest_target_hit"]/c["verified_earliest_target_scored"]
+            if c["verified_earliest_target_scored"] else None),
+        "legacy_earliest_target_temporal_proxy_fraction":(
+            c["earliest_target_hit"]/c["earliest_target_scored"]
+            if c["earliest_target_scored"] else None),
         "proposal_coverage":c["proposals"]/c["issues"] if c["issues"] else None,
         "execution_counts":dict(ec),
         "execution_arrival_success_fraction":(
             ec["arrival_success"]/ec["arrival_known"] if ec["arrival_known"] else None),
         "execution_earliest_target_hit_fraction":(
+            ec["verified_earliest_target_hit"]/ec["verified_earliest_target_scored"]
+            if ec["verified_earliest_target_scored"] else None),
+        "execution_legacy_earliest_target_temporal_proxy_fraction":(
             ec["earliest_target_hit"]/ec["earliest_target_scored"]
             if ec["earliest_target_scored"] else None),
+        "earliest_target_scoring_version":"V172_EVIDENCE_QUALIFIED",
+        "legacy_temporal_proxy_is_not_stock_at_arrival_proof":True,
         "actionable_executions":executions,
         "mean_departure_minus_oracle_seconds":_mean(dep_errors),
         "median_departure_minus_oracle_seconds":statistics.median(dep_errors) if dep_errors else None,
