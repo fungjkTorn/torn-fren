@@ -31,13 +31,13 @@
 
     body {
       margin: 0;
-      padding: 8px 10px;
+      padding: 0;
       background: var(--bg);
       color: var(--text);
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
 
-    .page { width: 100%; margin: 0 auto; }
+    .page { width: 100%; margin: 0 auto; padding: 10px 10px 8px; }
 
     h1 {
       margin: 0 0 4px;
@@ -591,7 +591,8 @@
     }
 
     @media (max-width: 760px) {
-      body { padding: 10px; }
+      body { padding: 0; }
+      .page { padding: 10px; }
 
       button {
         min-height: 42px;
