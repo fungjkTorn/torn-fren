@@ -38,6 +38,7 @@ CHAMPION_KIND={
     "uni:Nessie Plushie":"nessie_template",
     "uni:Red Fox Plushie":"redfox_analog",
     "jap:Xanax":"japan_quantity_rate",
+    "sou:Xanax":"v19_sou_dyn1",
 }
 
 
@@ -47,10 +48,55 @@ def roster():
     return dict(CHAMPION_KIND)
 
 
+def earliest_event_candidates(events,issued):
+    """Return candidate departures only for the earliest reachable event.
+
+    The product contract is earliest reachable restock first. A champion may
+    choose timing *within* that event, but it may not skip to a later restock
+    merely because that later event scores better.
+    """
+    reachable=[e for e in events if e.get("reachable")]
+    if not reachable:
+        return []
+    event=min(reachable,key=lambda e:(e.get("event_index",10**9),
+                                      e.get("predicted_restock_epoch",10**18)))
+    earliest=event.get("earliest_departure_epoch")
+    end=event.get("predicted_depletion_epoch")
+    country_event=dict(event)
+    if not isinstance(earliest,int) or not isinstance(end,int):
+        return [event]
+    country=event.get("item_key_country")
+    # Caller supplies travel implicitly through candidate geometry already.
+    # Build a bounded candidate set over the same event window. This is an
+    # event-count/point-count guard, not a calendar lookahead horizon.
+    latest=event.get("latest_departure_epoch")
+    if not isinstance(latest,int):
+        latest=earliest
+    if latest<=earliest:
+        return [event]
+    span=latest-earliest
+    points=[earliest]
+    dense_end=min(latest,earliest+3600)
+    t=earliest+300
+    while t<=dense_end:
+        points.append(t);t+=300
+    if latest>dense_end:
+        slots=48
+        for i in range(1,slots+1):
+            x=dense_end+round((latest-dense_end)*i/slots)
+            if x>points[-1]:points.append(x)
+    out=[]
+    for dep in points[:64]:
+        e=dict(event)
+        e["candidate_departure_epoch"]=dep
+        out.append(e)
+    return out
+
+
 def _candidate_delays(events,issued):
     rows=[]
     for e in events:
-        dep=e.get("earliest_departure_epoch")
+        dep=e.get("candidate_departure_epoch",e.get("earliest_departure_epoch"))
         if isinstance(dep,int) and dep>=issued:
             rows.append((dep-issued,e))
     rows.sort(key=lambda x:x[0])
@@ -329,6 +375,8 @@ def choose_event(db,key,issued,events):
         return _redfox_choice(db,key,issued,events)
     if kind=="pair_analog":
         return _pair_choice(db,key,issued,events)
+    if kind=="v19_sou_dyn1":
+        return _engine_choice(db,key,issued,events,"v19","dyn1")
     if kind=="japan_quantity_rate":
         # Japan Xanax uses the physical-zero quantity-rate event model itself.
         # Its candidate event list is already generated from that route by V167.
