@@ -20,6 +20,8 @@ on:
       - 'tests/test_pc_original_specialists.py'
       - 'research/japan_xanax/renewal_shadow.py'
       - 'tests/test_v169_south_africa_source_gate.py'
+      - 'research/v169_failure_diagnostics.py'
+      - 'tests/test_v169_failure_diagnostics.py'
       - 'research/plushie_champions/**'
       - 'deploy/research_runner/export_snapshot.py'
       - 'deploy/research_runner/tune_snapshot_for_forward.sh'
@@ -68,6 +70,8 @@ on:
       - 'tests/test_pc_original_specialists.py'
       - 'research/japan_xanax/renewal_shadow.py'
       - 'tests/test_v169_south_africa_source_gate.py'
+      - 'research/v169_failure_diagnostics.py'
+      - 'tests/test_v169_failure_diagnostics.py'
       - 'research/plushie_champions/**'
       - 'deploy/research_runner/export_snapshot.py'
       - 'deploy/research_runner/tune_snapshot_for_forward.sh'
@@ -131,6 +135,7 @@ jobs:
           tests.test_find_missing_specialists_pc
           tests.test_pc_original_specialists
           tests.test_v169_south_africa_source_gate
+          tests.test_v169_failure_diagnostics
           tests.test_research_runner_export_snapshot
           tests.test_research_runner_bootstrap_contract -q
 
