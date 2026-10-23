@@ -122,8 +122,10 @@ def build(base,source,output):
                     "SELECT COUNT(*) FROM stock_history WHERE country='sou' AND lower(item_name)='xanax'"
                 ).fetchone()[0]
                 if added!=count:raise ValueError("source-history copy mismatch")
-        os.replace(tmp,target)
-        os.chmod(target,0o600)
+        # Exclusive hard-link publication cannot overwrite a concurrent
+        # archive creator. Same private directory guarantees same filesystem.
+        os.link(tmp,target)
+        tmp.unlink()
         return {
             "status":"RESEARCH_25_ITEM_SANITIZED_ARCHIVE_READY",
             "output":str(target),"new_item":ITEM,"added_rows":count,
