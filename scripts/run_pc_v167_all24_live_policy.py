@@ -1,4 +1,4 @@
-"""Parallel/resumable PC runner for V167 all-24 live-policy replay."""
+"""Parallel/resumable PC runner for V169 24-beta + South Africa Xanax live-policy replay."""
 from __future__ import annotations
 
 import argparse
@@ -157,7 +157,7 @@ def main():
 
     items=tuple(a.item_key or ITEMS)
     if len(set(items))!=len(items) or not set(items)<=set(ITEMS):
-        p.error("choose unique keys from V167 all24 roster")
+        p.error("choose unique keys from V169 all25 research roster")
 
     manifest={
         "source":str(source),"start":start,"end":end,"items":list(items),
@@ -171,7 +171,7 @@ def main():
         raise ValueError("output folder belongs to a different V167 run")
     mf.write_text(json.dumps(manifest,indent=2,sort_keys=True)+"\n",encoding="utf-8")
 
-    print("V167 ALL24 LIVE POLICY REPLAY",len(items),"START",start,"END",end,
+    print("V169 ALL25 LIVE POLICY REPLAY",len(items),"START",start,"END",end,
           "STEP",300,"WORKERS",a.workers,"FIXED_HORIZON",None,
           "SMOKE",bool(a.smoke),flush=True)
     results={}
