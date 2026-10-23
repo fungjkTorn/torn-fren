@@ -19,6 +19,9 @@ from pathlib import Path
 import numpy as np
 
 KEY='jap:Xanax';FLIGHT=8940;GRACE=10;WAIT=28800;STEP=300
+# Historical research extension only. V163's production 24-item roster and
+# private export roster remain unchanged.
+RESEARCH_ONLY_ADDITIONAL_ITEMS=frozenset({'sou:Xanax'})
 ROOT=Path(__file__).resolve().parents[2]
 FAMILIES=('paired_recent','sequence_blocks','quantity_blocks')
 MODES=tuple(f+'_'+gate for f in FAMILIES for gate in ('peak','60'))+('leave_now_control','rate_current_quarter')
@@ -129,7 +132,8 @@ def source_data(source,now=None,*,item_key=KEY):
     # Explicit checkout pin defeats the VM's older staged research default.
     os.environ['TORNFREN_REPLAY_WORK']=str(ROOT);os.environ['TORNFREN_REPLAY_PINNED_RESEARCH']=str(ROOT/'research')
     from research.continuous_departure_replay import ArrivalEvidence,model,MAX_POLLS
-    if item_key not in model.exact_roster():raise ValueError('Unverified item key')
+    if item_key not in (set(model.exact_roster()) | RESEARCH_ONLY_ADDITIONAL_ITEMS):
+        raise ValueError('Unverified item key')
     country,name=item_key.split(':',1)
     clock=int(time.time()) if now is None else now
     with closing(sqlite3.connect(Path(source).resolve(strict=True).as_uri()+'?mode=ro',uri=True,timeout=12)) as db:
