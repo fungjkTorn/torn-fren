@@ -7,7 +7,7 @@ from unittest.mock import Mock
 from research.v173_adaptive_flight_policy import (
     CausalCycles, weighted_quantile, historical_openings,
     wait_window_grade, plan_at_issue, summary, rank, SPECIAL_WINDOWS,
-    fit_restock_bias, STRATEGIES,
+    fit_restock_bias, STRATEGIES, ROUTES,
 )
 
 
@@ -158,8 +158,8 @@ class V173CausalTests(unittest.TestCase):
             "selected_event":{"event_index":0,
                               "predicted_restock_epoch":31100},
         }
-        for country in ("sou","mex","arg","uni"):
-            with self.subTest(country=country):
+        for item_key in sorted(ROUTES):
+            with self.subTest(item_key=item_key):
                 rows=[]
                 for i in range(10):
                     base=1000+i*3000
