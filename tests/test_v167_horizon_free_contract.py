@@ -14,7 +14,7 @@ class Obs:
 
 class V167HorizonFreeContractTests(unittest.TestCase):
     def test_champion_roster_is_exact_24(self):
-        self.assertEqual(24,len(CHAMPION_KIND))
+        self.assertEqual(25,len(CHAMPION_KIND))
         self.assertIn("jap:Xanax",CHAMPION_KIND)
 
     def test_v163_can_project_days_ahead_without_time_horizon(self):
