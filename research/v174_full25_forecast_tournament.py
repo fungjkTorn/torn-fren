@@ -335,7 +335,7 @@ def fixed_roster(source,reports,source_south,start,end):
         db.execute("PRAGMA query_only=ON")
         have=set(db.execute("SELECT DISTINCT country||':'||item_name FROM stock_history"))
         md=dict(db.execute("SELECT key,value FROM research_metadata"))
-    missing=set(ROUTES)-have
+    missing={k for k in ROUTES if k not in have}
     if missing:raise ValueError("25-item data missing: "+repr(sorted(missing)))
     if md.get("sanitized_stock_only")!="true" or md.get("roster_size")!="25":
         raise ValueError("source must be the separate sanitized 25-item archive")
@@ -355,7 +355,8 @@ def run_item(source,key,baseline,start,end,screen_step=3600,finalists=4):
     if end+flight+GRACE+180>cutoff:
         raise ValueError("immature validation arrival truth: "+key)
     starts=[r["issued_epoch"] for r in baseline["records"]]
-    if starts[0]!=start or starts[-1]!=end or any(
+    expected_last=start+((end-start)//STEP)*STEP
+    if starts[0]!=start or starts[-1]!=expected_last or any(
             b-a!=STEP for a,b in zip(starts,starts[1:])):
         raise ValueError("V169 issue-tape identity mismatch: "+key)
     split=start+int((end-start)*.60)
@@ -370,7 +371,6 @@ def run_item(source,key,baseline,start,end,screen_step=3600,finalists=4):
     wait_windows=SPECIAL_WINDOWS.get(key,())
     records_by_time=[r[0] for r in rows]
     available=tuple(ALL_CANDIDATES)
-    screen=Counter()
     screen_stats={name:Counter() for name in available}
     val_stats=None
     scratch=None
