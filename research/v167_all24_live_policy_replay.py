@@ -44,7 +44,9 @@ from research.v166_seven_specialist_earliest_replay import (
 from research.v145_provider_continuous_phases import provider_continuous_phases
 from research.v128_full24_earliest_shadow import _gap_index
 from deploy.scripts.v163_readonly_event_first_preview import predict_events as v163_predict_events
-from research.v167_event_candidate_scoring import CHAMPION_KIND, choose_event
+from research.v167_event_candidate_scoring import (
+    CHAMPION_KIND, choose_event, earliest_event_candidates,
+)
 
 MAX_EVENTS=64
 MIN_QTY=30
@@ -60,8 +62,8 @@ ROUTES={
     }
     for key,kind in CHAMPION_KIND.items()
 }
-if len(ROUTES)!=24:
-    raise ValueError("V167 requires exact 24-item champion roster")
+if len(ROUTES)!=25:
+    raise ValueError("V169 requires 24 beta items plus South Africa Xanax")
 
 
 def _ro(path):
@@ -273,6 +275,8 @@ def _forecast_to_candidates(forecast,issued):
                 "predicted_restock_late_epoch":issued,
                 "predicted_stocked_lifetime_seconds":max(0,end-issued),
                 "earliest_departure_epoch":dep,
+                "latest_departure_epoch":current.get(
+                    "expected_latest_departure_epoch",dep),
                 "predicted_arrival_epoch":current.get("expected_arrival_epoch"),
                 "reachable":True,
             })
@@ -287,6 +291,7 @@ def _forecast_to_candidates(forecast,issued):
             "predicted_restock_late_epoch":raw.get("restock_late_epoch"),
             "predicted_stocked_lifetime_seconds":raw.get("estimated_stocked_duration_seconds"),
             "earliest_departure_epoch":dep,
+            "latest_departure_epoch":raw.get("expected_latest_departure_epoch"),
             "predicted_arrival_epoch":raw.get("expected_arrival_epoch"),
             "reachable":dep is not None,
         })
@@ -328,7 +333,8 @@ def generic_plan(source,key,issued,mode):
 
 
 def routed_champion_plan(causal_db,key,issued,events):
-    result=choose_event(causal_db,key,issued,events)
+    candidates=earliest_event_candidates(events,issued)
+    result=choose_event(causal_db,key,issued,candidates)
     return {
         "model":"champion",
         "champion_kind":CHAMPION_KIND[key],
