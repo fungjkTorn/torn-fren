@@ -328,6 +328,56 @@ def screen_rank(s,windows):
             s["proposal_coverage"])
 
 
+def release_recommendation(candidate,screen_winner,validation,windows):
+    """Research decision only: promote candidate after actionable holdout gain.
+
+    Every candidate was frozen on the development screen. No new thresholds,
+    policies, or timing offsets are chosen from validation outcomes.
+    """
+    default={"selected_policy":"V169_INCUMBENT",
+             "automatic_production_deploy":False}
+    if candidate=="V169_INCUMBENT":
+        return {**default,"reason":"ORIGINAL_CHAMPION_WON_DEVELOPMENT_SCREEN"}
+    baseline=validation.get("V169_INCUMBENT")
+    challenger=validation.get(candidate)
+    if not baseline or not challenger:
+        return {**default,"reason":"UNSCORED_FINALIST"}
+    if (min(baseline["actionable_known_arrivals"],
+            challenger["actionable_known_arrivals"])<30
+        or min(baseline["actionable_departures"],
+               challenger["actionable_departures"])<30):
+        return {**default,"reason":"INSUFFICIENT_MATCHED_HOLDOUT_EXECUTIONS"}
+    if (challenger["proposal_coverage"]<
+        baseline["proposal_coverage"]*.75):
+        return {**default,"reason":"PROPOSAL_COVERAGE_REGRESSION"}
+    old=baseline["actionable_arrival_success_fraction"]
+    new=challenger["actionable_arrival_success_fraction"]
+    if old is None or new is None or new<old-.03:
+        return {**default,"reason":"STOCK_ON_LANDING_REGRESSION"}
+    if windows:
+        w=max(windows)
+        # Candidate and baseline have the same validation clock denominator.
+        target=f"landing_or_wait_{w}_seconds_success_per_issue"
+        baseline_value=baseline.get(target)
+        candidate_value=challenger.get(target)
+    else:
+        target="actionable_success_per_issue"
+        baseline_value=baseline.get(target)
+        candidate_value=challenger.get(target)
+    if baseline_value is None or candidate_value is None:
+        return {**default,"reason":"MISSING_HOLDOUT_METRIC"}
+    gain=candidate_value-baseline_value
+    if gain<.005:
+        return {**default,"reason":"INSUFFICIENT_ACTIONABLE_HOLDOUT_GAIN",
+                "gain_per_issue":round(gain,6)}
+    return {
+        "selected_policy":candidate,
+        "reason":"OFFLINE_PROMOTION_CANDIDATE_NEEDS_LIVE_IMPLEMENTATION",
+        "gain_per_issue":round(gain,6),"comparison_metric":target,
+        "automatic_production_deploy":False,
+    }
+
+
 def fixed_roster(source,reports,source_south,start,end):
     if not len(ROUTES)==25:raise ValueError("25-item roster contract changed")
     with closing(sqlite3.connect(Path(source).resolve(strict=True).as_uri()+
@@ -437,6 +487,7 @@ def run_item(source,key,baseline,start,end,screen_step=3600,finalists=4):
                                   "finalists":list(selected)}),flush=True)
     val_briefs={n:brief(c,wait_windows) for n,c in val_stats.items()}
     selection=next((name for name in ranked if name in selected),"V169_INCUMBENT")
+    gate=release_recommendation(selection,ranked[0],val_briefs,wait_windows)
     return {
         "item_key":key,"status":"V174_ALL25_FULL_MODEL_REFORECAST_COMPLETED",
         "model_recomputed_per_issue":True,"screen_configurations":len(available),
@@ -447,6 +498,7 @@ def run_item(source,key,baseline,start,end,screen_step=3600,finalists=4):
         "screen_ranking":[{"candidate":n,"screen":screen_briefs[n]} for n in ranked],
         "finalists":list(selected),
         "development_selected_candidate":selection,
+        "research_release_recommendation":gate,
         "validation_results":val_briefs,
         "original_champion_validation":val_briefs.get("V169_INCUMBENT"),
         "special_wait_windows_seconds":list(wait_windows),
@@ -504,6 +556,7 @@ def main():
         print(json.dumps({"progress":f"{idx}/25","item_key":key,
                           "status":"COMPLETED","resumed":resumed,
                           "selected":results[key]["development_selected_candidate"],
+                          "release_policy":results[key]["research_release_recommendation"]["selected_policy"],
                           "finalists":results[key]["finalists"]}),flush=True)
     output={
         "status":"V174_COMPLETED_TRUE_ALL25_CAUSAL_FORECAST_TOURNAMENT",
