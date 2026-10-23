@@ -26,6 +26,8 @@ on:
       - 'tests/test_v169_source_coverage.py'
       - 'deploy/research_runner/build_v169_25_item_archive.py'
       - 'tests/test_build_v169_25_item_archive.py'
+      - 'research/v168_south_africa_xanax.py'
+      - 'tests/test_v168_south_africa_xanax.py'
       - 'research/plushie_champions/**'
       - 'deploy/research_runner/export_snapshot.py'
       - 'deploy/research_runner/tune_snapshot_for_forward.sh'
@@ -80,6 +82,8 @@ on:
       - 'tests/test_v169_source_coverage.py'
       - 'deploy/research_runner/build_v169_25_item_archive.py'
       - 'tests/test_build_v169_25_item_archive.py'
+      - 'research/v168_south_africa_xanax.py'
+      - 'tests/test_v168_south_africa_xanax.py'
       - 'research/plushie_champions/**'
       - 'deploy/research_runner/export_snapshot.py'
       - 'deploy/research_runner/tune_snapshot_for_forward.sh'
@@ -146,6 +150,7 @@ jobs:
           tests.test_v169_failure_diagnostics
           tests.test_v169_source_coverage
           tests.test_build_v169_25_item_archive
+          tests.test_v168_south_africa_xanax
           tests.test_research_runner_export_snapshot
           tests.test_research_runner_bootstrap_contract -q
 
