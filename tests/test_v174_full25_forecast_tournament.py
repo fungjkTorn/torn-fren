@@ -58,9 +58,6 @@ class V174ContractTests(unittest.TestCase):
         for tr in tracks.values():
             self.assertTrue(all(t<=2200 for t in
                 [tr.last.epoch]))
-        later=dict(rows)
-        self.assertIsNotNone(later)
-
     def test_previously_stocked_is_eligible_for_next_future_restock_all_roster(self):
         event0={"event_index":0,"reachable":True,"predicted_restock_epoch":1000,
                 "predicted_depletion_epoch":1700,
