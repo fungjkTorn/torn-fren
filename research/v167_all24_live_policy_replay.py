@@ -47,6 +47,9 @@ from deploy.scripts.v163_readonly_event_first_preview import predict_events as v
 from research.v167_event_candidate_scoring import (
     CHAMPION_KIND, choose_event, earliest_event_candidates,
 )
+from research.v169_incremental_checkpoint_selector import (
+    IncrementalCheckpointSelector, TARGETS as CHECKPOINT_TARGETS,
+)
 
 MAX_EVENTS=64
 MIN_QTY=30
@@ -332,9 +335,11 @@ def generic_plan(source,key,issued,mode):
     }
 
 
-def routed_champion_plan(causal_db,key,issued,events):
+def routed_champion_plan(causal_db,key,issued,events,checkpoint_selection=None):
     candidates=earliest_event_candidates(events,issued)
-    result=choose_event(causal_db,key,issued,candidates)
+    result=choose_event(
+        causal_db,key,issued,candidates,
+        checkpoint_selection=checkpoint_selection)
     return {
         "model":"champion",
         "champion_kind":CHAMPION_KIND[key],
@@ -380,6 +385,8 @@ def replay_item(*,source,key,start,end,workdir):
     # use truth gap boundaries but only phases built from <=issue rows later
     records=[]
     previous_target=None
+    checkpoint_selector=(
+        IncrementalCheckpointSelector(key) if key in CHECKPOINT_TARGETS else None)
     try:
         for issued in range(start,end+1,STEP):
             mirror.advance(issued)
@@ -391,7 +398,12 @@ def replay_item(*,source,key,start,end,workdir):
             forecast,events=event_timeline_for_issue(
                 key,causal_rows,gaps,issued)
             baseline_target=first_reachable(events)
-            local=routed_champion_plan(scratch,key,issued,events)
+            checkpoint_selection=(
+                checkpoint_selector.update_and_select(scratch,issued)
+                if checkpoint_selector is not None else None)
+            local=routed_champion_plan(
+                scratch,key,issued,events,
+                checkpoint_selection=checkpoint_selection)
             selected_index=local.get("selected_event_index")
             target=next((e for e in events if e["event_index"]==selected_index),None)
             dep=local.get("departure") if target is not None else None
@@ -410,6 +422,7 @@ def replay_item(*,source,key,start,end,workdir):
                 "route_model":ROUTES[key]["primary"],
                 "champion_kind":CHAMPION_KIND[key],
                 "route_status":local.get("status"),
+                "checkpoint_selector":checkpoint_selection,
                 "champion_score":local.get("model_score"),
                 "event_forecast_status":forecast.get("status"),
                 "baseline_first_reachable_event":baseline_target,
