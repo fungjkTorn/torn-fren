@@ -159,8 +159,7 @@ def predict_events(item,phases,*,asof,horizon=None,
     last=phases.get("last_observation")
     if (phase not in ("HIGH","LOW") or type(onset) is not int
         or onset>asof or onset<=0 or last is None
-        or type(last.epoch) is not int or last.epoch>asof
-        or asof-last.epoch>86400):
+        or type(last.epoch) is not int or last.epoch>asof):
         return dict(common,status="CURRENT_PHASE_UNKNOWN")
     age=asof-onset
     active=phase_quantiles(high if phase=="HIGH" else low,age=age)
