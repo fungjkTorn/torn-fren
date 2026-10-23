@@ -40,6 +40,30 @@ class SouthAfricaV168ChampionTests(unittest.TestCase):
         self.assertEqual(delta,0)
         self.assertEqual(offset,-300)
 
+    def test_screen_values_broad_coverage_over_tiny_conditional_win_rate(self):
+        # A cherry-picked 4/4 record is worse advice than reliably successful
+        # 60/100 from the same 100 issue clock opportunities.
+        rare={"issues":100,"proposals":4,"arrival_known":4,
+              "arrival_success_fraction":1.0,
+              "earliest_hit_fraction":1.0,
+              "proposal_coverage":.04,
+              "counts":{"arrival_success":4}}
+        broad={"issues":100,"proposals":80,"arrival_known":75,
+               "arrival_success_fraction":.8,
+               "earliest_hit_fraction":.8,
+               "proposal_coverage":.8,
+               "counts":{"arrival_success":60}}
+        self.assertGreater(_rank_summary(broad),_rank_summary(rare))
+
+    def test_screen_prefers_real_successful_arrivals_over_abstaining(self):
+        a={"issues":100,"proposals":75,"arrival_known":70,
+           "arrival_success_fraction":.95,"earliest_hit_fraction":.9,
+           "proposal_coverage":.75,"counts":{"arrival_success":66}}
+        b={"issues":100,"proposals":90,"arrival_known":85,
+           "arrival_success_fraction":.83,"earliest_hit_fraction":.8,
+           "proposal_coverage":.9,"counts":{"arrival_success":71}}
+        self.assertGreater(_rank_summary(b),_rank_summary(a))
+
     def test_sparse_unscored_model_is_not_mistaken_for_good_candidate(self):
         summary={"arrival_success_fraction":None,"earliest_hit_fraction":None,
                  "proposal_coverage":0.0,"arrival_known":0}
