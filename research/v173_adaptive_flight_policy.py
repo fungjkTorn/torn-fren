@@ -68,8 +68,10 @@ class CausalCycles:
             prev=self.last
             if prev is None or prev[2]!=provider or self.crosses(prev[0],t):
                 # A provider change/gap must not manufacture a restock cycle.
-                self.high_start=t if q>=30 else None
-                self.zero_start=t if q==0 else None
+                # An observation at the beginning of coverage or following
+                # a provider switch/gap is left-censored, not a phase onset.
+                self.high_start=None
+                self.zero_start=None
                 self.last_physical=None
             else:
                 pt,pq,_=prev
@@ -261,17 +263,25 @@ def summary(counts,windows):
         out[f"wait_{seconds}_seconds_extra_success"]=success
         out[f"landing_or_wait_{seconds}_seconds_success_fraction"]=(
             (counts["arrival_success"]+success)/known if known else None)
+        out[f"landing_or_wait_{seconds}_seconds_success_per_issue"]=(
+            (counts["arrival_success"]+success)/n if n else None)
         out[f"wait_{seconds}_seconds_unknown"]=counts[f"wait_{seconds}_unknown"]
     return out
 
 
-def rank(d):
+def rank(d,windows=()):
     # Minimum coverage/denominator is essential; don't choose a model from
     # 5 successes out of just 5 heavily cherry-picked opportunities.
     enough=(d["proposals"]>=max(12,d["issues"]*.1)
             and d["arrival_known"]>=20
             and d["executions"]>=25)
-    return (int(enough), d["success_per_issue"] or 0,
+    # For Canada/Japan ONLY, prioritize stocked landing OR qualified next
+    # restock within the largest explicitly accepted waiting window.
+    # Other items keep the landing-only objective.
+    union=(d.get(f"landing_or_wait_{max(windows)}_seconds_success_per_issue")
+           if windows else d["success_per_issue"])
+    return (int(enough), union or 0,
+            d["success_per_issue"] or 0,
             d["arrival_success_fraction"] or 0,
             d["proposal_coverage"] or 0)
 
@@ -349,13 +359,16 @@ def replay_item(source,report,key,start,end):
              for stage in counters}
     # One pre-registered selection using ONLY earlier 60%; no validation
     # winner tuning / retrospective threshold selection.
-    chosen=max(STRATEGIES,key=lambda name:rank(reports["development"][name]))
+    chosen=max(STRATEGIES,key=lambda name:rank(reports["development"][name],windows))
     return {
         "item_key":key,"chosen_using_development_only":chosen,
         "incumbent_validation":reports["validation"]["V169_INCUMBENT"],
         "challenger_validation":reports["validation"][chosen],
         "all_policies":reports,"regime_shift_issue_flags":flags,
         "special_post_arrival_wait_windows_seconds":list(windows),
+        "model_selection_target":(
+            "LANDING_OR_CONFIRMED_RESTOCK_WITHIN_MAX_SPECIAL_WAIT"
+            if windows else "STOCKED_ARRIVAL_ONLY"),
         "source_rows":len(rows),"baseline_records":len(records),
         "production_modified":False,
     }
