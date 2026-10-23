@@ -145,7 +145,7 @@ class TravelDecisionContractTests(unittest.TestCase):
         self.assertEqual(report["estimated_arrival_epoch"], NOW+1200)
         self.assertEqual(report["forecast_events"][0]["index"], 1)
 
-    def test_conservative_window_and_eight_hour_horizon(self):
+    def test_conservative_window_and_event_driven_horizon(self):
         e = make_event(NOW+2600, length=900)
         e["early_stock_end_epoch"] = NOW+2750
         bounded = self.decision([e], arrival_policy="bounded")
@@ -154,9 +154,11 @@ class TravelDecisionContractTests(unittest.TestCase):
         bounded = self.decision([e], arrival_policy="bounded")
         self.assertEqual(bounded["estimated_arrival_epoch"], NOW+2800)
         late = self.decision([make_event(NOW+30100, length=900)])
-        self.assertEqual(late["status"], STATUS_NO_WINDOW)
+        self.assertEqual(late["status"], "WAIT_FOR_ESTIMATED_DEPARTURE")
+        self.assertEqual(late["selected_restock_event_index"], 1)
         self.assertEqual(late["forecast_events"][0]["reason"],
-                         "AFTER_EIGHT_HOUR_DEPARTURE_HORIZON")
+                         "ESTIMATED_STOCKED_PHASE_REACHABLE")
+        self.assertGreater(late["estimated_departure_epoch"]-NOW,8*3600)
 
     def test_issue_at_next_five_minute_tick_expires_but_events_remain(self):
         forecast = make_forecast([make_event(NOW+2600)])
