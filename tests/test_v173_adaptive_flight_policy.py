@@ -7,7 +7,7 @@ from unittest.mock import Mock
 from research.v173_adaptive_flight_policy import (
     CausalCycles, weighted_quantile, historical_openings,
     wait_window_grade, plan_at_issue, summary, rank, SPECIAL_WINDOWS,
-    fit_restock_bias, STRATEGIES, ROUTES,
+    fit_restock_bias, STRATEGIES, ROUTES, release_gate,
 )
 
 
@@ -178,6 +178,27 @@ class V173CausalTests(unittest.TestCase):
         dep,target=plan_at_issue("V169_BIAS_ADJUSTED",record,None,600,
                                  bias_seconds=600)
         self.assertEqual((dep,target),(77600,90600))
+
+    def test_holdout_retention_gate_requires_real_gain_and_stocked_reliability(self):
+        incumbent={"issues":100,"proposals":80,"executions":75,
+                   "arrival_known":70,"arrival_success_fraction":.85,
+                   "proposal_coverage":.8,"success_per_issue":.60,
+                   "landing_or_wait_600_seconds_success_per_issue":.63}
+        weak={**incumbent,"arrival_success_fraction":.65,
+              "success_per_issue":.68}
+        bad=release_gate("RECENT6",incumbent,weak,())
+        self.assertEqual(bad["decision"],"RETAIN_STOCKED_ARRIVAL_RELIABILITY")
+        strong={**incumbent,"arrival_success_fraction":.86,
+                "success_per_issue":.66,
+                "landing_or_wait_600_seconds_success_per_issue":.70}
+        good=release_gate("REGIME_AUTO",incumbent,strong,())
+        self.assertEqual(good["policy"],"REGIME_AUTO")
+        self.assertFalse(good["deploy_automatically"])
+        self.assertEqual(release_gate("REGIME_AUTO",incumbent,
+                         strong, (300,600))["policy"],"REGIME_AUTO")
+        sparse={**strong,"arrival_known":12}
+        self.assertEqual(release_gate("RECENT10",incumbent,sparse,())["policy"],
+                         "V169_INCUMBENT")
 
     def test_causal_forecast_ignores_rows_after_issue(self):
         rows=[(0,0,"yata")]
