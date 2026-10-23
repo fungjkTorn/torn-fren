@@ -105,6 +105,26 @@ class V173CausalTests(unittest.TestCase):
                               arrival_success=45,arrival_failure=5),())
         self.assertGreater(rank(broad),rank(sparse))
 
+    def test_special_wait_success_changes_preference_only_for_canada_japan(self):
+        # Same issue tape: one model lands stocked more often, but another
+        # has more combined landing-or-wait successes.
+        strong_landing=summary(Counter(
+            issues=100,proposals=80,executions=75,arrival_success=60,
+            arrival_failure=15,wait_600_success=0),(300,600))
+        stronger_with_wait=summary(Counter(
+            issues=100,proposals=80,executions=75,arrival_success=50,
+            arrival_failure=25,wait_600_success=20),(300,600))
+        self.assertGreater(rank(strong_landing),rank(stronger_with_wait))
+        self.assertGreater(rank(stronger_with_wait,(300,600)),
+                           rank(strong_landing,(300,600)))
+
+    def test_first_stock_observation_is_left_censored_not_new_restock(self):
+        c=CausalCycles([(0,500,"yata"),(100,480,"yata")],lambda *_:False)
+        c.advance(200)
+        self.assertIsNone(c.high_start)
+        self.assertFalse(c.viable_current(200,500,6))
+        self.assertEqual(c.available_durations,[])
+
     def test_causal_forecast_ignores_rows_after_issue(self):
         rows=[(0,0,"yata")]
         for i in range(6):
