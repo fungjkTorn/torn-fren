@@ -8,9 +8,10 @@ from research.v167_all24_live_policy_replay import (
 
 class V167PolicyTests(unittest.TestCase):
     def test_exact_24_routes_and_japan_included(self):
-        self.assertEqual(24,len(ROUTES))
+        self.assertEqual(25,len(ROUTES))
         self.assertEqual("champion",ROUTES["jap:Xanax"]["primary"])
         self.assertEqual("japan_quantity_rate",ROUTES["jap:Xanax"]["champion_kind"])
+        self.assertEqual("v19_sou_dyn1",ROUTES["sou:Xanax"]["champion_kind"])
 
     def test_event_projection_has_no_time_horizon(self):
         # Multi-day depleted cycles should still project; no 8h/30d cutoff.
