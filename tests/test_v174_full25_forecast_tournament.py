@@ -106,6 +106,28 @@ class V174ContractTests(unittest.TestCase):
                             proposal_success=100,proposal_failure=50),())
         self.assertGreater(screen_rank(broad,()),screen_rank(small,()))
 
+    def test_full25_sqlite_archive_preflight_extracts_strings_and_checks_metadata(self):
+        with tempfile.TemporaryDirectory() as td:
+            p=Path(td)/"roster.db"
+            with sqlite3.connect(p) as db:
+                db.executescript("""
+                    CREATE TABLE stock_history(
+                        timestamp INTEGER,country TEXT,item_name TEXT);
+                    CREATE TABLE research_metadata(
+                        key TEXT,value TEXT);
+                    INSERT INTO research_metadata VALUES('sanitized_stock_only','true');
+                    INSERT INTO research_metadata VALUES('roster_size','25');
+                """)
+                db.executemany(
+                    "INSERT INTO stock_history VALUES(?,?,?)",
+                    [(12345,*key.split(":",1)) for key in sorted(ROUTES)])
+            with patch("research.v174_full25_forecast_tournament.find_original_report",
+                       side_effect=lambda root,key,start,end,south_report:
+                       {"item_key":key,"records":[{"issued_epoch":start}]}):
+                roster=fixed_roster(p,td,p,12345,12645)
+            self.assertEqual(len(roster),25)
+            self.assertEqual(set(roster),set(ROUTES))
+
     def test_end_to_end_scoring_scaffold_with_source_read_only(self):
         # Real-shaped SQLite + CausalMirror, but synthetic deterministic
         # engine instead of CPU-heavy specialist fitting in CI.
