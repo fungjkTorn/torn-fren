@@ -383,7 +383,8 @@ def fixed_roster(source,reports,source_south,start,end):
     with closing(sqlite3.connect(Path(source).resolve(strict=True).as_uri()+
                                  "?mode=ro",uri=True,timeout=30)) as db:
         db.execute("PRAGMA query_only=ON")
-        have=set(db.execute("SELECT DISTINCT country||':'||item_name FROM stock_history"))
+        have={r[0] for r in db.execute(
+            "SELECT DISTINCT country||':'||item_name FROM stock_history")}
         md=dict(db.execute("SELECT key,value FROM research_metadata"))
     missing={k for k in ROUTES if k not in have}
     if missing:raise ValueError("25-item data missing: "+repr(sorted(missing)))
