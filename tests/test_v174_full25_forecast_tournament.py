@@ -106,6 +106,40 @@ class V174ContractTests(unittest.TestCase):
                             proposal_success=100,proposal_failure=50),())
         self.assertGreater(screen_rank(broad,()),screen_rank(small,()))
 
+    def test_v19_rebuilds_points_and_truncates_recent_training_window(self):
+        from types import SimpleNamespace
+        from services import history_service
+        from services import plushie_flower_dynamic_planner_v19 as engine
+        from research.v174_full25_forecast_tournament import engine_issue_plans
+        issued=1791700000
+        points=[SimpleNamespace(t=issued-(239-i)*900) for i in range(240)]
+        counts=[]
+        def fake_plan(qtime,history_points,times,timeline,deps,features,
+                      cfg,delays,travel,grace):
+            counts.append((len(history_points),cfg.name,travel))
+            return {"departure_time":float(qtime+600),"probability":.75}
+        ctx=[
+            patch("research.v174_full25_forecast_tournament._install_frozen_readonly_history"),
+            patch.object(history_service,"get_collection_gaps",return_value=[]),
+            patch.object(engine,"load_item",return_value=([],[],0,[])),
+            patch.object(engine,"Timeline",return_value=object()),
+            patch.object(engine,"completed_cycle_features",return_value=([],[])),
+            patch.object(engine,"build_points",return_value=points),
+            patch.object(engine,"plan",side_effect=fake_plan),
+        ]
+        for p in ctx:p.start()
+        try:
+            plans=engine_issue_plans(None,"sou:Xanax",issued,[
+                (600,{"event_index":1,"predicted_restock_epoch":issued+900})],
+                {"v19:dyn1","v19:dyn1@48h"})
+        finally:
+            for p in reversed(ctx):p.stop()
+        self.assertIn("v19:dyn1",plans)
+        self.assertIn("v19:dyn1@48h",plans)
+        self.assertEqual({x[0] for x in counts},{240,193})
+        self.assertTrue(all(x[1]=="dyn1" and x[2]==11820 for x in counts))
+        self.assertTrue(all(x["departure"]==issued+600 for x in plans.values()))
+
     def test_full25_sqlite_archive_preflight_extracts_strings_and_checks_metadata(self):
         with tempfile.TemporaryDirectory() as td:
             p=Path(td)/"roster.db"
