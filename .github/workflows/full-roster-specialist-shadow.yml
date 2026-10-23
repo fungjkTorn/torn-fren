@@ -32,6 +32,8 @@ on:
       - 'tests/test_v172_verified_arrival_target_score.py'
       - 'research/v173_adaptive_flight_policy.py'
       - 'tests/test_v173_adaptive_flight_policy.py'
+      - 'research/v174_full25_forecast_tournament.py'
+      - 'tests/test_v174_full25_forecast_tournament.py'
       - 'research/v167_all24_live_policy_replay.py'
       - 'research/plushie_champions/**'
       - 'deploy/research_runner/export_snapshot.py'
@@ -93,6 +95,8 @@ on:
       - 'tests/test_v172_verified_arrival_target_score.py'
       - 'research/v173_adaptive_flight_policy.py'
       - 'tests/test_v173_adaptive_flight_policy.py'
+      - 'research/v174_full25_forecast_tournament.py'
+      - 'tests/test_v174_full25_forecast_tournament.py'
       - 'research/v167_all24_live_policy_replay.py'
       - 'research/plushie_champions/**'
       - 'deploy/research_runner/export_snapshot.py'
@@ -163,6 +167,7 @@ jobs:
           tests.test_v168_south_africa_xanax
           tests.test_v172_verified_arrival_target_score
           tests.test_v173_adaptive_flight_policy
+          tests.test_v174_full25_forecast_tournament
           tests.test_research_runner_export_snapshot
           tests.test_research_runner_bootstrap_contract -q
 
