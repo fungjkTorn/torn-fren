@@ -32,6 +32,7 @@ from research.quantity_rate_cycles import QuantityRateCycles
 from research.true_zero_cycles import ZeroCycles
 from research.plushie_champions.common import TRAVEL_SECONDS, STEP, GRACE
 from research.v166_seven_specialist_earliest_replay import CausalMirror
+from research.v172_verified_arrival_target_score import grade_target_window
 from services.travel_decision_contract_v166 import build_item_travel_decision
 from services.travel_window_policy import project_policy
 from services.frozen_candidate_worker_v31 import _install_frozen_readonly_history
@@ -158,11 +159,20 @@ def _score(dep,issued,truth_rows,truth_gaps,evidence,truth_cutoff):
     target=_earliest_reachable_window(
         truth_rows,truth_gaps,issued,FLIGHT,truth_cutoff)
     if target["status"]=="EARLIEST_REACHABLE_FOUND":
-        c["earliest_scored"]+=1
         arr=dep+FLIGHT+GRACE
-        hit=(arr>=target["restock"] and
-             (target["depletion"] is None or arr<target["depletion"]))
-        c["earliest_hit"]+=int(hit)
+        grade,reason=grade_target_window(
+            arrival=dep+FLIGHT,state=state,
+            restock=target["restock"],depletion=target["depletion"],grace=GRACE)
+        c["target_evidence_"+reason]+=1
+        if grade is not None:
+            c["earliest_scored"]+=1
+            c["earliest_hit"]+=int(grade)
+        # Keep legacy temporal overlap as a labeled diagnostic only. Unknown
+        # depletion must never count as a verified arrival-window hit.
+        c["temporal_target_scored"]+=1
+        c["temporal_target_proxy_hit"]+=int(
+            arr>=target["restock"] and
+            (target["depletion"] is None or arr<target["depletion"]))
         return c,dep-target["oracle_earliest_departure"],dep+FLIGHT-target["restock"]
     return c,None,None
 
@@ -255,6 +265,10 @@ def replay(*,source,start,end,output,screen_step=3600,finalists=4):
                 "arrival_success_fraction":c["arrival_success"]/known if known else None,
                 "earliest_scored":c["earliest_scored"],
                 "earliest_hit_fraction":c["earliest_hit"]/c["earliest_scored"] if c["earliest_scored"] else None,
+                "target_evidence_version":"V172_EVIDENCE_QUALIFIED",
+                "temporal_target_proxy_fraction":(
+                    c["temporal_target_proxy_hit"]/c["temporal_target_scored"]
+                    if c["temporal_target_scored"] else None),
                 "median_departure_minus_oracle_seconds":statistics.median(dep) if dep else None,
                 "median_arrival_minus_actual_restock_seconds":statistics.median(arr) if arr else None,
                 "counts":dict(c),
