@@ -167,15 +167,29 @@ def _score(dep,issued,truth_rows,truth_gaps,evidence,truth_cutoff):
     return c,None,None
 
 
+# Screen real-world usefulness, not conditional accuracy alone. A model that
+# predicts only a handful of "easy" flights must not outrank one reliably
+# giving viable advice on many more historical five-minute issue clocks.
+MIN_SCREEN_COVERAGE=0.60
+MIN_SCREEN_KNOWN=12
+
+
 def _rank_summary(summary):
+    coverage=summary.get("proposal_coverage") or 0
+    known=summary.get("arrival_known") or 0
+    issues=summary.get("issues") or 0
+    good=(summary.get("counts") or {}).get("arrival_success",0)
+    # All issue clocks are the common denominator: an abstention or UNKNOWN
+    # never masquerades as a successful departure.
+    unconditional=good/issues if issues else 0
+    eligible=coverage>=MIN_SCREEN_COVERAGE and known>=MIN_SCREEN_KNOWN
     return (
-        summary["arrival_success_fraction"]
-        if summary["arrival_success_fraction"] is not None else -1,
-        summary["earliest_hit_fraction"]
-        if summary["earliest_hit_fraction"] is not None else -1,
-        summary["proposal_coverage"]
-        if summary["proposal_coverage"] is not None else -1,
-        summary["arrival_known"],
+        int(eligible),
+        unconditional,
+        summary.get("arrival_success_fraction") or 0,
+        summary.get("earliest_hit_fraction") or 0,
+        coverage,
+        known,
     )
 
 
@@ -233,6 +247,11 @@ def replay(*,source,start,end,output,screen_step=3600,finalists=4):
                 "issues":c["issues"],"proposals":c["proposals"],
                 "proposal_coverage":c["proposals"]/c["issues"] if c["issues"] else None,
                 "arrival_known":known,
+                "arrival_success_per_issue_fraction":(
+                    c["arrival_success"]/c["issues"] if c["issues"] else None),
+                "minimum_screen_evidence_met":(
+                    c["proposals"]/c["issues"]>=MIN_SCREEN_COVERAGE
+                    and known>=MIN_SCREEN_KNOWN) if c["issues"] else False,
                 "arrival_success_fraction":c["arrival_success"]/known if known else None,
                 "earliest_scored":c["earliest_scored"],
                 "earliest_hit_fraction":c["earliest_hit"]/c["earliest_scored"] if c["earliest_scored"] else None,
@@ -300,6 +319,12 @@ def replay(*,source,start,end,output,screen_step=3600,finalists=4):
         "validation":validation,
         "winner_on_untouched_validation":winner["candidate"],
         "winner_validation":winner["validation"],
+        "winner_selection_also_uses_validation_outcomes":True,
+        "winner_requires_independent_forward_confirmation":True,
+        "candidate_metric_unit":"FIVE_MINUTE_ISSUES_NOT_ACTIONABLE_EXECUTIONS",
+        "screen_minimum_proposal_coverage":MIN_SCREEN_COVERAGE,
+        "screen_minimum_known_arrivals":MIN_SCREEN_KNOWN,
+        "ranking_priority":"EVIDENCE_GATE_THEN_SUCCESS_PER_ALL_ISSUES",
         "actual_player_flights":False,
         "production_modified":False,
         "validation_not_used_for_screen_selection":True,
