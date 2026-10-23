@@ -27,6 +27,7 @@ START=1791504000
 END=1792533131
 SPECIAL_WINDOWS={"can:Xanax":(300,600),"jap:Xanax":(600,1200,1800)}
 STRATEGIES=("V169_INCUMBENT","CURRENT_STOCK_GUARD",
+            "V169_BIAS_ADJUSTED","CURRENT_STOCK_GUARD_BIAS",
             "RECENT6","RECENT10","RECENT20","REGIME_AUTO")
 RECENCY_N={"RECENT6":6,"RECENT10":10,"RECENT20":20}
 
@@ -195,20 +196,57 @@ def wait_window_grade(arrival,state,windows,openings,evidence):
             else "NO_QUALIFYING_RESTOCK" for w in windows}
 
 
-def plan_at_issue(name,rec,clock,flight):
+def fit_restock_bias(records,fit_end,flight):
+    """Frozen event-level timing calibration using only matured EARLIER outcomes.
+
+    Deduplicate five-minute forecast updates by observed target event. Never
+    treat 400 correlated issue rows as 400 independent restock training labels.
+    Restrict to events that physically occurred before the fixed fit boundary.
+    This stage is NOT used to score or select a model. Selection uses the next
+    chronological slice and final holdout remains untouched.
+    """
+    by_event={}
+    for rec in records:
+        issued=rec["issued_epoch"]
+        if issued>=fit_end-flight-180:break
+        event=rec.get("selected_event") or {}
+        predicted=event.get("predicted_restock_epoch")
+        actual=rec.get("actual_target_restock_epoch")
+        if (not isinstance(predicted,int) or not isinstance(actual,int)
+            or event.get("event_index",0)<1
+            or actual>fit_end or actual<=issued
+            or abs(actual-predicted)>3*3600):
+            continue
+        # Earliest historical issued forecast per independent restock target.
+        if actual not in by_event:
+            by_event[actual]=actual-predicted
+    deltas=list(by_event.values())
+    if len(deltas)<4:
+        return {"offset_seconds":0,"independent_events":len(deltas),
+                "supported":False,"fit_before_epoch":fit_end}
+    value=int(max(-1800,min(1800,round(median(deltas)/60)*60)))
+    return {"offset_seconds":value,"independent_events":len(deltas),
+            "supported":True,"fit_before_epoch":fit_end}
+
+
+def plan_at_issue(name,rec,clock,flight,bias_seconds=0):
     issued=rec["issued_epoch"]
     legacy=rec.get("recommended_departure_epoch")
     event=rec.get("selected_event")
-    if name=="V169_INCUMBENT":
-        return legacy,("CURRENT" if event and event.get("event_index")==0
-                       else event.get("predicted_restock_epoch") if event else None)
-    if name=="CURRENT_STOCK_GUARD":
-        if event and event.get("event_index")==0 and legacy is not None:
+    if name in ("V169_INCUMBENT","V169_BIAS_ADJUSTED",
+                "CURRENT_STOCK_GUARD","CURRENT_STOCK_GUARD_BIAS"):
+        guard=name in ("CURRENT_STOCK_GUARD","CURRENT_STOCK_GUARD_BIAS")
+        use_bias=name in ("V169_BIAS_ADJUSTED","CURRENT_STOCK_GUARD_BIAS")
+        if guard and event and event.get("event_index")==0 and legacy is not None:
             if not clock.viable_current(issued,flight,10):
-                # The current shelf cannot safely survive this flight:
-                # forecast the NEXT event, even during the current restock.
+                # UNIVERSAL RULE: leave during any currently stocked phase
+                # if the NEXT predicted replenishment will be reachable.
                 return clock.next_departure(issued,flight,10,
                                             buffer_seconds=180,conservative=True)
+        if use_bias and event and event.get("event_index",0)>=1 and legacy is not None:
+            p=event.get("predicted_restock_epoch")
+            if isinstance(p,int):
+                return max(issued,legacy+bias_seconds),p+bias_seconds
         return legacy,("CURRENT" if event and event.get("event_index")==0
                        else event.get("predicted_restock_epoch") if event else None)
     n=RECENCY_N.get(name,6 if clock.regime() else 20)
@@ -300,7 +338,9 @@ def replay_item(source,report,key,start,end):
     # Grade truth labels from full history but never give openings to a plan.
     opening_evidence=historical_openings(rows,crosses)
     windows=SPECIAL_WINDOWS.get(key,())
+    fit_end=start+int(.3*(end-start))
     split=start+int(.6*(end-start))
+    bias=fit_restock_bias(records,fit_end,flight)
     counters={stage:{name:Counter() for name in STRATEGIES}
               for stage in ("development","validation")}
     prev={name:None for name in STRATEGIES}
@@ -312,18 +352,25 @@ def replay_item(source,report,key,start,end):
             raise ValueError("not an uninterrupted five-minute issue tape")
         clock.advance(issued)
         flags+=int(clock.regime())
-        stage="development" if issued<split else "validation"
+        stage=("calibration" if issued<fit_end else
+               "development" if issued<split else "validation")
+        if stage=="calibration":
+            # Calibration is not a selection score. The model is fitted on
+            # just this earlier 30%, and all finalist comparisons start later.
+            continue
         for name in STRATEGIES:
             c=counters[stage][name]
             c["issues"]+=1
-            dep,target=plan_at_issue(name,rec,clock,flight)
+            dep,target=plan_at_issue(
+                name,rec,clock,flight,bias_seconds=bias["offset_seconds"])
             if dep is None:continue
             if dep<issued:raise ValueError("proposed departure before issuance")
             c["proposals"]+=1
             if not issued<=dep<issued+STEP:
                 prev[name]=(issued,target)
                 continue
-            if name in ("V169_INCUMBENT","CURRENT_STOCK_GUARD") and (
+            if name in ("V169_INCUMBENT","CURRENT_STOCK_GUARD",
+                        "V169_BIAS_ADJUSTED","CURRENT_STOCK_GUARD_BIAS") and (
                 name=="V169_INCUMBENT" or
                 (rec.get("selected_event") and rec["selected_event"].get("event_index")!=0)
             ) and dep==rec.get("recommended_departure_epoch"):
@@ -365,6 +412,10 @@ def replay_item(source,report,key,start,end):
         "incumbent_validation":reports["validation"]["V169_INCUMBENT"],
         "challenger_validation":reports["validation"][chosen],
         "all_policies":reports,"regime_shift_issue_flags":flags,
+        "per_item_early_period_event_level_bias":bias,
+        "calibration_period_end_epoch":fit_end,
+        "selection_period_start_epoch":fit_end,
+        "untouched_validation_start_epoch":split,
         "special_post_arrival_wait_windows_seconds":list(windows),
         "model_selection_target":(
             "LANDING_OR_CONFIRMED_RESTOCK_WITHIN_MAX_SPECIAL_WAIT"
@@ -407,7 +458,7 @@ def main():
     result={
         "status":"V173_CAUSAL_25_ITEM_RECENCY_REGIME_ADAPTIVE_REPLAY",
         "start":a.start_epoch,"end":a.end_epoch,"items_requested":len(keys),
-        "items_completed":len(results),"split":"EARLIER_60_DEVELOPMENT_LAST_40_UNTOUCHED",
+        "items_completed":len(results),"split":"FIRST_30_BIAS_CALIBRATION_NEXT_30_SELECTION_LAST_40_UNTOUCHED",
         "source":"SANITIZED_25_ITEM_HISTORICAL_SQLITE",
         "baseline":"V169_AS_ISSUED_FROZEN_FORECASTS",
         "decisions_replanned_every_seconds":STEP,
@@ -416,6 +467,7 @@ def main():
         "extra_wait_results_are_distinct_from_arrival_success":True,
         "wait_windows_seconds":SPECIAL_WINDOWS,
         "recent_completed_cycle_windows":[6,10,20],
+        "per_item_restock_bias_fit":"EARLIER_30_PERCENT_EVENT_DEDUPLICATED_CAPPED_PLUS_MINUS_30_MIN",
         "drift_guard":"LAST6_VS_PRIOR18_MEDIAN_RATIO_OUTSIDE_0.78_TO_1.25",
         "past_outcomes_never_used_to_fit_same_issued_decision":True,
         "selection_never_uses_validation_results":True,
