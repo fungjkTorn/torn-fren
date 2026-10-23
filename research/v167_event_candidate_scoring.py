@@ -43,8 +43,8 @@ CHAMPION_KIND={
 
 
 def roster():
-    if len(CHAMPION_KIND)!=24:
-        raise ValueError(f"expected 24 champion identities, got {len(CHAMPION_KIND)}")
+    if len(CHAMPION_KIND)!=25:
+        raise ValueError(f"expected 25 research identities, got {len(CHAMPION_KIND)}")
     return dict(CHAMPION_KIND)
 
 
@@ -201,12 +201,13 @@ def _timeline_only(db,key):
     return con,SimpleNamespace(timelines={(country,item):tl})
 
 
-def _checkpoint_choice(db,key,issued,events):
-    from research.v166_seven_specialist_earliest_replay import _checkpoint4_single_tick
-    picked=_checkpoint4_single_tick(db,key,issued)
-    expert=picked.get("expert")
-    if expert is None:
-        return {"status":picked.get("status","CHECKPOINT4_NOT_READY"),"departure":None}
+def _checkpoint_choice(db,key,issued,events,selection=None):
+    if selection is None or selection.get("status")!="SELECTED":
+        return {"status":(selection or {}).get("status","CHECKPOINT4_NOT_READY"),
+                "departure":None}
+    from research.v45_online_template_probe import EXPERTS
+    idx=int(selection["expert_index"])
+    expert=EXPERTS[idx]
     candidates=_candidate_delays(events,issued)
     if not candidates:
         return {"status":"NO_REACHABLE_EVENT_CANDIDATES","departure":None}
@@ -224,7 +225,11 @@ def _checkpoint_choice(db,key,issued,events):
     delay,prob,event,_=choice
     return {"status":"EVENT_CANDIDATE_SELECTED","departure":issued+delay,
             "selected_event_index":event["event_index"],"score":prob,
-            "selected_expert":expert,"model_generation":"CHECKPOINT4"}
+            "selected_expert":expert,
+            "selected_expert_index":idx,
+            "selector_posterior_score":selection.get("posterior_score"),
+            "selector_resolved_count":selection.get("resolved_count"),
+            "model_generation":"CHECKPOINT4"}
 
 
 def _nessie_choice(db,key,issued,events):
@@ -354,7 +359,7 @@ def _pair_choice(db,key,issued,events):
             "model_generation":"PINNED_PAIR_SELECTOR"}
 
 
-def choose_event(db,key,issued,events):
+def choose_event(db,key,issued,events,checkpoint_selection=None):
     """Return one champion-scored event candidate, with no calendar horizon."""
     kind=CHAMPION_KIND.get(key)
     if kind is None:return {"status":"NO_CHAMPION_IDENTITY","departure":None}
@@ -366,7 +371,8 @@ def choose_event(db,key,issued,events):
     if kind=="v20":
         return _engine_choice(db,key,issued,events,"v20",V20_EXTRA[key])
     if kind=="checkpoint4_template":
-        return _checkpoint_choice(db,key,issued,events)
+        return _checkpoint_choice(
+            db,key,issued,events,selection=checkpoint_selection)
     if kind=="nessie_template":
         return _nessie_choice(db,key,issued,events)
     if kind=="camel_template_bank":
