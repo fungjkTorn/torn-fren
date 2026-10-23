@@ -22,6 +22,8 @@ on:
       - 'tests/test_v169_south_africa_source_gate.py'
       - 'research/v169_failure_diagnostics.py'
       - 'tests/test_v169_failure_diagnostics.py'
+      - 'scripts/check_v169_source_coverage.py'
+      - 'tests/test_v169_source_coverage.py'
       - 'research/plushie_champions/**'
       - 'deploy/research_runner/export_snapshot.py'
       - 'deploy/research_runner/tune_snapshot_for_forward.sh'
@@ -72,6 +74,8 @@ on:
       - 'tests/test_v169_south_africa_source_gate.py'
       - 'research/v169_failure_diagnostics.py'
       - 'tests/test_v169_failure_diagnostics.py'
+      - 'scripts/check_v169_source_coverage.py'
+      - 'tests/test_v169_source_coverage.py'
       - 'research/plushie_champions/**'
       - 'deploy/research_runner/export_snapshot.py'
       - 'deploy/research_runner/tune_snapshot_for_forward.sh'
@@ -136,6 +140,7 @@ jobs:
           tests.test_pc_original_specialists
           tests.test_v169_south_africa_source_gate
           tests.test_v169_failure_diagnostics
+          tests.test_v169_source_coverage
           tests.test_research_runner_export_snapshot
           tests.test_research_runner_bootstrap_contract -q
 
