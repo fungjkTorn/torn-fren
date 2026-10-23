@@ -2,6 +2,9 @@
 from __future__ import annotations
 
 from collections import Counter
+from pathlib import Path
+import sqlite3
+import tempfile
 import unittest
 from unittest.mock import patch
 
@@ -9,7 +12,7 @@ from deploy.scripts.v163_readonly_event_first_preview import OBS
 from research.v174_full25_forecast_tournament import (
     ALL_CANDIDATES, ENGINE_NAMES, AdaptiveRate, AdaptiveZero,
     advance_trackers, event_departures, grade_candidates, brief,
-    screen_rank, fixed_roster,
+    screen_rank, fixed_roster, run_item,
 )
 from research.v167_all24_live_policy_replay import ROUTES
 from research.v173_adaptive_flight_policy import SPECIAL_WINDOWS
@@ -102,6 +105,63 @@ class V174ContractTests(unittest.TestCase):
         broad=brief(Counter(issues=200,proposals=150,
                             proposal_success=100,proposal_failure=50),())
         self.assertGreater(screen_rank(broad,()),screen_rank(small,()))
+
+    def test_end_to_end_scoring_scaffold_with_source_read_only(self):
+        # Real-shaped SQLite + CausalMirror, but synthetic deterministic
+        # engine instead of CPU-heavy specialist fitting in CI.
+        start=1791504000
+        end=start+24*300
+        cutoff=end+11820+3000
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td);source=root/"synthetic.db"
+            with sqlite3.connect(source) as db:
+                db.executescript("""
+                    CREATE TABLE stock_history(
+                        id INTEGER PRIMARY KEY,
+                        timestamp INTEGER,country TEXT,item_name TEXT,
+                        quantity INTEGER,source TEXT);
+                    CREATE TABLE poll_heartbeats(
+                        id INTEGER PRIMARY KEY,
+                        timestamp INTEGER,mode TEXT,success INTEGER,
+                        source TEXT);
+                    CREATE TABLE collection_gaps(
+                        id INTEGER PRIMARY KEY,
+                        start_timestamp INTEGER,end_timestamp INTEGER,reason TEXT);
+                """)
+                db.executemany(
+                    "INSERT INTO stock_history(timestamp,country,item_name,quantity,source) VALUES(?,?,?,?,?)",
+                    [(start-100,"sou","Xanax",0,"yata"),
+                     (start+10,"sou","Xanax",2500,"yata"),
+                     (end+11820+2500,"sou","Xanax",0,"yata")])
+                db.executemany(
+                    "INSERT INTO poll_heartbeats(timestamp,mode,success,source) VALUES(?,'poll-cycle',1,'yata')",
+                    [(t,) for t in range(start-300,cutoff+1,300)])
+            records=[
+                {"issued_epoch":t,
+                 "recommended_departure_epoch":t,
+                 "target_stable_from_previous_replan":True,
+                 "selected_event":{"event_index":0,
+                                   "predicted_restock_epoch":t},
+                 }
+                for t in range(start,end+1,300)]
+            baseline={"item_key":"sou:Xanax","start":start,
+                      "end":end,"records":records}
+            before=source.read_bytes()
+            def fake_fresh(_db,_key,issued,_causal,_gaps,_trackers,wanted,_baseline):
+                return {name:{"departure":issued,
+                              "target":issued,
+                              "event_index":0}
+                        for name in wanted}
+            with patch("research.v174_full25_forecast_tournament.forecast_issue",
+                       side_effect=fake_fresh):
+                result=run_item(source,"sou:Xanax",baseline,
+                                start,end,screen_step=3600,finalists=4)
+            self.assertEqual(source.read_bytes(),before)
+            self.assertTrue(result["model_recomputed_per_issue"])
+            self.assertGreater(result["validation_issue_clocks"],0)
+            self.assertIn("V169_INCUMBENT",result["finalists"])
+            self.assertIn("research_release_recommendation",result)
+            self.assertFalse(result["production_modified"])
 
     def test_validate_exact_final_grid_alignment(self):
         # V169 end time includes seconds beyond the final valid 300s issue.
