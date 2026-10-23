@@ -8,6 +8,7 @@ import json
 import threading
 from pathlib import Path
 from urllib.parse import urlencode
+from services.product_ui_contract_v171 import attach_board_ui
 
 from services.travel_window_policy import project_policy
 from services.departure_recommendation import project_recommendation
@@ -95,9 +96,11 @@ def build_board(snapshot,*,now,flight_overrides=None):
                      "graph_url":"/?"+urlencode({"country":country,"item":name}),
                      "quality_label":"Research estimate — recheck before travel",
                      "arrival_stock_quantity_prediction":None})
-    return {"schema_version":1,"status":"RESEARCH_PREVIEW","asof_epoch":issued,"evaluated_at_epoch":now,
-            "source_poll_age_seconds":age,"rows":rows,"item_count":len(rows),
-            "personalization_requires_api_key":False,"calibrated_arrival_probability_available":False}
+    board={"schema_version":1,"status":"RESEARCH_PREVIEW","asof_epoch":issued,
+           "evaluated_at_epoch":now,"source_poll_age_seconds":age,"rows":rows,
+           "item_count":len(rows),"personalization_requires_api_key":False,
+           "calibrated_arrival_probability_available":False}
+    return attach_board_ui(board,now=now)
 
 
 class SnapshotCache:
