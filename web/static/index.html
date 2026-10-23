@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Torn Fren — Stock History</title>
 
+  <link rel="stylesheet" href="/site_shell.css">
+  <script defer src="/site_shell.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
 
@@ -635,9 +637,10 @@
   </style>
 </head>
 <body>
-  <main class="page">
-    <h1 id="title">Loading...</h1>
-    <div id="subtitle"></div>
+  <a class="tf-skip" href="#main-content">Skip to content</a>
+  <header class="tf-shell"><a class="tf-brand" href="/experimental">TORN<span>-FREN</span></a><button class="tf-menu" type="button" aria-expanded="false" aria-label="Toggle navigation">☰</button><nav class="tf-nav" aria-label="Main navigation"><a data-tf-section="overview" href="/experimental">Overview</a><a data-tf-section="detail" href="/">Item detail</a><a data-tf-section="travel" href="/travel-decisions">Travel decisions</a></nav><div class="tf-shell-status"><span class="tf-beta">Beta</span></div></header>
+  <main class="page" id="main-content">
+    <div class="tf-page-heading"><div><div class="tf-eyebrow">Item detail</div><h1 id="title">Loading...</h1><div id="subtitle" class="tf-page-subtitle"></div></div><div class="tf-context-actions"><a class="tf-action-link" href="/experimental">Browse all items</a><a class="tf-action-link primary" href="/travel-decisions">Plan a trip</a></div></div>
 
     <div class="controls">
       <div class="timeframes" id="timeframes">
@@ -670,7 +673,7 @@
     <div id="sharedDeparturePreview" hidden role="status" style="padding:12px 20px;color:#b8ef76"></div>
     <section id="insights-panel" aria-live="polite">
       <div class="insight-section" id="history-section">
-        <div class="insight-title">Observed history</div>
+        <div class="insight-title">Stock history</div>
         <div class="metrics">
           <div class="metric"><div class="metric-label">Current stock</div><div class="metric-value" id="currentStock">—</div></div>
           <div class="metric"><div class="metric-label">Foreign buy price</div><div class="metric-value" id="currentCost">—</div><div class="metric-subvalue" id="currentCostMeta"></div></div>
@@ -693,7 +696,7 @@
 
       <div class="insight-section" id="prediction-section">
         <div class="prediction-header-row">
-          <div class="insight-title">Prediction v2</div>
+          <div class="insight-title">Restock forecast</div>
         </div>
 
         <div class="prediction-main" id="predictionEstimate">Not enough data</div>
@@ -701,22 +704,22 @@
 
         <div class="prediction-primary-grid">
           <div class="prediction-kpi">
-            <div class="prediction-kpi-label">Target arrival window</div>
+            <div class="prediction-kpi-label">Target stock window</div>
             <div class="prediction-kpi-value" id="predictionArrivalValue">—</div>
           </div>
           <div class="prediction-kpi">
-            <div class="prediction-kpi-label">Best departure window</div>
+            <div class="prediction-kpi-label">Recommended leave window</div>
             <div class="prediction-kpi-value" id="predictionLeaveByValue">—</div>
           </div>
           <div class="prediction-kpi">
-            <div class="prediction-kpi-label">Travel reliability</div>
+            <div class="prediction-kpi-label">Historical evidence</div>
             <div class="prediction-kpi-value"><span class="reliability-badge insufficient" id="predictionReliabilityBadge">—</span></div>
           </div>
         </div>
 
         <div class="success-row">
           <div class="success-box">
-            <div class="success-label">Historical trip success</div>
+            <div class="success-label">Arrival success</div>
             <div class="success-value" id="predictionLifetimeSuccess">—</div>
             <div class="success-help">All resolved trips</div>
           </div>
