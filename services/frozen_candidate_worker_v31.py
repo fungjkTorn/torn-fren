@@ -56,6 +56,15 @@ def _install_frozen_readonly_history(history_service, db):
                 factory=RetryingReadOnlyConnection,
             )
             try:
+                # Sanitized exports intentionally omit descriptive gap reasons.
+                # Shadow only that table on this connection; preserve all gap
+                # boundaries and never ALTER the source or its frozen copy.
+                columns = {row[1] for row in connection.execute(
+                    "PRAGMA main.table_info(collection_gaps)")}
+                if columns and "reason" not in columns:
+                    connection.execute("""CREATE TEMP VIEW collection_gaps AS
+                        SELECT *, 'sanitized collector gap (reason unavailable)' AS reason
+                        FROM main.collection_gaps""")
                 connection.execute("PRAGMA query_only=ON")
                 return connection
             except BaseException:

@@ -158,14 +158,10 @@ class FirstReleaseNativeTests(unittest.TestCase):
         cls.now = NOW
         start = NOW - 80 * 3600 - 300
         with sqlite3.connect(cls.source) as db:
-            db.executescript("""
-                CREATE TABLE stock_history(id INTEGER PRIMARY KEY,
-                  timestamp INTEGER,country TEXT,item_name TEXT,quantity INTEGER,source TEXT);
-                CREATE TABLE poll_heartbeats(id INTEGER PRIMARY KEY,
-                  timestamp INTEGER,mode TEXT,success INTEGER,source TEXT);
-                CREATE TABLE collection_gaps(id INTEGER PRIMARY KEY,
-                  start_timestamp INTEGER,end_timestamp INTEGER,reason TEXT);
-            """)
+            # Exercise the actual VM exporter schema, including its deliberate
+            # omission of collection_gaps.reason, rather than a collector clone.
+            from deploy.research_runner.export_snapshot import DDL
+            db.executescript(DDL)
             rows = []
             for key in FIRST_RELEASE_MODELS:
                 country, item = key.split(":", 1)
@@ -178,6 +174,40 @@ class FirstReleaseNativeTests(unittest.TestCase):
             db.executemany("INSERT INTO stock_history(timestamp,country,item_name,quantity,source) VALUES(?,?,?,?,?)", rows)
             db.executemany("INSERT INTO poll_heartbeats(timestamp,mode,success,source) VALUES(?,'poll-cycle',1,'yata')",
                            [(t,) for t in range(start, NOW + 1, 60)])
+
+    def test_sanitized_gap_adapter_preserves_boundaries_and_readonly_source(self):
+        from services import history_service
+        from services.frozen_candidate_worker_v31 import _install_frozen_readonly_history
+        for with_reason in (False, True):
+            with self.subTest(with_reason=with_reason), tempfile.TemporaryDirectory() as td:
+                source = Path(td) / "gaps.sqlite"
+                with sqlite3.connect(source) as db:
+                    db.execute("CREATE TABLE collection_gaps(start_timestamp INTEGER,end_timestamp INTEGER" +
+                               (",reason TEXT)" if with_reason else ")"))
+                    db.execute("INSERT INTO collection_gaps VALUES(" +
+                               ("100,200,'original reason')" if with_reason else "100,200)"))
+                    db.execute("INSERT INTO collection_gaps VALUES(" +
+                               ("300,NULL,'open gap')" if with_reason else "300,NULL)"))
+                before = source.read_bytes()
+                saved = {name: getattr(history_service, name) for name in
+                         ("DB_PATH", "_connect", "init_db", "_DB_READY")}
+                try:
+                    _install_frozen_readonly_history(history_service, source)
+                    gaps = history_service.get_collection_gaps()
+                    self.assertEqual([(100, 200), (300, None)],
+                        [(g['start_timestamp'], g['end_timestamp']) for g in gaps])
+                    if with_reason:
+                        self.assertEqual('original reason', gaps[0]['reason'])
+                    self.assertEqual(100, history_service._collection_gap_overlap(150, 160)['start_timestamp'])
+                    self.assertEqual(2, len(history_service._collection_gaps_overlapping(150, 350)))
+                    with history_service._connect() as db:
+                        self.assertEqual(1, db.execute('PRAGMA query_only').fetchone()[0])
+                        with self.assertRaises(sqlite3.OperationalError):
+                            db.execute('DELETE FROM main.collection_gaps')
+                finally:
+                    for name, value in saved.items():
+                        setattr(history_service, name, value)
+                self.assertEqual(before, source.read_bytes())
 
     @classmethod
     def tearDownClass(cls):
