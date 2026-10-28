@@ -40,8 +40,9 @@ def build_item_travel_decision(
     target_qty=30, grace_seconds=DEFAULT_GRACE_SECONDS,
     arrival_policy="expected",
 ):
-    """Issue-pinned physical-restock -> first reachable >=30 arrival.
+    """Issue-pinned restock -> first reachable configured-stock arrival.
 
+    Legacy forecasts use >=30; other targets require matching forecast metadata.
     Physical 0->positive events are kept even when purchase-window estimation
     abstains. Arrival is the *actual landing epoch*; the ten seconds after
     landing are an additional stock-survival requirement, not permission to
@@ -133,7 +134,7 @@ def build_item_travel_decision(
             "estimated_arrival_plus_grace_epoch": (
                 arrival + grace_seconds if arrival is not None else None),
             "flight_reachable": bool(reachable),
-            "item_quantity_threshold": 30,
+            "item_quantity_threshold": target_qty,
             "calibration_state": "UNCALIBRATED",
             "forecast_horizon_seconds": center - issued,
             "model_proven_success": False,
@@ -190,7 +191,9 @@ def build_item_travel_decision(
     too_old = now - issued >= 300
     stale_poll = poll_age_seconds is None or poll_age_seconds > max_poll_age_seconds
     model_available = forecast.get("status") == "EVENT_TIMELINE_FORECAST_AVAILABLE"
-    if target_qty != 30:
+    # Legacy forecasts omit this metadata and have always used >=30.
+    # A new threshold is valid only when the forecaster used that threshold.
+    if target_qty != forecast.get("arrival_stock_threshold", 30):
         status, reason = STATUS_ABSTAIN, "REQUESTED_THRESHOLD_NOT_SUPPORTED_BY_MODEL"
     elif stale_poll or too_old:
         status = STATUS_STALE

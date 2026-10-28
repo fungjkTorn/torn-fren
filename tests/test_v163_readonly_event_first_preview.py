@@ -103,7 +103,10 @@ class EventTimelineTests(unittest.TestCase):
         p=phase(age=200)
         p["stocked_durations"]=[300,400,600,900]*5
         p["depleted_durations"]=[900,1000,1200,1800]*5
-        events=m.predict_events("mex:Jaguar Plushie",p,asof=ASOF)["restock_events"]
+        # Exercise explicit legacy horizon behavior; the current default has
+        # no calendar cap (covered by the first-release/horizon-free tests).
+        events=m.predict_events("mex:Jaguar Plushie",p,asof=ASOF,
+                                horizon=28800)["restock_events"]
         self.assertGreater(len(events),3)
         widths=[e["restock_window_width_seconds"] for e in events]
         self.assertEqual(widths,sorted(widths))

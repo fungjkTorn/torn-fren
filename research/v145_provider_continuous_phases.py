@@ -21,7 +21,7 @@ from research.v128_full24_earliest_shadow import (
 )
 
 
-def provider_continuous_phases(observations, *, asof, gaps=()):
+def provider_continuous_phases(observations, *, asof, gaps=(), min_qty=MIN_QTY):
     """Return V128-compatible durations plus explicit transition diagnostics.
 
     Eligible starts/ends are observed consecutive-row threshold crossings
@@ -37,6 +37,8 @@ def provider_continuous_phases(observations, *, asof, gaps=()):
     """
     if type(asof) is not int or asof <= 0:
         raise ValueError("invalid as-of epoch")
+    if type(min_qty) is not int or min_qty < 1:
+        raise ValueError("invalid stock threshold")
     crosses_gap = _gap_index(gaps, asof)
     last = None
     current = None
@@ -54,7 +56,7 @@ def provider_continuous_phases(observations, *, asof, gaps=()):
             or obs.quantity < 0 or not obs.source):
             c["invalid_observation"] += 1
             continue
-        high = obs.quantity >= MIN_QTY
+        high = obs.quantity >= min_qty
         if last is None:
             current, onset = high, None
         else:

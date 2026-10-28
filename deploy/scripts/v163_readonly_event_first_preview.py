@@ -108,7 +108,7 @@ def _window(item,asof,start,stocked_duration,early_start,late_start,early_lifeti
 
 def predict_events(item,phases,*,asof,horizon=None,
                    max_events=MAX_EVENTS,min_bounded=MIN_BOUNDED,
-                   recent_cycles=None):
+                   recent_cycles=None,min_qty=MIN_QTY):
     """All modeled replenishments up to horizon, not just selected flights.
 
     Causal input: phase evidence closed at or before asof, plus the
@@ -116,6 +116,7 @@ def predict_events(item,phases,*,asof,horizon=None,
     grows; these are *estimates*, with no calibrated forecast accuracy.
     """
     if (type(asof) is not int or asof<=0
+        or type(min_qty) is not int or min_qty<1
         or (horizon is not None and (type(horizon) is not int or horizon<300))
         or type(max_events) is not int
         or not 1<=max_events<=MAX_EVENTS or
@@ -131,7 +132,7 @@ def predict_events(item,phases,*,asof,horizon=None,
         "predictions_are_provisional":True,
         "restock_accuracy_verified":False,
         "not_a_success_probability":True,
-        "arrival_stock_threshold":MIN_QTY,
+        "arrival_stock_threshold":min_qty,
         "flight_seconds":TRAVEL_SECONDS[item.split(":",1)[0]],
         "restock_events":[],"current_stock_window":None,
         "forecast_event_count":0,
