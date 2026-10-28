@@ -116,6 +116,9 @@ def main():
     if digest(APP.read_bytes())!=EXPECTED_APP:
         raise ValueError('website source changed since preflight; refusing to overwrite it')
     if BASE.is_symlink() or DROPIN.exists():raise ValueError('existing beta deployment requires review')
+    for unit in (SERVICE,TIMER):
+        if (Path('/etc/systemd/system')/unit).exists():
+            raise ValueError('existing beta unit requires review: '+unit)
     for path in (PYTHON,WEB_PYTHON,SOURCE):
         if not path.is_file():raise ValueError('required runtime/source missing: '+str(path))
     web_props=run(['systemctl','show',WEB,'--property=User,WorkingDirectory,ActiveState'])

@@ -72,7 +72,7 @@ def publish(source, state, *, model_sha, item_runner=None, clock=time.time):
                         "--source",str(frozen),"--key",key,"--issued",str(issued),
                         "--flight",str(flight)],text=True,capture_output=True,timeout=15)
                     if child.returncode:
-                        raise RuntimeError("native item process failed")
+                        raise RuntimeError("native item process failed: "+child.stderr[-2000:])
                     row = json.loads(child.stdout)
                 else:
                     row = item_runner(frozen,key,now=issued,flight_seconds=flight)
@@ -80,7 +80,7 @@ def publish(source, state, *, model_sha, item_runner=None, clock=time.time):
                     raise ValueError("item identity or issue clock mismatch")
                 rows[key] = row
             except (ValueError,RuntimeError,subprocess.TimeoutExpired) as error:
-                failures.append({"item_key":key,"error_type":type(error).__name__})
+                failures.append({"item_key":key,"error_type":type(error).__name__,"detail":str(error)[-2000:]})
         # Do not replace a coherent ten-item feed with a partial one.
         if failures or len(rows) != 10:
             raise RuntimeError("incomplete publisher batch: "+json.dumps(failures))
