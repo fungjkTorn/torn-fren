@@ -1,1 +1,23 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>TORN FREN · Live beta</title><link rel="stylesheet" href="/first-release-assets/beta.css"></head><body class="beta-page"><header class="beta-nav"><a href="/experimental">TORN<span>FREN</span></a><nav><a href="/experimental">Overview</a><a href="/">Stock graph</a><a href="/travel-decisions">Travel decisions</a></nav><span class="beta-label">LIVE BETA</span></header><main class="beta-main"><p class="beta-eyebrow">YOUR NEXT BUYING OPPORTUNITY</p><h1 id="beta-title">Ten items. One travel plan.</h1><p class="beta-intro">The earliest reachable restock, with departure timing and live results. PI + pilot flight times. Success means stock above 30 at calculated arrival.</p><div id="beta-health" class="beta-health">Loading the latest forecast…</div><section id="beta-grid" class="beta-grid"></section><p class="beta-footnote">Other plushies, flowers and Xanax models are under review. The stock graph remains available. Forecast outcomes are measured from stock polls; no actual flight is required. Historical test rates are not included.</p></main><script src="/first-release-assets/beta.js"></script></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Torn Fren · Travel planner</title>
+  <link rel="stylesheet" href="/first-release-assets/beta.css">
+</head>
+<body class="beta-page">
+  <header class="beta-nav"><a class="beta-brand" href="/experimental">TORN<span>FREN</span></a><nav aria-label="Main navigation"><a href="/experimental" aria-current="page">Travel planner</a><a href="/">Stock graph</a></nav><span class="beta-label">LIVE BETA</span></header>
+  <main class="beta-main">
+    <div class="beta-heading"><div><p class="beta-eyebrow">PLAN YOUR NEXT TRIP</p><h1 id="beta-title">Travel planner</h1><p class="beta-intro">Departure estimates for the earliest reachable buying opportunity.</p></div><div class="beta-profile">PI + pilot<span>Success = stock &gt;30 at arrival</span></div></div>
+    <div class="beta-summary" aria-label="Forecast summary"><div><strong id="beta-total">—</strong><span>tracked items</span></div><div><strong id="beta-ready">—</strong><span>leave now</span></div><div><strong id="beta-scheduled">—</strong><span>scheduled</span></div><div><strong id="beta-unavailable">—</strong><span>awaiting forecast</span></div><p id="beta-health" role="status">Connecting to forecast feed…</p></div>
+    <section class="beta-list" aria-label="Item forecasts">
+      <div class="beta-filters"><label class="beta-search">Search items<input id="beta-search" type="search" placeholder="Search item or country…" autocomplete="off"></label><label>Country<select id="beta-country"><option value="">All countries</option></select></label><label>Type<select id="beta-type"><option value="">All items</option><option value="flower">Flowers</option><option value="plushie">Plushies</option><option value="xanax">Xanax</option></select></label><label>Status<select id="beta-status"><option value="">All statuses</option><option value="ready">Leave now</option><option value="scheduled">Scheduled</option><option value="unavailable">Awaiting forecast</option></select></label><label>Sort by<select id="beta-sort"><option value="departure">Next departure</option><option value="country">Country</option><option value="item">Item name</option></select></label></div>
+      <div class="beta-list-meta"><span id="beta-count">Loading items…</span><span>Last 10: <i class="beta-dot SUCCESS"></i> success <i class="beta-dot FAILURE"></i> miss <i class="beta-dot UNKNOWN"></i> unknown <i class="beta-dot PENDING"></i> pending</span></div>
+      <div class="beta-table-wrap"><table class="beta-table"><thead><tr><th scope="col">Item / country</th><th scope="col">Current stock</th><th scope="col">Departure</th><th scope="col">Arrival</th><th scope="col">Leave before</th><th scope="col">Last 10 opportunities</th><th scope="col"><span class="beta-sr-only">Actions</span></th></tr></thead><tbody id="beta-rows"></tbody></table></div>
+      <p id="beta-empty" class="beta-empty" hidden>No items match these filters. Try a different item or country.</p>
+      <nav id="beta-pagination" class="beta-pagination" aria-label="Item pages" hidden><button id="beta-prev" type="button">← Previous</button><span id="beta-page-number"></span><button id="beta-next" type="button">Next →</button></nav>
+    </section>
+    <p class="beta-footnote">Live results use stock polls at calculated arrival; no actual flight is required. Repeated forecasts count as one opportunity. Other models remain under review.</p>
+  </main>
+  <script src="/first-release-assets/beta.js"></script>
+</body></html>
