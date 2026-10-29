@@ -139,3 +139,20 @@ rows. Original files and migration audits were retained. Duplicates were removed
 only after comparing every field except execution duration; the first forecast
 was preserved. Final reporting must independently require all 2,017 expected
 issue clocks exactly once per item and reject nonidentical duplicates.
+
+## Final opportunity audit
+
+The live TargetIndex is intentionally conservative about all provider changes.
+The completed replay audit found that this can exclude earlier failed forecasts
+even when both providers agree on the same >30 availability state. The primary
+research report therefore additionally uses forecast_opportunity_audit's
+ProviderContinuousTargetIndex, consistent with the phase forecaster: benign
+same-state switches preserve identity; conflicting threshold changes and gaps
+still reject it. Every saved landing outcome remains unchanged, and the earliest
+issued forecast is selected after sorting by its clock. The strict original
+counts are retained as a reference view. Neither this research matcher nor
+new models have been deployed into the live evidence recorder.
+
+Tests cover future and current target continuity, conflicting switches, gaps,
+mixed-provider arrival grades staying unknown, and an earlier failure winning
+over a later successful revision even when input rows arrive out of order.

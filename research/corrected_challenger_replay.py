@@ -141,7 +141,7 @@ def run(source, output, *, days=7, step=300, pilot=False, timeout=30, items=None
                     records.append(r)
                     print(json.dumps({'item':key,'issued':issued,'seconds':r['seconds'],'status':r['status']}),flush=True)
             groups = {}; unmatched = Counter()
-            for r in records:
+            for r in sorted(records,key=lambda r:r['issued']):
                 if r.get('observed_target') and (r.get('row',{}).get('decision') or {}).get('estimated_departure_epoch') is not None:
                     groups.setdefault(r['observed_target']['epoch'],r)
                 else:
