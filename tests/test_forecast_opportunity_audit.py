@@ -15,7 +15,7 @@ class OpportunityAuditTests(unittest.TestCase):
         index=ProviderContinuousTargetIndex(history,[])
         self.assertEqual(10,index.target(row(2,1)['row'])['epoch'])
         self.assertEqual(10,index.target(row(25,0)['row'])['epoch'])
-        self.assertIsNone(TargetIndex(history,[]).target(row(2,1)['row']))
+        self.assertEqual(10,TargetIndex(history,[]).target(row(2,1)['row'])['epoch'])
 
     def test_conflicting_switch_and_gap_still_prevent_identity(self):
         conflict=[(1,0,'a'),(5,100,'b'),(10,0,'b'),(15,100,'b')]

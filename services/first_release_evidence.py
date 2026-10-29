@@ -42,6 +42,8 @@ def connect(path):
       CREATE TRIGGER IF NOT EXISTS immutable_outcomes_delete BEFORE DELETE ON outcomes
         BEGIN SELECT RAISE(ABORT,'outcomes are append-only'); END;
     """)
+    from services.simulated_trip_evidence import initialize
+    initialize(db)
     return db
 
 
@@ -122,7 +124,10 @@ class TargetIndex:
         self.history_start = rows[0][0] if rows else None
         self.actual = openings(rows, gaps)
         self.times = [r["epoch"] for r in self.actual]
-        self.switches = [b[0] for a,b in zip(rows,rows[1:]) if a[2] != b[2]]
+        # Agreement on availability preserves a buying window. Only a
+        # cross-provider threshold contradiction makes its identity ambiguous.
+        self.switches = [b[0] for a,b in zip(rows,rows[1:])
+            if a[2] != b[2] and (a[1] > 30) != (b[1] > 30)]
         usable = sorted((a, b if b is not None else 2**63-1) for a,b in gaps)
         self.gap_starts = [a for a,b in usable]
         self.gap_ends = []
@@ -192,7 +197,7 @@ def score(db, source, *, cutoff, model_sha):
             key,entry["issued"],cutoff,json.dumps(evidence,sort_keys=True)))
 
 
-def summary(db, source, *, item_key, model_sha, cutoff):
+def legacy_summary(db, source, *, item_key, model_sha, cutoff):
     """First published forecast per observed opportunity, never 5m rows as trips.
 
     Unmatched issues remain visible separately and do not create independent
@@ -242,6 +247,12 @@ def summary(db, source, *, item_key, model_sha, cutoff):
     start = max(start,index.history_start or cutoff)
     observed = [o["epoch"] for o in index.actual if o["epoch"] >= start]
     return {"label":"Last 10 observed forecast opportunities",
+            "evidence_policy":"PROVIDER_CONTINUOUS_FIRST_ISSUE_V2",
+            "matched_opportunities_total":len(grouped),
+            "matched_success_fraction":counts["SUCCESS"]/known if known else None,
+            "recorded_forecast_revisions":sum(raw_outcomes.values()),
+            "unmatched_revision_total":sum(unmatched.values()),
+            "rate_status":"WITHHELD_UNMATCHED_OUTCOMES" if unmatched_misses else "KNOWN_MATCHED_RESULTS" if known else "UNKNOWN_RESULTS" if counts['UNKNOWN'] else "AWAITING_ARRIVALS" if counts['PENDING'] else "AWAITING_WINDOW_MATCH" if raw_outcomes else "NO_RECORDED_OUTCOMES",
             "trips":trips,"successes":counts["SUCCESS"],"failures":counts["FAILURE"],
             "unknown":counts["UNKNOWN"],"pending":counts["PENDING"],
             "known":known,"success_fraction":counts["SUCCESS"]/known if known and not unmatched_misses else None,
@@ -251,3 +262,8 @@ def summary(db, source, *, item_key, model_sha, cutoff):
             "coverage_start_epoch":start,
             "observed_opportunities_without_matched_forecast":sum(t not in grouped for t in observed),
             "actual_player_trips_required":False,"historical_rates_included":False}
+
+
+def summary(db,source,*,item_key,model_sha,cutoff):
+    from services.simulated_trip_evidence import summary as simulated_summary
+    return simulated_summary(db,source,item_key=item_key,model_sha=model_sha,cutoff=cutoff)
