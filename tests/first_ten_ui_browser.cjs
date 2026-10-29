@@ -31,6 +31,7 @@ fs.mkdirSync(output,{recursive:true});
   return route.fulfill({status:404,body:'Not found'});
  });
  const page=await context.newPage();page.on('pageerror',e=>errors.push(e.message));
+ await page.clock.install();
  await page.goto('http://torn-ui.test/experimental');await page.waitForSelector('#beta-rows tr');
  assert.equal(await page.locator('#beta-rows tr').count(),10);
  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
@@ -46,6 +47,14 @@ fs.mkdirSync(output,{recursive:true});
  await page.locator('#beta-country').selectOption('');await page.locator('#beta-type').selectOption('plushie');assert.equal(await page.locator('#beta-rows tr').count(),1);
  await page.locator('#beta-type').selectOption('');await page.locator('#beta-sort').selectOption('item');assert((await page.locator('.beta-item-name').first().textContent()).startsWith('Banana'));
  await page.locator('#beta-search').fill('not-an-item');assert(await page.locator('#beta-empty').isVisible());await page.locator('#beta-search').fill('');
+ // A transient refresh failure keeps still-valid advice visible. Recalculation
+ // and a network hiccup must not turn every existing forecast into a blank.
+ const validAdvice=await page.locator('[data-arrival-key]').allTextContents();
+ failFeed=true;await page.clock.fastForward(31000);
+ await page.waitForFunction(()=>document.querySelector('#beta-health').textContent.includes('Refresh delayed'));
+ const retainedAdvice=await page.locator('[data-arrival-key]').allTextContents();
+ assert.equal(retainedAdvice.filter(t=>t!=='—').length,validAdvice.filter(t=>t!=='—').length);
+ failFeed=false;
  await page.setViewportSize({width:390,height:844});await page.screenshot({path:path.join(output,'planner-mobile.png'),fullPage:true});assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
  // Fifty rows use the same list, filters and detail interaction.
  feed={...base,rows:Array.from({length:50},(_,i)=>{const r=structuredClone(base.rows[i%10]);if(i>=10)r.item_key+=' '+i;return r;})};
@@ -56,7 +65,11 @@ fs.mkdirSync(output,{recursive:true});
  await page.locator('#beta-search').fill('49');assert.equal(await page.locator('#beta-rows tr').count(),1);await page.locator('#beta-search').fill('');
  assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
  await page.setViewportSize({width:1440,height:1000});await page.screenshot({path:path.join(output,'planner-50-items.png')});
- // Failure must remove all departure/arrival advice, including open details.
+ // Genuine expiry removes advice even if the last forecast was cached.
+ await page.clock.fastForward(301000);
+ assert((await page.locator('[data-arrival-key]').allTextContents()).every(t=>t==='—'));
+ assert((await page.locator('[data-leave-key]').allTextContents()).every(t=>t==='Stock data delayed'));
+ // A failed initial fetch has no cached advice to display.
  failFeed=true;await page.reload();await page.waitForFunction(()=>document.querySelector('#beta-health').textContent.includes('unavailable'));
  assert.equal(await page.locator('[data-arrival-key]').count(),0);failFeed=false;feed=structuredClone(base);
  const chartPage=await context.newPage();chartPage.on('pageerror',e=>errors.push(e.message));

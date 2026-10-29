@@ -13,7 +13,7 @@
   const duration=s=>{const m=Math.floor(Math.max(0,s)/60);return m>=60?`${Math.floor(m/60)}h ${m%60}m`:`${m}m`;};
   const byId=id=>document.getElementById(id);
   const graph=!byId('beta-rows');
-  let data=null,selectedKey=null,dialog=null,returnFocus=null,graphKey=null,pageIndex=0;
+  let data=null,selectedKey=null,dialog=null,returnFocus=null,graphKey=null,pageIndex=0,feedError=false;
   const pageSize=20;
   const filters={search:'',country:'',type:'',status:'',sort:'departure'};
   function state(r){
@@ -21,7 +21,7 @@
     if(!data||now()>data.valid_until_epoch||!Number.isInteger(dep)||!Number.isInteger(end)||now()>end)return 'unavailable';
     return dep<=now()?'ready':'scheduled';
   }
-  function leave(r){return state(r)==='ready'?'Leave now':state(r)==='scheduled'?clock(r.decision.estimated_departure_epoch):'Awaiting forecast';}
+  function leave(r){return state(r)==='ready'?'Leave now':state(r)==='scheduled'?clock(r.decision.estimated_departure_epoch):(!data||now()>data.valid_until_epoch||['STALE_DATA','STALE_COUNTRY_DATA'].includes(r.decision?.status)?'Stock data delayed':'Awaiting forecast');}
   function arrival(r){return state(r)==='unavailable'?null:Math.max(now(),r.decision.estimated_departure_epoch)+r.decision.player_flight_seconds;}
   function rate(r){const m=r.live||{};return typeof m.success_fraction==='number'?`${Math.round(m.success_fraction*100)}% · ${m.successes}/${m.known}`:m.known?`${m.successes}/${m.known} matched · rate pending`:'Collecting results';}
   function dots(r,full=false){
@@ -75,7 +75,7 @@
     if(!data)return;
     if(!graph){
       for(const [id,value] of [['total',data.rows.length],['ready',data.rows.filter(r=>state(r)==='ready').length],['scheduled',data.rows.filter(r=>state(r)==='scheduled').length],['unavailable',data.rows.filter(r=>state(r)==='unavailable').length]])byId('beta-'+id).textContent=value;
-      byId('beta-health').textContent=now()>data.valid_until_epoch?'Stock feed needs refresh · advice paused':`Updated ${clock(data.published_epoch)} · refreshes automatically`;
+      byId('beta-health').textContent=now()>data.valid_until_epoch?'Stock updates delayed · advice paused':feedError?'Refresh delayed · showing the last valid forecast':`Updated ${clock(data.published_epoch)} · refreshes automatically`;
     }
   }
   function ensureDialog(){
@@ -127,7 +127,7 @@
   async function refresh(){
     try{
       const response=await fetch('/api/first-release',{cache:'no-store'});if(!response.ok)throw Error('feed unavailable');
-      const next=await response.json();if(!Array.isArray(next.rows))throw Error('invalid feed');data=next;
+      const next=await response.json();if(!Array.isArray(next.rows))throw Error('invalid feed');data=next;feedError=false;
       if(graph)renderGraph();else renderList();
       if(dialog?.open&&selectedKey){
         const row=data.rows.find(r=>r.item_key===selectedKey);
@@ -141,8 +141,9 @@
       }
       tick();
     }catch(e){
-      if(data){data.valid_until_epoch=0;if(graph)renderGraph();else renderList();tick();}
-      if(!graph)byId('beta-health').textContent='Forecast feed unavailable · departure advice paused';
+      feedError=true;
+      if(data){if(graph)renderGraph();else renderList();tick();}
+      if(!graph&&!data)byId('beta-health').textContent='Forecast feed unavailable · departure advice paused';
       else if(!data)byId('first-release-panel').textContent='Forecast feed unavailable. Stock history remains available.';
     }
   }

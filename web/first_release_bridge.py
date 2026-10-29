@@ -46,6 +46,8 @@ def read_board(*,now=None,path=None):
             "asof_epoch":s["asof_epoch"],"published_epoch":s["published_epoch"],
             "valid_until_epoch":s["valid_until_epoch"],"model_sha":s["model_sha"],
             "source_heartbeat_epoch":s["source_heartbeat_epoch"],
+            "publisher_sha":s.get("publisher_sha",s["model_sha"]),
+            "source_refresh":s.get("source_refresh"),
             "recent_publications":s.get("recent_publications",[]),
             "stock_success_rule":s["stock_success_rule"],"flight_profile":s["flight_profile"]}
 

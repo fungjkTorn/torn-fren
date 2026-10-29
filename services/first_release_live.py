@@ -42,9 +42,12 @@ def readonly(path):
     return db
 
 
-def publish(source, state, *, model_sha, item_runner=None, clock=time.time):
+def publish(source, state, *, model_sha, item_runner=None, clock=time.time,
+            live_source=None, publisher_sha=None):
     if not re.fullmatch("[0-9a-f]{40}",model_sha):
         raise ValueError("immutable source revision required")
+    if publisher_sha is not None and not re.fullmatch("[0-9a-f]{40}",publisher_sha):
+        raise ValueError("immutable publisher revision required")
     state = Path(state)
     if state.is_symlink() or not state.is_dir():
         raise ValueError("ordinary existing state directory required")
@@ -57,6 +60,10 @@ def publish(source, state, *, model_sha, item_runner=None, clock=time.time):
         with closing(readonly(source)) as src, closing(sqlite3.connect(frozen)) as dest:
             src.backup(dest,pages=1024,sleep=.01)
         issued = int(clock())
+        source_refresh = None
+        if live_source is not None:
+            from services.first_release_source import refresh_tail
+            source_refresh = refresh_tail(frozen,live_source,cutoff=issued)
         health = inspect_live_source(frozen,issued)
         if health["status"] != "FRESH":
             raise ValueError("source unavailable: "+health["status"])
@@ -103,6 +110,8 @@ def publish(source, state, *, model_sha, item_runner=None, clock=time.time):
                 row["decision"] = d
                 row["published_epoch"] = published
                 row["source_heartbeat_epoch"] = health["last_successful_heartbeat"]
+                row["publisher_sha"] = publisher_sha or model_sha
+                row["source_refresh"] = source_refresh
                 # Global poll coverage is disclosed; provider country clocks,
                 # where available, are reported without inventing per-item age.
                 country = key.split(":",1)[0]
@@ -121,6 +130,7 @@ def publish(source, state, *, model_sha, item_runner=None, clock=time.time):
             ledger.commit()
             prior = ledger.execute("SELECT DISTINCT p.issued,p.published FROM publications p JOIN issues i ON i.issued=p.issued WHERE i.model_sha=? ORDER BY p.issued DESC LIMIT 2",(model_sha,)).fetchall()
             snapshot = {"schema_version":1,"status":"LIVE_BETA","model_sha":model_sha,
+                "publisher_sha":publisher_sha or model_sha,"source_refresh":source_refresh,
                 "asof_epoch":issued,"published_epoch":published,
                 "source_heartbeat_epoch":health["last_successful_heartbeat"],
                 "valid_until_epoch":min(issued+300,health["last_successful_heartbeat"]+180),
@@ -134,6 +144,7 @@ def publish(source, state, *, model_sha, item_runner=None, clock=time.time):
             ledger.commit()
         os.chmod(state/"forecasts.sqlite",0o600)
     return {"status":"TEN_ITEM_SNAPSHOT_PUBLISHED","asof_epoch":issued,
+            "publisher_sha":publisher_sha or model_sha,"source_refresh":source_refresh,
             "published_epoch":published,"items":10,"model_sha":model_sha,
             "elapsed_seconds":int(clock())-started,"snapshot_sha256":digest}
 
@@ -146,11 +157,13 @@ def main():
     item.add_argument("--flight",type=int,required=True)
     pub=sub.add_parser("publish"); pub.add_argument("--source",required=True)
     pub.add_argument("--state",required=True); pub.add_argument("--model-sha",required=True)
+    pub.add_argument("--live-source");pub.add_argument("--publisher-sha")
     args=p.parse_args()
     if args.action=="item":
         value=forecast_first_release_item(args.source,args.key,now=args.issued,flight_seconds=args.flight)
     else:
-        value=publish(args.source,args.state,model_sha=args.model_sha)
+        value=publish(args.source,args.state,model_sha=args.model_sha,
+                      live_source=args.live_source,publisher_sha=args.publisher_sha)
     print(json.dumps(value,sort_keys=True))
 
 
