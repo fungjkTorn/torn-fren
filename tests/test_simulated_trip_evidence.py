@@ -50,6 +50,44 @@ class SimulationTests(unittest.TestCase):
         state,frozen,changes=advance(state,None,[],700)
         self.assertEqual([],frozen);self.assertEqual('WITHDRAWN_STALE_BEFORE_DEPARTURE',changes[0]['kind'])
 
+    def test_completed_identity_survives_expiry_and_another_tested_target(self):
+        state={'active':None,'completed':[]};observed=[{'epoch':90}]
+        state,frozen,_=advance(state,recommendation(100,100,anchor=90,end=130),observed,100)
+        self.assertEqual(1,len(frozen))
+        future=recommendation(200,200,anchor=500,end=800)
+        future['_availability_anchor']=90
+        future['decision']['selected_restock_event_index']=1
+        future['decision']['forecast_events']=[{'index':1,'predicted_restock_epoch':500,'predicted_stock_below_30_epoch':800}]
+        state,frozen,_=advance(state,future,observed,200);self.assertEqual(1,len(frozen))
+        state,_,_=advance(state,{'asof_epoch':250,'decision':{}},observed,250)
+        # Native forecasts can extend an expired stock window after forecasting
+        # a future target. That does not create another current-restock trip.
+        state,frozen,_=advance(state,recommendation(300,300,anchor=90,end=900),observed,300)
+        self.assertEqual([],frozen)
+        self.assertEqual(2,len(state['completed']))
+        self.assertTrue(all('forecast' not in plan for plan in state['completed']))
+
+    def test_restock_during_publication_does_not_shift_native_future_ordinal(self):
+        with tempfile.TemporaryDirectory() as td:
+            db=old.connect(Path(td)/'ledger.db');src=sqlite3.connect(':memory:')
+            src.executescript('''CREATE TABLE stock_history(id INTEGER PRIMARY KEY,timestamp,country,item_name,quantity,source);
+                CREATE TABLE collection_gaps(start_timestamp,end_timestamp);
+                CREATE TABLE poll_heartbeats(timestamp,mode,success);
+                CREATE TABLE country_stock_observations(id INTEGER PRIMARY KEY,received_epoch,country,country_update_epoch,clock_status);''')
+            src.executemany("INSERT INTO stock_history VALUES(?,?,'uni','Xanax',?,'a')",[(1,10,0),(2,110,100)])
+            src.executemany("INSERT INTO poll_heartbeats VALUES(?,'poll-cycle',1)",[(t,) for t in range(10,501,10)])
+            src.executemany("INSERT INTO country_stock_observations(received_epoch,country,country_update_epoch,clock_status) VALUES(?,'uni',?,'REPORTED')",[(t,t) for t in range(10,501,10)])
+            future=recommendation(100,120,anchor=110,end=900)
+            future['published_epoch']=120;future['decision']['selected_restock_event_index']=1
+            future['decision']['forecast_events']=[{'index':1,'predicted_restock_epoch':110,'predicted_stock_below_30_epoch':900}]
+            for row in (future,recommendation(130,130,anchor=110,end=900)):
+                old.record(db,row,model_sha='sha');db.execute('INSERT INTO publications VALUES(?,?,?)',(row['asof_epoch'],row['published_epoch'],'digest'))
+            result=summary(db,src,item_key='uni:Xanax',model_sha='sha',cutoff=500)
+            self.assertEqual(1,result['simulated_trips_total'])
+            self.assertEqual(0,result['trips'][0]['origin_opening'])
+            state=json.loads(db.execute('SELECT payload FROM simulation_cursors').fetchone()[0])
+            self.assertEqual(110,state['completed'][0]['resolved_opening'])
+
     def test_future_target_becoming_current_is_not_a_second_test_after_a_miss(self):
         state={'active':None,'completed':[]}
         future=recommendation(100,100,anchor=500,end=900)

@@ -4,7 +4,7 @@ The old headline metric grouped forecasts by matched continuous availability win
 
 ## Agreed policy
 
-`RECOMMENDED_DEPARTURE_FREEZE_V3` reconstructs the published recommendation stream chronologically. The currently recommended exact departure may change before departure; revisions, postponements, withdrawals and target changes are recorded separately. At that recommended departure, the trip freezes with its original departure, arrival and selected forecast. Later forecasts and outcomes cannot move it or replace a failed result. Repeated leave-now advice for the same target is not another trip. New qualified current-stock restocks, including surplus-to-base resets, can create a new target while availability remains continuous.
+`RECOMMENDED_DEPARTURE_FREEZE_V4` reconstructs the published recommendation stream chronologically. The currently recommended exact departure may change before departure; revisions, postponements, withdrawals and target changes are recorded separately. At that recommended departure, the trip freezes with its original departure, arrival and selected forecast. Later forecasts and outcomes cannot move it or replace a failed result. Repeated leave-now advice for the same target is not another trip. New qualified current-stock restocks, including surplus-to-base resets, can create a new target while availability remains continuous.
 
 A due departure is materialized when the next publication is processed, preserving the same ordering in backfill and incremental operation. Stale recommendations do not silently become trips. No actual player departure is required.
 
@@ -31,3 +31,11 @@ The deployment requires the SSH key on the user's Windows machine. GitHub access
 ## Validation
 
 Regression tests cover chronological revision/freeze behavior, failed-target retry suppression, withdrawals and expiration, normal variable bands, small sellbacks, reset signatures, arrival evidence independent of restock boundaries, provider changes, threshold handling, idempotency, immutable raw and frozen evidence, private preview of the active ten only, and deployment rollback. Desktop and mobile browser fixtures check the updated status text and detail dialog. Real research-history checks validate quantity grouping mechanics only; they are not a new accuracy claim for the current live ten.
+
+## Live-ledger audit and V4 correction (October 29)
+
+The first deployment report confirmed V3 applied, but the subsequent public-feed audit found repeated Ceibo trips with the identical `restock:1793225633` identity. Its 117 reconstructed trips across the cohort must not be interpreted as 117 independent restocks or accepted accuracy evidence. V3 could discard a completed identity after the predicted window expired and a different target had become the newest completed trip. A later extended current-stock forecast could therefore create another test of the same restock. V3 also used publication-time availability as the origin for a forecast calculated at an earlier source cutoff, shifting future ordinals when a restock occurred during inference/publication.
+
+V4 retains compact completed identities independently of window expiry and rechecks already tested targets at freeze. It chooses the forecast origin using the issue-time source cutoff. Later observed openings resolve target identity separately from the frozen forecast geometry. A versioned reconstruction preserves V3 records as an audit trail; it does not delete or overwrite them. Reports expose the duplicate-identity audit and deployment refuses to apply a preview with duplicate target groups or a missing audit. The installer supports upgrading the exact known V3 overlay while preserving the original native model directory.
+
+New regressions reproduce forgotten-target re-entry after window expiry and a restock arriving between issue and publication. The existing seven-item forecast archive is a mechanics check, not a substitute for the current VM ledger preview. Heather's unusually broad learned quantity band (407–9,999 in the VM report) still merits a separate historical restock-signature review; V4 does not silently retune that band.

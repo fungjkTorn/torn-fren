@@ -84,10 +84,14 @@ def repair(archive,apply=False):
     revision=hashlib.sha256(evidence+js+board+ENTRY.encode()+b''.join(companions.values())).hexdigest()[:20]
     board_path=JS.with_name('board.html')
     old_unit=UNIT.read_bytes();old_js=JS.read_bytes();old_board=board_path.read_bytes();old_snapshot=(BASE/'latest.json').read_bytes()
-    if old_unit.count(b'-m services.first_release_live')!=1:
+    commands=[b'-m services.first_release_live',str(BASE/'reporting'/'98ebf83b2b87555dfca1'/'entry.py').encode(),str(BASE/'reporting'/revision/'entry.py').encode()]
+    found=[command for command in commands if old_unit.count(command)==1]
+    if len(found)!=1:
         raise ValueError('publisher command differs; inspect active unit before applying overlay')
+    old_command=found[0]
     before=json.loads(old_snapshot)
     result={'status':'EVIDENCE_REPAIR_PLAN','reporting_revision':revision,'model_sha':before['model_sha'],
+        'evidence_policy':'RECOMMENDED_DEPARTURE_FREEZE_V4',
         'collector_modified':False,'native_models_modified':False,'raw_evidence_deleted':False}
     if os.geteuid()!=0:raise PermissionError('root required for private evidence preview')
     folder=BASE/'reporting'/revision;folder.mkdir(parents=True,exist_ok=True)
@@ -100,9 +104,12 @@ def repair(archive,apply=False):
     began=time.monotonic()
     comparison=preview(folder,BASE/'forecasts.sqlite',COLLECTOR,before['model_sha'])
     result['preview_seconds']=round(time.monotonic()-began,2)
-    fields=('simulated_trips_total','known','successes','failures','unknown','pending','observed_restocks_since_start','revision_counts','restock_profile')
+    fields=('simulated_trips_total','known','successes','failures','unknown','pending','observed_restocks_since_start','revision_counts','restock_profile','target_identity_audit')
     result['preview']={key:{f:m.get(f) for f in fields} for key,m in comparison.items()}
     if not apply:return result
+    if any(m.get('target_identity_audit',{}).get('duplicate_target_groups',1) for m in comparison.values()):
+        result.update(status='EVIDENCE_REPAIR_BLOCKED',error='duplicate or missing target identity audit; live service unchanged')
+        return result
     backup_root=BACKUPS;backup_root.mkdir(exist_ok=True,parents=True)
     backup=Path(tempfile.mkdtemp(prefix='planner-evidence-',dir=backup_root));backup.chmod(0o700)
     (backup/'service').write_bytes(old_unit);(backup/'beta.js').write_bytes(old_js);(backup/'board.html').write_bytes(old_board);(backup/'latest.json').write_bytes(old_snapshot)
@@ -117,7 +124,7 @@ def repair(archive,apply=False):
         try:src.backup(dst)
         finally:dst.close();src.close()
         reconcile(folder,BASE/'forecasts.sqlite',COLLECTOR,before['model_sha'])
-        new_unit=old_unit.replace(b'-m services.first_release_live',str(folder/'entry.py').encode())
+        new_unit=old_unit.replace(old_command,str(folder/'entry.py').encode())
         atomic(UNIT,new_unit);atomic(JS,js);atomic(board_path,board)
         run(['systemd-analyze','verify',str(UNIT)])
         run(['systemctl','daemon-reload'])
@@ -125,7 +132,7 @@ def repair(archive,apply=False):
         current=json.loads((BASE/'latest.json').read_text())
         if current['model_sha']!=before['model_sha'] or current['published_epoch']<=before['published_epoch']:
             raise ValueError('new publication identity/clock failed')
-        if len(current['live_metrics'])!=10 or not all(m.get('evidence_policy')=='RECOMMENDED_DEPARTURE_FREEZE_V3' for m in current['live_metrics'].values()):
+        if len(current['live_metrics'])!=10 or not all(m.get('evidence_policy')=='RECOMMENDED_DEPARTURE_FREEZE_V4' for m in current['live_metrics'].values()):
             raise ValueError('new evidence policy not active')
         result.update(status='EVIDENCE_REPAIR_APPLIED',published_epoch=current['published_epoch'],
             counts={k:{f:m.get(f) for f in fields} for k,m in current['live_metrics'].items()})
@@ -140,4 +147,4 @@ def repair(archive,apply=False):
 if __name__=='__main__':
     p=argparse.ArgumentParser(description=__doc__);p.add_argument('--archive',required=True);p.add_argument('--apply',action='store_true')
     a=p.parse_args();r=repair(a.archive,a.apply);print(json.dumps(r,indent=2))
-    if r['status']=='EVIDENCE_REPAIR_ROLLED_BACK':raise SystemExit(1)
+    if r['status'] in ('EVIDENCE_REPAIR_ROLLED_BACK','EVIDENCE_REPAIR_BLOCKED'):raise SystemExit(1)

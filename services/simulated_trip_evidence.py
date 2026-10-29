@@ -10,7 +10,7 @@ import json
 import sqlite3
 from services.restock_signatures import learn,events,clean_pairs
 
-POLICY='RECOMMENDED_DEPARTURE_FREEZE_V3'
+POLICY='RECOMMENDED_DEPARTURE_FREEZE_V4'
 
 
 def initialize(db):
@@ -57,7 +57,10 @@ def candidate(row,observed):
     event=(f.get('current_stock_window') or {}) if selected==0 else next((e for e in d.get('forecast_events',[]) if e['index']==selected),{})
     start=event.get('predicted_restock_epoch',arr);end=event.get('predicted_stock_below_30_epoch',d.get('estimated_departure_deadline_epoch',dep)+(arr-dep))
     stamp=row.get('published_epoch',row['asof_epoch'])
-    prior=[e for e in observed if e['epoch']<=stamp]
+    # The native forecast only knew source data through its issue time.
+    # A restock between inference and publication must not shift event 1
+    # onto the following physical restock.
+    prior=[e for e in observed if e['epoch']<=row['asof_epoch']]
     return {'departure_epoch':dep,'arrival_epoch':arr,'issued_epoch':row['asof_epoch'],
         'published_epoch':stamp,'selected_event_index':selected,
         'window_start':start,'window_end':max(end,arr),
@@ -97,16 +100,19 @@ def advance(state,row,observed,now):
     def freeze(plan):
         if plan['departure_epoch']>plan['valid_until']:
             change('WITHDRAWN_STALE_BEFORE_DEPARTURE',plan);return
-        frozen.append(deepcopy(plan));state['completed'].append(deepcopy(plan))
+        if any(same_episode(old,plan) for old in state['completed']):
+            change('SUPPRESSED_ALREADY_TESTED_TARGET',plan);return
+        frozen.append(deepcopy(plan))
+        # Keep durable target identities even after their predicted window
+        # expires. A later extension cannot authorize another test.
+        identity={k:deepcopy(v) for k,v in plan.items() if k not in ('forecast','reason','issued_epoch','published_epoch','valid_until','departure_epoch','arrival_epoch')}
+        state['completed'].append(identity)
         change('FROZEN_AT_RECOMMENDED_DEPARTURE',plan)
     active=state.get('active')
     if active and active['departure_epoch']<now:
         freeze(active);active=None
     if row is not None:
         new=candidate(row,observed)
-        anchor=new.get('episode_anchor') if new else None
-        newest=state['completed'][-1]['id'] if state['completed'] else None
-        state['completed']=[old for old in state['completed'] if old['id']==newest or old['window_end']>=now or (anchor is not None and old.get('episode_anchor')==anchor)]
         if new and new['departure_epoch']<now:
             new=None
         if new is None:
@@ -172,9 +178,9 @@ def summary(db,source,*,item_key,model_sha,cutoff):
     availability=[b[0] for a,b in clean_pairs(rows,gaps) if a[1]<=30<b[1]]
     for entry in entries:
         row=json.loads(entry[1]);row['published_epoch']=entry[2]
-        pos=bisect.bisect_right(availability,entry[2])-1
+        pos=bisect.bisect_right(availability,entry[0])-1
         row['_availability_anchor']=availability[pos] if pos>=0 else 0
-        row['_availability_openings']=availability[:pos+1]
+        row['_availability_openings']=availability[:bisect.bisect_right(availability,entry[2])]
         state,frozen,changes=advance(state,row,observed,entry[2]);save(frozen,changes,entry[0])
         db.execute('''INSERT INTO simulation_cursors VALUES(?,?,?,?,?) ON CONFLICT(item,model_sha,policy)
             DO UPDATE SET issued=excluded.issued,payload=excluded.payload''',(*args,entry[0],json.dumps(state,sort_keys=True)))
@@ -198,6 +204,10 @@ def summary(db,source,*,item_key,model_sha,cutoff):
     changes={r[0]:r[1] for r in db.execute('SELECT kind,COUNT(*) FROM simulation_changes WHERE item=? AND model_sha=? AND policy=? GROUP BY kind',args)}
     restocks=[json.loads(r[0]) for r in db.execute('SELECT payload FROM simulation_restocks WHERE item=? AND model_sha=? AND policy=? ORDER BY epoch',args)]
     tested={t['restock_anchor'] for t in trips if t['restock_anchor'] is not None}
+    identities=Counter(('observed:'+str(plan['resolved_opening']) if plan.get('resolved_opening') is not None else
+        'observed:'+plan['episode_anchor'].split(':',1)[1] if plan.get('episode_anchor') is not None else
+        'future:'+str(plan['origin_opening'])+':'+str(plan['target_offset'])) for plan in state['completed'])
+    duplicate_identities={identity:count for identity,count in identities.items() if count>1}
     return {'label':'Last 10 frozen simulated trips','evidence_policy':POLICY,'trips':latest,
         'known':known,'successes':counts['SUCCESS'],'failures':counts['FAILURE'],
         'unknown':counts['UNKNOWN'],'pending':counts['PENDING'],
@@ -208,6 +218,8 @@ def summary(db,source,*,item_key,model_sha,cutoff):
         'restocks_without_confirmed_test_link':sum(e['epoch'] not in tested for e in restocks),
         'restock_identity_does_not_gate_arrival_outcome':True,
         'active_recommendation':state['active'],'coverage_start_epoch':start,
+        'target_identity_audit':{'duplicate_target_groups':len(duplicate_identities),'duplicates':duplicate_identities,
+            'retained_completed_identities':len(state['completed'])},
         'percentage_withheld_for_unmatched_misses':False,
         'rate_status':'KNOWN_SIMULATED_TRIPS' if known else 'UNKNOWN_RESULTS' if counts['UNKNOWN'] else 'AWAITING_ARRIVALS' if counts['PENDING'] else 'AWAITING_DEPARTURE',
         'actual_player_trips_required':False,'historical_rates_included':False}

@@ -11,6 +11,27 @@ from test_first_release_live import make_issue,SHA
 
 
 class PlannerRepairTests(unittest.TestCase):
+    def test_known_v3_overlay_upgrade_blocks_duplicate_preview_before_live_changes(self):
+        with tempfile.TemporaryDirectory() as td:
+            base=Path(td);unit=base/'publisher.service';js=base/'beta.js'
+            old_command=base/'reporting'/'98ebf83b2b87555dfca1'/'entry.py'
+            unit.write_text('ExecStart=python '+str(old_command)+' publish\n')
+            js.write_text('old UI');js.with_name('board.html').write_text('old board')
+            (base/'latest.json').write_text(json.dumps({'model_sha':SHA,'published_epoch':100}))
+            archive=base/'patch.zip'
+            with zipfile.ZipFile(archive,'w') as z:
+                for name in ('first_release_evidence','restock_signatures','simulated_trip_evidence'):
+                    z.writestr('services/'+name+'.py',(Path('services')/(name+'.py')).read_bytes())
+                z.writestr('web/first_release_assets/beta.js','new UI')
+                z.writestr('web/first_release_assets/board.html','new board')
+            original=unit.read_bytes()
+            duplicate={'mex:Dahlia':{'target_identity_audit':{'duplicate_target_groups':1}}}
+            with patch.object(installer,'BASE',base),patch.object(installer,'UNIT',unit),patch.object(installer,'JS',js),patch.object(installer,'preview',return_value=duplicate),patch.object(installer.os,'geteuid',return_value=0),patch.object(installer,'run') as run:
+                result=installer.repair(archive,True)
+            self.assertEqual('EVIDENCE_REPAIR_BLOCKED',result['status'])
+            self.assertEqual(original,unit.read_bytes());self.assertEqual('old UI',js.read_text())
+            run.assert_not_called()
+
     def test_private_preview_backfills_active_ten_without_writing_original_ledger(self):
         with tempfile.TemporaryDirectory() as td:
             base=Path(td);folder=base/'overlay';folder.mkdir()
