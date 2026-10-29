@@ -1,0 +1,20 @@
+{
+  "expected_publisher_sha": "2fa6365859ec0ac8d160ac3d0ac9c5b43a90b56a",
+  "files": {
+    "web/first_release_assets/beta.css": {
+      "previous_sha256": "c24d9bc9a05c035702042a72b7e60e775dd140fc6ae6ca6268cabef311cfbce9",
+      "sha256": "7da72471ff305267dcb5fc643b6dfbe7d41e55fa6f0c61d359fafd95990957ed"
+    },
+    "web/first_release_assets/beta.js": {
+      "previous_sha256": "c52cdc8cce3b913f87231c574c080268bdf70c5dff11e6bf1d4e17963d66d399",
+      "sha256": "788816f44c90dbe7dfbf21d3fb7e4b04914d029a25fa5014b844ace514725449"
+    },
+    "web/first_release_bridge.py": {
+      "previous_sha256": "e672f0868c5eaf153c83b1dfb5c5e3d3084bbc9fe4480b389107b26d0bbc89e9",
+      "sha256": "db3aa6b2f6a0811c4cb91c3daf2ce62cf094cbcb2c65635e56eae36beefb94bd"
+    }
+  },
+  "model_sha": "45d14b5e931458e41dc31e551310994caf4f8a1d",
+  "schema_version": 1,
+  "ui_revision": "travel-windows-v1"
+}

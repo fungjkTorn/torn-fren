@@ -1,6 +1,6 @@
 (() => {
   'use strict';
-  const UI_VERSION='compact-planner-v1';
+  const UI_VERSION='travel-windows-v1';
   document.documentElement.dataset.betaUi=UI_VERSION;
   const countries={arg:'Argentina',can:'Canada',cay:'Cayman Islands',haw:'Hawaii',jap:'Japan',mex:'Mexico',swi:'Switzerland',uae:'UAE',uni:'United Kingdom',chi:'China',sou:'South Africa'};
   const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -93,23 +93,113 @@
     ensureDialog();selectedKey=key;returnFocus=trigger;dialog.innerHTML=detailHtml(r);dialog.showModal();
   }
   function currentGraphKey(){try{return country+':'+item;}catch(e){const q=new URLSearchParams(location.search);return (q.get('country')||'uni')+':'+(q.get('item')||'');}}
+  function travelWindows(r){
+    if(!r||state(r)==='unavailable')return null;
+    const d=r.decision,start=Math.max(now(),d.estimated_departure_epoch),end=d.estimated_departure_deadline_epoch,flight=d.player_flight_seconds;
+    if(!Number.isInteger(flight)||start>end)return null;
+    return {departureStart:start,departureEnd:end,arrivalStart:start+flight,arrivalEnd:end+flight};
+  }
+  function windowText(w,kind){
+    if(!w)return '—';
+    if(kind==='departure')return `${w.departureStart<=now()?'Now':clock(w.departureStart)} – ${clock(w.departureEnd)}`;
+    return `${clock(w.arrivalStart)} – ${clock(w.arrivalEnd)}`;
+  }
+  function graphChart(){return window.Chart?.getChart('stockChart');}
+  function graphRow(){return data?.rows.find(r=>r.item_key===currentGraphKey());}
+  function paintTravelGraph(){graphChart()?.draw();}
+  let focusTravel=true,scrollPaintTimer=null,lastPaintFresh=null;
+  function focusTravelWindows(allowZoom=true){
+    const w=travelWindows(graphRow()),c=graphChart(),scroller=byId('chart-scroll');
+    if(!w||!c||!scroller)return;
+    focusTravel=true;
+    const span=w.arrivalEnd-now()+1800;
+    if(allowZoom){
+      const active=document.querySelector('#timeframes button.active');
+      if(active){
+        const choices=[...document.querySelectorAll('#timeframes button[data-minutes]')].sort((a,b)=>Number(a.dataset.minutes)-Number(b.dataset.minutes));
+        const choice=choices.find(b=>Number(b.dataset.minutes)*60>=span*1.12)||choices.at(-1);
+        if(choice!==active){choice.click();requestAnimationFrame(()=>requestAnimationFrame(()=>focusTravelWindows(false)));return;}
+      }
+    }
+    // Chart.js can defer its responsive resize until after a timeframe click.
+    // Resolve the new canvas geometry before choosing a horizontal viewport.
+    c.resize();c.update('none');
+    const x=c.scales.x,left=x.getPixelForValue((now()-900)*1000),right=x.getPixelForValue((w.arrivalEnd+900)*1000),width=scroller.clientWidth;
+    const desired=right-left<width-24?left-Math.max(0,width-(right-left))*.15:left;
+    scroller.scrollLeft=Math.max(0,Math.min(scroller.scrollWidth-width,desired));
+    paintTravelGraph();
+  }
+  function installTravelOverlay(){
+    if(!window.Chart)return;
+    // The legacy P1 marker treats calculation time as a new drop for current
+    // stock. Suppress it only for the approved beta; retain other chart behavior.
+    try{
+      const legacy=window.Chart.registry.getPlugin('predictionOverlay'),old=legacy.beforeDatasetsDraw;
+      legacy.beforeDatasetsDraw=function(c,...args){if(c.$prediction?.first_release)return;return old.call(this,c,...args);};
+    }catch(e){}
+    window.Chart.register({id:'firstReleaseTravelWindows',beforeDatasetsDraw(c){
+      c.$travelWindows=null;
+      const w=travelWindows(graphRow());if(!w)return;
+      const {ctx,chartArea:a,scales:{x}}=c;if(!a||!x)return;
+      c.$travelWindows={...w,estimated:true};
+      const scroll=byId('chart-scroll'),visibleLeft=Math.max(a.left,(scroll?.scrollLeft||0)+8),visibleRight=Math.min(a.right,(scroll?.scrollLeft||0)+(scroll?.clientWidth||a.right)-8);
+      ctx.save();ctx.beginPath();ctx.rect(a.left,a.top,a.right-a.left,a.bottom-a.top);ctx.clip();
+      const bands=[{kind:'departure',start:w.departureStart,end:w.departureEnd,color:'#edc578',wash:'rgba(237,197,120,.065)',lane:'rgba(114,85,29,.60)',top:a.top+8,label:'Leave'},
+        {kind:'arrival',start:w.arrivalStart,end:w.arrivalEnd,color:'#82dbc2',wash:'rgba(130,219,194,.065)',lane:'rgba(35,99,83,.60)',top:a.top+42,label:'Arrive'}];
+      for(const band of bands){
+        const left=x.getPixelForValue(band.start*1000),right=x.getPixelForValue(band.end*1000);
+        if(right<a.left||left>a.right)continue;
+        const l=Math.max(left,a.left),r=Math.min(right,a.right);
+        ctx.fillStyle=band.wash;ctx.fillRect(l,a.top,Math.max(1,r-l),a.bottom-a.top);
+        ctx.fillStyle=band.lane;ctx.fillRect(l,band.top,Math.max(1,r-l),26);
+        ctx.strokeStyle=band.color;ctx.lineWidth=1;ctx.setLineDash([5,4]);
+        for(const boundary of [left,right]){ctx.beginPath();ctx.moveTo(boundary,band.top);ctx.lineTo(boundary,a.bottom);ctx.stroke();}
+        ctx.setLineDash([]);ctx.font='600 11px system-ui,sans-serif';ctx.textBaseline='middle';
+        const label=`${band.label} · ${windowText(w,band.kind)} · estimated`,labelWidth=ctx.measureText(label).width;
+        // Keep the complete range readable even when a short window is only
+        // a narrow strip at the edge of a 24/72-hour history view.
+        const labelX=visibleLeft+7;
+        if(right>=visibleLeft&&left<=visibleRight){
+          const labelRight=visibleRight-3;ctx.save();ctx.beginPath();ctx.rect(labelX-3,band.top,labelRight-labelX+3,26);ctx.clip();
+          ctx.fillStyle='rgba(13,22,32,.92)';ctx.fillRect(labelX-3,band.top+2,Math.min(labelWidth+8,labelRight-labelX+3),22);
+          ctx.fillStyle=band.color;ctx.fillText(label,labelX,band.top+13);ctx.restore();
+        }
+      }
+      const nowX=x.getPixelForValue(now()*1000);
+      if(nowX>=a.left&&nowX<=a.right){ctx.strokeStyle='#c6d0df';ctx.setLineDash([3,4]);ctx.beginPath();ctx.moveTo(nowX,a.top+78);ctx.lineTo(nowX,a.bottom);ctx.stroke();ctx.setLineDash([]);ctx.font='11px system-ui,sans-serif';ctx.fillStyle='#dce6f3';ctx.fillText('Now',nowX+5,a.bottom-12);}
+      ctx.restore();
+    }});
+    if(typeof window.jumpToLatest==='function'){
+      const old=window.jumpToLatest;
+      window.jumpToLatest=function(){if(focusTravel&&travelWindows(graphRow())&&graphChart())focusTravelWindows(false);else old();};
+    }
+  }
   function setupGraph(){
     document.body.classList.add('beta-graph');
     const page=document.querySelector('main.page');if(!page)return;
     const nav=document.createElement('nav');nav.className='beta-graph-nav';nav.setAttribute('aria-label','Main navigation');nav.innerHTML='<a class="beta-brand" href="/experimental">TORN<span>FREN</span></a><a href="/experimental">Travel planner</a><span class="beta-label">LIVE BETA</span>';page.prepend(nav);
-    const panel=document.createElement('section');panel.id='first-release-panel';panel.className='beta-inline';panel.setAttribute('aria-label','Travel forecast');panel.textContent='Loading travel forecast…';page.insertBefore(panel,page.querySelector('.controls'));
+    const overview=document.createElement('section');overview.className='beta-graph-overview';overview.setAttribute('aria-label','Observed history and travel plan');page.insertBefore(overview,page.querySelector('.controls'));
     const history=byId('history-section');
-    if(history){const details=document.createElement('details');details.className='beta-history';details.innerHTML='<summary>Stock and price statistics</summary>';details.append(history);page.append(details);}
-    // The chart already exposes its own redraw/resize hook. Recalculate after
-    // removing the old fixed-height dashboard panels from the page flow.
+    if(history){const details=document.createElement('details');details.className='beta-history';details.open=innerWidth>=900;details.innerHTML='<summary>Observed history</summary>';details.append(history);overview.append(details);}
+    const panel=document.createElement('section');panel.id='first-release-panel';panel.className='beta-inline';panel.setAttribute('aria-label','Travel forecast');panel.textContent='Loading travel forecast…';overview.append(panel);
+    const controls=page.querySelector('.right-controls'),show=document.createElement('button');show.id='beta-show-windows';show.type='button';show.textContent='Show travel windows';show.addEventListener('click',()=>focusTravelWindows(true));controls?.prepend(show);
+    byId('latestButton')?.addEventListener('click',()=>{focusTravel=false;});
+    for(const id of ['countrySelect','itemSelect'])byId(id)?.addEventListener('change',()=>{focusTravel=true;});
+    byId('chart-scroll')?.addEventListener('scroll',()=>{clearTimeout(scrollPaintTimer);scrollPaintTimer=setTimeout(paintTravelGraph,100);},{passive:true});
+    const legend=page.querySelector('.legend');
+    if(legend){legend.querySelector('.prediction')?.remove();legend.insertAdjacentHTML('beforeend','<span class="beta-legend-departure">Estimated departure window</span><span class="beta-legend-arrival">Estimated arrival window</span>');}
+    installTravelOverlay();
+    window.addEventListener('resize',()=>{if(focusTravel)requestAnimationFrame(()=>focusTravelWindows(false));});
     requestAnimationFrame(()=>window.dispatchEvent(new Event('resize')));
   }
   function renderGraph(){
     const panel=byId('first-release-panel');if(!panel||!data)return;
-    graphKey=currentGraphKey();const r=data.rows.find(r=>r.item_key===graphKey);
-    if(!r){panel.innerHTML='<div class="beta-inline-plan"><div><strong>Model under review</strong><span class="beta-sub">Stock history is available; departure advice is not enabled for this item.</span></div><a href="/experimental">View travel planner ↗</a></div>';return;}
-    const d=r.decision||{};
-    panel.innerHTML=`<div class="beta-inline-plan"><div><span class="beta-sub">${d.selected_restock_event_index===0?'Current stock window':'Next buying opportunity'}</span><strong data-leave-key="${esc(r.item_key)}" class="beta-leave">${esc(leave(r))}</strong></div><div><span class="beta-sub">Arrival · ${duration(d.player_flight_seconds||0)} flight</span><strong data-arrival-key="${esc(r.item_key)}">${esc(clock(arrival(r)))}</strong></div><div><span class="beta-sub">Leave before</span><strong data-deadline-key="${esc(r.item_key)}">${state(r)==='unavailable'?'—':esc(clock(d.estimated_departure_deadline_epoch))}</strong></div><div><span class="beta-sub">Last 10 opportunities</span><span class="beta-rate">${esc(rate(r))}</span>${dots(r)}</div><div class="beta-actions"><button class="beta-text-button" type="button" data-details="${esc(r.item_key)}">Forecast details</button><a href="/experimental">All items ↗</a></div></div>${state(r)==='unavailable'?`<p class="beta-health-inline">${esc(reason(r))}</p>`:''}`;
+    const nextKey=currentGraphKey(),changed=nextKey!==graphKey;graphKey=nextKey;
+    const r=graphRow();
+    if(!r){panel.innerHTML='<div class="beta-inline-plan"><div><strong>Model under review</strong><span class="beta-sub">Observed stock history is available. Departure advice is not enabled for this item.</span></div><a href="/experimental">View travel planner ↗</a></div>';byId('beta-show-windows').disabled=true;paintTravelGraph();return;}
+    const d=r.decision||{},w=travelWindows(r);byId('beta-show-windows').disabled=!w;
+    panel.innerHTML=`<div class="beta-plan-heading"><div><span class="beta-sub">${d.selected_restock_event_index===0?'Current stock · already available':'Predicted buying window'} · ${duration(d.player_flight_seconds||0)} flight</span><strong data-leave-key="${esc(r.item_key)}" class="beta-leave">${esc(leave(r))}</strong><span class="beta-sub">${w?`Arrival if you leave then: <span data-arrival-key="${esc(r.item_key)}">${esc(clock(arrival(r)))}</span>`:esc(reason(r))}</span></div><button class="beta-text-button" type="button" data-details="${esc(r.item_key)}">Forecast details</button></div><div class="beta-travel-ranges"><div><span>Estimated departure window</span><strong data-window-key="${esc(r.item_key)}" data-window-kind="departure">${esc(windowText(w,'departure'))}</strong></div><div><span>Estimated arrival window</span><strong data-window-key="${esc(r.item_key)}" data-window-kind="arrival">${esc(windowText(w,'arrival'))}</strong></div></div><div class="beta-plan-results"><span class="beta-sub">Last 10 opportunities</span><span class="beta-rate">${esc(rate(r))}</span>${dots(r)}<a href="/experimental">All items ↗</a></div><p class="beta-window-note">${w?'These ranges shift by the flight duration. The estimated stock deadline bounds arrival; this is not a guaranteed stock window.':'Advice resumes when fresh data supports a buying window.'}</p>`;
+    requestAnimationFrame(()=>{paintTravelGraph();if(changed&&focusTravel)focusTravelWindows(false);});
   }
   function tick(){
     if(!data)return;
@@ -121,6 +211,12 @@
       for(const e of document.querySelectorAll('[data-leave-key]'))if(e.dataset.leaveKey===r.item_key){e.textContent=leave(r);e.classList.toggle('beta-waiting',!fresh);}
       for(const e of document.querySelectorAll('[data-arrival-key]'))if(e.dataset.arrivalKey===r.item_key)e.textContent=clock(arrival(r));
       for(const e of document.querySelectorAll('[data-deadline-key]'))if(e.dataset.deadlineKey===r.item_key)e.textContent=fresh?clock(r.decision.estimated_departure_deadline_epoch):'—';
+    }
+    if(graph){
+      const r=graphRow(),w=travelWindows(r);
+      for(const el of document.querySelectorAll('[data-window-key]'))if(el.dataset.windowKey===r?.item_key)el.textContent=windowText(w,el.dataset.windowKind);
+      if(byId('beta-show-windows'))byId('beta-show-windows').disabled=!w;
+      if(Boolean(w)!==lastPaintFresh||now()%15===0){paintTravelGraph();lastPaintFresh=Boolean(w);}
     }
     summary();
   }

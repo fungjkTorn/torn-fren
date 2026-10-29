@@ -16,6 +16,7 @@ ROSTER=frozenset(("arg:Ceibo Flower","can:Crocus","cay:Banana Orchid","haw:Orchi
  "jap:Cherry Blossom","mex:Dahlia","mex:Jaguar Plushie","swi:Edelweiss",
  "uae:Tribulus Omanense","uni:Heather"))
 ASSETS=Path(__file__).with_name("first_release_assets")
+UI_REVISION="travel-windows-v1"
 
 
 def read_board(*,now=None,path=None):
@@ -42,7 +43,7 @@ def read_board(*,now=None,path=None):
             "valid_until_epoch":s["valid_until_epoch"],
             "source_heartbeat_epoch":r.get("source_heartbeat_epoch"),
             "model_sha":s["model_sha"]})
-    return {"status":"STALE_DATA" if stale else "LIVE_BETA","rows":rows,
+    return {"status":"STALE_DATA" if stale else "LIVE_BETA","rows":rows,"ui_revision":UI_REVISION,
             "asof_epoch":s["asof_epoch"],"published_epoch":s["published_epoch"],
             "valid_until_epoch":s["valid_until_epoch"],"model_sha":s["model_sha"],
             "source_heartbeat_epoch":s["source_heartbeat_epoch"],
@@ -76,14 +77,28 @@ def attach_history(payload,board):
     index=d.get("selected_restock_event_index")
     event=next((e for e in d.get("forecast_events",[]) if e["index"]==index),None)
     if index==0:
-        center=f["asof_epoch"]; lo=hi=center
+        # Calculation time is not a restock. Keep the old chart's reference
+        # timestamp usable without inventing an observed opening at issue time.
+        center=d["estimated_arrival_epoch"]
+        restock_center=restock_lo=restock_hi=None
         end=(f.get("current_stock_window") or {}).get("predicted_stock_below_30_epoch")
     else:
-        center=event["predicted_restock_epoch"]; lo=event["restock_early_epoch"]; hi=event["restock_late_epoch"]
+        center=restock_center=event["predicted_restock_epoch"]
+        restock_lo=event["restock_early_epoch"]; restock_hi=event["restock_late_epoch"]
         end=event["predicted_stock_below_30_epoch"]
+    deadline=d["estimated_departure_deadline_epoch"]; flight=d["player_flight_seconds"]
+    arrival_start=dep+flight; arrival_end=deadline+flight
     prediction={"first_release":True,"estimate_timestamp":center,
+        "opportunity_kind":"CURRENT_STOCK" if index==0 else "PREDICTED_STOCK_WINDOW",
+        "estimate_kind":"ARRIVAL_REFERENCE" if index==0 else "RESTOCK_ESTIMATE",
+        "restock_estimate_timestamp":restock_center,
+        "restock_window_start_timestamp":restock_lo,"restock_window_end_timestamp":restock_hi,
+        "departure_window_start_timestamp":dep,"departure_window_end_timestamp":deadline,
+        "arrival_window_start_timestamp":arrival_start,"arrival_window_end_timestamp":arrival_end,
         "valid_until_epoch":row["valid_until_epoch"],
-        "window_start_timestamp":lo,"window_end_timestamp":hi,
+        # The graph must extend into the future far enough to display both
+        # travel windows, rather than stopping at a past restock reference.
+        "window_start_timestamp":arrival_start,"window_end_timestamp":arrival_end,
         "target_depletion_timestamp":end,"prediction_number":index,
         "projected":index>1,"recommended_arrival_timestamp":d["estimated_arrival_epoch"],
         "departure_epoch":dep,"departure_deadline_epoch":d["estimated_departure_deadline_epoch"],
