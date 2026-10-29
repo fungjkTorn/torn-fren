@@ -14,14 +14,14 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 from research.corrected_challenger_replay import run
-from research.corrected_challengers import forecast,MODELS
+from research.corrected_challengers import forecast,ALL_MODELS
 from research.replay_history_acceleration import cached_history
 
 
 def main():
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('--source',required=True);p.add_argument('--output',required=True)
-    p.add_argument('--item',required=True,choices=tuple(MODELS));p.add_argument('--max-seconds',type=int,default=14400)
+    p.add_argument('--item',required=True,choices=tuple(ALL_MODELS));p.add_argument('--max-seconds',type=int,default=14400)
     a=p.parse_args()
     root=Path(a.output);root.mkdir(parents=True,exist_ok=True)
     hashes={Path(f).name:hashlib.sha256(Path(f).read_bytes()).hexdigest() for f in (__file__,Path(__file__).with_name('replay_history_acceleration.py'))}

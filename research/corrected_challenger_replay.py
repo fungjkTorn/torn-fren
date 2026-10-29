@@ -17,7 +17,7 @@ import tempfile
 import time
 
 from research.causal_replay_slice import CausalReplaySlice
-from research.corrected_challengers import MODELS, POLICY, forecast
+from research.corrected_challengers import MODELS, NEXT_MODELS, ALL_MODELS, POLICY, forecast
 from services.first_release_evidence import grade, TargetIndex
 
 
@@ -70,7 +70,7 @@ def run(source, output, *, days=7, step=300, pilot=False, timeout=30, items=None
             raise ValueError('need seven days of pre-test warmup plus the complete replay week; refresh snapshot')
         gaps = truth.execute('SELECT start_timestamp,end_timestamp FROM collection_gaps').fetchall()
         identities = {'source_sha256':digest, 'code_sha256':fingerprints, 'policy':POLICY, 'start':start,
-            'end':end, 'step':step, 'pilot':pilot, 'models':dict(MODELS),
+            'end':end, 'step':step, 'pilot':pilot, 'models':dict(NEXT_MODELS if items and all(k in NEXT_MODELS for k in items) else MODELS),
             'score_rule':'stock >30 at exact calculated arrival; zero grace',
             'training_policy':'ALL_AVAILABLE_CAUSAL_HISTORY_NO_ROLLING_LOOKBACK',
             'issuance_cadence_is_not_departure_filter':True,
@@ -80,7 +80,7 @@ def run(source, output, *, days=7, step=300, pilot=False, timeout=30, items=None
             raise ValueError('output belongs to a different source or replay contract')
         manifest.write_text(json.dumps(identities, indent=2)+'\n')
         for key in items or MODELS:
-            if key not in MODELS:
+            if key not in ALL_MODELS:
                 raise ValueError('unknown challenger')
             country, item = key.split(':',1)
             rows = truth.execute('''SELECT timestamp,quantity,source FROM stock_history
@@ -149,7 +149,7 @@ def run(source, output, *, days=7, step=300, pilot=False, timeout=30, items=None
             counts=Counter(r['outcome']['status'] for r in groups.values())
             known=counts['SUCCESS']+counts['FAILURE']
             unsafe=unmatched['FAILURE']+unmatched['UNKNOWN']+unmatched['ERROR']
-            report={'item':key,'model':MODELS[key],'pilot':pilot,'issue_rows':len(records),
+            report={'item':key,'model':ALL_MODELS[key],'pilot':pilot,'issue_rows':len(records),
                 'seconds':sum(r['seconds'] for r in records),'distinct_opportunity_counts':dict(counts),
                 'estimated_full_week_model_seconds':sum(r['seconds'] for r in records)/len(records)*(days*86400//step+1) if records else None,
                 'success_fraction':counts['SUCCESS']/known if known and not unsafe else None,
@@ -165,7 +165,8 @@ def main():
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('--source');p.add_argument('--output');p.add_argument('--days',type=int,default=7,choices=[7])
     p.add_argument('--step',type=int,default=300,choices=[300,900,1800,3600])
-    p.add_argument('--pilot',action='store_true');p.add_argument('--item',choices=tuple(MODELS))
+    p.add_argument('--pilot',action='store_true');p.add_argument('--item',choices=tuple(ALL_MODELS))
+    p.add_argument('--next-five',action='store_true')
     p.add_argument('--max-seconds',type=int,default=1800)
     p.add_argument('--worker');p.add_argument('--issued',type=int)
     a=p.parse_args()
@@ -174,7 +175,7 @@ def main():
     if not a.source or not a.output:
         p.error('--source and --output are required')
     if a.max_seconds<=0:p.error('--max-seconds must be positive')
-    run(a.source,a.output,days=a.days,step=a.step,pilot=a.pilot,items=[a.item] if a.item else None,max_seconds=a.max_seconds)
+    run(a.source,a.output,days=a.days,step=a.step,pilot=a.pilot,items=[a.item] if a.item else list(NEXT_MODELS) if a.next_five else None,max_seconds=a.max_seconds)
 
 
 if __name__=='__main__':main()

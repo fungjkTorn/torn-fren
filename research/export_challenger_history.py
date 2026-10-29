@@ -15,6 +15,8 @@ import time
 
 ITEMS = ('arg:Monkey Plushie','can:Wolverine Plushie','cay:Stingray Plushie',
          'chi:Peony','sou:African Violet','sou:Lion Plushie','uni:Xanax')
+ITEMS += ('uae:Camel Plushie','uni:Nessie Plushie','sou:Xanax',
+          'uni:Red Fox Plushie','chi:Panda Plushie')
 DDL = '''
 CREATE TABLE stock_history(id INTEGER PRIMARY KEY,timestamp INTEGER,country TEXT,item_name TEXT,quantity INTEGER,source TEXT);
 CREATE INDEX stock_item ON stock_history(country,lower(item_name),timestamp,id);

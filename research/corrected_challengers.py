@@ -22,13 +22,21 @@ MODELS = MappingProxyType({
     'uni:Xanax': ('v19', 'dyn8'),
 })
 POLICY = 'CORRECTED_CHALLENGERS_FIRST_REACHABLE_V1'
+NEXT_MODELS = MappingProxyType({
+    'uae:Camel Plushie': ('v19','dyn3'),
+    'uni:Nessie Plushie': ('v19','dyn8'),
+    'sou:Xanax': ('v19','dyn6'),
+    'uni:Red Fox Plushie': ('v18','dyn1'),
+    'chi:Panda Plushie': ('v19','dyn1'),
+})
+ALL_MODELS = MappingProxyType({**MODELS,**NEXT_MODELS})
 
 
 def forecast(source, key, issued):
-    if key not in MODELS:
+    if key not in ALL_MODELS:
         raise ValueError('item is outside frozen challenger roster')
     row = forecast_first_release_item(source, key, now=issued,
-        flight_seconds=TRAVEL_SECONDS[key.split(':')[0]], model_roster=MODELS,
+        flight_seconds=TRAVEL_SECONDS[key.split(':')[0]], model_roster=ALL_MODELS,
         timing_full_history=True)
     row.update(research_policy=POLICY, production_deployed=False,
                training_policy='ALL_AVAILABLE_CAUSAL_HISTORY_NO_ROLLING_LOOKBACK',

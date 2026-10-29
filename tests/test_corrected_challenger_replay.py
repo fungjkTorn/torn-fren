@@ -34,7 +34,7 @@ class ReplayTests(unittest.TestCase):
             before=source.read_bytes()
             with patch('research.export_challenger_history.time.time',return_value=now):
                 report=export(source,out,days=28)
-            self.assertEqual(before,source.read_bytes());self.assertEqual(7,len(report['items']))
+            self.assertEqual(before,source.read_bytes());self.assertEqual(len(ITEMS),len(report['items']))
             with sqlite3.connect(out) as con:
                 self.assertIsNone(con.execute("SELECT 1 FROM sqlite_master WHERE name='secrets'").fetchone())
             with self.assertRaises(ValueError):export(source,out)
