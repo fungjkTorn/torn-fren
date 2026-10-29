@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 from contextlib import closing
 from copy import deepcopy
+from dataclasses import replace
 import importlib
 import json
 from pathlib import Path
@@ -113,7 +114,8 @@ def build_first_release_decision(forecast, *, now, flight_seconds,
     return result
 
 
-def native_timing_choice(db, *, model_roster=FIRST_RELEASE_MODELS, **request):
+def native_timing_choice(db, *, model_roster=FIRST_RELEASE_MODELS,
+                         full_history=False, **request):
     """Run exactly one frozen configuration against a read-only source.
 
     Use in an isolated publisher process: the legacy engines share a module
@@ -133,6 +135,10 @@ def native_timing_choice(db, *, model_roster=FIRST_RELEASE_MODELS, **request):
     engine = importlib.import_module(
         "services.plushie_flower_dynamic_planner_" + request["generation"])
     config = next(c for c in engine.configs() if c.name == request["config"])
+    if type(full_history) is not bool:
+        raise ValueError("full_history must be an explicit boolean")
+    if full_history:
+        config = replace(config, lookback_points=None)
     saved = {name: getattr(history_service, name) for name in
              ("DB_PATH", "_connect", "init_db", "_DB_READY")}
     try:
@@ -166,7 +172,8 @@ def native_timing_choice(db, *, model_roster=FIRST_RELEASE_MODELS, **request):
 
 
 def forecast_first_release_item(source, item_key, *, now, flight_seconds,
-                                model_roster=FIRST_RELEASE_MODELS):
+                                model_roster=FIRST_RELEASE_MODELS,
+                                timing_full_history=False):
     """Fresh, causal, read-only one-item pipeline; no production writes.
 
     Shared empirical stocked/depleted phases generate the event timeline.
@@ -205,12 +212,14 @@ def forecast_first_release_item(source, item_key, *, now, flight_seconds,
     decision = build_first_release_decision(
         forecast, now=now, flight_seconds=flight_seconds,
         poll_age_seconds=now - health["last_successful_heartbeat"],
-        timing_choice=lambda **kw: native_timing_choice(source,model_roster=model_roster,**kw),
+        timing_choice=lambda **kw: native_timing_choice(source,model_roster=model_roster,
+            full_history=timing_full_history,**kw),
         model_roster=model_roster,
     )
     return {"item_key": item_key, "asof_epoch": now,
             "forecast": forecast, "decision": decision,
             "collector_written": False, "production_deployed": False,
+            "timing_full_history_override": timing_full_history,
             "country_specific_freshness_verified": False}
 
 
