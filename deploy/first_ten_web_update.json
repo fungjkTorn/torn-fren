@@ -2,19 +2,23 @@
   "expected_publisher_sha": "2fa6365859ec0ac8d160ac3d0ac9c5b43a90b56a",
   "files": {
     "web/first_release_assets/beta.css": {
-      "previous_sha256": "c24d9bc9a05c035702042a72b7e60e775dd140fc6ae6ca6268cabef311cfbce9",
-      "sha256": "7da72471ff305267dcb5fc643b6dfbe7d41e55fa6f0c61d359fafd95990957ed"
+      "previous_sha256": "7da72471ff305267dcb5fc643b6dfbe7d41e55fa6f0c61d359fafd95990957ed",
+      "sha256": "745654af1eea4763a8a0b28b7eaa1ae5a8ae30d8b952209b28b4c8f90b117a42"
     },
     "web/first_release_assets/beta.js": {
-      "previous_sha256": "c52cdc8cce3b913f87231c574c080268bdf70c5dff11e6bf1d4e17963d66d399",
-      "sha256": "788816f44c90dbe7dfbf21d3fb7e4b04914d029a25fa5014b844ace514725449"
+      "previous_sha256": "788816f44c90dbe7dfbf21d3fb7e4b04914d029a25fa5014b844ace514725449",
+      "sha256": "d2fc0a3fe2415c50bb9fb51be3c1d30d277a21e23917b1e9d464179aae017467"
+    },
+    "web/first_release_assets/board.html": {
+      "previous_sha256": "e5d03274f4b9f9418e103bcc7e168304ef42885561925e170e203bd76607a103",
+      "sha256": "792b151383f1e1f03992bbec524f57f919f7c998b7b9e6d2475ff40db086f566"
     },
     "web/first_release_bridge.py": {
-      "previous_sha256": "e672f0868c5eaf153c83b1dfb5c5e3d3084bbc9fe4480b389107b26d0bbc89e9",
-      "sha256": "db3aa6b2f6a0811c4cb91c3daf2ce62cf094cbcb2c65635e56eae36beefb94bd"
+      "previous_sha256": "db3aa6b2f6a0811c4cb91c3daf2ce62cf094cbcb2c65635e56eae36beefb94bd",
+      "sha256": "c3569fd86315cc11efea6402aeefbc187977e33c376759546f2969a30836fa59"
     }
   },
   "model_sha": "45d14b5e931458e41dc31e551310994caf4f8a1d",
   "schema_version": 1,
-  "ui_revision": "travel-windows-v1"
+  "ui_revision": "planner-financials-v1"
 }

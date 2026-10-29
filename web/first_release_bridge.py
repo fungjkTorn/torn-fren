@@ -4,11 +4,17 @@ This file is installed beside the existing app. It depends only on the web
 runtime and the immutable publisher's JSON protocol, not its research modules.
 """
 import json
+import bisect
+import sqlite3
+import statistics
+from contextlib import closing
+from functools import lru_cache
 import os
 from pathlib import Path
 import time
 from urllib.parse import parse_qs
 
+from starlette.concurrency import run_in_threadpool
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import HTMLResponse, JSONResponse, FileResponse, Response
 
@@ -16,7 +22,7 @@ ROSTER=frozenset(("arg:Ceibo Flower","can:Crocus","cay:Banana Orchid","haw:Orchi
  "jap:Cherry Blossom","mex:Dahlia","mex:Jaguar Plushie","swi:Edelweiss",
  "uae:Tribulus Omanense","uni:Heather"))
 ASSETS=Path(__file__).with_name("first_release_assets")
-UI_REVISION="travel-windows-v1"
+UI_REVISION="planner-financials-v1"
 
 
 def read_board(*,now=None,path=None):
@@ -111,10 +117,76 @@ def attach_history(payload,board):
     return payload
 
 
+# Historical descriptive statistics are cached separately from forecasting.
+# No fitting, collector writes or old V2 analysis is enabled by this endpoint.
+@lru_cache(maxsize=32)
+def _history_summary_cached(path,country,item,bucket):
+    cutoff=int(time.time());deadline=time.monotonic()+2
+    with closing(sqlite3.connect(Path(path).resolve(strict=True).as_uri()+'?mode=ro',uri=True,timeout=2)) as db:
+        db.execute('PRAGMA query_only=ON');db.execute('PRAGMA temp_store=MEMORY')
+        db.set_progress_handler(lambda:time.monotonic()>deadline,10000);db.execute('BEGIN')
+        rows=db.execute('''SELECT timestamp,quantity,source FROM stock_history
+            WHERE country=? AND lower(item_name)=lower(?) AND timestamp<=?
+            ORDER BY timestamp,id LIMIT 50001''',(country,item,cutoff)).fetchall()
+        if len(rows)>50000:raise ValueError('bounded historical sample exceeded')
+        if len(rows)<2:return {'status':'UNAVAILABLE','reason':'No exported historical sample for this item.'}
+        gaps=db.execute('''SELECT start_timestamp,end_timestamp FROM collection_gaps
+            WHERE start_timestamp<=? AND COALESCE(end_timestamp,9223372036854775807)>=?
+            ORDER BY start_timestamp''',(cutoff,rows[0][0])).fetchall()
+        hb=db.execute("SELECT MAX(timestamp) FROM poll_heartbeats WHERE success=1 AND mode='poll-cycle' AND timestamp<=?",(cutoff,)).fetchone()[0]
+    starts=[];ends=[];maximum=0
+    for start,end in gaps:
+        starts.append(start);maximum=max(maximum,min(cutoff,end if end is not None else cutoff));ends.append(maximum)
+    def gap_between(a,b):
+        index=bisect.bisect_right(starts,b)-1
+        return index>=0 and ends[index]>=a
+    high_durations=[];low_durations=[];onset=None;last_open=None;last_zero=None;uncertain=0
+    previous=None;peak=max(rows,key=lambda r:r[1])
+    for row in rows:
+        stamp,quantity,provider=row
+        if previous is not None:
+            t0,q0,p0=previous
+            dirty=stamp<=t0 or gap_between(t0,stamp)
+            conflict=provider!=p0 and (quantity>30)!=(q0>30)
+            if dirty or conflict:
+                onset=None;uncertain+=1
+            else:
+                if p0==provider and q0>0 and quantity==0:last_zero=stamp
+                if (q0>30)!=(quantity>30):
+                    if onset is not None:
+                        (high_durations if q0>30 else low_durations).append(stamp-onset)
+                    if quantity>30:last_open=stamp
+                    onset=stamp
+        previous=row
+    average=lambda values:round(statistics.mean(values)) if values else None
+    median=lambda values:round(statistics.median(values)) if values else None
+    return {'status':'AVAILABLE','calculated_epoch':cutoff,'source_heartbeat_epoch':hb,
+        'sample_start_epoch':rows[0][0],'sample_end_epoch':rows[-1][0],'sample_rows':len(rows),
+        'last_restock_timestamp':last_open,'last_depletion_timestamp':last_zero,
+        'last_peak_quantity':peak[1],'last_peak_timestamp':peak[0],
+        'avg_stocked_seconds':average(high_durations),'median_stocked_seconds':median(high_durations),
+        'avg_unstocked_seconds':average(low_durations),'median_unstocked_seconds':median(low_durations),
+        'completed_stock_windows':len(high_durations),'uncertain_boundaries':uncertain,
+        'stocked_threshold':'>30','depletion_threshold':'=0','forecast_accuracy_claimed':False,'source_read_only':True}
+
+
+def read_history_summary(country,item,*,path=None):
+    if country not in {'arg','can','cay','haw','jap','mex','swi','uae','uni','chi','sou'} or not item or len(item)>120 or '\x00' in item:
+        raise ValueError('invalid item selection')
+    source=path or os.environ.get('TORN_FREN_HISTORY_SUMMARY_SOURCE','/var/lib/torn-fren-research/stock_history_forward.db')
+    return dict(_history_summary_cached(str(source),country,item,int(time.time())//300))
+
+
 def install_first_release(app):
     class BetaMiddleware(BaseHTTPMiddleware):
         async def dispatch(self,request,call_next):
             path=request.url.path
+            if path=="/api/first-release/history-summary":
+                try:
+                    summary=await run_in_threadpool(read_history_summary,request.query_params.get('country',''),request.query_params.get('item',''))
+                    return JSONResponse(summary,headers={"Cache-Control":"no-store"})
+                except (OSError,ValueError,sqlite3.Error):
+                    return JSONResponse({"status":"UNAVAILABLE","reason":"Historical sample is unavailable; live stock and forecasts are separate."},headers={"Cache-Control":"no-store"})
             if path.startswith("/first-release-assets/"):
                 name=path.rsplit("/",1)[-1]
                 if name in ("beta.js","beta.css"):

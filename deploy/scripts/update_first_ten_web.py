@@ -13,7 +13,7 @@ import urllib.request
 
 ROOT=Path('/opt/torn-fren')
 BACKUPS=Path('/var/backups/torn-fren-ops')
-ALLOWED=frozenset(('web/first_release_bridge.py','web/first_release_assets/beta.js','web/first_release_assets/beta.css'))
+ALLOWED=frozenset(('web/first_release_bridge.py','web/first_release_assets/beta.js','web/first_release_assets/beta.css','web/first_release_assets/board.html'))
 WEB='torn-fren-web.service'
 
 
@@ -67,7 +67,14 @@ def health(manifest,files):
         if digest(get('/first-release-assets/'+name))!=digest(files['web/first_release_assets/'+name]):
             raise ValueError('updated website asset not served: '+name)
     for route in ('/','/experimental','/travel-decisions'):
-        if b'/first-release-assets/beta.js' not in get(route):raise ValueError('website route failed: '+route)
+        raw=get(route)
+        if b'/first-release-assets/beta.js' not in raw:raise ValueError('website route failed: '+route)
+        if route!='/' and 'web/first_release_assets/board.html' in files and digest(raw)!=digest(files['web/first_release_assets/board.html']):
+            raise ValueError('planner HTML revision mismatch: '+route)
+    if manifest['ui_revision']=='planner-financials-v1':
+        summary=json.loads(get('/api/first-release/history-summary?country=can&item=Crocus'))
+        if summary.get('status')!='AVAILABLE' or summary.get('source_read_only') is not True:
+            raise ValueError('observed-history summary is not available to the website')
     return {'ui_revision':feed['ui_revision'],'publisher_sha':feed['publisher_sha'],
             'model_sha':feed['model_sha'],'routes':'PASS','assets':'PASS','feed_status':feed['status']}
 
