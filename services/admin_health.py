@@ -12,6 +12,7 @@ from services.history_service import (
     get_collector_recovery_status,
     init_db,
 )
+from services.admin_live_beta_health import read_live_beta_health
 
 ROOT = Path(__file__).resolve().parent.parent
 DATA_DIR = ROOT / "data"
@@ -199,6 +200,11 @@ def _backup_status(now):
     latest_timestamp = None
     latest_size_bytes = None
     latest_name = None
+    oldest_timestamp = None
+    try:
+        oldest_timestamp = int(files[0].stat().st_mtime) if files else None
+    except OSError:
+        pass
     if latest is not None:
         try:
             stat = latest.stat()
@@ -217,6 +223,7 @@ def _backup_status(now):
         "directory": str(BACKUP_DIR),
         "count": len(files),
         "total_bytes": int(total_bytes),
+        "oldest_backup_timestamp": oldest_timestamp,
         "last_backup_timestamp": latest_timestamp,
         "last_backup_age_seconds": (
             max(0, int(now - latest_timestamp))
@@ -302,9 +309,32 @@ def build_admin_health():
     else:
         health = "stale"
 
+    collector_health = health
+    live_beta = read_live_beta_health(now)
+    publisher = _systemctl_properties('torn-fren-first-ten-beta.service',
+        ['ActiveState','SubState','Result','ExecMainStatus','ExecMainExitTimestamp','CPUUsageNSec','MemoryCurrent'])
+    timer = _systemctl_properties('torn-fren-first-ten-beta.timer',
+        ['ActiveState','SubState','NextElapseUSecRealtime'])
+    live_beta['service'] = publisher
+    live_beta['timer'] = timer
+    # A oneshot service is normally inactive between successful timer runs.
+    publisher_failed = publisher.get('Result') not in (None,'','success')
+    timer_failed = bool(timer) and timer.get('ActiveState') != 'active'
+    if publisher_failed or timer_failed:
+        live_beta['status']='delayed'
+        live_beta.setdefault('issues',[]).append('publisher service or timer needs attention')
+    disk = _disk_usage()
+    disk_percent = disk.get('used_percent') if disk else None
+    disk_health = 'unknown' if disk_percent is None else ('stale' if disk_percent>=95 else 'delayed' if disk_percent>=85 else 'healthy')
+    if health == 'healthy' and (live_beta['status']!='healthy' or disk_health in ('delayed','stale')):
+        health = 'delayed'
+
     return {
         "generated_at": now,
         "health": health,
+        "collector_health": collector_health,
+        "live_beta": live_beta,
+        "disk_health": disk_health,
         "collector": {
             "stale": bool(collector.get("stale")),
             "last_success_timestamp": last_success_ts,
@@ -318,6 +348,7 @@ def build_admin_health():
             "counts": counts,
         },
         "forecast_auditor": {
+            "scope": "LEGACY_FORECAST_AUDITOR_NOT_CURRENT_LIVE_BETA",
             "pending_points": int(pending_points[0]) if pending_points else 0,
             "resolved_points": int(resolved_points[0]) if resolved_points else 0,
             "invalidated_points": int(invalid_points[0]) if invalid_points else 0,
@@ -339,6 +370,6 @@ def build_admin_health():
             "git_branch": _git_branch(),
             "git_commit": _git_commit(),
             "pid": os.getpid(),
-            "disk": _disk_usage(),
+            "disk": disk,
         },
     }

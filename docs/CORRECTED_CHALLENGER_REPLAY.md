@@ -115,3 +115,27 @@ There is no deployment, challenger/incumbent comparison or live certification
 in this single-model replay. A separate comparison would need explicit pinned
 controls and matching sample definitions; this request runs only one corrected
 candidate for each shortlisted item.
+
+## Verified execution acceleration
+
+research.cached_challenger_replay retains the identical issue clocks, native
+models, full-history override, causal mirror, scoring and opportunity grouping.
+It runs one isolated process per item, reuses imports, caches collector queries
+over already closed historical intervals, and computes integer leave-one-out
+means from an exact sum instead of repeatedly summing the same peak list.
+It does not cache predictions, reduce history, skip clocks or omit failures.
+Changing source identity, gap metadata or the first heartbeat clears the query
+caches. Each native call keeps its 30-second timeout. Process-local patches are
+restored when the context exits and never installed on the VM.
+
+Before using it on the uploaded 20261029T032420Z snapshot, complete forecast
+payloads were compared to the original worker at three causal issue clocks
+for every item (21/21 identical). Unit tests additionally check exact numeric
+types/values, metadata invalidation and restoration. Per-item acceleration
+sidecars identify the helper hashes alongside the original replay manifest.
+
+The initial switch between runners briefly produced duplicate identical issue
+rows. Original files and migration audits were retained. Duplicates were removed
+only after comparing every field except execution duration; the first forecast
+was preserved. Final reporting must independently require all 2,017 expected
+issue clocks exactly once per item and reject nonidentical duplicates.
