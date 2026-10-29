@@ -52,7 +52,8 @@ def _delays(earliest, latest, now):
 
 
 def build_first_release_decision(forecast, *, now, flight_seconds,
-                                 poll_age_seconds, timing_choice=None):
+                                 poll_age_seconds, timing_choice=None,
+                                 model_roster=FIRST_RELEASE_MODELS):
     """Pure decision policy. timing_choice may only select from supplied delays.
 
     Forecasts must explicitly model >=31. Model confidence is advisory, not
@@ -60,9 +61,9 @@ def build_first_release_decision(forecast, *, now, flight_seconds,
     still prevents recommendations. Inputs are never modified.
     """
     key = forecast.get("item_key")
-    if key not in FIRST_RELEASE_MODELS:
+    if key not in model_roster:
         raise ValueError("item is outside the first-release roster")
-    generation, config = FIRST_RELEASE_MODELS[key]
+    generation, config = model_roster[key]
     result = build_item_travel_decision(
         forecast, now=now, player_flight_seconds=flight_seconds,
         poll_age_seconds=poll_age_seconds, target_qty=MIN_QUANTITY,
@@ -112,7 +113,7 @@ def build_first_release_decision(forecast, *, now, flight_seconds,
     return result
 
 
-def native_timing_choice(db, **request):
+def native_timing_choice(db, *, model_roster=FIRST_RELEASE_MODELS, **request):
     """Run exactly one frozen configuration against a read-only source.
 
     Use in an isolated publisher process: the legacy engines share a module
@@ -123,7 +124,7 @@ def native_timing_choice(db, **request):
     from services.frozen_candidate_worker_v31 import (
         _install_frozen_readonly_history, inspect_live_source,
     )
-    if FIRST_RELEASE_MODELS.get(request["item_key"]) != (
+    if model_roster.get(request["item_key"]) != (
             request["generation"], request["config"]):
         raise ValueError("frozen model identity mismatch")
     source = inspect_live_source(db, request["now"])
@@ -140,7 +141,7 @@ def native_timing_choice(db, **request):
         quantity = request["min_quantity"]
         loaded = engine.load_item(country, item, quantity)
         cleaned, cycles = loaded[:2]
-        if request["generation"] == "v19":
+        if request["generation"] in ("v19","v20"):
             gaps = engine.normalize_gaps(history_service.get_collection_gaps())
             timeline = engine.Timeline(cleaned, cycles, quantity, gaps=gaps)
             deps, features = engine.completed_cycle_features(cycles, gaps=gaps)
@@ -164,14 +165,15 @@ def native_timing_choice(db, **request):
             setattr(history_service, name, value)
 
 
-def forecast_first_release_item(source, item_key, *, now, flight_seconds):
+def forecast_first_release_item(source, item_key, *, now, flight_seconds,
+                                model_roster=FIRST_RELEASE_MODELS):
     """Fresh, causal, read-only one-item pipeline; no production writes.
 
     Shared empirical stocked/depleted phases generate the event timeline.
     The named incumbent refines timing, rather than inventing a second event
     calendar. Forecasts and scheduling remain explicitly uncalibrated.
     """
-    if item_key not in FIRST_RELEASE_MODELS:
+    if item_key not in model_roster:
         raise ValueError("item is outside the first-release roster")
     from deploy.scripts.v163_readonly_event_first_preview import predict_events
     from research.v128_full24_earliest_shadow import _read_item
@@ -203,7 +205,8 @@ def forecast_first_release_item(source, item_key, *, now, flight_seconds):
     decision = build_first_release_decision(
         forecast, now=now, flight_seconds=flight_seconds,
         poll_age_seconds=now - health["last_successful_heartbeat"],
-        timing_choice=lambda **kw: native_timing_choice(source, **kw),
+        timing_choice=lambda **kw: native_timing_choice(source,model_roster=model_roster,**kw),
+        model_roster=model_roster,
     )
     return {"item_key": item_key, "asof_epoch": now,
             "forecast": forecast, "decision": decision,

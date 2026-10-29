@@ -1,0 +1,316 @@
+{
+  "actual_player_trips_required": false,
+  "additional_adapter_check": "uni:Xanax",
+  "existing_live_roster_size": 10,
+  "items": {
+    "arg:Monkey Plushie": {
+      "disposition": "SPECIALIST_ADAPTER_AND_ARTIFACT_CHECK",
+      "live_accuracy_certified": false,
+      "model_identity": "checkpoint4_template",
+      "native_operation_test": "NOT_RUN_FOR_THIS_COHORT",
+      "old_simulation_fraction": 0.6951983298538622,
+      "old_simulation_known": 479,
+      "old_simulation_successes": 333,
+      "old_unknown": 22
+    },
+    "can:Wolverine Plushie": {
+      "disposition": "FOLLOWING_DIAGNOSTIC_COHORT",
+      "live_accuracy_certified": false,
+      "model_identity": "V18 dyn8",
+      "native_operation_test": "NOT_RUN_FOR_THIS_COHORT",
+      "old_simulation_fraction": 0.7771084337349398,
+      "old_simulation_known": 498,
+      "old_simulation_successes": 387,
+      "old_unknown": 31,
+      "recent_chart_sample": {
+        "accuracy_evidence": false,
+        "first_epoch": 1792633205,
+        "last_epoch": 1793238003,
+        "latest_quantity": 154,
+        "minimum_quantity": 0,
+        "poll_gap_certification": false,
+        "recent_stocked_minutes": [
+          47.5,
+          43.98,
+          62.67
+        ],
+        "recent_unstocked_minutes": [
+          16.35,
+          15.0,
+          17.35
+        ],
+        "rows": 7507
+      }
+    },
+    "can:Xanax": {
+      "disposition": "SPECIAL_WAIT_WINDOW_DIAGNOSTIC",
+      "live_accuracy_certified": false,
+      "model_identity": "v18:dyn2",
+      "native_operation_test": "NOT_RUN_FOR_THIS_COHORT",
+      "old_simulation_fraction": 0.5,
+      "old_simulation_known": 266,
+      "old_simulation_successes": 133,
+      "old_unknown": 7,
+      "recent_chart_sample": {
+        "accuracy_evidence": false,
+        "first_epoch": 1792633205,
+        "last_epoch": 1793235623,
+        "latest_quantity": 0,
+        "minimum_quantity": 0,
+        "poll_gap_certification": false,
+        "recent_stocked_minutes": [
+          19.02,
+          8.5,
+          45.48
+        ],
+        "recent_unstocked_minutes": [
+          123.0,
+          123.0,
+          109.5
+        ],
+        "rows": 2187
+      }
+    },
+    "cay:Stingray Plushie": {
+      "candidate_model": {
+        "config": "dyn7",
+        "engine_sha256": "823e76f59ba208e30e649e23a91aa685c3a2c8e235e10c167479f833cb3cb79c",
+        "generation": "v18"
+      },
+      "disposition": "NEXT_COHORT_VM_PREFLIGHT",
+      "live_accuracy_certified": false,
+      "model_identity": "V18 dyn7",
+      "native_operation_test": "SYNTHETIC_ONLY_PASSED",
+      "old_simulation_fraction": 0.8785834738617201,
+      "old_simulation_known": 593,
+      "old_simulation_successes": 521,
+      "old_unknown": 37,
+      "recent_chart_sample": {
+        "accuracy_evidence": false,
+        "first_epoch": 1792633195,
+        "last_epoch": 1793237303,
+        "latest_quantity": 0,
+        "minimum_quantity": 0,
+        "poll_gap_certification": false,
+        "recent_stocked_minutes": [
+          54.47,
+          58.33,
+          60.5
+        ],
+        "recent_unstocked_minutes": [
+          16.87,
+          15.67,
+          17.0
+        ],
+        "rows": 6470
+      }
+    },
+    "chi:Panda Plushie": {
+      "disposition": "SPECIALIST_ADAPTER_AND_ARTIFACT_CHECK",
+      "live_accuracy_certified": false,
+      "model_identity": "pair_analog",
+      "native_operation_test": "NOT_RUN_FOR_THIS_COHORT",
+      "old_simulation_fraction": 0.6270627062706271,
+      "old_simulation_known": 303,
+      "old_simulation_successes": 190,
+      "old_unknown": 29
+    },
+    "chi:Peony": {
+      "candidate_model": {
+        "config": "traj12",
+        "engine_sha256": "a640e6cc2a90901a7f6131fc40e88428c6f4643c71d0df691bd0df97a8faa0e8",
+        "generation": "v20"
+      },
+      "disposition": "NEXT_COHORT_VM_PREFLIGHT",
+      "live_accuracy_certified": false,
+      "model_identity": "V20 traj12",
+      "native_operation_test": "SYNTHETIC_ONLY_PASSED",
+      "old_simulation_fraction": 0.8975,
+      "old_simulation_known": 400,
+      "old_simulation_successes": 359,
+      "old_unknown": 16,
+      "recent_chart_sample": {
+        "accuracy_evidence": false,
+        "first_epoch": 1792633200,
+        "last_epoch": 1793237945,
+        "latest_quantity": 1586,
+        "minimum_quantity": 0,
+        "poll_gap_certification": false,
+        "recent_stocked_minutes": [
+          967.85,
+          738.87,
+          987.02
+        ],
+        "recent_unstocked_minutes": [
+          67.67,
+          75.5,
+          61.5
+        ],
+        "rows": 4324
+      }
+    },
+    "jap:Xanax": {
+      "disposition": "SPECIAL_WAIT_WINDOW_DIAGNOSTIC",
+      "live_accuracy_certified": false,
+      "model_identity": "japan_quantity_rate",
+      "native_operation_test": "NOT_RUN_FOR_THIS_COHORT",
+      "old_simulation_fraction": 0.3333333333333333,
+      "old_simulation_known": 183,
+      "old_simulation_successes": 61,
+      "old_unknown": 12,
+      "recent_chart_sample": {
+        "accuracy_evidence": false,
+        "first_epoch": 1792633210,
+        "last_epoch": 1793233113,
+        "latest_quantity": 0,
+        "minimum_quantity": 0,
+        "poll_gap_certification": false,
+        "recent_stocked_minutes": [
+          33.02,
+          1.48,
+          41.48
+        ],
+        "recent_unstocked_minutes": [
+          113.02,
+          31.65,
+          94.85
+        ],
+        "rows": 2030
+      }
+    },
+    "sou:African Violet": {
+      "candidate_model": {
+        "config": "dyn7",
+        "engine_sha256": "ea7abbded212bfb692a7461e0976580b24eace26fbaab3be8f2beaa124f434d9",
+        "generation": "v19"
+      },
+      "disposition": "NEXT_COHORT_VM_PREFLIGHT",
+      "live_accuracy_certified": false,
+      "model_identity": "V19 dyn7",
+      "native_operation_test": "SYNTHETIC_ONLY_PASSED",
+      "old_simulation_fraction": 0.8931297709923665,
+      "old_simulation_known": 524,
+      "old_simulation_successes": 468,
+      "old_unknown": 14,
+      "recent_chart_sample": {
+        "accuracy_evidence": false,
+        "first_epoch": 1792633195,
+        "last_epoch": 1793237883,
+        "latest_quantity": 9776,
+        "minimum_quantity": 0,
+        "poll_gap_certification": false,
+        "recent_stocked_minutes": [
+          761.68,
+          940.55,
+          838.52
+        ],
+        "recent_unstocked_minutes": [
+          46.33,
+          65.65,
+          65.52
+        ],
+        "rows": 4564
+      }
+    },
+    "sou:Lion Plushie": {
+      "disposition": "SPECIALIST_ADAPTER_AND_ARTIFACT_CHECK",
+      "live_accuracy_certified": false,
+      "model_identity": "pair_analog",
+      "native_operation_test": "NOT_RUN_FOR_THIS_COHORT",
+      "old_simulation_fraction": 0.7647058823529411,
+      "old_simulation_known": 340,
+      "old_simulation_successes": 260,
+      "old_unknown": 19
+    },
+    "sou:Xanax": {
+      "disposition": "FOLLOWING_DIAGNOSTIC_COHORT",
+      "live_accuracy_certified": false,
+      "model_identity": "V19 dyn1",
+      "native_operation_test": "NOT_RUN_FOR_THIS_COHORT",
+      "old_simulation_fraction": 0.675,
+      "old_simulation_known": 560,
+      "old_simulation_successes": 378,
+      "old_unknown": 27
+    },
+    "swi:Chamois Plushie": {
+      "disposition": "SPECIALIST_ADAPTER_AND_ARTIFACT_CHECK",
+      "live_accuracy_certified": false,
+      "model_identity": "checkpoint4_template",
+      "native_operation_test": "NOT_RUN_FOR_THIS_COHORT",
+      "old_simulation_fraction": 0.658051689860835,
+      "old_simulation_known": 503,
+      "old_simulation_successes": 331,
+      "old_unknown": 28
+    },
+    "uae:Camel Plushie": {
+      "disposition": "SPECIALIST_ADAPTER_AND_ARTIFACT_CHECK",
+      "live_accuracy_certified": false,
+      "model_identity": "camel_template_bank",
+      "native_operation_test": "NOT_RUN_FOR_THIS_COHORT",
+      "old_simulation_fraction": 0.6451077943615257,
+      "old_simulation_known": 603,
+      "old_simulation_successes": 389,
+      "old_unknown": 39
+    },
+    "uni:Nessie Plushie": {
+      "disposition": "SPECIALIST_ADAPTER_AND_ARTIFACT_CHECK",
+      "live_accuracy_certified": false,
+      "model_identity": "nessie_template",
+      "native_operation_test": "NOT_RUN_FOR_THIS_COHORT",
+      "old_simulation_fraction": 0.65625,
+      "old_simulation_known": 480,
+      "old_simulation_successes": 315,
+      "old_unknown": 33
+    },
+    "uni:Red Fox Plushie": {
+      "disposition": "SPECIALIST_ADAPTER_AND_ARTIFACT_CHECK",
+      "live_accuracy_certified": false,
+      "model_identity": "redfox_analog",
+      "native_operation_test": "NOT_RUN_FOR_THIS_COHORT",
+      "old_simulation_fraction": 0.7350993377483444,
+      "old_simulation_known": 151,
+      "old_simulation_successes": 111,
+      "old_unknown": 9
+    },
+    "uni:Xanax": {
+      "candidate_model": {
+        "config": "dyn3",
+        "engine_sha256": "ea7abbded212bfb692a7461e0976580b24eace26fbaab3be8f2beaa124f434d9",
+        "generation": "v19"
+      },
+      "disposition": "CONTINUOUS_CURRENT_STOCK_CHECK",
+      "live_accuracy_certified": false,
+      "model_identity": "V19 dyn3",
+      "native_operation_test": "SYNTHETIC_ONLY_PASSED",
+      "old_simulation_fraction": 0.8970588235294118,
+      "old_simulation_known": 476,
+      "old_simulation_successes": 427,
+      "old_unknown": 14,
+      "recent_chart_sample": {
+        "accuracy_evidence": false,
+        "first_epoch": 1792633199,
+        "last_epoch": 1793237964,
+        "latest_quantity": 2775,
+        "minimum_quantity": 1443,
+        "poll_gap_certification": false,
+        "recent_stocked_minutes": [],
+        "recent_unstocked_minutes": [],
+        "rows": 2808
+      }
+    }
+  },
+  "live_publisher_changed": false,
+  "new_forward_rule": "Stock >30 at calculated landing; zero grace; first physically reachable event before timing refinement.",
+  "new_model_tournament_run": false,
+  "old_evidence_rule": "Pre-update correlated issue rows; >=30 stock with +10-second bracket. Not current live success percentages.",
+  "priority_cohort": [
+    "cay:Stingray Plushie",
+    "sou:African Violet",
+    "chi:Peony"
+  ],
+  "remaining_items": 15,
+  "review_user_date": "2026-10-28",
+  "status": "NEXT_COHORT_PREPARATION_NOT_DEPLOYED",
+  "total_reviewed_items": 25,
+  "website_changed": false
+}
