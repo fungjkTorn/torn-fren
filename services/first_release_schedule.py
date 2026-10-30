@@ -178,7 +178,7 @@ def native_timing_choice(db, *, model_roster=FIRST_RELEASE_MODELS,
 def forecast_first_release_item(source, item_key, *, now, flight_seconds,
                                 model_roster=FIRST_RELEASE_MODELS,
                                 timing_full_history=False, forecast_transform=None,
-                                current_stock_leave_now=False):
+                                current_stock_leave_now=False,event_forecaster=None):
     """Fresh, causal, read-only one-item pipeline; no production writes.
 
     Shared empirical stocked/depleted phases generate the event timeline.
@@ -208,7 +208,7 @@ def forecast_first_release_item(source, item_key, *, now, flight_seconds,
         ).fetchall()
     phases = provider_continuous_phases(
         rows, asof=now, gaps=gaps, min_qty=MIN_QUANTITY)
-    forecast = predict_events(
+    forecast = (event_forecaster or predict_events)(
         item_key, phases, asof=now, horizon=None, min_qty=MIN_QUANTITY)
     forecast["phase_definition"] = "STOCK_ABOVE_30_PURCHASE_AVAILABILITY"
     # Legacy field names say below_30; expose the actual >=31 semantics too.

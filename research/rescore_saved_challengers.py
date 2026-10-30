@@ -51,14 +51,16 @@ def rescore(source,archive,output):
     if digest(source)!=manifest['source_sha256']:raise ValueError('stock source differs from original replay')
     if output.exists():raise ValueError('choose a new output directory; prior results are preserved')
     output.mkdir(parents=True)
-    identity=hashlib.sha256(json.dumps({'source':manifest['source_sha256'],'models':manifest['models'],
-        'training':manifest['training_policy'],'native_code':manifest['code_sha256']},sort_keys=True).encode()).hexdigest()[:40]
+    identity_input={'source':manifest['source_sha256'],'models':manifest['models'],
+        'training':manifest['training_policy'],'native_code':manifest['code_sha256']}
+    if manifest.get('cleanup_variant') is not None:identity_input['cleanup_variant']=manifest['cleanup_variant']
+    identity=hashlib.sha256(json.dumps(identity_input,sort_keys=True).encode()).hexdigest()[:40]
     result={'status':'SAVED_CHALLENGERS_RESCORED','evidence_policy':POLICY,'research_identity':identity,
         'start_epoch':manifest['start'],'cutoff_epoch':manifest['end'],'source_sha256':manifest['source_sha256'],
         'saved_forecast_hashes':files,'original_models':manifest['models'],'training_policy':manifest['training_policy'],
         'sampling_seconds':manifest['step'],'publication_clock':'SAMPLED_ISSUE_TIME_NO_MEASURED_SERVER_LATENCY',
         'advice_expiry_preserved':True,'unrecorded_refreshes_assumed':False,'model_inference_run':False,
-        'production_modified':False,'arrival_timing_changed':False,'items':{}}
+        'production_modified':False,'arrival_timing_changed':False,'cleanup_variant':manifest.get('cleanup_variant'),'items':{}}
     root=Path(__file__).resolve().parents[1]
     result['scoring_code_sha256']={str(p.relative_to(root)):digest(p) for p in [Path(__file__).resolve(),root/'services/simulated_trip_evidence.py',root/'services/restock_signatures.py',root/'research/nearest_stock_boundary_misses.py']}
     with closing(connect(output/'rescore.sqlite')) as db, closing(sqlite3.connect(source.as_uri()+'?mode=ro',uri=True)) as stock:

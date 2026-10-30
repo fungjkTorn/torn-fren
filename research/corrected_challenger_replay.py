@@ -10,6 +10,7 @@ from collections import Counter
 from contextlib import closing
 import hashlib
 import json
+import os
 from pathlib import Path
 import sqlite3
 import subprocess
@@ -53,8 +54,8 @@ def run(source, output, *, days=7, step=300, pilot=False, timeout=30, items=None
         return h.hexdigest()
     digest = sha(source)
     root=Path(__file__).resolve().parents[1]
-    code_paths=[__file__,root/'research/corrected_challengers.py',root/'research/causal_replay_slice.py',
-        root/'research/current_stock_continuation.py',root/'services/native_history_acceleration.py',
+    code_paths=[__file__,root/'research/corrected_challengers.py',root/'research/causal_replay_slice.py',root/'research/matched_champion_audit.py',
+        root/'research/prelive_cleanup.py',root/'research/current_stock_continuation.py',root/'services/native_history_acceleration.py',
         root/'services/first_release_schedule.py',root/'services/first_release_evidence.py',
         root/'services/travel_decision_contract_v166.py',root/'services/history_service.py',
         root/'services/plushie_flower_dynamic_planner_v18.py',root/'services/restock_signatures.py',
@@ -77,7 +78,7 @@ def run(source, output, *, days=7, step=300, pilot=False, timeout=30, items=None
             'score_rule':'stock >30 at exact calculated arrival; zero grace',
             'training_policy':'ALL_AVAILABLE_CAUSAL_HISTORY_NO_ROLLING_LOOKBACK',
             'issuance_cadence_is_not_departure_filter':True,
-            'production_modified':False}
+            'production_modified':False,'cleanup_variant':os.environ.get('TORNFREN_PRELIVE_VARIANT')}
         manifest = output/'manifest.json'
         if manifest.exists() and json.loads(manifest.read_text()) != json.loads(json.dumps(identities)):
             raise ValueError('output belongs to a different source or replay contract')
@@ -160,7 +161,7 @@ def run(source, output, *, days=7, step=300, pilot=False, timeout=30, items=None
                 'observed_openings_in_test':sum(start<=t<=end for t in index.times),
                 'observed_openings_without_matched_forecast':sum(start<=t<=end and t not in groups for t in index.times),
                 'first_forecasts_per_opportunity':list(groups.values()),
-                'live_accuracy_certified':False,'production_modified':False}
+                'live_accuracy_certified':False,'production_modified':False,'cleanup_variant':os.environ.get('TORNFREN_PRELIVE_VARIANT')}
             (output/(path.stem+'.summary.json')).write_text(json.dumps(report,indent=2)+'\n')
 
 

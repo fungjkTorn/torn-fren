@@ -65,7 +65,12 @@ def candidate(row,observed):
     selected=d.get('selected_restock_event_index');f=row.get('forecast') or {}
     event=(f.get('current_stock_window') or {}) if selected==0 else next((e for e in d.get('forecast_events',[]) if e['index']==selected),{})
     start=event.get('predicted_restock_epoch',arr);end=event.get('predicted_stock_below_30_epoch',d.get('estimated_departure_deadline_epoch',dep)+(arr-dep))
+    if type(start) is not int:start=row.get('published_epoch',row['asof_epoch'])
+    if type(end) is not int:end=arr
     stamp=row.get('published_epoch',row['asof_epoch'])
+    if selected==0 and f.get('current_stock_arrival_support') and not f.get('current_stock_window'):
+        event={'current_stock_arrival_support':deepcopy(f['current_stock_arrival_support'])}
+        start=stamp;end=arr
     # The saved source may lag the issue clock. A restock not yet present in
     # that snapshot must not shift event 1 onto the following physical restock.
     known_until=input_cutoff(row)

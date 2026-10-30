@@ -36,7 +36,10 @@ def causal_copy(source, target, issued):
                 CREATE INDEX stock_clock ON stock_history(timestamp);
                 CREATE INDEX poll_cycle_start ON poll_heartbeats(mode,timestamp);
                 CREATE INDEX poll_clock ON poll_heartbeats(mode,success,timestamp);
-                CREATE INDEX gap_clock ON collection_gaps(start_timestamp,end_timestamp);''')
+                CREATE INDEX gap_clock ON collection_gaps(start_timestamp,end_timestamp);
+                CREATE TABLE country_stock_observations(id INTEGER PRIMARY KEY,received_epoch INTEGER,
+                    country TEXT,source TEXT,country_update_epoch INTEGER,clock_status TEXT);
+                CREATE INDEX country_clock ON country_stock_observations(country,received_epoch,id);''')
             with dst:
                 dst.executemany('INSERT INTO stock_history VALUES(?,?,?,?,?,?)',src.execute(
                     'SELECT id,timestamp,country,item_name,quantity,source FROM stock_history WHERE timestamp<=?',(issued,)))
@@ -44,6 +47,9 @@ def causal_copy(source, target, issued):
                     'SELECT timestamp,mode,success FROM poll_heartbeats WHERE timestamp<=?',(issued,)))
                 dst.executemany('INSERT INTO collection_gaps(start_timestamp,end_timestamp) VALUES(?,?)',src.execute(
                     'SELECT start_timestamp,CASE WHEN end_timestamp>? THEN NULL ELSE end_timestamp END FROM collection_gaps WHERE start_timestamp<=?',(issued,issued)))
+                if src.execute("SELECT 1 FROM sqlite_master WHERE name='country_stock_observations'").fetchone():
+                    dst.executemany('INSERT INTO country_stock_observations VALUES(?,?,?,?,?,?)',src.execute(
+                        'SELECT id,received_epoch,country,source,country_update_epoch,clock_status FROM country_stock_observations WHERE received_epoch<=?',(issued,)))
     Path(target).chmod(0o400)
 
 

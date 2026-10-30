@@ -108,7 +108,7 @@ def _window(item,asof,start,stocked_duration,early_start,late_start,early_lifeti
 
 def predict_events(item,phases,*,asof,horizon=None,
                    max_events=MAX_EVENTS,min_bounded=MIN_BOUNDED,
-                   recent_cycles=None,min_qty=MIN_QTY):
+                   recent_cycles=None,min_qty=MIN_QTY,phase_estimator=None):
     """All modeled replenishments up to horizon, not just selected flights.
 
     Causal input: phase evidence closed at or before asof, plus the
@@ -163,12 +163,13 @@ def predict_events(item,phases,*,asof,horizon=None,
         or type(last.epoch) is not int or last.epoch>asof):
         return dict(common,status="CURRENT_PHASE_UNKNOWN")
     age=asof-onset
-    active=phase_quantiles(high if phase=="HIGH" else low,age=age)
+    estimate=phase_estimator or phase_quantiles
+    active=estimate(high if phase=="HIGH" else low,age=age)
     if active is None:
         return dict(common,status="CURRENT_PHASE_OVERRAN_HISTORICAL_SURVIVORS",
                     phase_age_seconds=age)
-    hi=phase_quantiles(phases.get("future_stocked_durations",high))
-    lo=phase_quantiles(low)
+    hi=estimate(phases.get("future_stocked_durations",high))
+    lo=estimate(low)
     if hi is None or lo is None:
         return common
     common["phase_age_seconds"]=age

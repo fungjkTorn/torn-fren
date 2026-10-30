@@ -34,6 +34,9 @@ class CausalReplaySlice:
                             'SELECT id,timestamp,country,item_name,quantity,source FROM stock_history WHERE timestamp>? AND timestamp<=?',(self.issued,issued)))
                         dst.executemany('INSERT INTO poll_heartbeats(timestamp,mode,success) VALUES(?,?,?)',src.execute(
                             'SELECT timestamp,mode,success FROM poll_heartbeats WHERE timestamp>? AND timestamp<=?',(self.issued,issued)))
+                        if src.execute("SELECT 1 FROM sqlite_master WHERE name='country_stock_observations'").fetchone():
+                            dst.executemany('INSERT INTO country_stock_observations VALUES(?,?,?,?,?,?)',src.execute(
+                                'SELECT id,received_epoch,country,source,country_update_epoch,clock_status FROM country_stock_observations WHERE received_epoch>? AND received_epoch<=?',(self.issued,issued)))
                         # Gaps are small metadata, and existing gap closures can
                         # become newly knowable without adding a new row.
                         dst.execute('DELETE FROM collection_gaps')

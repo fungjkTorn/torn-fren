@@ -1,0 +1,277 @@
+{
+  "source_sha256": "543b67f1fe4874961130948ecee1d9df4870efe80599726f13828b19da8a6687",
+  "actual_observations_only": true,
+  "misses": [
+    {
+      "trip_id": "1792729500",
+      "departure_epoch": 1792729500,
+      "arrival_epoch": 1792741320,
+      "selected_event_index": 1,
+      "miss": {
+        "classification": "LATE",
+        "previous_zero_epoch": 1792739860,
+        "next_restock_epoch": 1792756511,
+        "minutes_after_zero": 24.333333333333332,
+        "minutes_before_restock": 253.18333333333334,
+        "zero_boundary_interval": [
+          1792739803,
+          1792739860
+        ],
+        "restock_boundary_interval": [
+          1792756424,
+          1792756511
+        ]
+      },
+      "resolved_observed_opening_epoch": 1792736083,
+      "observed_purchase_end_epoch": 1792739860,
+      "observed_zero_epoch": 1792739860,
+      "predicted_window_start": 1792736770,
+      "predicted_window_end": 1792751258,
+      "predicted_headroom_minutes": 165.63333333333333,
+      "predicted_end_minus_observed_end_minutes": 189.96666666666667
+    },
+    {
+      "trip_id": "1792740000",
+      "departure_epoch": 1792740300,
+      "arrival_epoch": 1792752120,
+      "selected_event_index": 1,
+      "miss": {
+        "classification": "LATE",
+        "previous_zero_epoch": 1792749583,
+        "next_restock_epoch": 1792756511,
+        "minutes_after_zero": 42.28333333333333,
+        "minutes_before_restock": 73.18333333333334,
+        "zero_boundary_interval": [
+          1792749523,
+          1792749583
+        ],
+        "restock_boundary_interval": [
+          1792756424,
+          1792756511
+        ]
+      },
+      "resolved_observed_opening_epoch": 1792747124,
+      "observed_purchase_end_epoch": 1792749523,
+      "observed_zero_epoch": 1792749583,
+      "predicted_window_start": 1792747298,
+      "predicted_window_end": 1792761040,
+      "predicted_headroom_minutes": 148.66666666666666,
+      "predicted_end_minus_observed_end_minutes": 191.95
+    },
+    {
+      "trip_id": "1792808700",
+      "departure_epoch": 1792808700,
+      "arrival_epoch": 1792820520,
+      "selected_event_index": 0,
+      "miss": {
+        "classification": "LATE",
+        "previous_zero_epoch": 1792819993,
+        "next_restock_epoch": 1792827823,
+        "minutes_after_zero": 8.783333333333333,
+        "minutes_before_restock": 121.71666666666667,
+        "zero_boundary_interval": [
+          1792819903,
+          1792819993
+        ],
+        "restock_boundary_interval": [
+          1792827495,
+          1792827823
+        ]
+      },
+      "resolved_observed_opening_epoch": 1792806075,
+      "observed_purchase_end_epoch": 1792809074,
+      "observed_zero_epoch": 1792809192,
+      "predicted_window_start": 1792808700,
+      "predicted_window_end": 1792820563,
+      "predicted_headroom_minutes": 0.7166666666666667,
+      "predicted_end_minus_observed_end_minutes": 191.48333333333332
+    },
+    {
+      "trip_id": "1792809300",
+      "departure_epoch": 1792815714,
+      "arrival_epoch": 1792827534,
+      "selected_event_index": 1,
+      "miss": {
+        "classification": "EARLY",
+        "previous_zero_epoch": 1792819993,
+        "next_restock_epoch": 1792827823,
+        "minutes_after_zero": 125.68333333333334,
+        "minutes_before_restock": 4.816666666666666,
+        "zero_boundary_interval": [
+          1792819903,
+          1792819993
+        ],
+        "restock_boundary_interval": [
+          1792827495,
+          1792827823
+        ]
+      },
+      "resolved_observed_opening_epoch": 1792816123,
+      "observed_purchase_end_epoch": 1792819993,
+      "observed_zero_epoch": 1792819993,
+      "predicted_window_start": 1792816574,
+      "predicted_window_end": 1792827535,
+      "predicted_headroom_minutes": 0.016666666666666666,
+      "predicted_end_minus_observed_end_minutes": 125.7
+    },
+    {
+      "trip_id": "1792820100",
+      "departure_epoch": 1792826229,
+      "arrival_epoch": 1792838049,
+      "selected_event_index": 1,
+      "miss": {
+        "classification": "LATE",
+        "previous_zero_epoch": 1792830677,
+        "next_restock_epoch": 1792847536,
+        "minutes_after_zero": 122.86666666666666,
+        "minutes_before_restock": 158.11666666666667,
+        "zero_boundary_interval": [
+          1792830616,
+          1792830677
+        ],
+        "restock_boundary_interval": [
+          1792847449,
+          1792847536
+        ]
+      },
+      "resolved_observed_opening_epoch": 1792827823,
+      "observed_purchase_end_epoch": 1792830616,
+      "observed_zero_epoch": 1792830677,
+      "predicted_window_start": 1792827434,
+      "predicted_window_end": 1792838050,
+      "predicted_headroom_minutes": 0.016666666666666666,
+      "predicted_end_minus_observed_end_minutes": 123.9
+    },
+    {
+      "trip_id": "1792857900",
+      "departure_epoch": 1792860000,
+      "arrival_epoch": 1792871820,
+      "selected_event_index": 1,
+      "miss": {
+        "classification": "LATE",
+        "previous_zero_epoch": 1792869889,
+        "next_restock_epoch": 1792876938,
+        "minutes_after_zero": 32.18333333333333,
+        "minutes_before_restock": 85.3,
+        "zero_boundary_interval": [
+          1792869824,
+          1792869889
+        ],
+        "restock_boundary_interval": [
+          1792876877,
+          1792876938
+        ]
+      },
+      "resolved_observed_opening_epoch": 1792876938,
+      "observed_purchase_end_epoch": 1792879222,
+      "observed_zero_epoch": 1792879222,
+      "predicted_window_start": 1792866973,
+      "predicted_window_end": 1792876066,
+      "predicted_headroom_minutes": 70.76666666666667,
+      "predicted_end_minus_observed_end_minutes": -52.6
+    },
+    {
+      "trip_id": "1792879500",
+      "departure_epoch": 1792880700,
+      "arrival_epoch": 1792892520,
+      "selected_event_index": 1,
+      "miss": {
+        "classification": "LATE",
+        "previous_zero_epoch": 1792891634,
+        "next_restock_epoch": 1792898324,
+        "minutes_after_zero": 14.766666666666667,
+        "minutes_before_restock": 96.73333333333333,
+        "zero_boundary_interval": [
+          1792891514,
+          1792891634
+        ],
+        "restock_boundary_interval": [
+          1792898234,
+          1792898324
+        ]
+      },
+      "resolved_observed_opening_epoch": 1792887232,
+      "observed_purchase_end_epoch": 1792891634,
+      "observed_zero_epoch": 1792891634,
+      "predicted_window_start": 1792887945,
+      "predicted_window_end": 1792895626,
+      "predicted_headroom_minutes": 51.766666666666666,
+      "predicted_end_minus_observed_end_minutes": 66.53333333333333
+    },
+    {
+      "trip_id": "1793061000",
+      "departure_epoch": 1793061000,
+      "arrival_epoch": 1793072820,
+      "selected_event_index": 0,
+      "miss": {
+        "classification": "EARLY",
+        "previous_zero_epoch": 1793068709,
+        "next_restock_epoch": 1793075839,
+        "minutes_after_zero": 68.51666666666667,
+        "minutes_before_restock": 50.31666666666667,
+        "zero_boundary_interval": [
+          1793068669,
+          1793068709
+        ],
+        "restock_boundary_interval": [
+          1793075699,
+          1793075839
+        ]
+      },
+      "resolved_observed_opening_epoch": null,
+      "observed_purchase_end_epoch": null,
+      "observed_zero_epoch": null,
+      "predicted_window_start": 1793061000,
+      "predicted_window_end": 1793072847,
+      "predicted_headroom_minutes": 0.45,
+      "predicted_end_minus_observed_end_minutes": null
+    },
+    {
+      "trip_id": "1793217900",
+      "departure_epoch": 1793217900,
+      "arrival_epoch": 1793229720,
+      "selected_event_index": 0,
+      "miss": {
+        "classification": "EARLY",
+        "previous_zero_epoch": 1793226654,
+        "next_restock_epoch": 1793232323,
+        "minutes_after_zero": 51.1,
+        "minutes_before_restock": 43.38333333333333,
+        "zero_boundary_interval": [
+          1793226593,
+          1793226654
+        ],
+        "restock_boundary_interval": [
+          1793232153,
+          1793232323
+        ]
+      },
+      "resolved_observed_opening_epoch": 1793210784,
+      "observed_purchase_end_epoch": 1793224654,
+      "observed_zero_epoch": 1793224773,
+      "predicted_window_start": 1793217900,
+      "predicted_window_end": 1793229744,
+      "predicted_headroom_minutes": 0.4,
+      "predicted_end_minus_observed_end_minutes": 84.83333333333333
+    },
+    {
+      "trip_id": "1793284800",
+      "departure_epoch": 1793284800,
+      "arrival_epoch": 1793296620,
+      "selected_event_index": 0,
+      "miss": {
+        "classification": "UNKNOWN",
+        "previous_zero_epoch": 1793290506,
+        "next_restock_epoch": 1793297007,
+        "reason": "provider conflict or gap between boundaries"
+      },
+      "resolved_observed_opening_epoch": 1793277145,
+      "observed_purchase_end_epoch": 1793290327,
+      "observed_zero_epoch": 1793290506,
+      "predicted_window_start": 1793284800,
+      "predicted_window_end": 1793297094,
+      "predicted_headroom_minutes": 7.9,
+      "predicted_end_minus_observed_end_minutes": 112.78333333333333
+    }
+  ]
+}

@@ -185,6 +185,26 @@ def build_item_travel_decision(
                 "calibration_state": "UNCALIBRATED",
                 "model_proven_success": False,
             }
+    # A quantity-based current-stock estimate can support an immediate arrival
+    # without claiming to know a depletion timestamp or a restock onset.
+    support = forecast.get("current_stock_arrival_support")
+    if isinstance(support,dict):
+        supported_epoch=support.get("arrival_epoch")
+        lower_quantity=support.get("lower_quantity_estimate")
+        loss_rate=support.get("loss_rate_upper")
+        if (type(supported_epoch) is int and supported_epoch==issued+flight
+                and isinstance(lower_quantity,(int,float)) and math.isfinite(lower_quantity)
+                and isinstance(loss_rate,(int,float)) and math.isfinite(loss_rate) and loss_rate>=0
+                and support.get("quantity_at_issue")==forecast.get("observed_current_quantity")
+                and lower_quantity-loss_rate*(now-issued)>=target_qty and support.get("asof_epoch")==issued
+                and support.get("depletion_epoch") is None):
+            current_offer={"index":0,"predicted_restock_epoch":None,
+                "estimated_departure_start_epoch":now,"estimated_latest_departure_epoch":now,
+                "estimated_arrival_epoch":now+flight,
+                "estimated_arrival_plus_grace_epoch":now+flight+grace_seconds,
+                "flight_reachable":True,"reason":"CURRENT_QUANTITY_SUPPORTS_IMMEDIATE_ARRIVAL",
+                "calibration_state":"UNCALIBRATED","model_proven_success":False,
+                "depletion_epoch":None,"arrival_support_only":True}
     if current_offer is not None:
         selected = current_offer
 

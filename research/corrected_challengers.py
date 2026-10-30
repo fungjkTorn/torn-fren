@@ -34,6 +34,11 @@ ALL_MODELS = MappingProxyType({**MODELS,**NEXT_MODELS})
 
 
 def forecast(source, key, issued):
+    import os
+    variant=os.environ.get('TORNFREN_PRELIVE_VARIANT')
+    if variant:
+        from research.prelive_cleanup import forecast as cleaned_forecast
+        return cleaned_forecast(source,key,issued,variant)
     if key not in ALL_MODELS:
         raise ValueError('item is outside frozen challenger roster')
     from research.current_stock_continuation import extend_current_stock
