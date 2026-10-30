@@ -8,7 +8,7 @@ causes a search of later events. No model tournaments or gameplay actions.
 from __future__ import annotations
 
 import argparse
-from contextlib import closing
+from contextlib import closing, nullcontext
 from copy import deepcopy
 from dataclasses import replace
 import importlib
@@ -143,29 +143,31 @@ def native_timing_choice(db, *, model_roster=FIRST_RELEASE_MODELS,
              ("DB_PATH", "_connect", "init_db", "_DB_READY")}
     try:
         _install_frozen_readonly_history(history_service, db)
-        country, item = request["item_key"].split(":", 1)
-        quantity = request["min_quantity"]
-        loaded = engine.load_item(country, item, quantity)
-        cleaned, cycles = loaded[:2]
-        if request["generation"] in ("v19","v20"):
-            gaps = engine.normalize_gaps(history_service.get_collection_gaps())
-            timeline = engine.Timeline(cleaned, cycles, quantity, gaps=gaps)
-            deps, features = engine.completed_cycle_features(cycles, gaps=gaps)
-        else:
-            timeline = engine.Timeline(cleaned, cycles, quantity)
-            deps, features = engine.completed_cycle_features(cycles)
-        points = engine.build_points(timeline, deps, features, 600)
-        if len(points) < 60:
-            return None
-        proposal = engine.plan(
-            float(request["now"]), points, [p.t for p in points],
-            timeline, deps, features, config, list(request["delays"]),
-            request["flight_seconds"], 0,
-        )
-        if proposal is None:
-            return None
-        return {"departure": int(proposal["departure_time"]),
-                "score": proposal.get("probability")}
+        from services.native_history_acceleration import immutable_history_queries
+        with immutable_history_queries(history_service) if full_history else nullcontext():
+            country, item = request["item_key"].split(":", 1)
+            quantity = request["min_quantity"]
+            loaded = engine.load_item(country, item, quantity)
+            cleaned, cycles = loaded[:2]
+            if request["generation"] in ("v19","v20"):
+                gaps = engine.normalize_gaps(history_service.get_collection_gaps())
+                timeline = engine.Timeline(cleaned, cycles, quantity, gaps=gaps)
+                deps, features = engine.completed_cycle_features(cycles, gaps=gaps)
+            else:
+                timeline = engine.Timeline(cleaned, cycles, quantity)
+                deps, features = engine.completed_cycle_features(cycles)
+            points = engine.build_points(timeline, deps, features, 600)
+            if len(points) < 60:
+                return None
+            proposal = engine.plan(
+                float(request["now"]), points, [p.t for p in points],
+                timeline, deps, features, config, list(request["delays"]),
+                request["flight_seconds"], 0,
+            )
+            if proposal is None:
+                return None
+            return {"departure": int(proposal["departure_time"]),
+                    "score": proposal.get("probability")}
     finally:
         for name, value in saved.items():
             setattr(history_service, name, value)

@@ -55,3 +55,23 @@ No GitHub Actions are used. GitHub preparation alone does not apply the VM deplo
 The October 29, 8:57 PM ET attempt stopped before changing the website or installing/enabling the challenger service. The installed V5 `beta.js` had CRLF line endings (36,313 bytes, SHA-256 `1e7fea55aef49765447f622c9d11efa67b31072778f2d674cbbd1ba9c3bcd767`); the reviewed LF representation was 35,956 bytes with SHA-256 `d2d856f07d181854738ad66096f541edcc1d27e15ff694b785c3e039d9859276`. Converting only CRLF to LF produces byte-identical reviewed source; there were no code changes.
 
 The guard now accepts the exact reviewed bytes or their CRLF-equivalent representation. It does not strip whitespace, discard a BOM or ignore content edits. Any remaining difference still stops before preflight or deployment, with installed and normalized hashes in the report. Backups and rollback retain the original installed bytes. Tests cover equivalent CRLF acceptance, unchanged originals in preview, rejection of real edits before any preflight, successful deployment, slow preflight and rollback. The actual installed public script was checked against the guard.
+
+### Runtime preflight correction
+
+The October 29 retry passed website content review but stopped before activation
+because the six-item batch exceeded the 55-second cadence budget. That report
+omitted the actual runtime. No six-item deployment success has been confirmed.
+
+Full-history native inference now reuses one frozen read-only connection and
+memoizes repeated history queries within that isolated inference. Integer peak
+leave-one-out means use the same exact arithmetic result without recomputing the
+entire list for every cycle. Caches are discarded before the child exits; no
+predictions or training rows are reused across publications. Original ten-item
+inference keeps its existing path.
+
+All six complete forecast outputs matched the previous implementation exactly
+at the newest uploaded historical cutoff. Combined local native inference fell
+from 10.448 to 3.200 seconds. These are local measurements, not VM guarantees.
+See `SIX_CHALLENGER_RUNTIME_VALIDATION_20261029.json`. The VM must still pass the
+55-second limit; the report now includes per-item and whole-run timing, including
+source refresh, if it exceeds that budget. No cadence or freshness rule is relaxed.

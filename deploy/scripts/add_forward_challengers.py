@@ -33,6 +33,13 @@ CONFIGS={'arg:Monkey Plushie':('v20','traj3'),'can:Wolverine Plushie':('v20','tr
 ADDED=frozenset(CONFIGS)
 
 
+class CadenceBudgetError(ValueError):
+    def __init__(self,preflight):
+        self.preflight=preflight
+        elapsed=preflight.get('total_elapsed_seconds',preflight['elapsed_seconds'])
+        super().__init__(f'challenger batch took {elapsed}s; exceeds 55s one-minute cadence budget; original deployment unchanged')
+
+
 def run(args,timeout=30):
     p=subprocess.run([str(a) for a in args],capture_output=True,text=True,timeout=timeout)
     if p.returncode:raise RuntimeError(p.stderr[-3000:] or p.stdout[-3000:])
@@ -185,7 +192,7 @@ def deploy(archive,sha,apply=False):
             '--setenv=TORNFREN_REPLAY_PINNED_RESEARCH='+str(BASE/'no-legacy-stage'),
             PYTHON,'-B','-m','services.challenger_live','--collector',COLLECTOR,'--source',source,'--state',td,'--model-sha',sha],timeout=145)
         preflight=json.loads(raw);snapshot=json.loads((Path(td)/'latest.json').read_text());validate_snapshot(snapshot,sha)
-        if preflight['elapsed_seconds']>55:raise ValueError('challenger batch exceeds the one-minute cadence budget; original deployment unchanged')
+        if preflight.get('total_elapsed_seconds',preflight['elapsed_seconds'])>55:raise CadenceBudgetError(preflight)
         result={'status':'SIX_CHALLENGER_PLAN','release_sha':sha,'preflight':preflight,
             'new_items':sorted(ADDED),'resulting_items':16,'primary_publisher_modified':False,
             'collector_modified':False,'historical_results_seeded':False,'raw_evidence_deleted':False,
@@ -231,5 +238,6 @@ if __name__=='__main__':
     except Exception as exc:
         result={'status':'SIX_CHALLENGERS_STOPPED','error_type':type(exc).__name__,'error':str(exc),
             'primary_publisher_modified':False,'collector_modified':False}
+        if isinstance(exc,CadenceBudgetError):result['preflight']=exc.preflight
     print(json.dumps(result,indent=2))
     if result['status'] in ('SIX_CHALLENGERS_ROLLED_BACK','SIX_CHALLENGERS_STOPPED'):raise SystemExit(1)

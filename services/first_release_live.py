@@ -69,8 +69,10 @@ def publish(source, state, *, model_sha, item_runner=None, clock=time.time,
         if health["status"] != "FRESH":
             raise ValueError("source unavailable: "+health["status"])
         rows = {}
+        item_runtimes = {}
         failures = []
         for key in model_roster:
+            item_started = time.monotonic()
             flight = TRAVEL_SECONDS[key.split(":",1)[0]]
             if int(clock())-started > time_budget_seconds:
                 raise TimeoutError(f"publisher exceeded {time_budget_seconds}-second inference budget")
@@ -90,6 +92,7 @@ def publish(source, state, *, model_sha, item_runner=None, clock=time.time,
                 if row.get("item_key") != key or row.get("asof_epoch") != issued:
                     raise ValueError("item identity or issue clock mismatch")
                 rows[key] = row
+                item_runtimes[key] = round(time.monotonic()-item_started,3)
             except (ValueError,RuntimeError,subprocess.TimeoutExpired) as error:
                 failures.append({"item_key":key,"error_type":type(error).__name__,"detail":str(error)[-2000:]})
         # Do not replace a coherent ten-item feed with a partial one.
@@ -151,7 +154,7 @@ def publish(source, state, *, model_sha, item_runner=None, clock=time.time,
     return {"status":"SIX_ITEM_SNAPSHOT_PUBLISHED" if challenger_cohort else "TEN_ITEM_SNAPSHOT_PUBLISHED","asof_epoch":issued,
             "publisher_sha":publisher_sha or model_sha,"source_refresh":source_refresh,
             "published_epoch":published,"items":len(model_roster),"model_sha":model_sha,
-            "elapsed_seconds":int(clock())-started,"snapshot_sha256":digest}
+            "elapsed_seconds":int(clock())-started,"item_runtime_seconds":item_runtimes,"snapshot_sha256":digest}
 
 
 def main():

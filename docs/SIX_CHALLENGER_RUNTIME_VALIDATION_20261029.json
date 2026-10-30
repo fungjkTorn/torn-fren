@@ -1,0 +1,46 @@
+{
+  "source_sha256": "4fef31cf3ee0e4d079efabf5ed6f1de71e91fdc167a8c886e63860edbdd731f7",
+  "issue_epoch": 1793244234,
+  "scope": "Local historical comparison; not a VM cadence measurement",
+  "models_unchanged": true,
+  "full_available_history_retained": true,
+  "preflight_limit_seconds": 55,
+  "results": [
+    {
+      "item_key": "arg:Monkey Plushie",
+      "baseline_seconds": 2.405,
+      "optimized_seconds": 0.555,
+      "exact_output_match": true
+    },
+    {
+      "item_key": "can:Wolverine Plushie",
+      "baseline_seconds": 2.299,
+      "optimized_seconds": 0.669,
+      "exact_output_match": true
+    },
+    {
+      "item_key": "cay:Stingray Plushie",
+      "baseline_seconds": 2.205,
+      "optimized_seconds": 0.556,
+      "exact_output_match": true
+    },
+    {
+      "item_key": "chi:Peony",
+      "baseline_seconds": 0.627,
+      "optimized_seconds": 0.398,
+      "exact_output_match": true
+    },
+    {
+      "item_key": "sou:African Violet",
+      "baseline_seconds": 0.563,
+      "optimized_seconds": 0.385,
+      "exact_output_match": true
+    },
+    {
+      "item_key": "sou:Lion Plushie",
+      "baseline_seconds": 2.349,
+      "optimized_seconds": 0.637,
+      "exact_output_match": true
+    }
+  ]
+}

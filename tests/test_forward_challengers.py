@@ -91,6 +91,22 @@ class ForwardChallengerTests(unittest.TestCase):
                     self.assertEqual(CHALLENGER_MODELS[key],(row['decision']['timing_model_generation'],row['decision']['timing_model_config']))
         finally:FirstReleaseNativeTests.tearDownClass()
 
+    def test_accelerated_six_forecasts_equal_uncached_native_outputs(self):
+        from contextlib import nullcontext
+        from test_first_release_schedule import FirstReleaseNativeTests
+        from services.first_release_schedule import forecast_first_release_item
+        from research.plushie_champions.common import TRAVEL_SECONDS
+        FirstReleaseNativeTests.setUpClass()
+        try:
+            for key in CHALLENGER_MODELS:
+                args=dict(now=1790000000,flight_seconds=TRAVEL_SECONDS[key.split(':')[0]],
+                    model_roster=CHALLENGER_MODELS,timing_full_history=True)
+                with patch('services.native_history_acceleration.immutable_history_queries',side_effect=lambda h:nullcontext()):
+                    baseline=forecast_first_release_item(FirstReleaseNativeTests.source,key,**args)
+                accelerated=forecast_first_release_item(FirstReleaseNativeTests.source,key,**args)
+                self.assertEqual(baseline,accelerated,key)
+        finally:FirstReleaseNativeTests.tearDownClass()
+
     def deployment_fixture(self,p):
         state=p/'state';state.mkdir();root=p/'app';root.mkdir();base=p/'base';base.mkdir()
         unit=p/'new.service';timer=p/'new.timer';primary=p/'primary.service';primary.write_text('original ten unit')
@@ -162,7 +178,8 @@ class ForwardChallengerTests(unittest.TestCase):
             import pwd
             account=pwd.getpwuid(os.getuid());stack.enter_context(patch.object(installer.pwd,'getpwnam',return_value=account))
             stack.enter_context(patch.object(installer.os,'geteuid',return_value=0))
-            with self.assertRaisesRegex(ValueError,'cadence budget'):installer.deploy(archive,'b'*40,True)
+            with self.assertRaisesRegex(installer.CadenceBudgetError,'cadence budget') as stopped:installer.deploy(archive,'b'*40,True)
+            self.assertEqual(56,stopped.exception.preflight['elapsed_seconds'])
             self.assertFalse(unit.exists());self.assertFalse(timer.exists())
             for name,raw in originals.items():self.assertEqual(raw,(root/name).read_bytes())
 
