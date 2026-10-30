@@ -1,0 +1,297 @@
+{
+  "sou:Xanax": {
+    "withheld_forecast_reasons": {
+      "STALE_COUNTRY_DATA": 47,
+      "CURRENT_PHASE_UNKNOWN": 121
+    },
+    "daily_frozen_outcomes": {
+      "2026-10-23": {
+        "FAILURE": 5,
+        "SUCCESS": 1
+      },
+      "2026-10-24": {
+        "FAILURE": 4,
+        "SUCCESS": 2,
+        "UNKNOWN": 2
+      },
+      "2026-10-25": {
+        "SUCCESS": 2,
+        "UNKNOWN": 2
+      },
+      "2026-10-26": {
+        "SUCCESS": 4
+      },
+      "2026-10-27": {
+        "SUCCESS": 5
+      },
+      "2026-10-28": {
+        "SUCCESS": 4
+      },
+      "2026-10-29": {
+        "SUCCESS": 2,
+        "PENDING": 1
+      }
+    },
+    "miss_classes": {
+      "LATE": 8,
+      "EARLY": 1
+    },
+    "early_within_2_minutes": 0,
+    "early_within_5_minutes": 1,
+    "late_within_2_minutes": 0,
+    "late_within_5_minutes": 0,
+    "median_early_minutes": 4.816666666666666,
+    "median_late_minutes": 30.858333333333334
+  },
+  "uae:Camel Plushie": {
+    "withheld_forecast_reasons": {
+      "CURRENT_PHASE_UNKNOWN": 92,
+      "STALE_COUNTRY_DATA": 132,
+      "CURRENT_PHASE_OVERRAN_HISTORICAL_SURVIVORS": 31
+    },
+    "daily_frozen_outcomes": {
+      "2026-10-22": {
+        "SUCCESS": 2
+      },
+      "2026-10-23": {
+        "SUCCESS": 18,
+        "FAILURE": 11
+      },
+      "2026-10-24": {
+        "FAILURE": 10,
+        "SUCCESS": 15,
+        "UNKNOWN": 1
+      },
+      "2026-10-25": {
+        "SUCCESS": 10,
+        "UNKNOWN": 2
+      },
+      "2026-10-26": {
+        "FAILURE": 4,
+        "SUCCESS": 10,
+        "UNKNOWN": 2
+      },
+      "2026-10-27": {
+        "SUCCESS": 11,
+        "FAILURE": 3,
+        "UNKNOWN": 1
+      },
+      "2026-10-28": {
+        "UNKNOWN": 2,
+        "SUCCESS": 13,
+        "FAILURE": 1
+      },
+      "2026-10-29": {
+        "SUCCESS": 10,
+        "FAILURE": 3,
+        "PENDING": 2
+      }
+    },
+    "miss_classes": {
+      "EARLY": 17,
+      "UNKNOWN": 6,
+      "LATE": 7,
+      "POSITIVE_STOCK_AT_OR_BELOW_30": 2
+    },
+    "early_within_2_minutes": 7,
+    "early_within_5_minutes": 14,
+    "late_within_2_minutes": 4,
+    "late_within_5_minutes": 7,
+    "median_early_minutes": 2.783333333333333,
+    "median_late_minutes": 1.9166666666666667
+  },
+  "uni:Nessie Plushie": {
+    "withheld_forecast_reasons": {
+      "CURRENT_PHASE_UNKNOWN": 143,
+      "STALE_COUNTRY_DATA": 70,
+      "CURRENT_PHASE_OVERRAN_HISTORICAL_SURVIVORS": 18
+    },
+    "daily_frozen_outcomes": {
+      "2026-10-22": {
+        "SUCCESS": 1,
+        "FAILURE": 1
+      },
+      "2026-10-23": {
+        "FAILURE": 6,
+        "SUCCESS": 21,
+        "UNKNOWN": 1
+      },
+      "2026-10-24": {
+        "FAILURE": 5,
+        "UNKNOWN": 2,
+        "SUCCESS": 18
+      },
+      "2026-10-25": {
+        "FAILURE": 5,
+        "SUCCESS": 12,
+        "UNKNOWN": 1
+      },
+      "2026-10-26": {
+        "SUCCESS": 18,
+        "FAILURE": 3,
+        "UNKNOWN": 1
+      },
+      "2026-10-27": {
+        "FAILURE": 5,
+        "SUCCESS": 15,
+        "UNKNOWN": 2
+      },
+      "2026-10-28": {
+        "SUCCESS": 15,
+        "FAILURE": 6
+      },
+      "2026-10-29": {
+        "SUCCESS": 8,
+        "FAILURE": 6,
+        "UNKNOWN": 2,
+        "PENDING": 1
+      }
+    },
+    "miss_classes": {
+      "POSITIVE_STOCK_AT_OR_BELOW_30": 3,
+      "LATE": 16,
+      "EARLY": 16,
+      "UNKNOWN": 1,
+      "UNKNOWN_ZERO_BOUNDARY": 1
+    },
+    "early_within_2_minutes": 2,
+    "early_within_5_minutes": 11,
+    "late_within_2_minutes": 1,
+    "late_within_5_minutes": 8,
+    "median_early_minutes": 3.8166666666666664,
+    "median_late_minutes": 4.508333333333333
+  },
+  "uni:Xanax": {
+    "withheld_forecast_reasons": {
+      "STALE_COUNTRY_DATA": 70,
+      "CURRENT_PHASE_OVERRAN_HISTORICAL_SURVIVORS": 12
+    },
+    "daily_frozen_outcomes": {
+      "2026-10-22": {
+        "SUCCESS": 1
+      }
+    },
+    "miss_classes": {},
+    "early_within_2_minutes": 0,
+    "early_within_5_minutes": 0,
+    "late_within_2_minutes": 0,
+    "late_within_5_minutes": 0,
+    "median_early_minutes": null,
+    "median_late_minutes": null
+  },
+  "uni:Red Fox Plushie": {
+    "withheld_forecast_reasons": {
+      "STALE_COUNTRY_DATA": 70,
+      "CURRENT_PHASE_OVERRAN_HISTORICAL_SURVIVORS": 38,
+      "CURRENT_PHASE_UNKNOWN": 127
+    },
+    "daily_frozen_outcomes": {
+      "2026-10-22": {
+        "SUCCESS": 2
+      },
+      "2026-10-23": {
+        "SUCCESS": 17,
+        "FAILURE": 6,
+        "UNKNOWN": 1
+      },
+      "2026-10-24": {
+        "SUCCESS": 11,
+        "FAILURE": 10
+      },
+      "2026-10-25": {
+        "SUCCESS": 10,
+        "UNKNOWN": 3
+      },
+      "2026-10-26": {
+        "SUCCESS": 13,
+        "FAILURE": 2
+      },
+      "2026-10-27": {
+        "SUCCESS": 13,
+        "FAILURE": 2,
+        "UNKNOWN": 1
+      },
+      "2026-10-28": {
+        "SUCCESS": 13,
+        "FAILURE": 4
+      },
+      "2026-10-29": {
+        "FAILURE": 3,
+        "UNKNOWN": 1,
+        "SUCCESS": 10,
+        "PENDING": 1
+      }
+    },
+    "miss_classes": {
+      "LATE": 12,
+      "EARLY": 9,
+      "UNKNOWN": 3,
+      "POSITIVE_STOCK_AT_OR_BELOW_30": 2,
+      "UNKNOWN_ZERO_BOUNDARY": 1
+    },
+    "early_within_2_minutes": 1,
+    "early_within_5_minutes": 6,
+    "late_within_2_minutes": 2,
+    "late_within_5_minutes": 5,
+    "median_early_minutes": 3.4,
+    "median_late_minutes": 5.375
+  },
+  "chi:Panda Plushie": {
+    "withheld_forecast_reasons": {
+      "CURRENT_PHASE_UNKNOWN": 101,
+      "STALE_COUNTRY_DATA": 79,
+      "CURRENT_PHASE_OVERRAN_HISTORICAL_SURVIVORS": 23
+    },
+    "daily_frozen_outcomes": {
+      "2026-10-22": {
+        "SUCCESS": 2
+      },
+      "2026-10-23": {
+        "FAILURE": 10,
+        "SUCCESS": 18,
+        "UNKNOWN": 1
+      },
+      "2026-10-24": {
+        "FAILURE": 8,
+        "SUCCESS": 19,
+        "UNKNOWN": 1
+      },
+      "2026-10-25": {
+        "FAILURE": 1,
+        "SUCCESS": 13
+      },
+      "2026-10-26": {
+        "SUCCESS": 11,
+        "FAILURE": 5,
+        "UNKNOWN": 2
+      },
+      "2026-10-27": {
+        "SUCCESS": 10,
+        "FAILURE": 5,
+        "UNKNOWN": 2
+      },
+      "2026-10-28": {
+        "SUCCESS": 13,
+        "FAILURE": 4,
+        "UNKNOWN": 1
+      },
+      "2026-10-29": {
+        "SUCCESS": 8,
+        "FAILURE": 1,
+        "UNKNOWN": 3,
+        "PENDING": 2
+      }
+    },
+    "miss_classes": {
+      "EARLY": 16,
+      "LATE": 15,
+      "UNKNOWN": 3
+    },
+    "early_within_2_minutes": 4,
+    "early_within_5_minutes": 13,
+    "late_within_2_minutes": 4,
+    "late_within_5_minutes": 11,
+    "median_early_minutes": 3.1166666666666667,
+    "median_late_minutes": 2.783333333333333
+  }
+}

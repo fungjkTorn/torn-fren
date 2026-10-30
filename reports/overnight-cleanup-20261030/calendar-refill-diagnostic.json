@@ -1,0 +1,645 @@
+{
+  "stock_source_unchanged": true,
+  "model_behavior_changed": false,
+  "diagnostic_only": true,
+  "items": {
+    "sou": {
+      "pretest_profile": {
+        "training_cutoff": 1792720800,
+        "zero_refill_samples": 88,
+        "status": "LEARNED",
+        "normal_min": 2367,
+        "normal_max": 2500,
+        "reset_base": null,
+        "reset_training_samples": 0,
+        "normal_samples": 70,
+        "excluded_small_samples": 18,
+        "reset_candidate_base": 2500,
+        "classification_is_observational": true,
+        "method": "ITERATED_LOG_QUANTITY_CLUSTER_WITH_OBSERVED_RANGE"
+      },
+      "latest_profile_diagnostic_only": {
+        "training_cutoff": 1793325600,
+        "zero_refill_samples": 133,
+        "status": "LEARNED",
+        "normal_min": 2313,
+        "normal_max": 2500,
+        "reset_base": null,
+        "reset_training_samples": 0,
+        "normal_samples": 104,
+        "excluded_small_samples": 29,
+        "reset_candidate_base": 2500,
+        "classification_is_observational": true,
+        "method": "ITERATED_LOG_QUANTITY_CLUSTER_WITH_OBSERVED_RANGE"
+      },
+      "above30_returns_in_week": 42,
+      "returns_below_pretest_normal_band": 13,
+      "returns": [
+        {
+          "previous_epoch": 1792724950,
+          "epoch": 1792725010,
+          "before": 0,
+          "quantity": 2500,
+          "provider": "prometheus",
+          "below_pretest_normal_band": false
+        },
+        {
+          "previous_epoch": 1792735994,
+          "epoch": 1792736083,
+          "before": 0,
+          "quantity": 2413,
+          "provider": "yata",
+          "below_pretest_normal_band": false
+        },
+        {
+          "previous_epoch": 1792746671,
+          "epoch": 1792747124,
+          "before": 0,
+          "quantity": 2256,
+          "provider": "yata",
+          "below_pretest_normal_band": true
+        },
+        {
+          "previous_epoch": 1792756424,
+          "epoch": 1792756511,
+          "before": 0,
+          "quantity": 2496,
+          "provider": "yata",
+          "below_pretest_normal_band": false
+        },
+        {
+          "previous_epoch": 1792766591,
+          "epoch": 1792766651,
+          "before": 0,
+          "quantity": 2277,
+          "provider": "yata",
+          "below_pretest_normal_band": true
+        },
+        {
+          "previous_epoch": 1792776341,
+          "epoch": 1792776525,
+          "before": 0,
+          "quantity": 2340,
+          "provider": "yata",
+          "below_pretest_normal_band": true
+        },
+        {
+          "previous_epoch": 1792785793,
+          "epoch": 1792785853,
+          "before": 0,
+          "quantity": 2313,
+          "provider": "yata",
+          "below_pretest_normal_band": true
+        },
+        {
+          "previous_epoch": 1792796563,
+          "epoch": 1792796630,
+          "before": 0,
+          "quantity": 2225,
+          "provider": "yata",
+          "below_pretest_normal_band": true
+        },
+        {
+          "previous_epoch": 1792805922,
+          "epoch": 1792806075,
+          "before": 0,
+          "quantity": 2374,
+          "provider": "yata",
+          "below_pretest_normal_band": false
+        },
+        {
+          "previous_epoch": 1792816005,
+          "epoch": 1792816123,
+          "before": 0,
+          "quantity": 2496,
+          "provider": "yata",
+          "below_pretest_normal_band": false
+        },
+        {
+          "previous_epoch": 1792827495,
+          "epoch": 1792827823,
+          "before": 0,
+          "quantity": 2381,
+          "provider": "yata",
+          "below_pretest_normal_band": false
+        },
+        {
+          "previous_epoch": 1792838087,
+          "epoch": 1792838415,
+          "before": 0,
+          "quantity": 2163,
+          "provider": "yata",
+          "below_pretest_normal_band": true
+        },
+        {
+          "previous_epoch": 1792847449,
+          "epoch": 1792847536,
+          "before": 0,
+          "quantity": 2431,
+          "provider": "yata",
+          "below_pretest_normal_band": false
+        },
+        {
+          "previous_epoch": 1792857314,
+          "epoch": 1792857434,
+          "before": 0,
+          "quantity": 2500,
+          "provider": "prometheus",
+          "below_pretest_normal_band": false
+        },
+        {
+          "previous_epoch": 1792857674,
+          "epoch": 1792857706,
+          "before": 0,
+          "quantity": 1733,
+          "provider": "yata",
+          "below_pretest_normal_band": true
+        },
+        {
+          "previous_epoch": 1792876877,
+          "epoch": 1792876938,
+          "before": 0,
+          "quantity": 2500,
+          "provider": "yata",
+          "below_pretest_normal_band": false
+        },
+        {
+          "previous_epoch": 1792879222,
+          "epoch": 1792879304,
+          "before": 0,
+          "quantity": 516,
+          "provider": "yata",
+          "below_pretest_normal_band": true
+        },
+        {
+          "previous_epoch": 1792887106,
+          "epoch": 1792887232,
+          "before": 0,
+          "quantity": 2288,
+          "provider": "yata",
+          "below_pretest_normal_band": true
+        },
+        {
+          "previous_epoch": 1792898234,
+          "epoch": 1792898324,
+          "before": 0,
+          "quantity": 2457,
+          "provider": "yata",
+          "below_pretest_normal_band": false
+        },
+        {
+          "previous_epoch": 1792910655,
+          "epoch": 1792910835,
+          "before": 0,
+          "quantity": 2323,
+          "provider": "yata",
+          "below_pretest_normal_band": true
+        },
+        {
+          "previous_epoch": 1792923345,
+          "epoch": 1792923385,
+          "before": 0,
+          "quantity": 2452,
+          "provider": "prometheus",
+          "below_pretest_normal_band": false
+        },
+        {
+          "previous_epoch": 1792938736,
+          "epoch": 1792938946,
+          "before": 0,
+          "quantity": 2400,
+          "provider": "prometheus",
+          "below_pretest_normal_band": false
+        },
+        {
+          "previous_epoch": 1792958336,
+          "epoch": 1792958626,
+          "before": 0,
+          "quantity": 2483,
+          "provider": "prometheus",
+          "below_pretest_normal_band": false
+        },
+        {
+          "previous_epoch": 1793017458,
+          "epoch": 1793017528,
+          "before": 0,
+          "quantity": 2500,
+          "provider": "prometheus",
+          "below_pretest_normal_band": false
+        },
+        {
+          "previous_epoch": 1793037688,
+          "epoch": 1793037868,
+          "before": 0,
+          "quantity": 2438,
+          "provider": "prometheus",
+          "below_pretest_normal_band": false
+        },
+        {
+          "previous_epoch": 1793056189,
+          "epoch": 1793056399,
+          "before": 0,
+          "quantity": 2500,
+          "provider": "prometheus",
+          "below_pretest_normal_band": false
+        },
+        {
+          "previous_epoch": 1793056769,
+          "epoch": 1793056889,
+          "before": 0,
+          "quantity": 2342,
+          "provider": "prometheus",
+          "below_pretest_normal_band": true
+        },
+        {
+          "previous_epoch": 1793075699,
+          "epoch": 1793075839,
+          "before": 0,
+          "quantity": 2500,
+          "provider": "prometheus",
+          "below_pretest_normal_band": false
+        },
+        {
+          "previous_epoch": 1793095559,
+          "epoch": 1793095650,
+          "before": 0,
+          "quantity": 2461,
+          "provider": "prometheus",
+          "below_pretest_normal_band": false
+        },
+        {
+          "previous_epoch": 1793114010,
+          "epoch": 1793114150,
+          "before": 0,
+          "quantity": 2456,
+          "provider": "prometheus",
+          "below_pretest_normal_band": false
+        },
+        {
+          "previous_epoch": 1793133181,
+          "epoch": 1793133201,
+          "before": 0,
+          "quantity": 2483,
+          "provider": "prometheus",
+          "below_pretest_normal_band": false
+        },
+        {
+          "previous_epoch": 1793149501,
+          "epoch": 1793149531,
+          "before": 0,
+          "quantity": 283,
+          "provider": "prometheus",
+          "below_pretest_normal_band": true
+        },
+        {
+          "previous_epoch": 1793151861,
+          "epoch": 1793151991,
+          "before": 0,
+          "quantity": 2499,
+          "provider": "prometheus",
+          "below_pretest_normal_band": false
+        },
+        {
+          "previous_epoch": 1793175722,
+          "epoch": 1793175742,
+          "before": 0,
+          "quantity": 2476,
+          "provider": "prometheus",
+          "below_pretest_normal_band": false
+        },
+        {
+          "previous_epoch": 1793192104,
+          "epoch": 1793192194,
+          "before": 0,
+          "quantity": 2500,
+          "provider": "prometheus",
+          "below_pretest_normal_band": false
+        },
+        {
+          "previous_epoch": 1793210554,
+          "epoch": 1793210784,
+          "before": 0,
+          "quantity": 2500,
+          "provider": "prometheus",
+          "below_pretest_normal_band": false
+        },
+        {
+          "previous_epoch": 1793226473,
+          "epoch": 1793226593,
+          "before": 0,
+          "quantity": 1191,
+          "provider": "prometheus",
+          "below_pretest_normal_band": true
+        },
+        {
+          "previous_epoch": 1793232153,
+          "epoch": 1793232323,
+          "before": 0,
+          "quantity": 2500,
+          "provider": "prometheus",
+          "below_pretest_normal_band": false
+        },
+        {
+          "previous_epoch": 1793256245,
+          "epoch": 1793256504,
+          "before": 0,
+          "quantity": 2500,
+          "provider": "prometheus",
+          "below_pretest_normal_band": false
+        },
+        {
+          "previous_epoch": 1793277124,
+          "epoch": 1793277145,
+          "before": 0,
+          "quantity": 2500,
+          "provider": "prometheus",
+          "below_pretest_normal_band": false
+        },
+        {
+          "previous_epoch": 1793296917,
+          "epoch": 1793297007,
+          "before": 0,
+          "quantity": 2474,
+          "provider": "prometheus",
+          "below_pretest_normal_band": false
+        },
+        {
+          "previous_epoch": 1793321217,
+          "epoch": 1793321277,
+          "before": 0,
+          "quantity": 2483,
+          "provider": "prometheus",
+          "below_pretest_normal_band": false
+        }
+      ],
+      "qualified_events_with_pretest_profile": [
+        {
+          "epoch": 1792725010,
+          "previous_epoch": 1792724950,
+          "before": 0,
+          "quantity": 2500,
+          "kind": "NORMAL_ZERO_REFILL",
+          "provider": "prometheus"
+        },
+        {
+          "epoch": 1792736083,
+          "previous_epoch": 1792735994,
+          "before": 0,
+          "quantity": 2413,
+          "kind": "NORMAL_ZERO_REFILL",
+          "provider": "yata"
+        },
+        {
+          "epoch": 1792756511,
+          "previous_epoch": 1792756424,
+          "before": 0,
+          "quantity": 2496,
+          "kind": "NORMAL_ZERO_REFILL",
+          "provider": "yata"
+        },
+        {
+          "epoch": 1792806075,
+          "previous_epoch": 1792805922,
+          "before": 0,
+          "quantity": 2374,
+          "kind": "NORMAL_ZERO_REFILL",
+          "provider": "yata"
+        },
+        {
+          "epoch": 1792816123,
+          "previous_epoch": 1792816005,
+          "before": 0,
+          "quantity": 2496,
+          "kind": "NORMAL_ZERO_REFILL",
+          "provider": "yata"
+        },
+        {
+          "epoch": 1792827823,
+          "previous_epoch": 1792827495,
+          "before": 0,
+          "quantity": 2381,
+          "kind": "NORMAL_ZERO_REFILL",
+          "provider": "yata"
+        },
+        {
+          "epoch": 1792847536,
+          "previous_epoch": 1792847449,
+          "before": 0,
+          "quantity": 2431,
+          "kind": "NORMAL_ZERO_REFILL",
+          "provider": "yata"
+        },
+        {
+          "epoch": 1792857434,
+          "previous_epoch": 1792857314,
+          "before": 0,
+          "quantity": 2500,
+          "kind": "NORMAL_ZERO_REFILL",
+          "provider": "prometheus"
+        },
+        {
+          "epoch": 1792876938,
+          "previous_epoch": 1792876877,
+          "before": 0,
+          "quantity": 2500,
+          "kind": "NORMAL_ZERO_REFILL",
+          "provider": "yata"
+        },
+        {
+          "epoch": 1792898324,
+          "previous_epoch": 1792898234,
+          "before": 0,
+          "quantity": 2457,
+          "kind": "NORMAL_ZERO_REFILL",
+          "provider": "yata"
+        },
+        {
+          "epoch": 1792923385,
+          "previous_epoch": 1792923345,
+          "before": 0,
+          "quantity": 2452,
+          "kind": "NORMAL_ZERO_REFILL",
+          "provider": "prometheus"
+        },
+        {
+          "epoch": 1792938946,
+          "previous_epoch": 1792938736,
+          "before": 0,
+          "quantity": 2400,
+          "kind": "NORMAL_ZERO_REFILL",
+          "provider": "prometheus"
+        },
+        {
+          "epoch": 1792958626,
+          "previous_epoch": 1792958336,
+          "before": 0,
+          "quantity": 2483,
+          "kind": "NORMAL_ZERO_REFILL",
+          "provider": "prometheus"
+        },
+        {
+          "epoch": 1793017528,
+          "previous_epoch": 1793017458,
+          "before": 0,
+          "quantity": 2500,
+          "kind": "NORMAL_ZERO_REFILL",
+          "provider": "prometheus"
+        },
+        {
+          "epoch": 1793037868,
+          "previous_epoch": 1793037688,
+          "before": 0,
+          "quantity": 2438,
+          "kind": "NORMAL_ZERO_REFILL",
+          "provider": "prometheus"
+        },
+        {
+          "epoch": 1793056399,
+          "previous_epoch": 1793056189,
+          "before": 0,
+          "quantity": 2500,
+          "kind": "NORMAL_ZERO_REFILL",
+          "provider": "prometheus"
+        },
+        {
+          "epoch": 1793075839,
+          "previous_epoch": 1793075699,
+          "before": 0,
+          "quantity": 2500,
+          "kind": "NORMAL_ZERO_REFILL",
+          "provider": "prometheus"
+        },
+        {
+          "epoch": 1793095650,
+          "previous_epoch": 1793095559,
+          "before": 0,
+          "quantity": 2461,
+          "kind": "NORMAL_ZERO_REFILL",
+          "provider": "prometheus"
+        },
+        {
+          "epoch": 1793114150,
+          "previous_epoch": 1793114010,
+          "before": 0,
+          "quantity": 2456,
+          "kind": "NORMAL_ZERO_REFILL",
+          "provider": "prometheus"
+        },
+        {
+          "epoch": 1793133201,
+          "previous_epoch": 1793133181,
+          "before": 0,
+          "quantity": 2483,
+          "kind": "NORMAL_ZERO_REFILL",
+          "provider": "prometheus"
+        },
+        {
+          "epoch": 1793151991,
+          "previous_epoch": 1793151861,
+          "before": 0,
+          "quantity": 2499,
+          "kind": "NORMAL_ZERO_REFILL",
+          "provider": "prometheus"
+        },
+        {
+          "epoch": 1793175742,
+          "previous_epoch": 1793175722,
+          "before": 0,
+          "quantity": 2476,
+          "kind": "NORMAL_ZERO_REFILL",
+          "provider": "prometheus"
+        },
+        {
+          "epoch": 1793192194,
+          "previous_epoch": 1793192104,
+          "before": 0,
+          "quantity": 2500,
+          "kind": "NORMAL_ZERO_REFILL",
+          "provider": "prometheus"
+        },
+        {
+          "epoch": 1793210784,
+          "previous_epoch": 1793210554,
+          "before": 0,
+          "quantity": 2500,
+          "kind": "NORMAL_ZERO_REFILL",
+          "provider": "prometheus"
+        },
+        {
+          "epoch": 1793232323,
+          "previous_epoch": 1793232153,
+          "before": 0,
+          "quantity": 2500,
+          "kind": "NORMAL_ZERO_REFILL",
+          "provider": "prometheus"
+        },
+        {
+          "epoch": 1793256504,
+          "previous_epoch": 1793256245,
+          "before": 0,
+          "quantity": 2500,
+          "kind": "NORMAL_ZERO_REFILL",
+          "provider": "prometheus"
+        },
+        {
+          "epoch": 1793277145,
+          "previous_epoch": 1793277124,
+          "before": 0,
+          "quantity": 2500,
+          "kind": "NORMAL_ZERO_REFILL",
+          "provider": "prometheus"
+        },
+        {
+          "epoch": 1793297007,
+          "previous_epoch": 1793296917,
+          "before": 0,
+          "quantity": 2474,
+          "kind": "NORMAL_ZERO_REFILL",
+          "provider": "prometheus"
+        },
+        {
+          "epoch": 1793321277,
+          "previous_epoch": 1793321217,
+          "before": 0,
+          "quantity": 2483,
+          "kind": "NORMAL_ZERO_REFILL",
+          "provider": "prometheus"
+        }
+      ]
+    },
+    "uni": {
+      "pretest_profile": {
+        "training_cutoff": 1792720800,
+        "zero_refill_samples": 97,
+        "status": "LEARNED",
+        "normal_min": 2388,
+        "normal_max": 2500,
+        "reset_base": null,
+        "reset_training_samples": 1,
+        "normal_samples": 78,
+        "excluded_small_samples": 19,
+        "reset_candidate_base": 2500,
+        "classification_is_observational": true,
+        "method": "ITERATED_LOG_QUANTITY_CLUSTER_WITH_OBSERVED_RANGE"
+      },
+      "latest_profile_diagnostic_only": {
+        "training_cutoff": 1793325600,
+        "zero_refill_samples": 97,
+        "status": "LEARNED",
+        "normal_min": 2388,
+        "normal_max": 2500,
+        "reset_base": 2500,
+        "reset_training_samples": 8,
+        "normal_samples": 78,
+        "excluded_small_samples": 19,
+        "reset_candidate_base": 2500,
+        "classification_is_observational": true,
+        "method": "ITERATED_LOG_QUANTITY_CLUSTER_WITH_OBSERVED_RANGE"
+      },
+      "above30_returns_in_week": 0,
+      "returns_below_pretest_normal_band": 0,
+      "returns": [],
+      "qualified_events_with_pretest_profile": []
+    }
+  }
+}

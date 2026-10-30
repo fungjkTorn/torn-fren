@@ -1,0 +1,149 @@
+{
+  "source_sha256": "543b67f1fe4874961130948ecee1d9df4870efe80599726f13828b19da8a6687",
+  "frozen_native_commit": "4fe4b9e2f05200651d230012c9b59c42985758a3",
+  "recovery_commit": "2a6ce9285b3bb2b27d1fe5d1902277498775d472",
+  "model_behavior_changed_during_recovery": false,
+  "variants": {
+    "clean-full": {
+      "issue_clocks_per_item": {
+        "sou:Xanax": 2017,
+        "uae:Camel Plushie": 2017,
+        "uni:Nessie Plushie": 2017,
+        "uni:Xanax": 2017,
+        "uni:Red Fox Plushie": 2017,
+        "chi:Panda Plushie": 2017
+      },
+      "saved_prefixes_unchanged": true,
+      "causal_rate_label_checks": 11634,
+      "code_fingerprints_match": true,
+      "archive_sha256": {
+        "manifest.json": "b2c0c2b26c845c31fd50c2fd16ea6469f536c76ee378b5b05057b5b669bbe459",
+        "sou__Xanax.jsonl": "480c4ba4d9c5f4ffaf453b77cec9d5032ee387755eb23f95e9e293ce708ed0d2",
+        "uae__Camel_Plushie.jsonl": "bbc27126d5ca9a2550fa2edf915cc61f9d89a6bb20573d1fc3081dbc09a4c6a4",
+        "uni__Nessie_Plushie.jsonl": "440e6b7c924299dc64068a340bab8892e863becd1ecfb8ef8d9f98f0d8e0bf0e",
+        "uni__Xanax.jsonl": "d200a22875d8f803866fcdb004f4a75b7f5bd25ed6477372e213263239b97e17",
+        "uni__Red_Fox_Plushie.jsonl": "208748312e6c998bddc243a7b1b1b05e36de9785765e7a2c37fb78c6b7ae34b8",
+        "chi__Panda_Plushie.jsonl": "4a0a3961032397ff1a1fd611f514ec0df572a89f2eccb19ecf3fad611e10d320"
+      },
+      "wait_distribution": {
+        "sou:Xanax": {
+          "advice_wait_median_minutes": 136.16666666666666,
+          "advice_wait_p90_minutes": 277.25,
+          "advice_wait_max_minutes": 838.3333333333334,
+          "frozen_trip_wait_median_minutes": 0.0,
+          "frozen_trip_wait_p90_minutes": 1.55
+        },
+        "uae:Camel Plushie": {
+          "advice_wait_median_minutes": 5.0,
+          "advice_wait_p90_minutes": 24.566666666666666,
+          "advice_wait_max_minutes": 43.03333333333333,
+          "frozen_trip_wait_median_minutes": 0.0,
+          "frozen_trip_wait_p90_minutes": 1.4
+        },
+        "uni:Nessie Plushie": {
+          "advice_wait_median_minutes": 14.85,
+          "advice_wait_p90_minutes": 34.833333333333336,
+          "advice_wait_max_minutes": 43.7,
+          "frozen_trip_wait_median_minutes": 0.0,
+          "frozen_trip_wait_p90_minutes": 0.0
+        },
+        "uni:Xanax": {
+          "advice_wait_median_minutes": 0.0,
+          "advice_wait_p90_minutes": 0.0,
+          "advice_wait_max_minutes": 0.0,
+          "frozen_trip_wait_median_minutes": 0.0,
+          "frozen_trip_wait_p90_minutes": 0.0
+        },
+        "uni:Red Fox Plushie": {
+          "advice_wait_median_minutes": 13.866666666666667,
+          "advice_wait_p90_minutes": 33.21666666666667,
+          "advice_wait_max_minutes": 246.25,
+          "frozen_trip_wait_median_minutes": 0.0,
+          "frozen_trip_wait_p90_minutes": 1.1333333333333333
+        },
+        "chi:Panda Plushie": {
+          "advice_wait_median_minutes": 13.466666666666665,
+          "advice_wait_p90_minutes": 33.63333333333333,
+          "advice_wait_max_minutes": 133.71666666666667,
+          "frozen_trip_wait_median_minutes": 0.0,
+          "frozen_trip_wait_p90_minutes": 1.7833333333333334
+        }
+      },
+      "unresolved_statuses": {
+        "UNKNOWN": 37,
+        "PENDING": 7
+      }
+    },
+    "clean-recent7": {
+      "issue_clocks_per_item": {
+        "sou:Xanax": 2017,
+        "uae:Camel Plushie": 2017,
+        "uni:Nessie Plushie": 2017,
+        "uni:Xanax": 2017,
+        "uni:Red Fox Plushie": 2017,
+        "chi:Panda Plushie": 2017
+      },
+      "saved_prefixes_unchanged": true,
+      "causal_rate_label_checks": 11634,
+      "code_fingerprints_match": true,
+      "archive_sha256": {
+        "manifest.json": "999e7063d635ad0be013057fee8f132ef61cdd2f338d9866f3ffd4a78a41449a",
+        "sou__Xanax.jsonl": "06e57bcbaddcf036fd547e39de22d72fbd53d65f236541b57e31d9d04c44adbd",
+        "uae__Camel_Plushie.jsonl": "2d4b6e441aef7218f9f600d2da5ff4bc87993770122dde7aba451eb34a80b0b4",
+        "uni__Nessie_Plushie.jsonl": "cdd9b1ea7d86ff48a78a4ddb0dbc5f97e6462b99ff59ea67031836106d281f22",
+        "uni__Xanax.jsonl": "1be6f461f485a53dec9d00602815a42808dbf5443913c902c81dd2fa5316a263",
+        "uni__Red_Fox_Plushie.jsonl": "2731a606e4b8cfe9b3ba80a0f131f4862a409242139439c48a6e894176a4560a",
+        "chi__Panda_Plushie.jsonl": "88e2a093aecf5f5d616d42a4eebe152f4b2880597340e30eace39206b797dbf2"
+      },
+      "wait_distribution": {
+        "sou:Xanax": {
+          "advice_wait_median_minutes": 79.45,
+          "advice_wait_p90_minutes": 182.45,
+          "advice_wait_max_minutes": 382.06666666666666,
+          "frozen_trip_wait_median_minutes": 0.0,
+          "frozen_trip_wait_p90_minutes": 1.1833333333333333
+        },
+        "uae:Camel Plushie": {
+          "advice_wait_median_minutes": 6.175000000000001,
+          "advice_wait_p90_minutes": 27.283333333333335,
+          "advice_wait_max_minutes": 47.016666666666666,
+          "frozen_trip_wait_median_minutes": 0.0,
+          "frozen_trip_wait_p90_minutes": 1.75
+        },
+        "uni:Nessie Plushie": {
+          "advice_wait_median_minutes": 14.158333333333333,
+          "advice_wait_p90_minutes": 34.56666666666667,
+          "advice_wait_max_minutes": 138.48333333333332,
+          "frozen_trip_wait_median_minutes": 0.0,
+          "frozen_trip_wait_p90_minutes": 0.0
+        },
+        "uni:Xanax": {
+          "advice_wait_median_minutes": 0.0,
+          "advice_wait_p90_minutes": 0.0,
+          "advice_wait_max_minutes": 0.0,
+          "frozen_trip_wait_median_minutes": 0.0,
+          "frozen_trip_wait_p90_minutes": 0.0
+        },
+        "uni:Red Fox Plushie": {
+          "advice_wait_median_minutes": 5.0,
+          "advice_wait_p90_minutes": 25.0,
+          "advice_wait_max_minutes": 251.48333333333332,
+          "frozen_trip_wait_median_minutes": 0.0,
+          "frozen_trip_wait_p90_minutes": 0.48333333333333334
+        },
+        "chi:Panda Plushie": {
+          "advice_wait_median_minutes": 14.15,
+          "advice_wait_p90_minutes": 34.266666666666666,
+          "advice_wait_max_minutes": 139.71666666666667,
+          "frozen_trip_wait_median_minutes": 0.0,
+          "frozen_trip_wait_p90_minutes": 1.4666666666666666
+        }
+      },
+      "unresolved_statuses": {
+        "PENDING": 7,
+        "UNKNOWN": 40
+      }
+    }
+  },
+  "all_checks_passed": true
+}

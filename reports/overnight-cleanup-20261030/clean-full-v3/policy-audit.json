@@ -1,0 +1,12 @@
+{
+  "issue_clocks": 12102,
+  "advice_clocks": 10928,
+  "current_stock_leave_now_clocks": 1935,
+  "future_advice_clocks": 8993,
+  "model_errors": 0,
+  "geometry_mismatches": 0,
+  "training_override_missing": 0,
+  "wrong_model_identity": 0,
+  "wrong_threshold_or_grace": 0,
+  "all_checks_passed": true
+}

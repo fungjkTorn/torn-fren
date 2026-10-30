@@ -1,0 +1,1935 @@
+{
+  "source_sha256": "543b67f1fe4874961130948ecee1d9df4870efe80599726f13828b19da8a6687",
+  "start_epoch": 1792720800,
+  "cutoff_epoch": 1793325600,
+  "baseline": {
+    "sou:Xanax": {
+      "model": [
+        "v19",
+        "dyn6"
+      ],
+      "issue_clocks": 2017,
+      "advice_issue_clocks": 1849,
+      "simulated_trips": 40,
+      "successes": 25,
+      "failures": 10,
+      "known": 35,
+      "unknown": 4,
+      "pending": 1,
+      "known_success_fraction": 0.7142857142857143,
+      "target_identity_audit": {
+        "duplicate_target_groups": 0,
+        "duplicates": {},
+        "retained_completed_identities": 40
+      },
+      "restock_profile": {
+        "training_cutoff": 1792720800,
+        "zero_refill_samples": 88,
+        "status": "LEARNED",
+        "normal_min": 2367,
+        "normal_max": 2500,
+        "reset_base": null,
+        "reset_training_samples": 0,
+        "normal_samples": 70,
+        "excluded_small_samples": 18,
+        "reset_candidate_base": 2500,
+        "classification_is_observational": true,
+        "method": "ITERATED_LOG_QUANTITY_CLUSTER_WITH_OBSERVED_RANGE"
+      },
+      "qualified_restocks": 29,
+      "revision_counts": {
+        "FROZEN_AT_RECOMMENDED_DEPARTURE": 40,
+        "NEW_RECOMMENDATION": 106,
+        "POSTPONED_BEFORE_DEPARTURE": 463,
+        "REVISED_BEFORE_DEPARTURE": 799,
+        "SUPPRESSED_ALREADY_TESTED_TARGET": 1,
+        "WITHDRAWN_NO_ADVICE": 18,
+        "WITHDRAWN_STALE_BEFORE_DEPARTURE": 1,
+        "WITHDRAWN_TARGET_CHANGED": 45
+      },
+      "no_advice_clock_statuses": {
+        "STALE_COUNTRY_DATA": 47,
+        "MODEL_ABSTAIN": 121
+      },
+      "nearest_qualified_boundary_misses": {
+        "counts": {
+          "LATE": 6,
+          "EARLY": 3,
+          "UNKNOWN": 1
+        },
+        "median_late_minutes": 28.258333333333333,
+        "median_early_minutes": 43.38333333333333
+      },
+      "latest_ten": {
+        "known": 9,
+        "successes": 7,
+        "failures": 2,
+        "unknown": 0,
+        "pending": 1,
+        "success_fraction": 0.7777777777777778
+      },
+      "active_recommendation_at_cutoff": {
+        "departure_epoch": 1793338991,
+        "arrival_epoch": 1793350811,
+        "issued_epoch": 1793325600,
+        "published_epoch": 1793325600,
+        "selected_event_index": 1,
+        "input_cutoff_epoch": 1793325600,
+        "window_start": 1793342411,
+        "window_end": 1793353372,
+        "restock_anchor": null,
+        "episode_anchor": null,
+        "origin_opening": 1793321277,
+        "target_offset": 1,
+        "valid_until": 1793325778,
+        "reason": "FIRST_REACHABLE_WINDOW_SELECTED",
+        "forecast": {
+          "calibration_state": "UNCALIBRATED",
+          "early_stock_end_epoch": null,
+          "estimated_arrival_epoch": 1793342411,
+          "estimated_arrival_plus_grace_epoch": 1793342411,
+          "estimated_departure_start_epoch": 1793330591,
+          "estimated_latest_departure_epoch": 1793341551,
+          "flight_reachable": true,
+          "forecast_horizon_seconds": 16811,
+          "index": 1,
+          "item_quantity_threshold": 31,
+          "model_proven_success": false,
+          "predicted_restock_epoch": 1793342411,
+          "predicted_stock_below_30_epoch": 1793353372,
+          "predicted_true_depletion_epoch": null,
+          "reason": "ESTIMATED_STOCKED_PHASE_REACHABLE",
+          "restock_early_epoch": 1793337369,
+          "restock_late_epoch": 1793354163
+        },
+        "remaining_offset": 1,
+        "id": "1793324100"
+      }
+    },
+    "uae:Camel Plushie": {
+      "model": [
+        "v19",
+        "dyn3"
+      ],
+      "issue_clocks": 2017,
+      "advice_issue_clocks": 1762,
+      "simulated_trips": 131,
+      "successes": 89,
+      "failures": 32,
+      "known": 121,
+      "unknown": 8,
+      "pending": 2,
+      "known_success_fraction": 0.7355371900826446,
+      "target_identity_audit": {
+        "duplicate_target_groups": 0,
+        "duplicates": {},
+        "retained_completed_identities": 131
+      },
+      "restock_profile": {
+        "training_cutoff": 1792720800,
+        "zero_refill_samples": 1133,
+        "status": "LEARNED",
+        "normal_min": 2096,
+        "normal_max": 2500,
+        "reset_base": null,
+        "reset_training_samples": 0,
+        "normal_samples": 1009,
+        "excluded_small_samples": 124,
+        "reset_candidate_base": 2500,
+        "classification_is_observational": true,
+        "method": "ITERATED_LOG_QUANTITY_CLUSTER_WITH_OBSERVED_RANGE"
+      },
+      "qualified_restocks": 132,
+      "revision_counts": {
+        "FROZEN_AT_RECOMMENDED_DEPARTURE": 131,
+        "NEW_RECOMMENDATION": 199,
+        "POSTPONED_BEFORE_DEPARTURE": 243,
+        "REVISED_BEFORE_DEPARTURE": 451,
+        "WITHDRAWN_NO_ADVICE": 32,
+        "WITHDRAWN_STALE_BEFORE_DEPARTURE": 14,
+        "WITHDRAWN_TARGET_CHANGED": 22
+      },
+      "no_advice_clock_statuses": {
+        "MODEL_ABSTAIN": 123,
+        "STALE_COUNTRY_DATA": 132
+      },
+      "nearest_qualified_boundary_misses": {
+        "counts": {
+          "EARLY": 17,
+          "UNKNOWN": 6,
+          "LATE": 7,
+          "POSITIVE_STOCK_AT_OR_BELOW_30": 2
+        },
+        "median_late_minutes": 1.9166666666666667,
+        "median_early_minutes": 2.783333333333333
+      },
+      "latest_ten": {
+        "known": 8,
+        "successes": 5,
+        "failures": 3,
+        "unknown": 0,
+        "pending": 2,
+        "success_fraction": 0.625
+      },
+      "active_recommendation_at_cutoff": null
+    },
+    "uni:Nessie Plushie": {
+      "model": [
+        "v19",
+        "dyn8"
+      ],
+      "issue_clocks": 2017,
+      "advice_issue_clocks": 1786,
+      "simulated_trips": 155,
+      "successes": 108,
+      "failures": 37,
+      "known": 145,
+      "unknown": 9,
+      "pending": 1,
+      "known_success_fraction": 0.7448275862068966,
+      "target_identity_audit": {
+        "duplicate_target_groups": 0,
+        "duplicates": {},
+        "retained_completed_identities": 155
+      },
+      "restock_profile": {
+        "training_cutoff": 1792720800,
+        "zero_refill_samples": 1066,
+        "status": "LEARNED",
+        "normal_min": 2191,
+        "normal_max": 2502,
+        "reset_base": null,
+        "reset_training_samples": 0,
+        "normal_samples": 885,
+        "excluded_small_samples": 181,
+        "reset_candidate_base": 2500,
+        "classification_is_observational": true,
+        "method": "ITERATED_LOG_QUANTITY_CLUSTER_WITH_OBSERVED_RANGE"
+      },
+      "qualified_restocks": 153,
+      "revision_counts": {
+        "FROZEN_AT_RECOMMENDED_DEPARTURE": 155,
+        "NEW_RECOMMENDATION": 204,
+        "POSTPONED_BEFORE_DEPARTURE": 664,
+        "REVISED_BEFORE_DEPARTURE": 1159,
+        "WITHDRAWN_NO_ADVICE": 36,
+        "WITHDRAWN_STALE_BEFORE_DEPARTURE": 9,
+        "WITHDRAWN_TARGET_CHANGED": 3
+      },
+      "no_advice_clock_statuses": {
+        "MODEL_ABSTAIN": 161,
+        "STALE_COUNTRY_DATA": 70
+      },
+      "nearest_qualified_boundary_misses": {
+        "counts": {
+          "POSITIVE_STOCK_AT_OR_BELOW_30": 3,
+          "LATE": 16,
+          "EARLY": 16,
+          "UNKNOWN": 1,
+          "UNKNOWN_ZERO_BOUNDARY": 1
+        },
+        "median_late_minutes": 4.508333333333333,
+        "median_early_minutes": 3.8166666666666664
+      },
+      "latest_ten": {
+        "known": 8,
+        "successes": 4,
+        "failures": 4,
+        "unknown": 1,
+        "pending": 1,
+        "success_fraction": 0.5
+      },
+      "active_recommendation_at_cutoff": {
+        "departure_epoch": 1793326840,
+        "arrival_epoch": 1793333200,
+        "issued_epoch": 1793325600,
+        "published_epoch": 1793325600,
+        "selected_event_index": 3,
+        "input_cutoff_epoch": 1793325600,
+        "window_start": 1793332600,
+        "window_end": 1793334286,
+        "restock_anchor": null,
+        "episode_anchor": null,
+        "origin_opening": 1793323648,
+        "target_offset": 3,
+        "valid_until": 1793325778,
+        "reason": "FIRST_REACHABLE_WINDOW_SELECTED",
+        "forecast": {
+          "calibration_state": "UNCALIBRATED",
+          "early_stock_end_epoch": null,
+          "estimated_arrival_epoch": 1793332600,
+          "estimated_arrival_plus_grace_epoch": 1793332600,
+          "estimated_departure_start_epoch": 1793326240,
+          "estimated_latest_departure_epoch": 1793327925,
+          "flight_reachable": true,
+          "forecast_horizon_seconds": 7000,
+          "index": 3,
+          "item_quantity_threshold": 31,
+          "model_proven_success": false,
+          "predicted_restock_epoch": 1793332600,
+          "predicted_stock_below_30_epoch": 1793334286,
+          "predicted_true_depletion_epoch": null,
+          "reason": "ESTIMATED_STOCKED_PHASE_REACHABLE",
+          "restock_early_epoch": 1793330926,
+          "restock_late_epoch": 1793334978
+        },
+        "remaining_offset": 3,
+        "id": "1793324700"
+      }
+    },
+    "uni:Red Fox Plushie": {
+      "model": [
+        "v18",
+        "dyn1"
+      ],
+      "issue_clocks": 2017,
+      "advice_issue_clocks": 1782,
+      "simulated_trips": 123,
+      "successes": 89,
+      "failures": 27,
+      "known": 116,
+      "unknown": 6,
+      "pending": 1,
+      "known_success_fraction": 0.7672413793103449,
+      "target_identity_audit": {
+        "duplicate_target_groups": 0,
+        "duplicates": {},
+        "retained_completed_identities": 123
+      },
+      "restock_profile": {
+        "training_cutoff": 1792720800,
+        "zero_refill_samples": 1104,
+        "status": "LEARNED",
+        "normal_min": 2217,
+        "normal_max": 2504,
+        "reset_base": null,
+        "reset_training_samples": 0,
+        "normal_samples": 945,
+        "excluded_small_samples": 159,
+        "reset_candidate_base": 2500,
+        "classification_is_observational": true,
+        "method": "ITERATED_LOG_QUANTITY_CLUSTER_WITH_OBSERVED_RANGE"
+      },
+      "qualified_restocks": 118,
+      "revision_counts": {
+        "FROZEN_AT_RECOMMENDED_DEPARTURE": 123,
+        "NEW_RECOMMENDATION": 181,
+        "POSTPONED_BEFORE_DEPARTURE": 642,
+        "REVISED_BEFORE_DEPARTURE": 1094,
+        "SUPPRESSED_ALREADY_TESTED_TARGET": 1,
+        "WITHDRAWN_NO_ADVICE": 16,
+        "WITHDRAWN_STALE_BEFORE_DEPARTURE": 28,
+        "WITHDRAWN_TARGET_CHANGED": 12
+      },
+      "no_advice_clock_statuses": {
+        "STALE_COUNTRY_DATA": 70,
+        "MODEL_ABSTAIN": 165
+      },
+      "nearest_qualified_boundary_misses": {
+        "counts": {
+          "LATE": 12,
+          "EARLY": 9,
+          "UNKNOWN": 3,
+          "POSITIVE_STOCK_AT_OR_BELOW_30": 2,
+          "UNKNOWN_ZERO_BOUNDARY": 1
+        },
+        "median_late_minutes": 5.375,
+        "median_early_minutes": 3.4
+      },
+      "latest_ten": {
+        "known": 9,
+        "successes": 8,
+        "failures": 1,
+        "unknown": 0,
+        "pending": 1,
+        "success_fraction": 0.8888888888888888
+      },
+      "active_recommendation_at_cutoff": {
+        "departure_epoch": 1793326860,
+        "arrival_epoch": 1793333220,
+        "issued_epoch": 1793325600,
+        "published_epoch": 1793325600,
+        "selected_event_index": 3,
+        "input_cutoff_epoch": 1793325600,
+        "window_start": 1793332620,
+        "window_end": 1793334275,
+        "restock_anchor": null,
+        "episode_anchor": null,
+        "origin_opening": 1793323888,
+        "target_offset": 3,
+        "valid_until": 1793325778,
+        "reason": "FIRST_REACHABLE_WINDOW_SELECTED",
+        "forecast": {
+          "calibration_state": "UNCALIBRATED",
+          "early_stock_end_epoch": null,
+          "estimated_arrival_epoch": 1793332620,
+          "estimated_arrival_plus_grace_epoch": 1793332620,
+          "estimated_departure_start_epoch": 1793326260,
+          "estimated_latest_departure_epoch": 1793327914,
+          "flight_reachable": true,
+          "forecast_horizon_seconds": 7020,
+          "index": 3,
+          "item_quantity_threshold": 31,
+          "model_proven_success": false,
+          "predicted_restock_epoch": 1793332620,
+          "predicted_stock_below_30_epoch": 1793334275,
+          "predicted_true_depletion_epoch": null,
+          "reason": "ESTIMATED_STOCKED_PHASE_REACHABLE",
+          "restock_early_epoch": 1793330926,
+          "restock_late_epoch": 1793335241
+        },
+        "remaining_offset": 3,
+        "id": "1793324700"
+      }
+    },
+    "uni:Xanax": {
+      "model": [
+        "v19",
+        "dyn8"
+      ],
+      "issue_clocks": 2017,
+      "advice_issue_clocks": 1947,
+      "simulated_trips": 1,
+      "successes": 1,
+      "failures": 0,
+      "known": 1,
+      "unknown": 0,
+      "pending": 0,
+      "known_success_fraction": 1.0,
+      "target_identity_audit": {
+        "duplicate_target_groups": 0,
+        "duplicates": {},
+        "retained_completed_identities": 1
+      },
+      "restock_profile": {
+        "training_cutoff": 1792720800,
+        "zero_refill_samples": 97,
+        "status": "LEARNED",
+        "normal_min": 2388,
+        "normal_max": 2500,
+        "reset_base": null,
+        "reset_training_samples": 1,
+        "normal_samples": 78,
+        "excluded_small_samples": 19,
+        "reset_candidate_base": 2500,
+        "classification_is_observational": true,
+        "method": "ITERATED_LOG_QUANTITY_CLUSTER_WITH_OBSERVED_RANGE"
+      },
+      "qualified_restocks": 0,
+      "revision_counts": {
+        "FROZEN_AT_RECOMMENDED_DEPARTURE": 1,
+        "NEW_RECOMMENDATION": 3,
+        "POSTPONED_BEFORE_DEPARTURE": 9,
+        "REVISED_BEFORE_DEPARTURE": 19,
+        "SUPPRESSED_ALREADY_TESTED_TARGET": 2
+      },
+      "no_advice_clock_statuses": {
+        "STALE_COUNTRY_DATA": 70
+      },
+      "nearest_qualified_boundary_misses": {
+        "counts": {},
+        "median_late_minutes": null,
+        "median_early_minutes": null
+      },
+      "latest_ten": {
+        "known": 1,
+        "successes": 1,
+        "failures": 0,
+        "unknown": 0,
+        "pending": 0,
+        "success_fraction": 1.0
+      },
+      "active_recommendation_at_cutoff": null
+    },
+    "chi:Panda Plushie": {
+      "model": [
+        "v19",
+        "dyn1"
+      ],
+      "issue_clocks": 2017,
+      "advice_issue_clocks": 1814,
+      "simulated_trips": 140,
+      "successes": 94,
+      "failures": 34,
+      "known": 128,
+      "unknown": 10,
+      "pending": 2,
+      "known_success_fraction": 0.734375,
+      "target_identity_audit": {
+        "duplicate_target_groups": 0,
+        "duplicates": {},
+        "retained_completed_identities": 140
+      },
+      "restock_profile": {
+        "training_cutoff": 1792720800,
+        "zero_refill_samples": 1112,
+        "status": "LEARNED",
+        "normal_min": 2148,
+        "normal_max": 2500,
+        "reset_base": null,
+        "reset_training_samples": 0,
+        "normal_samples": 926,
+        "excluded_small_samples": 186,
+        "reset_candidate_base": 2500,
+        "classification_is_observational": true,
+        "method": "ITERATED_LOG_QUANTITY_CLUSTER_WITH_OBSERVED_RANGE"
+      },
+      "qualified_restocks": 142,
+      "revision_counts": {
+        "FROZEN_AT_RECOMMENDED_DEPARTURE": 140,
+        "NEW_RECOMMENDATION": 202,
+        "POSTPONED_BEFORE_DEPARTURE": 535,
+        "REVISED_BEFORE_DEPARTURE": 1019,
+        "WITHDRAWN_NO_ADVICE": 31,
+        "WITHDRAWN_STALE_BEFORE_DEPARTURE": 28,
+        "WITHDRAWN_TARGET_CHANGED": 2
+      },
+      "no_advice_clock_statuses": {
+        "MODEL_ABSTAIN": 124,
+        "STALE_COUNTRY_DATA": 79
+      },
+      "nearest_qualified_boundary_misses": {
+        "counts": {
+          "EARLY": 16,
+          "LATE": 15,
+          "UNKNOWN": 3
+        },
+        "median_late_minutes": 2.783333333333333,
+        "median_early_minutes": 3.1166666666666667
+      },
+      "latest_ten": {
+        "known": 5,
+        "successes": 5,
+        "failures": 0,
+        "unknown": 3,
+        "pending": 2,
+        "success_fraction": 1.0
+      },
+      "active_recommendation_at_cutoff": {
+        "departure_epoch": 1793327082,
+        "arrival_epoch": 1793336682,
+        "issued_epoch": 1793325600,
+        "published_epoch": 1793325600,
+        "selected_event_index": 4,
+        "input_cutoff_epoch": 1793325600,
+        "window_start": 1793335482,
+        "window_end": 1793337345,
+        "restock_anchor": null,
+        "episode_anchor": null,
+        "origin_opening": 1793322757,
+        "target_offset": 4,
+        "valid_until": 1793325778,
+        "reason": "FIRST_REACHABLE_WINDOW_SELECTED",
+        "forecast": {
+          "calibration_state": "UNCALIBRATED",
+          "early_stock_end_epoch": null,
+          "estimated_arrival_epoch": 1793335482,
+          "estimated_arrival_plus_grace_epoch": 1793335482,
+          "estimated_departure_start_epoch": 1793325882,
+          "estimated_latest_departure_epoch": 1793327744,
+          "flight_reachable": true,
+          "forecast_horizon_seconds": 9882,
+          "index": 4,
+          "item_quantity_threshold": 31,
+          "model_proven_success": false,
+          "predicted_restock_epoch": 1793335482,
+          "predicted_stock_below_30_epoch": 1793337345,
+          "predicted_true_depletion_epoch": null,
+          "reason": "ESTIMATED_STOCKED_PHASE_REACHABLE",
+          "restock_early_epoch": 1793333291,
+          "restock_late_epoch": 1793337983
+        },
+        "remaining_offset": 4,
+        "id": "1793323800"
+      }
+    }
+  },
+  "baseline_advice_behavior": {
+    "uae:Camel Plushie": {
+      "median_wait_minutes": 5.0,
+      "counts": {
+        "leave_now_clocks": 551,
+        "current_stock_advice_clocks": 0
+      }
+    },
+    "uni:Nessie Plushie": {
+      "median_wait_minutes": 14.85,
+      "counts": {
+        "leave_now_clocks": 322,
+        "current_stock_advice_clocks": 0
+      }
+    },
+    "sou:Xanax": {
+      "median_wait_minutes": 65.0,
+      "counts": {
+        "leave_now_clocks": 553,
+        "current_stock_advice_clocks": 396
+      }
+    },
+    "uni:Red Fox Plushie": {
+      "median_wait_minutes": 13.708333333333332,
+      "counts": {
+        "leave_now_clocks": 382,
+        "current_stock_advice_clocks": 6
+      }
+    },
+    "chi:Panda Plushie": {
+      "median_wait_minutes": 13.341666666666667,
+      "counts": {
+        "leave_now_clocks": 323,
+        "current_stock_advice_clocks": 5
+      }
+    },
+    "uni:Xanax": {
+      "median_wait_minutes": 0.0,
+      "counts": {
+        "leave_now_clocks": 1905,
+        "current_stock_advice_clocks": 1905
+      }
+    }
+  },
+  "variants": {
+    "clean-full": {
+      "items": {
+        "uae:Camel Plushie": {
+          "advice_behavior": {
+            "median_wait_minutes": 5.0,
+            "counts": {
+              "leave_now_clocks": 551,
+              "current_stock_advice_clocks": 0,
+              "future_placement_clocks": 1762,
+              "uncertainty_core_overlaps": 0,
+              "arrival_actually_adjusted": 0,
+              "recent_rate_exceeded_historical_upper": 65
+            }
+          },
+          "paired_median_departure_shift_minutes": 0.0,
+          "metrics": {
+            "model": [
+              "v19",
+              "dyn3"
+            ],
+            "issue_clocks": 2017,
+            "advice_issue_clocks": 1762,
+            "simulated_trips": 131,
+            "successes": 89,
+            "failures": 32,
+            "known": 121,
+            "unknown": 8,
+            "pending": 2,
+            "known_success_fraction": 0.7355371900826446,
+            "target_identity_audit": {
+              "duplicate_target_groups": 0,
+              "duplicates": {},
+              "retained_completed_identities": 131
+            },
+            "restock_profile": {
+              "training_cutoff": 1792720800,
+              "zero_refill_samples": 1133,
+              "status": "LEARNED",
+              "normal_min": 2096,
+              "normal_max": 2500,
+              "reset_base": null,
+              "reset_training_samples": 0,
+              "normal_samples": 1009,
+              "excluded_small_samples": 124,
+              "reset_candidate_base": 2500,
+              "classification_is_observational": true,
+              "method": "ITERATED_LOG_QUANTITY_CLUSTER_WITH_OBSERVED_RANGE"
+            },
+            "qualified_restocks": 132,
+            "revision_counts": {
+              "FROZEN_AT_RECOMMENDED_DEPARTURE": 131,
+              "NEW_RECOMMENDATION": 199,
+              "POSTPONED_BEFORE_DEPARTURE": 243,
+              "REVISED_BEFORE_DEPARTURE": 451,
+              "WITHDRAWN_NO_ADVICE": 32,
+              "WITHDRAWN_STALE_BEFORE_DEPARTURE": 14,
+              "WITHDRAWN_TARGET_CHANGED": 22
+            },
+            "no_advice_clock_statuses": {
+              "MODEL_ABSTAIN": 123,
+              "STALE_COUNTRY_DATA": 132
+            },
+            "nearest_qualified_boundary_misses": {
+              "counts": {
+                "EARLY": 17,
+                "UNKNOWN": 6,
+                "LATE": 7,
+                "POSITIVE_STOCK_AT_OR_BELOW_30": 2
+              },
+              "median_late_minutes": 1.9166666666666667,
+              "median_early_minutes": 2.783333333333333
+            },
+            "latest_ten": {
+              "known": 8,
+              "successes": 5,
+              "failures": 3,
+              "unknown": 0,
+              "pending": 2,
+              "success_fraction": 0.625
+            },
+            "active_recommendation_at_cutoff": null
+          },
+          "paired_observed_opportunities": {
+            "shared_observed_opportunities": 127,
+            "both_known": 119,
+            "both_failure": 30,
+            "both_success": 89,
+            "shared_but_not_both_known": 8,
+            "baseline_only_observed_opportunities": 0,
+            "candidate_only_observed_opportunities": 0
+          },
+          "known_success_rate_delta_pp": 0.0,
+          "advice_clock_change": 0,
+          "frozen_trip_change": 0,
+          "lower_rate": false
+        },
+        "uni:Nessie Plushie": {
+          "advice_behavior": {
+            "median_wait_minutes": 14.85,
+            "counts": {
+              "leave_now_clocks": 322,
+              "current_stock_advice_clocks": 0,
+              "future_placement_clocks": 1786,
+              "uncertainty_core_overlaps": 0,
+              "arrival_actually_adjusted": 0,
+              "recent_rate_exceeded_historical_upper": 82
+            }
+          },
+          "paired_median_departure_shift_minutes": 0.0,
+          "metrics": {
+            "model": [
+              "v19",
+              "dyn8"
+            ],
+            "issue_clocks": 2017,
+            "advice_issue_clocks": 1786,
+            "simulated_trips": 155,
+            "successes": 108,
+            "failures": 37,
+            "known": 145,
+            "unknown": 9,
+            "pending": 1,
+            "known_success_fraction": 0.7448275862068966,
+            "target_identity_audit": {
+              "duplicate_target_groups": 0,
+              "duplicates": {},
+              "retained_completed_identities": 155
+            },
+            "restock_profile": {
+              "training_cutoff": 1792720800,
+              "zero_refill_samples": 1066,
+              "status": "LEARNED",
+              "normal_min": 2191,
+              "normal_max": 2502,
+              "reset_base": null,
+              "reset_training_samples": 0,
+              "normal_samples": 885,
+              "excluded_small_samples": 181,
+              "reset_candidate_base": 2500,
+              "classification_is_observational": true,
+              "method": "ITERATED_LOG_QUANTITY_CLUSTER_WITH_OBSERVED_RANGE"
+            },
+            "qualified_restocks": 153,
+            "revision_counts": {
+              "FROZEN_AT_RECOMMENDED_DEPARTURE": 155,
+              "NEW_RECOMMENDATION": 204,
+              "POSTPONED_BEFORE_DEPARTURE": 664,
+              "REVISED_BEFORE_DEPARTURE": 1159,
+              "WITHDRAWN_NO_ADVICE": 36,
+              "WITHDRAWN_STALE_BEFORE_DEPARTURE": 9,
+              "WITHDRAWN_TARGET_CHANGED": 3
+            },
+            "no_advice_clock_statuses": {
+              "MODEL_ABSTAIN": 161,
+              "STALE_COUNTRY_DATA": 70
+            },
+            "nearest_qualified_boundary_misses": {
+              "counts": {
+                "POSITIVE_STOCK_AT_OR_BELOW_30": 3,
+                "LATE": 16,
+                "EARLY": 16,
+                "UNKNOWN": 1,
+                "UNKNOWN_ZERO_BOUNDARY": 1
+              },
+              "median_late_minutes": 4.508333333333333,
+              "median_early_minutes": 3.8166666666666664
+            },
+            "latest_ten": {
+              "known": 8,
+              "successes": 4,
+              "failures": 4,
+              "unknown": 1,
+              "pending": 1,
+              "success_fraction": 0.5
+            },
+            "active_recommendation_at_cutoff": {
+              "departure_epoch": 1793326840,
+              "arrival_epoch": 1793333200,
+              "issued_epoch": 1793325600,
+              "published_epoch": 1793325600,
+              "selected_event_index": 3,
+              "input_cutoff_epoch": 1793325600,
+              "window_start": 1793332600,
+              "window_end": 1793334286,
+              "restock_anchor": null,
+              "episode_anchor": null,
+              "origin_opening": 1793323648,
+              "target_offset": 3,
+              "valid_until": 1793325778,
+              "reason": "FIRST_REACHABLE_WINDOW_SELECTED",
+              "forecast": {
+                "calibration_state": "UNCALIBRATED",
+                "early_stock_end_epoch": 1793332096,
+                "estimated_arrival_epoch": 1793332600,
+                "estimated_arrival_plus_grace_epoch": 1793332600,
+                "estimated_departure_start_epoch": 1793326240,
+                "estimated_latest_departure_epoch": 1793327925,
+                "flight_reachable": true,
+                "forecast_horizon_seconds": 7000,
+                "index": 3,
+                "item_quantity_threshold": 31,
+                "model_proven_success": false,
+                "predicted_restock_epoch": 1793332600,
+                "predicted_stock_below_30_epoch": 1793334286,
+                "predicted_true_depletion_epoch": null,
+                "reason": "ESTIMATED_STOCKED_PHASE_REACHABLE",
+                "restock_early_epoch": 1793330926,
+                "restock_late_epoch": 1793334978
+              },
+              "remaining_offset": 3,
+              "id": "1793324700"
+            }
+          },
+          "paired_observed_opportunities": {
+            "shared_observed_opportunities": 153,
+            "both_known": 144,
+            "both_success": 108,
+            "both_failure": 36,
+            "shared_but_not_both_known": 9,
+            "baseline_only_observed_opportunities": 0,
+            "candidate_only_observed_opportunities": 0
+          },
+          "known_success_rate_delta_pp": 0.0,
+          "advice_clock_change": 0,
+          "frozen_trip_change": 0,
+          "lower_rate": false
+        },
+        "sou:Xanax": {
+          "advice_behavior": {
+            "median_wait_minutes": 136.16666666666666,
+            "counts": {
+              "leave_now_clocks": 157,
+              "current_stock_advice_clocks": 0,
+              "future_placement_clocks": 1849,
+              "uncertainty_core_overlaps": 16,
+              "arrival_actually_adjusted": 7,
+              "recent_rate_exceeded_historical_upper": 124
+            }
+          },
+          "paired_median_departure_shift_minutes": 0.0,
+          "metrics": {
+            "model": [
+              "v19",
+              "dyn6"
+            ],
+            "issue_clocks": 2017,
+            "advice_issue_clocks": 1849,
+            "simulated_trips": 34,
+            "successes": 20,
+            "failures": 9,
+            "known": 29,
+            "unknown": 4,
+            "pending": 1,
+            "known_success_fraction": 0.6896551724137931,
+            "target_identity_audit": {
+              "duplicate_target_groups": 0,
+              "duplicates": {},
+              "retained_completed_identities": 34
+            },
+            "restock_profile": {
+              "training_cutoff": 1792720800,
+              "zero_refill_samples": 88,
+              "status": "LEARNED",
+              "normal_min": 2367,
+              "normal_max": 2500,
+              "reset_base": null,
+              "reset_training_samples": 0,
+              "normal_samples": 70,
+              "excluded_small_samples": 18,
+              "reset_candidate_base": 2500,
+              "classification_is_observational": true,
+              "method": "ITERATED_LOG_QUANTITY_CLUSTER_WITH_OBSERVED_RANGE"
+            },
+            "qualified_restocks": 29,
+            "revision_counts": {
+              "FROZEN_AT_RECOMMENDED_DEPARTURE": 34,
+              "NEW_RECOMMENDATION": 74,
+              "POSTPONED_BEFORE_DEPARTURE": 644,
+              "REVISED_BEFORE_DEPARTURE": 1090,
+              "WITHDRAWN_NO_ADVICE": 32,
+              "WITHDRAWN_STALE_BEFORE_DEPARTURE": 2,
+              "WITHDRAWN_TARGET_CHANGED": 5
+            },
+            "no_advice_clock_statuses": {
+              "STALE_COUNTRY_DATA": 47,
+              "MODEL_ABSTAIN": 121
+            },
+            "nearest_qualified_boundary_misses": {
+              "counts": {
+                "LATE": 8,
+                "EARLY": 1
+              },
+              "median_late_minutes": 30.858333333333334,
+              "median_early_minutes": 4.816666666666666
+            },
+            "latest_ten": {
+              "known": 9,
+              "successes": 9,
+              "failures": 0,
+              "unknown": 0,
+              "pending": 1,
+              "success_fraction": 1.0
+            },
+            "active_recommendation_at_cutoff": {
+              "departure_epoch": 1793338991,
+              "arrival_epoch": 1793350811,
+              "issued_epoch": 1793325600,
+              "published_epoch": 1793325600,
+              "selected_event_index": 1,
+              "input_cutoff_epoch": 1793325600,
+              "window_start": 1793342411,
+              "window_end": 1793353372,
+              "restock_anchor": null,
+              "episode_anchor": null,
+              "origin_opening": 1793321277,
+              "target_offset": 1,
+              "valid_until": 1793325778,
+              "reason": "FIRST_REACHABLE_WINDOW_SELECTED",
+              "forecast": {
+                "calibration_state": "UNCALIBRATED",
+                "early_stock_end_epoch": 1793341231,
+                "estimated_arrival_epoch": 1793342411,
+                "estimated_arrival_plus_grace_epoch": 1793342411,
+                "estimated_departure_start_epoch": 1793330591,
+                "estimated_latest_departure_epoch": 1793341551,
+                "flight_reachable": true,
+                "forecast_horizon_seconds": 16811,
+                "index": 1,
+                "item_quantity_threshold": 31,
+                "model_proven_success": false,
+                "predicted_restock_epoch": 1793342411,
+                "predicted_stock_below_30_epoch": 1793353372,
+                "predicted_true_depletion_epoch": null,
+                "reason": "ESTIMATED_STOCKED_PHASE_REACHABLE",
+                "restock_early_epoch": 1793337369,
+                "restock_late_epoch": 1793354163
+              },
+              "remaining_offset": 1,
+              "id": "1793324100"
+            }
+          },
+          "paired_observed_opportunities": {
+            "shared_observed_opportunities": 34,
+            "both_known": 29,
+            "both_success": 20,
+            "both_failure": 6,
+            "shared_but_not_both_known": 5,
+            "baseline_only_success": 3,
+            "baseline_only_observed_opportunities": 6,
+            "candidate_only_observed_opportunities": 0
+          },
+          "known_success_rate_delta_pp": -2.463054187192115,
+          "advice_clock_change": 0,
+          "frozen_trip_change": -6,
+          "lower_rate": true
+        },
+        "uni:Red Fox Plushie": {
+          "advice_behavior": {
+            "median_wait_minutes": 13.866666666666667,
+            "counts": {
+              "leave_now_clocks": 376,
+              "current_stock_advice_clocks": 0,
+              "future_placement_clocks": 1782,
+              "uncertainty_core_overlaps": 6,
+              "arrival_actually_adjusted": 4,
+              "recent_rate_exceeded_historical_upper": 108
+            }
+          },
+          "paired_median_departure_shift_minutes": 0.0,
+          "metrics": {
+            "model": [
+              "v18",
+              "dyn1"
+            ],
+            "issue_clocks": 2017,
+            "advice_issue_clocks": 1782,
+            "simulated_trips": 123,
+            "successes": 89,
+            "failures": 27,
+            "known": 116,
+            "unknown": 6,
+            "pending": 1,
+            "known_success_fraction": 0.7672413793103449,
+            "target_identity_audit": {
+              "duplicate_target_groups": 0,
+              "duplicates": {},
+              "retained_completed_identities": 123
+            },
+            "restock_profile": {
+              "training_cutoff": 1792720800,
+              "zero_refill_samples": 1104,
+              "status": "LEARNED",
+              "normal_min": 2217,
+              "normal_max": 2504,
+              "reset_base": null,
+              "reset_training_samples": 0,
+              "normal_samples": 945,
+              "excluded_small_samples": 159,
+              "reset_candidate_base": 2500,
+              "classification_is_observational": true,
+              "method": "ITERATED_LOG_QUANTITY_CLUSTER_WITH_OBSERVED_RANGE"
+            },
+            "qualified_restocks": 118,
+            "revision_counts": {
+              "FROZEN_AT_RECOMMENDED_DEPARTURE": 123,
+              "NEW_RECOMMENDATION": 181,
+              "POSTPONED_BEFORE_DEPARTURE": 642,
+              "REVISED_BEFORE_DEPARTURE": 1093,
+              "WITHDRAWN_NO_ADVICE": 16,
+              "WITHDRAWN_STALE_BEFORE_DEPARTURE": 28,
+              "WITHDRAWN_TARGET_CHANGED": 13
+            },
+            "no_advice_clock_statuses": {
+              "STALE_COUNTRY_DATA": 70,
+              "MODEL_ABSTAIN": 165
+            },
+            "nearest_qualified_boundary_misses": {
+              "counts": {
+                "LATE": 12,
+                "EARLY": 9,
+                "UNKNOWN": 3,
+                "POSITIVE_STOCK_AT_OR_BELOW_30": 2,
+                "UNKNOWN_ZERO_BOUNDARY": 1
+              },
+              "median_late_minutes": 5.375,
+              "median_early_minutes": 3.4
+            },
+            "latest_ten": {
+              "known": 9,
+              "successes": 8,
+              "failures": 1,
+              "unknown": 0,
+              "pending": 1,
+              "success_fraction": 0.8888888888888888
+            },
+            "active_recommendation_at_cutoff": {
+              "departure_epoch": 1793326860,
+              "arrival_epoch": 1793333220,
+              "issued_epoch": 1793325600,
+              "published_epoch": 1793325600,
+              "selected_event_index": 3,
+              "input_cutoff_epoch": 1793325600,
+              "window_start": 1793332620,
+              "window_end": 1793334275,
+              "restock_anchor": null,
+              "episode_anchor": null,
+              "origin_opening": 1793323888,
+              "target_offset": 3,
+              "valid_until": 1793325778,
+              "reason": "FIRST_REACHABLE_WINDOW_SELECTED",
+              "forecast": {
+                "calibration_state": "UNCALIBRATED",
+                "early_stock_end_epoch": 1793332082,
+                "estimated_arrival_epoch": 1793332620,
+                "estimated_arrival_plus_grace_epoch": 1793332620,
+                "estimated_departure_start_epoch": 1793326260,
+                "estimated_latest_departure_epoch": 1793327914,
+                "flight_reachable": true,
+                "forecast_horizon_seconds": 7020,
+                "index": 3,
+                "item_quantity_threshold": 31,
+                "model_proven_success": false,
+                "predicted_restock_epoch": 1793332620,
+                "predicted_stock_below_30_epoch": 1793334275,
+                "predicted_true_depletion_epoch": null,
+                "reason": "ESTIMATED_STOCKED_PHASE_REACHABLE",
+                "restock_early_epoch": 1793330926,
+                "restock_late_epoch": 1793335241
+              },
+              "remaining_offset": 3,
+              "id": "1793324700"
+            }
+          },
+          "paired_observed_opportunities": {
+            "shared_observed_opportunities": 121,
+            "both_known": 115,
+            "both_success": 88,
+            "both_failure": 27,
+            "shared_but_not_both_known": 6,
+            "baseline_only_observed_opportunities": 0,
+            "candidate_only_observed_opportunities": 0
+          },
+          "known_success_rate_delta_pp": 0.0,
+          "advice_clock_change": 0,
+          "frozen_trip_change": 0,
+          "lower_rate": false
+        },
+        "chi:Panda Plushie": {
+          "advice_behavior": {
+            "median_wait_minutes": 13.466666666666665,
+            "counts": {
+              "leave_now_clocks": 318,
+              "current_stock_advice_clocks": 0,
+              "future_placement_clocks": 1814,
+              "uncertainty_core_overlaps": 5,
+              "arrival_actually_adjusted": 4,
+              "recent_rate_exceeded_historical_upper": 62
+            }
+          },
+          "paired_median_departure_shift_minutes": 0.0,
+          "metrics": {
+            "model": [
+              "v19",
+              "dyn1"
+            ],
+            "issue_clocks": 2017,
+            "advice_issue_clocks": 1814,
+            "simulated_trips": 140,
+            "successes": 94,
+            "failures": 34,
+            "known": 128,
+            "unknown": 10,
+            "pending": 2,
+            "known_success_fraction": 0.734375,
+            "target_identity_audit": {
+              "duplicate_target_groups": 0,
+              "duplicates": {},
+              "retained_completed_identities": 140
+            },
+            "restock_profile": {
+              "training_cutoff": 1792720800,
+              "zero_refill_samples": 1112,
+              "status": "LEARNED",
+              "normal_min": 2148,
+              "normal_max": 2500,
+              "reset_base": null,
+              "reset_training_samples": 0,
+              "normal_samples": 926,
+              "excluded_small_samples": 186,
+              "reset_candidate_base": 2500,
+              "classification_is_observational": true,
+              "method": "ITERATED_LOG_QUANTITY_CLUSTER_WITH_OBSERVED_RANGE"
+            },
+            "qualified_restocks": 142,
+            "revision_counts": {
+              "FROZEN_AT_RECOMMENDED_DEPARTURE": 140,
+              "NEW_RECOMMENDATION": 202,
+              "POSTPONED_BEFORE_DEPARTURE": 535,
+              "REVISED_BEFORE_DEPARTURE": 1019,
+              "WITHDRAWN_NO_ADVICE": 31,
+              "WITHDRAWN_STALE_BEFORE_DEPARTURE": 28,
+              "WITHDRAWN_TARGET_CHANGED": 2
+            },
+            "no_advice_clock_statuses": {
+              "MODEL_ABSTAIN": 124,
+              "STALE_COUNTRY_DATA": 79
+            },
+            "nearest_qualified_boundary_misses": {
+              "counts": {
+                "EARLY": 16,
+                "LATE": 15,
+                "UNKNOWN": 3
+              },
+              "median_late_minutes": 2.783333333333333,
+              "median_early_minutes": 3.1166666666666667
+            },
+            "latest_ten": {
+              "known": 5,
+              "successes": 5,
+              "failures": 0,
+              "unknown": 3,
+              "pending": 2,
+              "success_fraction": 1.0
+            },
+            "active_recommendation_at_cutoff": {
+              "departure_epoch": 1793327082,
+              "arrival_epoch": 1793336682,
+              "issued_epoch": 1793325600,
+              "published_epoch": 1793325600,
+              "selected_event_index": 4,
+              "input_cutoff_epoch": 1793325600,
+              "window_start": 1793335482,
+              "window_end": 1793337345,
+              "restock_anchor": null,
+              "episode_anchor": null,
+              "origin_opening": 1793322757,
+              "target_offset": 4,
+              "valid_until": 1793325778,
+              "reason": "FIRST_REACHABLE_WINDOW_SELECTED",
+              "forecast": {
+                "calibration_state": "UNCALIBRATED",
+                "early_stock_end_epoch": 1793334583,
+                "estimated_arrival_epoch": 1793335482,
+                "estimated_arrival_plus_grace_epoch": 1793335482,
+                "estimated_departure_start_epoch": 1793325882,
+                "estimated_latest_departure_epoch": 1793327744,
+                "flight_reachable": true,
+                "forecast_horizon_seconds": 9882,
+                "index": 4,
+                "item_quantity_threshold": 31,
+                "model_proven_success": false,
+                "predicted_restock_epoch": 1793335482,
+                "predicted_stock_below_30_epoch": 1793337345,
+                "predicted_true_depletion_epoch": null,
+                "reason": "ESTIMATED_STOCKED_PHASE_REACHABLE",
+                "restock_early_epoch": 1793333291,
+                "restock_late_epoch": 1793337983
+              },
+              "remaining_offset": 4,
+              "id": "1793323800"
+            }
+          },
+          "paired_observed_opportunities": {
+            "shared_observed_opportunities": 137,
+            "both_known": 127,
+            "both_success": 93,
+            "both_failure": 34,
+            "shared_but_not_both_known": 10,
+            "baseline_only_observed_opportunities": 0,
+            "candidate_only_observed_opportunities": 0
+          },
+          "known_success_rate_delta_pp": 0.0,
+          "advice_clock_change": 0,
+          "frozen_trip_change": 0,
+          "lower_rate": false
+        },
+        "uni:Xanax": {
+          "advice_behavior": {
+            "median_wait_minutes": 0.0,
+            "counts": {
+              "leave_now_clocks": 1935,
+              "current_stock_advice_clocks": 1935,
+              "recent_rate_exceeded_historical_upper": 90
+            }
+          },
+          "paired_median_departure_shift_minutes": 0.0,
+          "metrics": {
+            "model": [
+              "v19",
+              "dyn8"
+            ],
+            "issue_clocks": 2017,
+            "advice_issue_clocks": 1935,
+            "simulated_trips": 1,
+            "successes": 1,
+            "failures": 0,
+            "known": 1,
+            "unknown": 0,
+            "pending": 0,
+            "known_success_fraction": 1.0,
+            "target_identity_audit": {
+              "duplicate_target_groups": 0,
+              "duplicates": {},
+              "retained_completed_identities": 1
+            },
+            "restock_profile": {
+              "training_cutoff": 1792720800,
+              "zero_refill_samples": 97,
+              "status": "LEARNED",
+              "normal_min": 2388,
+              "normal_max": 2500,
+              "reset_base": null,
+              "reset_training_samples": 1,
+              "normal_samples": 78,
+              "excluded_small_samples": 19,
+              "reset_candidate_base": 2500,
+              "classification_is_observational": true,
+              "method": "ITERATED_LOG_QUANTITY_CLUSTER_WITH_OBSERVED_RANGE"
+            },
+            "qualified_restocks": 0,
+            "revision_counts": {
+              "FROZEN_AT_RECOMMENDED_DEPARTURE": 1,
+              "NEW_RECOMMENDATION": 1
+            },
+            "no_advice_clock_statuses": {
+              "STALE_COUNTRY_DATA": 70,
+              "MODEL_ABSTAIN": 12
+            },
+            "nearest_qualified_boundary_misses": {
+              "counts": {},
+              "median_late_minutes": null,
+              "median_early_minutes": null
+            },
+            "latest_ten": {
+              "known": 1,
+              "successes": 1,
+              "failures": 0,
+              "unknown": 0,
+              "pending": 0,
+              "success_fraction": 1.0
+            },
+            "active_recommendation_at_cutoff": null
+          },
+          "paired_observed_opportunities": {
+            "shared_observed_opportunities": 1,
+            "both_known": 1,
+            "both_success": 1,
+            "baseline_only_observed_opportunities": 0,
+            "candidate_only_observed_opportunities": 0
+          },
+          "known_success_rate_delta_pp": 0.0,
+          "advice_clock_change": -12,
+          "frozen_trip_change": 0,
+          "lower_rate": false
+        }
+      },
+      "research_identity": "d4a464e342f7d1b34ced223830be7935efd19ee0",
+      "idempotency_verified": true,
+      "original_inputs_unchanged": true
+    },
+    "clean-recent7": {
+      "items": {
+        "uae:Camel Plushie": {
+          "advice_behavior": {
+            "median_wait_minutes": 6.175000000000001,
+            "counts": {
+              "leave_now_clocks": 484,
+              "current_stock_advice_clocks": 0,
+              "future_placement_clocks": 1762,
+              "uncertainty_core_overlaps": 0,
+              "arrival_actually_adjusted": 0,
+              "recent_rate_exceeded_historical_upper": 65
+            }
+          },
+          "paired_median_departure_shift_minutes": 1.4333333333333333,
+          "metrics": {
+            "model": [
+              "v19",
+              "dyn3"
+            ],
+            "issue_clocks": 2017,
+            "advice_issue_clocks": 1762,
+            "simulated_trips": 130,
+            "successes": 81,
+            "failures": 36,
+            "known": 117,
+            "unknown": 11,
+            "pending": 2,
+            "known_success_fraction": 0.6923076923076923,
+            "target_identity_audit": {
+              "duplicate_target_groups": 0,
+              "duplicates": {},
+              "retained_completed_identities": 130
+            },
+            "restock_profile": {
+              "training_cutoff": 1792720800,
+              "zero_refill_samples": 1133,
+              "status": "LEARNED",
+              "normal_min": 2096,
+              "normal_max": 2500,
+              "reset_base": null,
+              "reset_training_samples": 0,
+              "normal_samples": 1009,
+              "excluded_small_samples": 124,
+              "reset_candidate_base": 2500,
+              "classification_is_observational": true,
+              "method": "ITERATED_LOG_QUANTITY_CLUSTER_WITH_OBSERVED_RANGE"
+            },
+            "qualified_restocks": 132,
+            "revision_counts": {
+              "FROZEN_AT_RECOMMENDED_DEPARTURE": 130,
+              "NEW_RECOMMENDATION": 195,
+              "POSTPONED_BEFORE_DEPARTURE": 225,
+              "REVISED_BEFORE_DEPARTURE": 462,
+              "WITHDRAWN_NO_ADVICE": 32,
+              "WITHDRAWN_STALE_BEFORE_DEPARTURE": 24,
+              "WITHDRAWN_TARGET_CHANGED": 9
+            },
+            "no_advice_clock_statuses": {
+              "MODEL_ABSTAIN": 123,
+              "STALE_COUNTRY_DATA": 132
+            },
+            "nearest_qualified_boundary_misses": {
+              "counts": {
+                "EARLY": 15,
+                "UNKNOWN": 6,
+                "LATE": 14,
+                "POSITIVE_STOCK_AT_OR_BELOW_30": 1
+              },
+              "median_late_minutes": 5.0,
+              "median_early_minutes": 3.25
+            },
+            "latest_ten": {
+              "known": 6,
+              "successes": 5,
+              "failures": 1,
+              "unknown": 2,
+              "pending": 2,
+              "success_fraction": 0.8333333333333334
+            },
+            "active_recommendation_at_cutoff": null
+          },
+          "paired_observed_opportunities": {
+            "shared_observed_opportunities": 124,
+            "both_known": 111,
+            "both_failure": 23,
+            "both_success": 70,
+            "candidate_only_success": 7,
+            "baseline_only_success": 11,
+            "shared_but_not_both_known": 13,
+            "baseline_only_observed_opportunities": 3,
+            "candidate_only_observed_opportunities": 2
+          },
+          "known_success_rate_delta_pp": -4.322949777495233,
+          "advice_clock_change": 0,
+          "frozen_trip_change": -1,
+          "lower_rate": true
+        },
+        "uni:Nessie Plushie": {
+          "advice_behavior": {
+            "median_wait_minutes": 14.158333333333333,
+            "counts": {
+              "leave_now_clocks": 372,
+              "current_stock_advice_clocks": 0,
+              "future_placement_clocks": 1786,
+              "uncertainty_core_overlaps": 0,
+              "arrival_actually_adjusted": 0,
+              "recent_rate_exceeded_historical_upper": 92
+            }
+          },
+          "paired_median_departure_shift_minutes": 0.0,
+          "metrics": {
+            "model": [
+              "v19",
+              "dyn8"
+            ],
+            "issue_clocks": 2017,
+            "advice_issue_clocks": 1786,
+            "simulated_trips": 151,
+            "successes": 100,
+            "failures": 39,
+            "known": 139,
+            "unknown": 11,
+            "pending": 1,
+            "known_success_fraction": 0.7194244604316546,
+            "target_identity_audit": {
+              "duplicate_target_groups": 0,
+              "duplicates": {},
+              "retained_completed_identities": 151
+            },
+            "restock_profile": {
+              "training_cutoff": 1792720800,
+              "zero_refill_samples": 1066,
+              "status": "LEARNED",
+              "normal_min": 2191,
+              "normal_max": 2502,
+              "reset_base": null,
+              "reset_training_samples": 0,
+              "normal_samples": 885,
+              "excluded_small_samples": 181,
+              "reset_candidate_base": 2500,
+              "classification_is_observational": true,
+              "method": "ITERATED_LOG_QUANTITY_CLUSTER_WITH_OBSERVED_RANGE"
+            },
+            "qualified_restocks": 153,
+            "revision_counts": {
+              "FROZEN_AT_RECOMMENDED_DEPARTURE": 151,
+              "NEW_RECOMMENDATION": 227,
+              "POSTPONED_BEFORE_DEPARTURE": 587,
+              "REVISED_BEFORE_DEPARTURE": 1057,
+              "WITHDRAWN_NO_ADVICE": 31,
+              "WITHDRAWN_STALE_BEFORE_DEPARTURE": 21,
+              "WITHDRAWN_TARGET_CHANGED": 24
+            },
+            "no_advice_clock_statuses": {
+              "MODEL_ABSTAIN": 161,
+              "STALE_COUNTRY_DATA": 70
+            },
+            "nearest_qualified_boundary_misses": {
+              "counts": {
+                "POSITIVE_STOCK_AT_OR_BELOW_30": 3,
+                "LATE": 12,
+                "EARLY": 21,
+                "TIE": 1,
+                "UNKNOWN": 2
+              },
+              "median_late_minutes": 4.516666666666667,
+              "median_early_minutes": 4.233333333333333
+            },
+            "latest_ten": {
+              "known": 8,
+              "successes": 5,
+              "failures": 3,
+              "unknown": 1,
+              "pending": 1,
+              "success_fraction": 0.625
+            },
+            "active_recommendation_at_cutoff": null
+          },
+          "paired_observed_opportunities": {
+            "shared_observed_opportunities": 146,
+            "both_known": 135,
+            "both_success": 96,
+            "both_failure": 31,
+            "shared_but_not_both_known": 11,
+            "baseline_only_success": 6,
+            "candidate_only_success": 2,
+            "baseline_only_observed_opportunities": 7,
+            "candidate_only_observed_opportunities": 3
+          },
+          "known_success_rate_delta_pp": -2.5403125775241953,
+          "advice_clock_change": 0,
+          "frozen_trip_change": -4,
+          "lower_rate": true
+        },
+        "sou:Xanax": {
+          "advice_behavior": {
+            "median_wait_minutes": 79.45,
+            "counts": {
+              "leave_now_clocks": 190,
+              "current_stock_advice_clocks": 0,
+              "future_placement_clocks": 1849,
+              "uncertainty_core_overlaps": 0,
+              "arrival_actually_adjusted": 0,
+              "recent_rate_exceeded_historical_upper": 118
+            }
+          },
+          "paired_median_departure_shift_minutes": -97.5,
+          "metrics": {
+            "model": [
+              "v19",
+              "dyn6"
+            ],
+            "issue_clocks": 2017,
+            "advice_issue_clocks": 1849,
+            "simulated_trips": 37,
+            "successes": 16,
+            "failures": 20,
+            "known": 36,
+            "unknown": 0,
+            "pending": 1,
+            "known_success_fraction": 0.4444444444444444,
+            "target_identity_audit": {
+              "duplicate_target_groups": 0,
+              "duplicates": {},
+              "retained_completed_identities": 37
+            },
+            "restock_profile": {
+              "training_cutoff": 1792720800,
+              "zero_refill_samples": 88,
+              "status": "LEARNED",
+              "normal_min": 2367,
+              "normal_max": 2500,
+              "reset_base": null,
+              "reset_training_samples": 0,
+              "normal_samples": 70,
+              "excluded_small_samples": 18,
+              "reset_candidate_base": 2500,
+              "classification_is_observational": true,
+              "method": "ITERATED_LOG_QUANTITY_CLUSTER_WITH_OBSERVED_RANGE"
+            },
+            "qualified_restocks": 29,
+            "revision_counts": {
+              "FROZEN_AT_RECOMMENDED_DEPARTURE": 37,
+              "NEW_RECOMMENDATION": 81,
+              "POSTPONED_BEFORE_DEPARTURE": 604,
+              "REVISED_BEFORE_DEPARTURE": 1131,
+              "WITHDRAWN_NO_ADVICE": 35,
+              "WITHDRAWN_STALE_BEFORE_DEPARTURE": 7,
+              "WITHDRAWN_TARGET_CHANGED": 1
+            },
+            "no_advice_clock_statuses": {
+              "STALE_COUNTRY_DATA": 47,
+              "MODEL_ABSTAIN": 121
+            },
+            "nearest_qualified_boundary_misses": {
+              "counts": {
+                "LATE": 17,
+                "UNKNOWN": 1,
+                "EARLY": 2
+              },
+              "median_late_minutes": 29.45,
+              "median_early_minutes": 34.09166666666667
+            },
+            "latest_ten": {
+              "known": 9,
+              "successes": 9,
+              "failures": 0,
+              "unknown": 0,
+              "pending": 1,
+              "success_fraction": 1.0
+            },
+            "active_recommendation_at_cutoff": {
+              "departure_epoch": 1793333877,
+              "arrival_epoch": 1793345697,
+              "issued_epoch": 1793325600,
+              "published_epoch": 1793325600,
+              "selected_event_index": 1,
+              "input_cutoff_epoch": 1793325600,
+              "window_start": 1793340297,
+              "window_end": 1793347698,
+              "restock_anchor": null,
+              "episode_anchor": null,
+              "origin_opening": 1793321277,
+              "target_offset": 1,
+              "valid_until": 1793325778,
+              "reason": "FIRST_REACHABLE_WINDOW_SELECTED",
+              "forecast": {
+                "calibration_state": "UNCALIBRATED",
+                "early_stock_end_epoch": 1793338643,
+                "estimated_arrival_epoch": 1793340297,
+                "estimated_arrival_plus_grace_epoch": 1793340297,
+                "estimated_departure_start_epoch": 1793328477,
+                "estimated_latest_departure_epoch": 1793335877,
+                "flight_reachable": true,
+                "forecast_horizon_seconds": 14697,
+                "index": 1,
+                "item_quantity_threshold": 31,
+                "model_proven_success": false,
+                "predicted_restock_epoch": 1793340297,
+                "predicted_stock_below_30_epoch": 1793347698,
+                "predicted_true_depletion_epoch": null,
+                "reason": "ESTIMATED_STOCKED_PHASE_REACHABLE",
+                "restock_early_epoch": 1793335741,
+                "restock_late_epoch": 1793345547
+              },
+              "remaining_offset": 1,
+              "id": "1793324100"
+            }
+          },
+          "paired_observed_opportunities": {
+            "shared_observed_opportunities": 36,
+            "both_known": 31,
+            "both_success": 11,
+            "both_failure": 4,
+            "baseline_only_success": 13,
+            "shared_but_not_both_known": 5,
+            "candidate_only_success": 3,
+            "baseline_only_observed_opportunities": 4,
+            "candidate_only_observed_opportunities": 1
+          },
+          "known_success_rate_delta_pp": -26.984126984126988,
+          "advice_clock_change": 0,
+          "frozen_trip_change": -3,
+          "lower_rate": true
+        },
+        "uni:Red Fox Plushie": {
+          "advice_behavior": {
+            "median_wait_minutes": 5.0,
+            "counts": {
+              "leave_now_clocks": 721,
+              "current_stock_advice_clocks": 0,
+              "future_placement_clocks": 1782,
+              "uncertainty_core_overlaps": 6,
+              "arrival_actually_adjusted": 3,
+              "recent_rate_exceeded_historical_upper": 130
+            }
+          },
+          "paired_median_departure_shift_minutes": 5.0,
+          "metrics": {
+            "model": [
+              "v18",
+              "dyn1"
+            ],
+            "issue_clocks": 2017,
+            "advice_issue_clocks": 1782,
+            "simulated_trips": 124,
+            "successes": 85,
+            "failures": 32,
+            "known": 117,
+            "unknown": 6,
+            "pending": 1,
+            "known_success_fraction": 0.7264957264957265,
+            "target_identity_audit": {
+              "duplicate_target_groups": 0,
+              "duplicates": {},
+              "retained_completed_identities": 124
+            },
+            "restock_profile": {
+              "training_cutoff": 1792720800,
+              "zero_refill_samples": 1104,
+              "status": "LEARNED",
+              "normal_min": 2217,
+              "normal_max": 2504,
+              "reset_base": null,
+              "reset_training_samples": 0,
+              "normal_samples": 945,
+              "excluded_small_samples": 159,
+              "reset_candidate_base": 2500,
+              "classification_is_observational": true,
+              "method": "ITERATED_LOG_QUANTITY_CLUSTER_WITH_OBSERVED_RANGE"
+            },
+            "qualified_restocks": 118,
+            "revision_counts": {
+              "FROZEN_AT_RECOMMENDED_DEPARTURE": 124,
+              "NEW_RECOMMENDATION": 168,
+              "POSTPONED_BEFORE_DEPARTURE": 200,
+              "REVISED_BEFORE_DEPARTURE": 419,
+              "WITHDRAWN_NO_ADVICE": 18,
+              "WITHDRAWN_STALE_BEFORE_DEPARTURE": 10,
+              "WITHDRAWN_TARGET_CHANGED": 16
+            },
+            "no_advice_clock_statuses": {
+              "STALE_COUNTRY_DATA": 70,
+              "MODEL_ABSTAIN": 165
+            },
+            "nearest_qualified_boundary_misses": {
+              "counts": {
+                "LATE": 18,
+                "EARLY": 12,
+                "UNKNOWN": 1,
+                "POSITIVE_STOCK_AT_OR_BELOW_30": 1
+              },
+              "median_late_minutes": 4.433333333333334,
+              "median_early_minutes": 2.6833333333333336
+            },
+            "latest_ten": {
+              "known": 9,
+              "successes": 7,
+              "failures": 2,
+              "unknown": 0,
+              "pending": 1,
+              "success_fraction": 0.7777777777777778
+            },
+            "active_recommendation_at_cutoff": null
+          },
+          "paired_observed_opportunities": {
+            "shared_observed_opportunities": 120,
+            "both_known": 111,
+            "both_success": 71,
+            "both_failure": 17,
+            "baseline_only_success": 14,
+            "candidate_only_success": 9,
+            "shared_but_not_both_known": 9,
+            "baseline_only_observed_opportunities": 1,
+            "candidate_only_observed_opportunities": 2
+          },
+          "known_success_rate_delta_pp": -4.074565281461839,
+          "advice_clock_change": 0,
+          "frozen_trip_change": 1,
+          "lower_rate": true
+        },
+        "chi:Panda Plushie": {
+          "advice_behavior": {
+            "median_wait_minutes": 14.15,
+            "counts": {
+              "leave_now_clocks": 357,
+              "current_stock_advice_clocks": 0,
+              "future_placement_clocks": 1814,
+              "uncertainty_core_overlaps": 6,
+              "arrival_actually_adjusted": 5,
+              "recent_rate_exceeded_historical_upper": 66
+            }
+          },
+          "paired_median_departure_shift_minutes": 0.0,
+          "metrics": {
+            "model": [
+              "v19",
+              "dyn1"
+            ],
+            "issue_clocks": 2017,
+            "advice_issue_clocks": 1814,
+            "simulated_trips": 142,
+            "successes": 93,
+            "failures": 35,
+            "known": 128,
+            "unknown": 12,
+            "pending": 2,
+            "known_success_fraction": 0.7265625,
+            "target_identity_audit": {
+              "duplicate_target_groups": 0,
+              "duplicates": {},
+              "retained_completed_identities": 142
+            },
+            "restock_profile": {
+              "training_cutoff": 1792720800,
+              "zero_refill_samples": 1112,
+              "status": "LEARNED",
+              "normal_min": 2148,
+              "normal_max": 2500,
+              "reset_base": null,
+              "reset_training_samples": 0,
+              "normal_samples": 926,
+              "excluded_small_samples": 186,
+              "reset_candidate_base": 2500,
+              "classification_is_observational": true,
+              "method": "ITERATED_LOG_QUANTITY_CLUSTER_WITH_OBSERVED_RANGE"
+            },
+            "qualified_restocks": 142,
+            "revision_counts": {
+              "FROZEN_AT_RECOMMENDED_DEPARTURE": 142,
+              "NEW_RECOMMENDATION": 200,
+              "POSTPONED_BEFORE_DEPARTURE": 525,
+              "REVISED_BEFORE_DEPARTURE": 971,
+              "WITHDRAWN_NO_ADVICE": 30,
+              "WITHDRAWN_STALE_BEFORE_DEPARTURE": 21,
+              "WITHDRAWN_TARGET_CHANGED": 6
+            },
+            "no_advice_clock_statuses": {
+              "MODEL_ABSTAIN": 124,
+              "STALE_COUNTRY_DATA": 79
+            },
+            "nearest_qualified_boundary_misses": {
+              "counts": {
+                "EARLY": 16,
+                "UNKNOWN": 3,
+                "LATE": 14,
+                "UNKNOWN_ZERO_BOUNDARY": 1,
+                "TIE": 1
+              },
+              "median_late_minutes": 3.5083333333333333,
+              "median_early_minutes": 3.341666666666667
+            },
+            "latest_ten": {
+              "known": 5,
+              "successes": 5,
+              "failures": 0,
+              "unknown": 3,
+              "pending": 2,
+              "success_fraction": 1.0
+            },
+            "active_recommendation_at_cutoff": {
+              "departure_epoch": 1793327030,
+              "arrival_epoch": 1793336630,
+              "issued_epoch": 1793325600,
+              "published_epoch": 1793325600,
+              "selected_event_index": 4,
+              "input_cutoff_epoch": 1793325600,
+              "window_start": 1793336030,
+              "window_end": 1793338011,
+              "restock_anchor": null,
+              "episode_anchor": null,
+              "origin_opening": 1793322757,
+              "target_offset": 4,
+              "valid_until": 1793325778,
+              "reason": "FIRST_REACHABLE_WINDOW_SELECTED",
+              "forecast": {
+                "calibration_state": "UNCALIBRATED",
+                "early_stock_end_epoch": 1793335414,
+                "estimated_arrival_epoch": 1793336030,
+                "estimated_arrival_plus_grace_epoch": 1793336030,
+                "estimated_departure_start_epoch": 1793326430,
+                "estimated_latest_departure_epoch": 1793328410,
+                "flight_reachable": true,
+                "forecast_horizon_seconds": 10430,
+                "index": 4,
+                "item_quantity_threshold": 31,
+                "model_proven_success": false,
+                "predicted_restock_epoch": 1793336030,
+                "predicted_stock_below_30_epoch": 1793338011,
+                "predicted_true_depletion_epoch": null,
+                "reason": "ESTIMATED_STOCKED_PHASE_REACHABLE",
+                "restock_early_epoch": 1793333945,
+                "restock_late_epoch": 1793340169
+              },
+              "remaining_offset": 4,
+              "id": "1793325600"
+            }
+          },
+          "paired_observed_opportunities": {
+            "shared_observed_opportunities": 133,
+            "both_known": 119,
+            "baseline_only_success": 14,
+            "shared_but_not_both_known": 14,
+            "candidate_only_success": 11,
+            "both_failure": 19,
+            "both_success": 75,
+            "baseline_only_observed_opportunities": 4,
+            "candidate_only_observed_opportunities": 6
+          },
+          "known_success_rate_delta_pp": -0.78125,
+          "advice_clock_change": 0,
+          "frozen_trip_change": 2,
+          "lower_rate": true
+        },
+        "uni:Xanax": {
+          "advice_behavior": {
+            "median_wait_minutes": 0.0,
+            "counts": {
+              "leave_now_clocks": 1935,
+              "current_stock_advice_clocks": 1935,
+              "recent_rate_exceeded_historical_upper": 100
+            }
+          },
+          "paired_median_departure_shift_minutes": 0.0,
+          "metrics": {
+            "model": [
+              "v19",
+              "dyn8"
+            ],
+            "issue_clocks": 2017,
+            "advice_issue_clocks": 1935,
+            "simulated_trips": 1,
+            "successes": 1,
+            "failures": 0,
+            "known": 1,
+            "unknown": 0,
+            "pending": 0,
+            "known_success_fraction": 1.0,
+            "target_identity_audit": {
+              "duplicate_target_groups": 0,
+              "duplicates": {},
+              "retained_completed_identities": 1
+            },
+            "restock_profile": {
+              "training_cutoff": 1792720800,
+              "zero_refill_samples": 97,
+              "status": "LEARNED",
+              "normal_min": 2388,
+              "normal_max": 2500,
+              "reset_base": null,
+              "reset_training_samples": 1,
+              "normal_samples": 78,
+              "excluded_small_samples": 19,
+              "reset_candidate_base": 2500,
+              "classification_is_observational": true,
+              "method": "ITERATED_LOG_QUANTITY_CLUSTER_WITH_OBSERVED_RANGE"
+            },
+            "qualified_restocks": 0,
+            "revision_counts": {
+              "FROZEN_AT_RECOMMENDED_DEPARTURE": 1,
+              "NEW_RECOMMENDATION": 1
+            },
+            "no_advice_clock_statuses": {
+              "STALE_COUNTRY_DATA": 70,
+              "MODEL_ABSTAIN": 12
+            },
+            "nearest_qualified_boundary_misses": {
+              "counts": {},
+              "median_late_minutes": null,
+              "median_early_minutes": null
+            },
+            "latest_ten": {
+              "known": 1,
+              "successes": 1,
+              "failures": 0,
+              "unknown": 0,
+              "pending": 0,
+              "success_fraction": 1.0
+            },
+            "active_recommendation_at_cutoff": null
+          },
+          "paired_observed_opportunities": {
+            "shared_observed_opportunities": 1,
+            "both_known": 1,
+            "both_success": 1,
+            "baseline_only_observed_opportunities": 0,
+            "candidate_only_observed_opportunities": 0
+          },
+          "known_success_rate_delta_pp": 0.0,
+          "advice_clock_change": -12,
+          "frozen_trip_change": 0,
+          "lower_rate": false
+        }
+      },
+      "research_identity": "4b5b7c0c5b87f93efb8600e665f3a96bb073eabf",
+      "idempotency_verified": true,
+      "original_inputs_unchanged": true
+    }
+  },
+  "actual_test_data_only": true,
+  "baseline_modified": false,
+  "limitation": "Retrospective already-inspected week; five-minute historical issuance; forward confirmation required."
+}

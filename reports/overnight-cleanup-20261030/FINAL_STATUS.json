@@ -1,0 +1,16 @@
+{
+  "status": "COMPLETE",
+  "issue_records": 24204,
+  "items_per_variant": 6,
+  "issue_clocks_per_item": 2017,
+  "variants": [
+    "clean-full",
+    "clean-recent7"
+  ],
+  "recommendation": "RETAIN_SAVED_BASELINE_DO_NOT_PROMOTE_CLEANUP",
+  "native_model_behavior_changed_during_recovery": false,
+  "source_sha256": "543b67f1fe4874961130948ecee1d9df4870efe80599726f13828b19da8a6687",
+  "live_sixteen_modified": false,
+  "scoring": "LIVE_V5_STRICT_STOCK_GT30_EXACT_ARRIVAL_ZERO_GRACE",
+  "authoritative_audits_passed": true
+}

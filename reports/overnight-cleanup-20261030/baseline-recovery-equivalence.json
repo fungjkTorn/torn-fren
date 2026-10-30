@@ -1,0 +1,6 @@
+{
+  "item_metrics_identical": true,
+  "research_identity_identical": true,
+  "difference": "scoring_code_sha256 only; additive evidence provenance code",
+  "source_sha256": "543b67f1fe4874961130948ecee1d9df4870efe80599726f13828b19da8a6687"
+}

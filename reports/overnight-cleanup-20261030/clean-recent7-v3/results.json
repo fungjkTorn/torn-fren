@@ -1,0 +1,528 @@
+{
+  "status": "SAVED_CHALLENGERS_RESCORED",
+  "evidence_policy": "RECOMMENDED_DEPARTURE_FREEZE_V5",
+  "research_identity": "4b5b7c0c5b87f93efb8600e665f3a96bb073eabf",
+  "start_epoch": 1792720800,
+  "cutoff_epoch": 1793325600,
+  "source_sha256": "543b67f1fe4874961130948ecee1d9df4870efe80599726f13828b19da8a6687",
+  "saved_forecast_hashes": {
+    "manifest.json": "999e7063d635ad0be013057fee8f132ef61cdd2f338d9866f3ffd4a78a41449a",
+    "sou__Xanax.jsonl": "06e57bcbaddcf036fd547e39de22d72fbd53d65f236541b57e31d9d04c44adbd",
+    "uae__Camel_Plushie.jsonl": "2d4b6e441aef7218f9f600d2da5ff4bc87993770122dde7aba451eb34a80b0b4",
+    "uni__Nessie_Plushie.jsonl": "cdd9b1ea7d86ff48a78a4ddb0dbc5f97e6462b99ff59ea67031836106d281f22",
+    "uni__Xanax.jsonl": "1be6f461f485a53dec9d00602815a42808dbf5443913c902c81dd2fa5316a263",
+    "uni__Red_Fox_Plushie.jsonl": "2731a606e4b8cfe9b3ba80a0f131f4862a409242139439c48a6e894176a4560a",
+    "chi__Panda_Plushie.jsonl": "88e2a093aecf5f5d616d42a4eebe152f4b2880597340e30eace39206b797dbf2"
+  },
+  "original_models": {
+    "sou:Xanax": [
+      "v19",
+      "dyn6"
+    ],
+    "uae:Camel Plushie": [
+      "v19",
+      "dyn3"
+    ],
+    "uni:Nessie Plushie": [
+      "v19",
+      "dyn8"
+    ],
+    "uni:Xanax": [
+      "v19",
+      "dyn8"
+    ],
+    "uni:Red Fox Plushie": [
+      "v18",
+      "dyn1"
+    ],
+    "chi:Panda Plushie": [
+      "v19",
+      "dyn1"
+    ]
+  },
+  "training_policy": "ALL_AVAILABLE_CAUSAL_HISTORY_NO_ROLLING_LOOKBACK",
+  "sampling_seconds": 300,
+  "publication_clock": "SAMPLED_ISSUE_TIME_NO_MEASURED_SERVER_LATENCY",
+  "advice_expiry_preserved": true,
+  "unrecorded_refreshes_assumed": false,
+  "model_inference_run": false,
+  "production_modified": false,
+  "arrival_timing_changed": false,
+  "cleanup_variant": "clean-recent7",
+  "items": {
+    "sou:Xanax": {
+      "model": [
+        "v19",
+        "dyn6"
+      ],
+      "issue_clocks": 2017,
+      "advice_issue_clocks": 1849,
+      "simulated_trips": 37,
+      "successes": 16,
+      "failures": 20,
+      "known": 36,
+      "unknown": 0,
+      "pending": 1,
+      "known_success_fraction": 0.4444444444444444,
+      "target_identity_audit": {
+        "duplicate_target_groups": 0,
+        "duplicates": {},
+        "retained_completed_identities": 37
+      },
+      "restock_profile": {
+        "training_cutoff": 1792720800,
+        "zero_refill_samples": 88,
+        "status": "LEARNED",
+        "normal_min": 2367,
+        "normal_max": 2500,
+        "reset_base": null,
+        "reset_training_samples": 0,
+        "normal_samples": 70,
+        "excluded_small_samples": 18,
+        "reset_candidate_base": 2500,
+        "classification_is_observational": true,
+        "method": "ITERATED_LOG_QUANTITY_CLUSTER_WITH_OBSERVED_RANGE"
+      },
+      "qualified_restocks": 29,
+      "revision_counts": {
+        "FROZEN_AT_RECOMMENDED_DEPARTURE": 37,
+        "NEW_RECOMMENDATION": 81,
+        "POSTPONED_BEFORE_DEPARTURE": 604,
+        "REVISED_BEFORE_DEPARTURE": 1131,
+        "WITHDRAWN_NO_ADVICE": 35,
+        "WITHDRAWN_STALE_BEFORE_DEPARTURE": 7,
+        "WITHDRAWN_TARGET_CHANGED": 1
+      },
+      "no_advice_clock_statuses": {
+        "STALE_COUNTRY_DATA": 47,
+        "MODEL_ABSTAIN": 121
+      },
+      "nearest_qualified_boundary_misses": {
+        "counts": {
+          "LATE": 17,
+          "UNKNOWN": 1,
+          "EARLY": 2
+        },
+        "median_late_minutes": 29.45,
+        "median_early_minutes": 34.09166666666667
+      },
+      "latest_ten": {
+        "known": 9,
+        "successes": 9,
+        "failures": 0,
+        "unknown": 0,
+        "pending": 1,
+        "success_fraction": 1.0
+      },
+      "active_recommendation_at_cutoff": {
+        "departure_epoch": 1793333877,
+        "arrival_epoch": 1793345697,
+        "issued_epoch": 1793325600,
+        "published_epoch": 1793325600,
+        "selected_event_index": 1,
+        "input_cutoff_epoch": 1793325600,
+        "window_start": 1793340297,
+        "window_end": 1793347698,
+        "restock_anchor": null,
+        "episode_anchor": null,
+        "origin_opening": 1793321277,
+        "target_offset": 1,
+        "valid_until": 1793325778,
+        "reason": "FIRST_REACHABLE_WINDOW_SELECTED",
+        "forecast": {
+          "calibration_state": "UNCALIBRATED",
+          "early_stock_end_epoch": 1793338643,
+          "estimated_arrival_epoch": 1793340297,
+          "estimated_arrival_plus_grace_epoch": 1793340297,
+          "estimated_departure_start_epoch": 1793328477,
+          "estimated_latest_departure_epoch": 1793335877,
+          "flight_reachable": true,
+          "forecast_horizon_seconds": 14697,
+          "index": 1,
+          "item_quantity_threshold": 31,
+          "model_proven_success": false,
+          "predicted_restock_epoch": 1793340297,
+          "predicted_stock_below_30_epoch": 1793347698,
+          "predicted_true_depletion_epoch": null,
+          "reason": "ESTIMATED_STOCKED_PHASE_REACHABLE",
+          "restock_early_epoch": 1793335741,
+          "restock_late_epoch": 1793345547
+        },
+        "remaining_offset": 1,
+        "id": "1793324100"
+      }
+    },
+    "uae:Camel Plushie": {
+      "model": [
+        "v19",
+        "dyn3"
+      ],
+      "issue_clocks": 2017,
+      "advice_issue_clocks": 1762,
+      "simulated_trips": 130,
+      "successes": 81,
+      "failures": 36,
+      "known": 117,
+      "unknown": 11,
+      "pending": 2,
+      "known_success_fraction": 0.6923076923076923,
+      "target_identity_audit": {
+        "duplicate_target_groups": 0,
+        "duplicates": {},
+        "retained_completed_identities": 130
+      },
+      "restock_profile": {
+        "training_cutoff": 1792720800,
+        "zero_refill_samples": 1133,
+        "status": "LEARNED",
+        "normal_min": 2096,
+        "normal_max": 2500,
+        "reset_base": null,
+        "reset_training_samples": 0,
+        "normal_samples": 1009,
+        "excluded_small_samples": 124,
+        "reset_candidate_base": 2500,
+        "classification_is_observational": true,
+        "method": "ITERATED_LOG_QUANTITY_CLUSTER_WITH_OBSERVED_RANGE"
+      },
+      "qualified_restocks": 132,
+      "revision_counts": {
+        "FROZEN_AT_RECOMMENDED_DEPARTURE": 130,
+        "NEW_RECOMMENDATION": 195,
+        "POSTPONED_BEFORE_DEPARTURE": 225,
+        "REVISED_BEFORE_DEPARTURE": 462,
+        "WITHDRAWN_NO_ADVICE": 32,
+        "WITHDRAWN_STALE_BEFORE_DEPARTURE": 24,
+        "WITHDRAWN_TARGET_CHANGED": 9
+      },
+      "no_advice_clock_statuses": {
+        "MODEL_ABSTAIN": 123,
+        "STALE_COUNTRY_DATA": 132
+      },
+      "nearest_qualified_boundary_misses": {
+        "counts": {
+          "EARLY": 15,
+          "UNKNOWN": 6,
+          "LATE": 14,
+          "POSITIVE_STOCK_AT_OR_BELOW_30": 1
+        },
+        "median_late_minutes": 5.0,
+        "median_early_minutes": 3.25
+      },
+      "latest_ten": {
+        "known": 6,
+        "successes": 5,
+        "failures": 1,
+        "unknown": 2,
+        "pending": 2,
+        "success_fraction": 0.8333333333333334
+      },
+      "active_recommendation_at_cutoff": null
+    },
+    "uni:Nessie Plushie": {
+      "model": [
+        "v19",
+        "dyn8"
+      ],
+      "issue_clocks": 2017,
+      "advice_issue_clocks": 1786,
+      "simulated_trips": 151,
+      "successes": 100,
+      "failures": 39,
+      "known": 139,
+      "unknown": 11,
+      "pending": 1,
+      "known_success_fraction": 0.7194244604316546,
+      "target_identity_audit": {
+        "duplicate_target_groups": 0,
+        "duplicates": {},
+        "retained_completed_identities": 151
+      },
+      "restock_profile": {
+        "training_cutoff": 1792720800,
+        "zero_refill_samples": 1066,
+        "status": "LEARNED",
+        "normal_min": 2191,
+        "normal_max": 2502,
+        "reset_base": null,
+        "reset_training_samples": 0,
+        "normal_samples": 885,
+        "excluded_small_samples": 181,
+        "reset_candidate_base": 2500,
+        "classification_is_observational": true,
+        "method": "ITERATED_LOG_QUANTITY_CLUSTER_WITH_OBSERVED_RANGE"
+      },
+      "qualified_restocks": 153,
+      "revision_counts": {
+        "FROZEN_AT_RECOMMENDED_DEPARTURE": 151,
+        "NEW_RECOMMENDATION": 227,
+        "POSTPONED_BEFORE_DEPARTURE": 587,
+        "REVISED_BEFORE_DEPARTURE": 1057,
+        "WITHDRAWN_NO_ADVICE": 31,
+        "WITHDRAWN_STALE_BEFORE_DEPARTURE": 21,
+        "WITHDRAWN_TARGET_CHANGED": 24
+      },
+      "no_advice_clock_statuses": {
+        "MODEL_ABSTAIN": 161,
+        "STALE_COUNTRY_DATA": 70
+      },
+      "nearest_qualified_boundary_misses": {
+        "counts": {
+          "POSITIVE_STOCK_AT_OR_BELOW_30": 3,
+          "LATE": 12,
+          "EARLY": 21,
+          "TIE": 1,
+          "UNKNOWN": 2
+        },
+        "median_late_minutes": 4.516666666666667,
+        "median_early_minutes": 4.233333333333333
+      },
+      "latest_ten": {
+        "known": 8,
+        "successes": 5,
+        "failures": 3,
+        "unknown": 1,
+        "pending": 1,
+        "success_fraction": 0.625
+      },
+      "active_recommendation_at_cutoff": null
+    },
+    "uni:Xanax": {
+      "model": [
+        "v19",
+        "dyn8"
+      ],
+      "issue_clocks": 2017,
+      "advice_issue_clocks": 1935,
+      "simulated_trips": 1,
+      "successes": 1,
+      "failures": 0,
+      "known": 1,
+      "unknown": 0,
+      "pending": 0,
+      "known_success_fraction": 1.0,
+      "target_identity_audit": {
+        "duplicate_target_groups": 0,
+        "duplicates": {},
+        "retained_completed_identities": 1
+      },
+      "restock_profile": {
+        "training_cutoff": 1792720800,
+        "zero_refill_samples": 97,
+        "status": "LEARNED",
+        "normal_min": 2388,
+        "normal_max": 2500,
+        "reset_base": null,
+        "reset_training_samples": 1,
+        "normal_samples": 78,
+        "excluded_small_samples": 19,
+        "reset_candidate_base": 2500,
+        "classification_is_observational": true,
+        "method": "ITERATED_LOG_QUANTITY_CLUSTER_WITH_OBSERVED_RANGE"
+      },
+      "qualified_restocks": 0,
+      "revision_counts": {
+        "FROZEN_AT_RECOMMENDED_DEPARTURE": 1,
+        "NEW_RECOMMENDATION": 1
+      },
+      "no_advice_clock_statuses": {
+        "STALE_COUNTRY_DATA": 70,
+        "MODEL_ABSTAIN": 12
+      },
+      "nearest_qualified_boundary_misses": {
+        "counts": {},
+        "median_late_minutes": null,
+        "median_early_minutes": null
+      },
+      "latest_ten": {
+        "known": 1,
+        "successes": 1,
+        "failures": 0,
+        "unknown": 0,
+        "pending": 0,
+        "success_fraction": 1.0
+      },
+      "active_recommendation_at_cutoff": null
+    },
+    "uni:Red Fox Plushie": {
+      "model": [
+        "v18",
+        "dyn1"
+      ],
+      "issue_clocks": 2017,
+      "advice_issue_clocks": 1782,
+      "simulated_trips": 124,
+      "successes": 85,
+      "failures": 32,
+      "known": 117,
+      "unknown": 6,
+      "pending": 1,
+      "known_success_fraction": 0.7264957264957265,
+      "target_identity_audit": {
+        "duplicate_target_groups": 0,
+        "duplicates": {},
+        "retained_completed_identities": 124
+      },
+      "restock_profile": {
+        "training_cutoff": 1792720800,
+        "zero_refill_samples": 1104,
+        "status": "LEARNED",
+        "normal_min": 2217,
+        "normal_max": 2504,
+        "reset_base": null,
+        "reset_training_samples": 0,
+        "normal_samples": 945,
+        "excluded_small_samples": 159,
+        "reset_candidate_base": 2500,
+        "classification_is_observational": true,
+        "method": "ITERATED_LOG_QUANTITY_CLUSTER_WITH_OBSERVED_RANGE"
+      },
+      "qualified_restocks": 118,
+      "revision_counts": {
+        "FROZEN_AT_RECOMMENDED_DEPARTURE": 124,
+        "NEW_RECOMMENDATION": 168,
+        "POSTPONED_BEFORE_DEPARTURE": 200,
+        "REVISED_BEFORE_DEPARTURE": 419,
+        "WITHDRAWN_NO_ADVICE": 18,
+        "WITHDRAWN_STALE_BEFORE_DEPARTURE": 10,
+        "WITHDRAWN_TARGET_CHANGED": 16
+      },
+      "no_advice_clock_statuses": {
+        "STALE_COUNTRY_DATA": 70,
+        "MODEL_ABSTAIN": 165
+      },
+      "nearest_qualified_boundary_misses": {
+        "counts": {
+          "LATE": 18,
+          "EARLY": 12,
+          "UNKNOWN": 1,
+          "POSITIVE_STOCK_AT_OR_BELOW_30": 1
+        },
+        "median_late_minutes": 4.433333333333334,
+        "median_early_minutes": 2.6833333333333336
+      },
+      "latest_ten": {
+        "known": 9,
+        "successes": 7,
+        "failures": 2,
+        "unknown": 0,
+        "pending": 1,
+        "success_fraction": 0.7777777777777778
+      },
+      "active_recommendation_at_cutoff": null
+    },
+    "chi:Panda Plushie": {
+      "model": [
+        "v19",
+        "dyn1"
+      ],
+      "issue_clocks": 2017,
+      "advice_issue_clocks": 1814,
+      "simulated_trips": 142,
+      "successes": 93,
+      "failures": 35,
+      "known": 128,
+      "unknown": 12,
+      "pending": 2,
+      "known_success_fraction": 0.7265625,
+      "target_identity_audit": {
+        "duplicate_target_groups": 0,
+        "duplicates": {},
+        "retained_completed_identities": 142
+      },
+      "restock_profile": {
+        "training_cutoff": 1792720800,
+        "zero_refill_samples": 1112,
+        "status": "LEARNED",
+        "normal_min": 2148,
+        "normal_max": 2500,
+        "reset_base": null,
+        "reset_training_samples": 0,
+        "normal_samples": 926,
+        "excluded_small_samples": 186,
+        "reset_candidate_base": 2500,
+        "classification_is_observational": true,
+        "method": "ITERATED_LOG_QUANTITY_CLUSTER_WITH_OBSERVED_RANGE"
+      },
+      "qualified_restocks": 142,
+      "revision_counts": {
+        "FROZEN_AT_RECOMMENDED_DEPARTURE": 142,
+        "NEW_RECOMMENDATION": 200,
+        "POSTPONED_BEFORE_DEPARTURE": 525,
+        "REVISED_BEFORE_DEPARTURE": 971,
+        "WITHDRAWN_NO_ADVICE": 30,
+        "WITHDRAWN_STALE_BEFORE_DEPARTURE": 21,
+        "WITHDRAWN_TARGET_CHANGED": 6
+      },
+      "no_advice_clock_statuses": {
+        "MODEL_ABSTAIN": 124,
+        "STALE_COUNTRY_DATA": 79
+      },
+      "nearest_qualified_boundary_misses": {
+        "counts": {
+          "EARLY": 16,
+          "UNKNOWN": 3,
+          "LATE": 14,
+          "UNKNOWN_ZERO_BOUNDARY": 1,
+          "TIE": 1
+        },
+        "median_late_minutes": 3.5083333333333333,
+        "median_early_minutes": 3.341666666666667
+      },
+      "latest_ten": {
+        "known": 5,
+        "successes": 5,
+        "failures": 0,
+        "unknown": 3,
+        "pending": 2,
+        "success_fraction": 1.0
+      },
+      "active_recommendation_at_cutoff": {
+        "departure_epoch": 1793327030,
+        "arrival_epoch": 1793336630,
+        "issued_epoch": 1793325600,
+        "published_epoch": 1793325600,
+        "selected_event_index": 4,
+        "input_cutoff_epoch": 1793325600,
+        "window_start": 1793336030,
+        "window_end": 1793338011,
+        "restock_anchor": null,
+        "episode_anchor": null,
+        "origin_opening": 1793322757,
+        "target_offset": 4,
+        "valid_until": 1793325778,
+        "reason": "FIRST_REACHABLE_WINDOW_SELECTED",
+        "forecast": {
+          "calibration_state": "UNCALIBRATED",
+          "early_stock_end_epoch": 1793335414,
+          "estimated_arrival_epoch": 1793336030,
+          "estimated_arrival_plus_grace_epoch": 1793336030,
+          "estimated_departure_start_epoch": 1793326430,
+          "estimated_latest_departure_epoch": 1793328410,
+          "flight_reachable": true,
+          "forecast_horizon_seconds": 10430,
+          "index": 4,
+          "item_quantity_threshold": 31,
+          "model_proven_success": false,
+          "predicted_restock_epoch": 1793336030,
+          "predicted_stock_below_30_epoch": 1793338011,
+          "predicted_true_depletion_epoch": null,
+          "reason": "ESTIMATED_STOCKED_PHASE_REACHABLE",
+          "restock_early_epoch": 1793333945,
+          "restock_late_epoch": 1793340169
+        },
+        "remaining_offset": 4,
+        "id": "1793325600"
+      }
+    }
+  },
+  "scoring_code_sha256": {
+    "research/rescore_saved_challengers.py": "a469457b4d0eab0a655818c9c6dec87000e7ab7abeb9e9520e61cec30ea3ea55",
+    "services/simulated_trip_evidence.py": "72b6bc2ef9b1a741903baf9155da25bd59beec50d3151bcce9e1d977661c8ee8",
+    "services/restock_signatures.py": "b872c5abab3d6e26882541fc7417903f3781c70c3580608ddf325773eb6abbd5",
+    "research/nearest_stock_boundary_misses.py": "d140e55b491bc6aea5f7fe0ed7f32d585e31ebc5ff5d139f69fc29f8d12eda71"
+  },
+  "idempotency_verified": true,
+  "saved_geometry_preserved": true,
+  "original_inputs_unchanged": true
+}
