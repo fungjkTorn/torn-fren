@@ -7,6 +7,7 @@ import bisect
 from contextlib import closing
 from copy import deepcopy
 import math
+import os
 from pathlib import Path
 import sqlite3
 
@@ -61,10 +62,12 @@ def event_forecaster(variant):
 class NetRates:
     """Incrementally evaluate actual ten-minute blocks; flat/rising blocks count."""
     def __init__(self,source,key,variant,asof,rows,gaps):
-        self.source=source;self.key=key;self.variant=variant;self.anchor=asof
+        self.source=source;self.key=key;self.variant=variant;self.anchor=int(os.environ.get("TORNFREN_REPLAY_CALIBRATION_START",asof))
+        if self.anchor>asof:raise ValueError("calibration starts in the future")
         self.last=0;self.next_end=(rows[0][0]//BLOCK+2)*BLOCK
         self.polls=[];self.clocks=[];self.clock_times=[];self.rates=[];self.weights=[];self.ends=[]
-        self.profile=learn(rows,gaps,asof)
+        calibration_gaps=[(lo,hi if hi is not None and hi<=self.anchor else None) for lo,hi in gaps if lo<=self.anchor]
+        self.profile=learn(rows,calibration_gaps,self.anchor)
     def update(self,rows,gaps,asof):
         if asof<self.last:raise ValueError('net-rate history must advance causally')
         previous=self.last

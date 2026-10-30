@@ -1,0 +1,67 @@
+{
+  "actual_data_only": true,
+  "calibration_start_epoch": 1792720800,
+  "resumed_issue_epoch": 1793023200,
+  "checks": [
+    {
+      "variant": "clean-full",
+      "item": "uae:Camel Plushie",
+      "resumed_forecast_matches_continuous_exactly": true
+    },
+    {
+      "variant": "clean-full",
+      "item": "uni:Nessie Plushie",
+      "resumed_forecast_matches_continuous_exactly": true
+    },
+    {
+      "variant": "clean-full",
+      "item": "sou:Xanax",
+      "resumed_forecast_matches_continuous_exactly": true
+    },
+    {
+      "variant": "clean-full",
+      "item": "uni:Red Fox Plushie",
+      "resumed_forecast_matches_continuous_exactly": true
+    },
+    {
+      "variant": "clean-full",
+      "item": "chi:Panda Plushie",
+      "resumed_forecast_matches_continuous_exactly": true
+    },
+    {
+      "variant": "clean-full",
+      "item": "uni:Xanax",
+      "resumed_forecast_matches_continuous_exactly": true
+    },
+    {
+      "variant": "clean-recent7",
+      "item": "uae:Camel Plushie",
+      "resumed_forecast_matches_continuous_exactly": true
+    },
+    {
+      "variant": "clean-recent7",
+      "item": "uni:Nessie Plushie",
+      "resumed_forecast_matches_continuous_exactly": true
+    },
+    {
+      "variant": "clean-recent7",
+      "item": "sou:Xanax",
+      "resumed_forecast_matches_continuous_exactly": true
+    },
+    {
+      "variant": "clean-recent7",
+      "item": "uni:Red Fox Plushie",
+      "resumed_forecast_matches_continuous_exactly": true
+    },
+    {
+      "variant": "clean-recent7",
+      "item": "chi:Panda Plushie",
+      "resumed_forecast_matches_continuous_exactly": true
+    },
+    {
+      "variant": "clean-recent7",
+      "item": "uni:Xanax",
+      "resumed_forecast_matches_continuous_exactly": true
+    }
+  ]
+}

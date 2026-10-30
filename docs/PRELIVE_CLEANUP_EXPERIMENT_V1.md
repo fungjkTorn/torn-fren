@@ -68,3 +68,15 @@ Treat the already-inspected week as retrospective research, not a blind holdout.
 Forward confirmation remains necessary; no automatic live promotion follows a
 higher historical percentage. Record failures and retain the baseline if a
 cleanup variant is worse.
+
+## Checkpoint consistency addendum
+
+Refill signature calibration is fixed at the replay start (1792720800), including
+on resume. Country clocks are copied by country through the as-of cutoff, with
+no later receipts. Twelve real-data midpoint forecasts matched continuous and
+resumed execution exactly. This is a reproducibility correction, not a change
+selected from accuracy results. The initial unscored partial runs are retained
+under `clean-full` and `clean-recent7`; comparative results will use fresh
+`clean-full-v2` / `clean-recent7-v2` directories and a single code checkpoint.
+No forecast observations or saved forecast rows were edited or re-scored into a
+different recommendation.

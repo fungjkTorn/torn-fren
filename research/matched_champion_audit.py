@@ -27,7 +27,7 @@ def causal_copy(source, target, issued):
     with closing(sqlite3.connect(Path(source).resolve().as_uri()+'?mode=ro',uri=True)) as src:
         src.execute('PRAGMA query_only=ON');src.execute('BEGIN')
         with closing(sqlite3.connect(target)) as dst:
-            # Explicit schema excludes any ancillary future metadata or clocks.
+            # Explicit schema copies bounded evidence and omits ancillary metadata.
             dst.executescript('''CREATE TABLE stock_history(id INTEGER PRIMARY KEY,
                 timestamp INTEGER,country TEXT,item_name TEXT,quantity INTEGER,source TEXT);
                 CREATE TABLE poll_heartbeats(id INTEGER PRIMARY KEY,timestamp INTEGER,mode TEXT,success INTEGER);
@@ -48,8 +48,9 @@ def causal_copy(source, target, issued):
                 dst.executemany('INSERT INTO collection_gaps(start_timestamp,end_timestamp) VALUES(?,?)',src.execute(
                     'SELECT start_timestamp,CASE WHEN end_timestamp>? THEN NULL ELSE end_timestamp END FROM collection_gaps WHERE start_timestamp<=?',(issued,issued)))
                 if src.execute("SELECT 1 FROM sqlite_master WHERE name='country_stock_observations'").fetchone():
-                    dst.executemany('INSERT INTO country_stock_observations VALUES(?,?,?,?,?,?)',src.execute(
-                        'SELECT id,received_epoch,country,source,country_update_epoch,clock_status FROM country_stock_observations WHERE received_epoch<=?',(issued,)))
+                    for country, in src.execute('SELECT DISTINCT country FROM country_stock_observations'):
+                        dst.executemany('INSERT INTO country_stock_observations VALUES(?,?,?,?,?,?)',src.execute(
+                            'SELECT id,received_epoch,country,source,country_update_epoch,clock_status FROM country_stock_observations WHERE country=? AND received_epoch<=?',(country,issued)))
     Path(target).chmod(0o400)
 
 

@@ -70,6 +70,8 @@ def run(source, output, *, days=7, step=300, pilot=False, timeout=30, items=None
             raise ValueError('no successful poll evidence')
         end = polls[-1]//step*step
         start = end-days*86400
+        if os.environ.get("TORNFREN_PRELIVE_VARIANT"):
+            os.environ["TORNFREN_REPLAY_CALIBRATION_START"]=str(start)
         if polls[0] > start-7*86400:
             raise ValueError('need seven days of pre-test warmup plus the complete replay week; refresh snapshot')
         gaps = truth.execute('SELECT start_timestamp,end_timestamp FROM collection_gaps').fetchall()
@@ -78,7 +80,7 @@ def run(source, output, *, days=7, step=300, pilot=False, timeout=30, items=None
             'score_rule':'stock >30 at exact calculated arrival; zero grace',
             'training_policy':'ALL_AVAILABLE_CAUSAL_HISTORY_NO_ROLLING_LOOKBACK',
             'issuance_cadence_is_not_departure_filter':True,
-            'production_modified':False,'cleanup_variant':os.environ.get('TORNFREN_PRELIVE_VARIANT')}
+            'production_modified':False,'cleanup_variant':os.environ.get('TORNFREN_PRELIVE_VARIANT'),'calibration_start_epoch':start if os.environ.get('TORNFREN_PRELIVE_VARIANT') else None}
         manifest = output/'manifest.json'
         if manifest.exists() and json.loads(manifest.read_text()) != json.loads(json.dumps(identities)):
             raise ValueError('output belongs to a different source or replay contract')
@@ -161,7 +163,7 @@ def run(source, output, *, days=7, step=300, pilot=False, timeout=30, items=None
                 'observed_openings_in_test':sum(start<=t<=end for t in index.times),
                 'observed_openings_without_matched_forecast':sum(start<=t<=end and t not in groups for t in index.times),
                 'first_forecasts_per_opportunity':list(groups.values()),
-                'live_accuracy_certified':False,'production_modified':False,'cleanup_variant':os.environ.get('TORNFREN_PRELIVE_VARIANT')}
+                'live_accuracy_certified':False,'production_modified':False,'cleanup_variant':os.environ.get('TORNFREN_PRELIVE_VARIANT'),'calibration_start_epoch':start if os.environ.get('TORNFREN_PRELIVE_VARIANT') else None}
             (output/(path.stem+'.summary.json')).write_text(json.dumps(report,indent=2)+'\n')
 
 
