@@ -35,7 +35,7 @@
     },
     "chi:Panda Plushie": {
       "status": "Remaining",
-      "detail": "Next-six sequence checked; full causal-history replay needs new six-item raw export"
+      "detail": "Corrected week replay completed: 94/128 known successes; 10 unknown, 2 pending. Research only."
     },
     "chi:Peony": {
       "status": "Live forward beta",
@@ -71,7 +71,7 @@
     },
     "sou:Xanax": {
       "status": "Remaining",
-      "detail": "Next-six sequence checked; full causal-history replay needs new six-item raw export"
+      "detail": "Corrected week replay completed: 25/35 known successes; 4 unknown, 1 pending. Research only."
     },
     "swi:Chamois Plushie": {
       "status": "Remaining",
@@ -83,7 +83,7 @@
     },
     "uae:Camel Plushie": {
       "status": "Remaining",
-      "detail": "Next-six sequence checked; full causal-history replay needs new six-item raw export"
+      "detail": "Corrected week replay completed: 89/121 known successes; 8 unknown, 2 pending. Research only."
     },
     "uae:Tribulus Omanense": {
       "status": "Existing live ten",
@@ -95,15 +95,15 @@
     },
     "uni:Nessie Plushie": {
       "status": "Remaining",
-      "detail": "Next-six sequence checked; full causal-history replay needs new six-item raw export"
+      "detail": "Corrected week replay completed: 108/145 known successes; 9 unknown, 1 pending. Research only."
     },
     "uni:Red Fox Plushie": {
       "status": "Remaining",
-      "detail": "Next-six sequence checked; full causal-history replay needs new six-item raw export"
+      "detail": "Corrected week replay completed: 89/116 known successes; 6 unknown, 1 pending. Research only."
     },
     "uni:Xanax": {
       "status": "Remaining",
-      "detail": "Research continuation replay complete on uploaded week: 1949/2017 advice clocks, 1/1 independent trip; latest six-item week pending export"
+      "detail": "Corrected week replay completed: 1/1 known successes; 0 unknown, 0 pending. Research only."
     }
   },
   "deployment_status": "SIX_CHALLENGERS_APPLIED",
