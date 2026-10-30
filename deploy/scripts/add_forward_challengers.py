@@ -47,6 +47,21 @@ def atomic(path,raw):
     finally:Path(temp).unlink(missing_ok=True)
 
 
+def reviewed_text(raw,expected,name):
+    """Accept reviewed LF text or its byte-equivalent CRLF representation.
+
+    Git archives produced on Windows may carry CRLF. Do not strip whitespace,
+    decode/re-encode, remove a BOM, or accept any other content difference.
+    Original bytes are still backed up and restored exactly on rollback.
+    """
+    actual=hashlib.sha256(raw).hexdigest()
+    if actual==expected:return 'BYTE_EXACT'
+    normalized=hashlib.sha256(raw.replace(b'\r\n',b'\n')).hexdigest()
+    if normalized==expected:return 'CRLF_EQUIVALENT'
+    raise ValueError('website changed; refuse overwrite: '+name+
+        '; expected='+expected+'; installed='+actual+'; LF-normalized='+normalized)
+
+
 def service(release,sha):
     return f'''[Unit]
 Description=Torn Fren six approved challengers and forward evidence
@@ -126,10 +141,10 @@ def deploy(archive,sha,apply=False):
     primary_unit=PRIMARY.read_bytes();primary=json.loads((BASE/'latest.json').read_text())
     if len(primary.get('items',{}))!=10:raise ValueError('original ten-item snapshot required')
     if int(time.time())>primary['valid_until_epoch']:raise ValueError('original feed is delayed; resolve before rollout')
-    old={}
+    old={};review={}
     for name,expected in EXPECTED.items():
         old[name]=(ROOT/name).read_bytes()
-        if hashlib.sha256(old[name]).hexdigest()!=expected:raise ValueError('website changed; refuse overwrite: '+name)
+        review[name]=reviewed_text(old[name],expected,name)
     with zipfile.ZipFile(archive) as z:
         if len(z.infolist())>2000 or sum(i.file_size for i in z.infolist())>100*1024*1024:raise ValueError('oversized release')
         files={}
@@ -173,7 +188,8 @@ def deploy(archive,sha,apply=False):
         if preflight['elapsed_seconds']>55:raise ValueError('challenger batch exceeds the one-minute cadence budget; original deployment unchanged')
         result={'status':'SIX_CHALLENGER_PLAN','release_sha':sha,'preflight':preflight,
             'new_items':sorted(ADDED),'resulting_items':16,'primary_publisher_modified':False,
-            'collector_modified':False,'historical_results_seeded':False,'raw_evidence_deleted':False}
+            'collector_modified':False,'historical_results_seeded':False,'raw_evidence_deleted':False,
+            'reviewed_website_files':review}
     if not apply:return result
     backup_root=BACKUPS;backup_root.mkdir(parents=True,exist_ok=True)
     backup=Path(tempfile.mkdtemp(prefix='six-challengers-',dir=backup_root));backup.chmod(0o700)

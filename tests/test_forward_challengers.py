@@ -96,7 +96,7 @@ class ForwardChallengerTests(unittest.TestCase):
         unit=p/'new.service';timer=p/'new.timer';primary=p/'primary.service';primary.write_text('original ten unit')
         originals={};expected={}
         for name in installer.EXPECTED:
-            path=root/name;path.parent.mkdir(parents=True,exist_ok=True);path.write_text('old '+name)
+            path=root/name;path.parent.mkdir(parents=True,exist_ok=True);path.write_text('old '+name+'\nsecond line\n')
             originals[name]=path.read_bytes();expected[name]=hashlib.sha256(path.read_bytes()).hexdigest()
         (base/'latest.json').write_text(json.dumps(self.snapshot(FIRST_RELEASE_MODELS)))
         with sqlite3.connect(state/'stock_history.sqlite') as db:
@@ -165,6 +165,36 @@ class ForwardChallengerTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError,'cadence budget'):installer.deploy(archive,'b'*40,True)
             self.assertFalse(unit.exists());self.assertFalse(timer.exists())
             for name,raw in originals.items():self.assertEqual(raw,(root/name).read_bytes())
+
+    def test_crlf_equivalent_installed_files_pass_without_weakening_review(self):
+        from contextlib import ExitStack
+        with tempfile.TemporaryDirectory() as td,ExitStack() as stack:
+            p=Path(td);archive,originals,patches,run,primary,root,unit,timer=self.deployment_fixture(p)
+            for item in patches:stack.enter_context(item)
+            installed={name:raw.replace(b'\n',b'\r\n') for name,raw in originals.items()}
+            for name,raw in installed.items():(root/name).write_bytes(raw)
+            stack.enter_context(patch.object(installer,'run',side_effect=run))
+            import pwd
+            account=pwd.getpwuid(os.getuid());stack.enter_context(patch.object(installer.pwd,'getpwnam',return_value=account))
+            stack.enter_context(patch.object(installer.os,'geteuid',return_value=0))
+            result=installer.deploy(archive,'b'*40,False)
+            self.assertEqual('SIX_CHALLENGER_PLAN',result['status'])
+            self.assertTrue(all(value=='CRLF_EQUIVALENT' for value in result['reviewed_website_files'].values()))
+            for name,raw in installed.items():self.assertEqual(raw,(root/name).read_bytes())
+            self.assertFalse(unit.exists());self.assertFalse(timer.exists())
+
+    def test_real_edit_to_crlf_installation_still_stops_before_preflight(self):
+        from contextlib import ExitStack
+        with tempfile.TemporaryDirectory() as td,ExitStack() as stack:
+            p=Path(td);archive,originals,patches,run,primary,root,unit,timer=self.deployment_fixture(p)
+            for item in patches:stack.enter_context(item)
+            name=next(iter(originals));modified=originals[name].replace(b'\n',b'\r\n')+b'changed code\r\n'
+            (root/name).write_bytes(modified)
+            runner=stack.enter_context(patch.object(installer,'run'))
+            stack.enter_context(patch.object(installer.os,'geteuid',return_value=0))
+            with self.assertRaisesRegex(ValueError,'website changed; refuse overwrite'):installer.deploy(archive,'b'*40,True)
+            runner.assert_not_called();self.assertEqual(modified,(root/name).read_bytes())
+            self.assertFalse(unit.exists());self.assertFalse(timer.exists())
 
 
 if __name__=='__main__':unittest.main()
