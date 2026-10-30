@@ -21,17 +21,19 @@ from starlette.responses import HTMLResponse, JSONResponse, FileResponse, Respon
 ROSTER=frozenset(("arg:Ceibo Flower","can:Crocus","cay:Banana Orchid","haw:Orchid",
  "jap:Cherry Blossom","mex:Dahlia","mex:Jaguar Plushie","swi:Edelweiss",
  "uae:Tribulus Omanense","uni:Heather"))
+CHALLENGER_ROSTER=frozenset(('arg:Monkey Plushie','can:Wolverine Plushie','cay:Stingray Plushie',
+    'chi:Peony','sou:African Violet','sou:Lion Plushie'))
 ASSETS=Path(__file__).with_name("first_release_assets")
-UI_REVISION="planner-financials-v1"
+UI_REVISION="forward-beta-six-v1"
 
 
-def read_board(*,now=None,path=None):
+def _read_single_board(*,now=None,path=None,roster=ROSTER):
     now=int(time.time()) if now is None else now
     p=Path(path or os.environ.get("TORN_FREN_FIRST_RELEASE_SNAPSHOT","/var/lib/torn-fren-live-beta/latest.json"))
     if not p.is_file() or p.stat().st_size>8*1024*1024:
         raise ValueError("beta snapshot unavailable")
     s=json.loads(p.read_text())
-    if set(s.get("items",{}))!=ROSTER or s.get("schema_version")!=1:
+    if set(s.get("items",{}))!=roster or s.get("schema_version")!=1:
         raise ValueError("incomplete beta snapshot")
     if type(s.get("published_epoch")) is not int or s["published_epoch"]>now+15:
         raise ValueError("invalid beta publication clock")
@@ -57,6 +59,29 @@ def read_board(*,now=None,path=None):
             "source_refresh":s.get("source_refresh"),
             "recent_publications":s.get("recent_publications",[]),
             "stock_success_rule":s["stock_success_rule"],"flight_profile":s["flight_profile"]}
+
+
+def read_board(*,now=None,path=None,challenger_path=None):
+    board=_read_single_board(now=now,path=path)
+    extra=Path(challenger_path or os.environ.get('TORN_FREN_CHALLENGER_SNAPSHOT','/var/lib/torn-fren-live-beta/challengers/latest.json'))
+    board['cohorts']={'incumbents':{'status':board['status'],'items':len(board['rows']),'model_sha':board['model_sha']}}
+    # Default original-ten fixtures and installations remain valid until a
+    # separately verified challenger publisher is installed.
+    if not extra.exists():return board
+    try:
+        added=_read_single_board(now=now,path=extra,roster=CHALLENGER_ROSTER)
+    except (OSError,ValueError,KeyError,TypeError):
+        board['cohorts']['challengers']={'status':'UNAVAILABLE','items':0}
+        return board
+    if added['stock_success_rule']!=board['stock_success_rule'] or added['flight_profile']!=board['flight_profile']:
+        board['cohorts']['challengers']={'status':'INCOMPATIBLE','items':0}
+        return board
+    for row in board['rows']:row['cohort']='incumbents'
+    for row in added['rows']:row['cohort']='challengers'
+    board['rows']=sorted(board['rows']+added['rows'],key=lambda r:r['item_key'])
+    board['cohorts']['challengers']={'status':added['status'],'items':len(added['rows']),
+        'model_sha':added['model_sha'],'published_epoch':added['published_epoch']}
+    return board
 
 
 def attach_history(payload,board):
@@ -173,7 +198,7 @@ def _history_summary_cached(path,country,item,bucket):
 def read_history_summary(country,item,*,path=None):
     if country not in {'arg','can','cay','haw','jap','mex','swi','uae','uni','chi','sou'} or not item or len(item)>120 or '\x00' in item:
         raise ValueError('invalid item selection')
-    source=path or os.environ.get('TORN_FREN_HISTORY_SUMMARY_SOURCE','/var/lib/torn-fren-research/stock_history_forward.db')
+    source=path or (os.environ.get('TORN_FREN_CHALLENGER_HISTORY','/var/lib/torn-fren-live-beta/challengers/stock_history.sqlite') if country+':'+item in CHALLENGER_ROSTER else os.environ.get('TORN_FREN_HISTORY_SUMMARY_SOURCE','/var/lib/torn-fren-research/stock_history_forward.db'))
     return dict(_history_summary_cached(str(source),country,item,int(time.time())//300))
 
 

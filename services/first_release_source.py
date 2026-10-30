@@ -15,7 +15,7 @@ MAX_EXPORT_LAG=600
 MAX_ROWS=20000
 
 
-def refresh_tail(snapshot,collector,*,cutoff):
+def refresh_tail(snapshot,collector,*,cutoff,model_roster=FIRST_RELEASE_MODELS):
     snapshot=Path(snapshot).resolve(strict=True);collector=Path(collector).resolve(strict=True)
     if snapshot==collector:raise ValueError('inference copy must differ from collector')
     if type(cutoff) is not int:raise ValueError('integer causal cutoff required')
@@ -38,7 +38,7 @@ def refresh_tail(snapshot,collector,*,cutoff):
             return rows
         total=0
         with dest:
-            for key in FIRST_RELEASE_MODELS:
+            for key in model_roster:
                 country,item=key.split(':',1)
                 rows=bounded('''SELECT timestamp,country,item_name,quantity,source FROM stock_history
                     WHERE country=? AND item_name=? AND timestamp BETWEEN ? AND ?
@@ -58,7 +58,7 @@ def refresh_tail(snapshot,collector,*,cutoff):
             dest.executemany('INSERT INTO collection_gaps(start_timestamp,end_timestamp) VALUES(?,?)',gaps)
             has_clocks=live.execute("SELECT 1 FROM sqlite_master WHERE name='country_stock_observations' AND type='table'").fetchone()
             if not has_clocks:raise ValueError('live country stock clocks are required')
-            countries=sorted({key.split(':',1)[0] for key in FIRST_RELEASE_MODELS})
+            countries=sorted({key.split(':',1)[0] for key in model_roster})
             receipts=0
             for country in countries:
                 rows=bounded('''SELECT received_epoch,country,source,country_update_epoch,export_epoch,

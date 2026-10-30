@@ -43,7 +43,8 @@ def readonly(path):
 
 
 def publish(source, state, *, model_sha, item_runner=None, clock=time.time,
-            live_source=None, publisher_sha=None):
+            live_source=None, publisher_sha=None, model_roster=FIRST_RELEASE_MODELS,
+            time_budget_seconds=45, item_timeout_seconds=15, challenger_cohort=False):
     if not re.fullmatch("[0-9a-f]{40}",model_sha):
         raise ValueError("immutable source revision required")
     if publisher_sha is not None and not re.fullmatch("[0-9a-f]{40}",publisher_sha):
@@ -63,21 +64,24 @@ def publish(source, state, *, model_sha, item_runner=None, clock=time.time,
         source_refresh = None
         if live_source is not None:
             from services.first_release_source import refresh_tail
-            source_refresh = refresh_tail(frozen,live_source,cutoff=issued)
+            source_refresh = refresh_tail(frozen,live_source,cutoff=issued,model_roster=model_roster)
         health = inspect_live_source(frozen,issued)
         if health["status"] != "FRESH":
             raise ValueError("source unavailable: "+health["status"])
         rows = {}
         failures = []
-        for key in FIRST_RELEASE_MODELS:
+        for key in model_roster:
             flight = TRAVEL_SECONDS[key.split(":",1)[0]]
-            if int(clock())-started > 45:
-                raise TimeoutError("publisher exceeded 45-second inference budget")
+            if int(clock())-started > time_budget_seconds:
+                raise TimeoutError(f"publisher exceeded {time_budget_seconds}-second inference budget")
             try:
                 if item_runner is None:
-                    child = subprocess.run([sys.executable,"-B","-m","services.first_release_live","item",
+                    command=[sys.executable,"-B","-m","services.first_release_live","item",
                         "--source",str(frozen),"--key",key,"--issued",str(issued),
-                        "--flight",str(flight)],text=True,capture_output=True,timeout=15)
+                        "--flight",str(flight)]
+                    if challenger_cohort:command.append('--challenger-cohort')
+                    child = subprocess.run(command,text=True,capture_output=True,
+                        timeout=min(item_timeout_seconds,max(1,time_budget_seconds-(int(clock())-started))))
                     if child.returncode:
                         raise RuntimeError("native item process failed: "+child.stderr[-2000:])
                     row = json.loads(child.stdout)
@@ -89,11 +93,11 @@ def publish(source, state, *, model_sha, item_runner=None, clock=time.time,
             except (ValueError,RuntimeError,subprocess.TimeoutExpired) as error:
                 failures.append({"item_key":key,"error_type":type(error).__name__,"detail":str(error)[-2000:]})
         # Do not replace a coherent ten-item feed with a partial one.
-        if failures or len(rows) != 10:
+        if failures or len(rows) != len(model_roster):
             raise RuntimeError("incomplete publisher batch: "+json.dumps(failures))
         published = int(clock())
-        if published-started > 45:
-            raise TimeoutError("publisher exceeded 45-second inference budget")
+        if published-started > time_budget_seconds:
+            raise TimeoutError(f"publisher exceeded {time_budget_seconds}-second inference budget")
         poll_age = published-health["last_successful_heartbeat"]
         if published-issued >= 180 or poll_age > 180:
             raise ValueError("source expired while preparing publication")
@@ -106,7 +110,8 @@ def publish(source, state, *, model_sha, item_runner=None, clock=time.time,
                 d = build_first_release_decision(row["forecast"],now=published,
                     flight_seconds=old["player_flight_seconds"],poll_age_seconds=poll_age,
                     timing_choice=lambda **kw: ({"departure":native_departure,
-                        "score":old.get("advisory_timing_score")} if type(native_departure) is int and native_departure>=published else None))
+                        "score":old.get("advisory_timing_score")} if type(native_departure) is int and native_departure>=published else None),
+                    model_roster=model_roster)
                 row["decision"] = d
                 row["published_epoch"] = published
                 row["source_heartbeat_epoch"] = health["last_successful_heartbeat"]
@@ -143,9 +148,9 @@ def publish(source, state, *, model_sha, item_runner=None, clock=time.time,
             ledger.execute("INSERT INTO publications VALUES(?,?,?)",(issued,published,digest))
             ledger.commit()
         os.chmod(state/"forecasts.sqlite",0o600)
-    return {"status":"TEN_ITEM_SNAPSHOT_PUBLISHED","asof_epoch":issued,
+    return {"status":"SIX_ITEM_SNAPSHOT_PUBLISHED" if challenger_cohort else "TEN_ITEM_SNAPSHOT_PUBLISHED","asof_epoch":issued,
             "publisher_sha":publisher_sha or model_sha,"source_refresh":source_refresh,
-            "published_epoch":published,"items":10,"model_sha":model_sha,
+            "published_epoch":published,"items":len(model_roster),"model_sha":model_sha,
             "elapsed_seconds":int(clock())-started,"snapshot_sha256":digest}
 
 
@@ -155,12 +160,17 @@ def main():
     item=sub.add_parser("item"); item.add_argument("--source",required=True)
     item.add_argument("--key",required=True); item.add_argument("--issued",type=int,required=True)
     item.add_argument("--flight",type=int,required=True)
+    item.add_argument('--challenger-cohort',action='store_true')
     pub=sub.add_parser("publish"); pub.add_argument("--source",required=True)
     pub.add_argument("--state",required=True); pub.add_argument("--model-sha",required=True)
     pub.add_argument("--live-source");pub.add_argument("--publisher-sha")
     args=p.parse_args()
     if args.action=="item":
-        value=forecast_first_release_item(args.source,args.key,now=args.issued,flight_seconds=args.flight)
+        extra={}
+        if args.challenger_cohort:
+            from services.forward_beta_roster import CHALLENGER_MODELS,FULL_HISTORY
+            extra=dict(model_roster=CHALLENGER_MODELS,timing_full_history=FULL_HISTORY)
+        value=forecast_first_release_item(args.source,args.key,now=args.issued,flight_seconds=args.flight,**extra)
     else:
         value=publish(args.source,args.state,model_sha=args.model_sha,
                       live_source=args.live_source,publisher_sha=args.publisher_sha)
