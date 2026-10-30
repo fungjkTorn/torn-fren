@@ -1,7 +1,7 @@
 {
   "original_items": 25,
-  "currently_confirmed_live": 10,
-  "prepared_additions": 6,
+  "currently_confirmed_live": 16,
+  "prepared_additions": 0,
   "target_live_after_deployment": 16,
   "remaining_after_deployment": 9,
   "items": {
@@ -10,7 +10,7 @@
       "detail": "v18 dyn3"
     },
     "arg:Monkey Plushie": {
-      "status": "Ready for six-item deployment",
+      "status": "Live forward beta",
       "detail": "v20 traj3; full history"
     },
     "can:Crocus": {
@@ -18,7 +18,7 @@
       "detail": "v18 dyn5"
     },
     "can:Wolverine Plushie": {
-      "status": "Ready for six-item deployment",
+      "status": "Live forward beta",
       "detail": "v20 traj12; full history"
     },
     "can:Xanax": {
@@ -30,7 +30,7 @@
       "detail": "v18 dyn7"
     },
     "cay:Stingray Plushie": {
-      "status": "Ready for six-item deployment",
+      "status": "Live forward beta",
       "detail": "v20 traj5; full history"
     },
     "chi:Panda Plushie": {
@@ -38,7 +38,7 @@
       "detail": "Scheduling corrected; actual-data pilot/week replay pending refreshed export"
     },
     "chi:Peony": {
-      "status": "Ready for six-item deployment",
+      "status": "Live forward beta",
       "detail": "v20 traj12; full history"
     },
     "haw:Orchid": {
@@ -62,11 +62,11 @@
       "detail": "v18 dyn3"
     },
     "sou:African Violet": {
-      "status": "Ready for six-item deployment",
+      "status": "Live forward beta",
       "detail": "v20 traj11; full history"
     },
     "sou:Lion Plushie": {
-      "status": "Ready for six-item deployment",
+      "status": "Live forward beta",
       "detail": "v20 traj12; full history"
     },
     "sou:Xanax": {
@@ -105,5 +105,8 @@
       "status": "Remaining",
       "detail": "Fix and validate current-stock continuation / long-phase handling"
     }
-  }
+  },
+  "deployment_status": "SIX_CHALLENGERS_APPLIED",
+  "challenger_release_sha": "8a8284d019272030e385bf5fb1b3cf5d4c8384a4",
+  "verified_public_feed_epoch": 1793324016
 }

@@ -9,21 +9,21 @@ The six use the exact tested V20 configurations with full available causal histo
 | Item | Status | Configuration or next step |
 | --- | --- | --- |
 | arg:Ceibo Flower | Existing live ten | v18 dyn3 |
-| arg:Monkey Plushie | Ready for six-item deployment | v20 traj3; full history |
+| arg:Monkey Plushie | Live forward beta | v20 traj3; full history |
 | can:Crocus | Existing live ten | v18 dyn5 |
-| can:Wolverine Plushie | Ready for six-item deployment | v20 traj12; full history |
+| can:Wolverine Plushie | Live forward beta | v20 traj12; full history |
 | can:Xanax | Remaining | Further challenger work |
 | cay:Banana Orchid | Existing live ten | v18 dyn7 |
-| cay:Stingray Plushie | Ready for six-item deployment | v20 traj5; full history |
+| cay:Stingray Plushie | Live forward beta | v20 traj5; full history |
 | chi:Panda Plushie | Remaining | Scheduling corrected; actual-data pilot/week replay pending refreshed export |
-| chi:Peony | Ready for six-item deployment | v20 traj12; full history |
+| chi:Peony | Live forward beta | v20 traj12; full history |
 | haw:Orchid | Existing live ten | v18 dyn3 |
 | jap:Cherry Blossom | Existing live ten | v19 dyn2 |
 | jap:Xanax | Remaining | Further challenger work; Japan Xanax needs its separate short-window approach |
 | mex:Dahlia | Existing live ten | v18 dyn2 |
 | mex:Jaguar Plushie | Existing live ten | v18 dyn3 |
-| sou:African Violet | Ready for six-item deployment | v20 traj11; full history |
-| sou:Lion Plushie | Ready for six-item deployment | v20 traj12; full history |
+| sou:African Violet | Live forward beta | v20 traj11; full history |
+| sou:Lion Plushie | Live forward beta | v20 traj12; full history |
 | sou:Xanax | Remaining | Scheduling corrected; actual-data pilot/week replay pending refreshed export |
 | swi:Chamois Plushie | Remaining | Further challenger work |
 | swi:Edelweiss | Existing live ten | v19 dyn9 |
@@ -34,11 +34,11 @@ The six use the exact tested V20 configurations with full available causal histo
 | uni:Red Fox Plushie | Remaining | Scheduling corrected; actual-data pilot/week replay pending refreshed export |
 | uni:Xanax | Remaining | Fix and validate current-stock continuation / long-phase handling |
 
-After successful deployment there will be 16 live forward-test items and 9 remaining. Before the VM apply report is verified, the six remain prepared rather than confirmed live.
+Deployment confirmed October 29 at 9:30 PM America/New_York. There are now 16 live forward-test items and 9 remaining. The report returned SIX_CHALLENGERS_APPLIED; the public API independently showed both cohorts fresh, all six model revisions correct, and three recorded forecast revisions each. Peony already had one pending frozen simulated trip.
 
 ## Runtime and deployment
 
-The six have a separate immutable source release, source copy, ledger, snapshot, lock, service and timer under `/var/lib/torn-fren-live-beta/challengers`. The timer runs each minute at :50 UTC, separately from the original ten at :20 UTC. CPUQuota is 75% of one core, Nice 19, MemoryMax 1 GiB. The original ten unit is not edited or stopped. No paid capacity upgrade is involved.
+The six have a separate immutable source release, source copy, ledger, snapshot, lock, service and timer under `/var/lib/torn-fren-live-beta/challengers`. The timer runs each minute at :50 UTC, separately from the original ten at :20 UTC. CPUQuota is 100% of one core, Nice 19, MemoryMax 1 GiB. The original ten unit is not edited or stopped. No paid capacity upgrade is involved.
 
 Bootstrap copies only stock observations, successful/failed poll evidence, country clocks and collection gaps for the six items, retaining all available causal training history. Each run updates only this private source with a bounded read-only collector tail; the original collector is never written. It does not depend on the original ten-item export containing the newcomers.
 
@@ -98,3 +98,14 @@ pushed implementation. Local combined native runtime was 3.249 versus 2.201
 seconds, before accounting for the VM quota change. This is evidence of reduced
 work, not confirmation of VM readiness. Evidence runtime is now disclosed
 separately. The next guarded run must establish actual VM cadence.
+
+### Activation confirmed
+
+The final guarded VM preflight completed in 33.449 seconds (55-second limit),
+including 18.261 seconds for evidence work. Release
+`8a8284d019272030e385bf5fb1b3cf5d4c8384a4` was applied. The report confirms the
+original publisher and collector were unmodified, historical results were not
+seeded, and raw evidence was not deleted. Subsequent public feed verification
+at epoch 1793324016 showed 16 rows, LIVE_BETA for both cohorts, and three new
+forecast revisions per challenger. These establish activation and ongoing
+recording, not prospective accuracy; known arrival outcomes had not matured.
