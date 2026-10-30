@@ -1,8 +1,9 @@
 """Resumable single-config replay; use --pilot before a seven-day run.
 
 300s is an issuance sampling cadence, NEVER a departure eligibility filter.
-Every issued future departure is scored. First issue per observed ordinal
-opportunity is frozen; later forecasts cannot replace its result.
+Every issued future departure is retained. The legacy ordinal summary is a
+diagnostic only; rescore_saved_challengers applies the live V5 freeze policy
+and is the authoritative success/miss report.
 """
 import argparse
 from collections import Counter
@@ -17,7 +18,7 @@ import tempfile
 import time
 
 from research.causal_replay_slice import CausalReplaySlice
-from research.corrected_challengers import MODELS, NEXT_MODELS, ALL_MODELS, POLICY, forecast
+from research.corrected_challengers import MODELS, NEXT_MODELS, NEXT_SIX_MODELS, ALL_MODELS, POLICY, forecast
 from services.first_release_evidence import grade, TargetIndex
 
 
@@ -53,8 +54,10 @@ def run(source, output, *, days=7, step=300, pilot=False, timeout=30, items=None
     digest = sha(source)
     root=Path(__file__).resolve().parents[1]
     code_paths=[__file__,root/'research/corrected_challengers.py',root/'research/causal_replay_slice.py',
+        root/'research/current_stock_continuation.py',root/'services/native_history_acceleration.py',
         root/'services/first_release_schedule.py',root/'services/first_release_evidence.py',
         root/'services/travel_decision_contract_v166.py',root/'services/history_service.py',
+        root/'services/plushie_flower_dynamic_planner_v18.py',root/'services/restock_signatures.py',
         root/'services/plushie_flower_dynamic_planner_v19.py',root/'services/plushie_flower_dynamic_planner_v20.py',
         root/'deploy/scripts/v163_readonly_event_first_preview.py',root/'research/v145_provider_continuous_phases.py']
     fingerprints={str(Path(p).relative_to(root)):sha(p) for p in code_paths}
@@ -70,7 +73,7 @@ def run(source, output, *, days=7, step=300, pilot=False, timeout=30, items=None
             raise ValueError('need seven days of pre-test warmup plus the complete replay week; refresh snapshot')
         gaps = truth.execute('SELECT start_timestamp,end_timestamp FROM collection_gaps').fetchall()
         identities = {'source_sha256':digest, 'code_sha256':fingerprints, 'policy':POLICY, 'start':start,
-            'end':end, 'step':step, 'pilot':pilot, 'models':dict(NEXT_MODELS if items and all(k in NEXT_MODELS for k in items) else MODELS),
+            'end':end, 'step':step, 'pilot':pilot, 'models':{k:ALL_MODELS[k] for k in (items or MODELS)},
             'score_rule':'stock >30 at exact calculated arrival; zero grace',
             'training_policy':'ALL_AVAILABLE_CAUSAL_HISTORY_NO_ROLLING_LOOKBACK',
             'issuance_cadence_is_not_departure_filter':True,
@@ -102,7 +105,7 @@ def run(source, output, *, days=7, step=300, pilot=False, timeout=30, items=None
                     db = mirror.advance(issued)
                     began = time.monotonic()
                     r = {'item':key, 'issued':issued, 'country_freshness':country_state(truth,country,issued)}
-                    if r['country_freshness']=='STALE':
+                    if r['country_freshness']!='FRESH':
                         r.update(status='STALE_COUNTRY_DATA', outcome={'status':'NO_RECOMMENDATION'})
                     else:
                         try:
@@ -149,7 +152,7 @@ def run(source, output, *, days=7, step=300, pilot=False, timeout=30, items=None
             counts=Counter(r['outcome']['status'] for r in groups.values())
             known=counts['SUCCESS']+counts['FAILURE']
             unsafe=unmatched['FAILURE']+unmatched['UNKNOWN']+unmatched['ERROR']
-            report={'item':key,'model':ALL_MODELS[key],'pilot':pilot,'issue_rows':len(records),
+            report={'legacy_ordinal_diagnostic_only':True,'authoritative_scoring':'research.rescore_saved_challengers / live V5','item':key,'model':ALL_MODELS[key],'pilot':pilot,'issue_rows':len(records),
                 'seconds':sum(r['seconds'] for r in records),'distinct_opportunity_counts':dict(counts),
                 'estimated_full_week_model_seconds':sum(r['seconds'] for r in records)/len(records)*(days*86400//step+1) if records else None,
                 'success_fraction':counts['SUCCESS']/known if known and not unsafe else None,
@@ -167,6 +170,7 @@ def main():
     p.add_argument('--step',type=int,default=300,choices=[300,900,1800,3600])
     p.add_argument('--pilot',action='store_true');p.add_argument('--item',choices=tuple(ALL_MODELS))
     p.add_argument('--next-five',action='store_true')
+    p.add_argument('--next-six',action='store_true')
     p.add_argument('--max-seconds',type=int,default=1800)
     p.add_argument('--worker');p.add_argument('--issued',type=int)
     a=p.parse_args()
@@ -175,7 +179,7 @@ def main():
     if not a.source or not a.output:
         p.error('--source and --output are required')
     if a.max_seconds<=0:p.error('--max-seconds must be positive')
-    run(a.source,a.output,days=a.days,step=a.step,pilot=a.pilot,items=[a.item] if a.item else list(NEXT_MODELS) if a.next_five else None,max_seconds=a.max_seconds)
+    run(a.source,a.output,days=a.days,step=a.step,pilot=a.pilot,items=[a.item] if a.item else list(NEXT_SIX_MODELS) if a.next_six else list(NEXT_MODELS) if a.next_five else None,max_seconds=a.max_seconds)
 
 
 if __name__=='__main__':main()

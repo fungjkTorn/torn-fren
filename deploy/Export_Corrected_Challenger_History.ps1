@@ -10,7 +10,7 @@ if ($LASTEXITCODE -ne 0) { throw 'Cannot read reviewed exporter from fetched Git
 $stamp = [DateTime]::UtcNow.ToString('yyyyMMddTHHmmssZ')
 $remote = "/home/ubuntu/torn-fren-challenger-history-$stamp.sqlite"
 $local = Join-Path $env:USERPROFILE "Desktop\torn-fren-challenger-history-$stamp.sqlite"
-$report = $exporter | & ssh -i $key ubuntu@150.136.108.146 "sudo -n python3 - --source /opt/torn-fren/data/stock_history.db --output $remote --days 120 --owner ubuntu"
+$report = $exporter | & ssh -i $key ubuntu@150.136.108.146 "sudo -n python3 - --source /opt/torn-fren/data/stock_history.db --output $remote --owner ubuntu"
 if ($LASTEXITCODE -ne 0) { throw 'Read-only export failed; no replay was started.' }
 $report | Write-Output
 & scp -i $key "ubuntu@150.136.108.146:$remote" $local

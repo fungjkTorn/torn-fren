@@ -54,7 +54,7 @@ def _delays(earliest, latest, now):
 
 def build_first_release_decision(forecast, *, now, flight_seconds,
                                  poll_age_seconds, timing_choice=None,
-                                 model_roster=FIRST_RELEASE_MODELS):
+                                 model_roster=FIRST_RELEASE_MODELS, current_stock_leave_now=False):
     """Pure decision policy. timing_choice may only select from supplied delays.
 
     Forecasts must explicitly model >=31. Model confidence is advisory, not
@@ -84,7 +84,9 @@ def build_first_release_decision(forecast, *, now, flight_seconds,
     earliest = selected["estimated_departure_start_epoch"]
     latest = selected["estimated_latest_departure_epoch"]
     departure = earliest
-    if timing_choice is not None:
+    if index == 0 and current_stock_leave_now:
+        result["timing_refinement_status"] = "CURRENT_STOCK_REACHABLE_LEAVE_NOW"
+    elif timing_choice is not None:
         delays = _delays(earliest, latest, now)
         proposal = timing_choice(
             item_key=key, generation=generation, config=config,
@@ -175,7 +177,8 @@ def native_timing_choice(db, *, model_roster=FIRST_RELEASE_MODELS,
 
 def forecast_first_release_item(source, item_key, *, now, flight_seconds,
                                 model_roster=FIRST_RELEASE_MODELS,
-                                timing_full_history=False):
+                                timing_full_history=False, forecast_transform=None,
+                                current_stock_leave_now=False):
     """Fresh, causal, read-only one-item pipeline; no production writes.
 
     Shared empirical stocked/depleted phases generate the event timeline.
@@ -211,12 +214,14 @@ def forecast_first_release_item(source, item_key, *, now, flight_seconds,
     # Legacy field names say below_30; expose the actual >=31 semantics too.
     for event in forecast["restock_events"]:
         event["predicted_stock_below_threshold_epoch"] = event["predicted_stock_below_30_epoch"]
+    if forecast_transform is not None:
+        forecast = forecast_transform(forecast,rows,gaps,now)
     decision = build_first_release_decision(
         forecast, now=now, flight_seconds=flight_seconds,
         poll_age_seconds=now - health["last_successful_heartbeat"],
         timing_choice=lambda **kw: native_timing_choice(source,model_roster=model_roster,
             full_history=timing_full_history,**kw),
-        model_roster=model_roster,
+        model_roster=model_roster,current_stock_leave_now=current_stock_leave_now,
     )
     return {"item_key": item_key, "asof_epoch": now,
             "forecast": forecast, "decision": decision,

@@ -1,0 +1,113 @@
+{
+  "status": "SAVED_CHALLENGERS_RESCORED",
+  "evidence_policy": "RECOMMENDED_DEPARTURE_FREEZE_V5",
+  "research_identity": "77c7020d9036f6f02b4a1a0a03324a6b07c1157d",
+  "start_epoch": 1792639200,
+  "cutoff_epoch": 1793244000,
+  "source_sha256": "4fef31cf3ee0e4d079efabf5ed6f1de71e91fdc167a8c886e63860edbdd731f7",
+  "saved_forecast_hashes": {
+    "manifest.json": "50ebe7201b173fda441a77eddf036e5623df72b1e4dfcf541bd35130bbad8209",
+    "uni__Xanax.jsonl": "979764af634b4339f2effd60b7c8702ade3c8be53e078ac7902adf5327c89bf8"
+  },
+  "original_models": {
+    "uni:Xanax": [
+      "v19",
+      "dyn8"
+    ]
+  },
+  "training_policy": "ALL_AVAILABLE_CAUSAL_HISTORY_NO_ROLLING_LOOKBACK",
+  "sampling_seconds": 300,
+  "publication_clock": "SAMPLED_ISSUE_TIME_NO_MEASURED_SERVER_LATENCY",
+  "advice_expiry_preserved": true,
+  "unrecorded_refreshes_assumed": false,
+  "model_inference_run": false,
+  "production_modified": false,
+  "arrival_timing_changed": false,
+  "items": {
+    "uni:Xanax": {
+      "model": [
+        "v19",
+        "dyn8"
+      ],
+      "issue_clocks": 2017,
+      "advice_issue_clocks": 1949,
+      "simulated_trips": 1,
+      "successes": 1,
+      "failures": 0,
+      "known": 1,
+      "unknown": 0,
+      "pending": 0,
+      "known_success_fraction": 1.0,
+      "target_identity_audit": {
+        "duplicate_target_groups": 0,
+        "duplicates": {},
+        "retained_completed_identities": 1
+      },
+      "restock_profile": {
+        "training_cutoff": 1792639200,
+        "zero_refill_samples": 97,
+        "status": "LEARNED",
+        "normal_min": 2388,
+        "normal_max": 2500,
+        "reset_base": null,
+        "reset_training_samples": 1,
+        "normal_samples": 78,
+        "excluded_small_samples": 19,
+        "reset_candidate_base": 2500,
+        "classification_is_observational": true,
+        "method": "ITERATED_LOG_QUANTITY_CLUSTER_WITH_OBSERVED_RANGE"
+      },
+      "qualified_restocks": 0,
+      "revision_counts": {
+        "FROZEN_AT_RECOMMENDED_DEPARTURE": 1,
+        "NEW_RECOMMENDATION": 3,
+        "POSTPONED_BEFORE_DEPARTURE": 9,
+        "REVISED_BEFORE_DEPARTURE": 19,
+        "SUPPRESSED_ALREADY_TESTED_TARGET": 2
+      },
+      "no_advice_clock_statuses": {
+        "STALE_COUNTRY_DATA": 68
+      },
+      "nearest_qualified_boundary_misses": {
+        "counts": {},
+        "median_late_minutes": null,
+        "median_early_minutes": null
+      },
+      "latest_ten": {
+        "known": 1,
+        "successes": 1,
+        "failures": 0,
+        "unknown": 0,
+        "pending": 0,
+        "success_fraction": 1.0
+      },
+      "active_recommendation_at_cutoff": null
+    }
+  },
+  "scoring_code_sha256": {
+    "research/rescore_saved_challengers.py": "378a3521c5db3828b9888b64116f7117f456e6c556f0b55c43c464783c496ead",
+    "services/simulated_trip_evidence.py": "bf0384742e3c84e55f24f594dd8c0a4344958ace6e0d3a9ffcedf5841ccfa20d",
+    "services/restock_signatures.py": "b872c5abab3d6e26882541fc7417903f3781c70c3580608ddf325773eb6abbd5",
+    "research/nearest_stock_boundary_misses.py": "d140e55b491bc6aea5f7fe0ed7f32d585e31ebc5ff5d139f69fc29f8d12eda71"
+  },
+  "idempotency_verified": true,
+  "saved_geometry_preserved": true,
+  "original_inputs_unchanged": true,
+  "experiment": "NEXT_SIX_UK_CURRENT_STOCK_CONTINUATION_V1",
+  "native_models_recomputed_before_rescore": true,
+  "limitations": [
+    "Only one independent trip in a continuously stocked week; no reliable accuracy estimate",
+    "No early/late misses to classify",
+    "Historical 300-second issuance sampling; zero grace and advice expiry preserved",
+    "Older uploaded week, not latest current week",
+    "Research only; no live deployment"
+  ],
+  "issue_status_counts": {
+    "ESTIMATED_DEPARTURE_WINDOW_OPEN": 1907,
+    "WAIT_FOR_ESTIMATED_DEPARTURE": 42,
+    "STALE_COUNTRY_DATA": 68
+  },
+  "previous_advice_issue_clocks": 460,
+  "fallback_issue_clocks": 1489,
+  "model_errors": 0
+}

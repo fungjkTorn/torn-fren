@@ -29,15 +29,17 @@ NEXT_MODELS = MappingProxyType({
     'uni:Red Fox Plushie': ('v18','dyn1'),
     'chi:Panda Plushie': ('v19','dyn1'),
 })
+NEXT_SIX_MODELS = MappingProxyType({**NEXT_MODELS,'uni:Xanax':MODELS['uni:Xanax']})
 ALL_MODELS = MappingProxyType({**MODELS,**NEXT_MODELS})
 
 
 def forecast(source, key, issued):
     if key not in ALL_MODELS:
         raise ValueError('item is outside frozen challenger roster')
+    from research.current_stock_continuation import extend_current_stock
     row = forecast_first_release_item(source, key, now=issued,
         flight_seconds=TRAVEL_SECONDS[key.split(':')[0]], model_roster=ALL_MODELS,
-        timing_full_history=True)
+        timing_full_history=True,current_stock_leave_now=key in NEXT_SIX_MODELS,forecast_transform=extend_current_stock if key=='uni:Xanax' else None)
     row.update(research_policy=POLICY, production_deployed=False,
                training_policy='ALL_AVAILABLE_CAUSAL_HISTORY_NO_ROLLING_LOOKBACK',
                original_tournament_percentages_do_not_transfer=True)

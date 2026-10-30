@@ -35,7 +35,7 @@
     },
     "chi:Panda Plushie": {
       "status": "Remaining",
-      "detail": "Scheduling corrected; actual-data pilot/week replay pending refreshed export"
+      "detail": "Next-six sequence checked; full causal-history replay needs new six-item raw export"
     },
     "chi:Peony": {
       "status": "Live forward beta",
@@ -71,7 +71,7 @@
     },
     "sou:Xanax": {
       "status": "Remaining",
-      "detail": "Scheduling corrected; actual-data pilot/week replay pending refreshed export"
+      "detail": "Next-six sequence checked; full causal-history replay needs new six-item raw export"
     },
     "swi:Chamois Plushie": {
       "status": "Remaining",
@@ -83,7 +83,7 @@
     },
     "uae:Camel Plushie": {
       "status": "Remaining",
-      "detail": "Scheduling corrected; actual-data pilot/week replay pending refreshed export"
+      "detail": "Next-six sequence checked; full causal-history replay needs new six-item raw export"
     },
     "uae:Tribulus Omanense": {
       "status": "Existing live ten",
@@ -95,15 +95,15 @@
     },
     "uni:Nessie Plushie": {
       "status": "Remaining",
-      "detail": "Scheduling corrected; actual-data pilot/week replay pending refreshed export"
+      "detail": "Next-six sequence checked; full causal-history replay needs new six-item raw export"
     },
     "uni:Red Fox Plushie": {
       "status": "Remaining",
-      "detail": "Scheduling corrected; actual-data pilot/week replay pending refreshed export"
+      "detail": "Next-six sequence checked; full causal-history replay needs new six-item raw export"
     },
     "uni:Xanax": {
       "status": "Remaining",
-      "detail": "Fix and validate current-stock continuation / long-phase handling"
+      "detail": "Research continuation replay complete on uploaded week: 1949/2017 advice clocks, 1/1 independent trip; latest six-item week pending export"
     }
   },
   "deployment_status": "SIX_CHALLENGERS_APPLIED",

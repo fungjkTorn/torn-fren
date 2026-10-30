@@ -39,6 +39,21 @@ class ReplayTests(unittest.TestCase):
                 self.assertIsNone(con.execute("SELECT 1 FROM sqlite_master WHERE name='secrets'").fetchone())
             with self.assertRaises(ValueError):export(source,out)
 
+    def test_default_export_keeps_all_history_without_rolling_cutoff(self):
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td);source=root/'source.db';now=self.source(source)
+            country,item=ITEMS[0].split(':',1)
+            with sqlite3.connect(source) as db:
+                db.executemany('INSERT INTO stock_history(timestamp,country,item_name,quantity,source) VALUES(?,?,?,?,?)',
+                    [(now-200*86400,country,item,5000,'yata'),(now-199*86400,country,item,4900,'yata')])
+            before=source.read_bytes()
+            with patch('research.export_challenger_history.time.time',return_value=now):
+                result=export(source,root/'all.db')
+            self.assertTrue(result['full_available_history']);self.assertIsNone(result['history_days'])
+            with sqlite3.connect(root/'all.db') as db:
+                self.assertEqual(2,db.execute('SELECT COUNT(*) FROM stock_history WHERE timestamp<?',(now-190*86400,)).fetchone()[0])
+            self.assertEqual(before,source.read_bytes())
+
     def test_future_departure_is_scored_without_five_minute_or_agreement_gate(self):
         with tempfile.TemporaryDirectory() as td:
             root=Path(td);source=root/'source.db';now=self.source(source);calls=[]

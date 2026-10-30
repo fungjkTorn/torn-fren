@@ -1,4 +1,4 @@
-"""Standalone, read-only collector export: seven challengers, stock evidence only.
+"""Standalone, read-only collector export: the next six challengers, stock evidence only.
 
 Safe to stream into python3 over SSH; no project imports or installs needed.
 Creates a NEW private file. Does not replace the live research database.
@@ -13,10 +13,8 @@ import sqlite3
 import tempfile
 import time
 
-ITEMS = ('arg:Monkey Plushie','can:Wolverine Plushie','cay:Stingray Plushie',
-         'chi:Peony','sou:African Violet','sou:Lion Plushie','uni:Xanax')
-ITEMS += ('uae:Camel Plushie','uni:Nessie Plushie','sou:Xanax',
-          'uni:Red Fox Plushie','chi:Panda Plushie')
+ITEMS = ('uae:Camel Plushie','uni:Nessie Plushie','uni:Red Fox Plushie',
+         'chi:Panda Plushie','sou:Xanax','uni:Xanax')
 DDL = '''
 CREATE TABLE stock_history(id INTEGER PRIMARY KEY,timestamp INTEGER,country TEXT,item_name TEXT,quantity INTEGER,source TEXT);
 CREATE INDEX stock_item ON stock_history(country,lower(item_name),timestamp,id);
@@ -30,11 +28,11 @@ CREATE TABLE research_metadata(key TEXT PRIMARY KEY,value TEXT);
 '''
 
 
-def export(source,output,*,days=120,owner=None):
+def export(source,output,*,days=None,owner=None):
     source=Path(source).resolve(strict=True);output=Path(output)
     if output.exists() or output.is_symlink() or source==output.resolve():
         raise ValueError('choose a new output file; source and existing exports cannot be replaced')
-    if not 14<=days<=120:
+    if days is not None and not 14<=days<=120:
         raise ValueError('history days must be 14..120')
     fd,name=tempfile.mkstemp(prefix='.challenger-export-',dir=output.parent)
     os.close(fd);temp=Path(name);os.chmod(temp,0o600)
@@ -43,7 +41,7 @@ def export(source,output,*,days=120,owner=None):
             src.execute('PRAGMA query_only=ON');src.execute('PRAGMA temp_store=MEMORY');src.execute('BEGIN')
             latest=src.execute("SELECT MAX(timestamp) FROM poll_heartbeats WHERE mode='poll-cycle' AND success=1").fetchone()[0]
             if latest is None:raise ValueError('no collector heartbeat')
-            cutoff=min(int(time.time()),latest);start=cutoff-days*86400
+            cutoff=min(int(time.time()),latest);start=0 if days is None else cutoff-days*86400
             dst.executescript(DDL);counts={}
             for key in ITEMS:
                 country,item=key.split(':',1)
@@ -72,7 +70,7 @@ def export(source,output,*,days=120,owner=None):
                     if len(clocks)>500000:raise ValueError('country clock cap exceeded')
                     dst.executemany('INSERT INTO country_stock_observations(received_epoch,country,source,country_update_epoch,clock_status) VALUES(?,?,?,?,?)',clocks)
             metadata={'schema':'corrected-challenger-history-v1','cutoff':cutoff,'history_days':days,
-                'items':counts,'sanitized_stock_only':True,'collector_modified':False,
+                'full_available_history':days is None,'items':counts,'sanitized_stock_only':True,'collector_modified':False,
                 'country_clock_table_available':bool(has_clocks)}
             dst.executemany('INSERT INTO research_metadata VALUES(?,?)',[(k,json.dumps(v)) for k,v in metadata.items()])
             dst.commit()
@@ -89,5 +87,5 @@ def export(source,output,*,days=120,owner=None):
 if __name__=='__main__':
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('--source',required=True);p.add_argument('--output',required=True)
-    p.add_argument('--days',type=int,default=120);p.add_argument('--owner')
+    p.add_argument('--days',type=int,default=None);p.add_argument('--owner')
     a=p.parse_args();print(json.dumps(export(a.source,a.output,days=a.days,owner=a.owner),sort_keys=True))
