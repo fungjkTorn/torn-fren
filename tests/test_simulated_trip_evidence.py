@@ -4,8 +4,8 @@ from pathlib import Path
 import sqlite3
 import tempfile
 import unittest
-from services.restock_signatures import learn,events
-from services.simulated_trip_evidence import advance,grade_trip,summary,initialize
+from services.restock_signatures import learn,events,normal_quantity_group
+from services.simulated_trip_evidence import advance,grade_trip,summary,initialize,input_cutoff,same_episode
 from services import first_release_evidence as old
 
 
@@ -17,6 +17,51 @@ def recommendation(t,dep,anchor=100,end=1000):
 
 
 class SimulationTests(unittest.TestCase):
+    def test_tiny_cluster_does_not_hide_a_separate_small_refill_tail(self):
+        quantities=[10,11,407,883,1351,1572,1633,1668,3370,3781,3824,3905,5189,5668,6176,6367,7657,8072,8256,8389,8405,8610,8815,9052,9156,9191,9207,9381,9406,9584]+[9800,9850,9900,9950,9999]*30
+        group,excluded=normal_quantity_group(quantities)
+        self.assertGreater(min(group),9000);self.assertEqual(9999,max(group))
+        self.assertGreater(excluded,2)
+        self.assertEqual([1000,1200,1500,1800,2100,2500]*3,normal_quantity_group([1000,1200,1500,1800,2100,2500]*3)[0])
+
+    def test_actual_ceibo_snapshot_lag_does_not_duplicate_the_frozen_target(self):
+        import bisect
+        fixture=json.loads((Path(__file__).parent/'fixtures/planner_ceibo_handoff.json').read_text())
+        state={'active':None,'completed':[]};trips=[];openings=fixture['openings']
+        for row in fixture['rows']:
+            until=input_cutoff(row);pos=bisect.bisect_right(openings,until)-1
+            row['_availability_anchor']=openings[pos] if pos>=0 else 0
+            row['_availability_openings']=[t for t in openings if t<=row['published_epoch']]
+            state,new,_=advance(state,row,[{'epoch':t} for t in openings],row['published_epoch'])
+            trips.extend(new)
+        self.assertEqual(1,len(trips))
+        self.assertEqual(1793221955,trips[0]['departure_epoch'])
+        self.assertEqual(1793228615,trips[0]['arrival_epoch'])
+        self.assertEqual(1793225633,state['completed'][0]['resolved_opening'])
+        self.assertEqual(1793225583,input_cutoff(fixture['rows'][1]))
+
+    def test_resolve_both_sides_when_restock_arrives_during_publication(self):
+        def future(t,dep,published):
+            row=recommendation(t,dep,anchor=110,end=900)
+            row['published_epoch']=published;row['_availability_anchor']=0
+            row['_availability_openings']=[110] if published>=110 else []
+            row['decision']['selected_restock_event_index']=1
+            row['decision']['forecast_events']=[{'index':1,'predicted_restock_epoch':110,'predicted_stock_below_30_epoch':900}]
+            return row
+        state={'active':None,'completed':[]}
+        state,first,_=advance(state,future(80,80,80),[],80)
+        state,second,_=advance(state,future(100,120,120),[{'epoch':110}],120)
+        self.assertEqual(1,len(first));self.assertEqual([],second)
+        self.assertTrue(same_episode(state['completed'][0],{'episode_anchor':'restock:110','selected_event_index':0}))
+        self.assertTrue(same_episode({'episode_anchor':'restock:110','selected_event_index':0},state['completed'][0]))
+
+    def test_item_change_before_completed_heartbeat_is_still_known(self):
+        row=recommendation(150,150);row['source_heartbeat_epoch']=100
+        row['forecast']['last_quantity_change_epoch']=140
+        self.assertEqual(140,input_cutoff(row))
+        row['forecast']['last_quantity_change_epoch']=999
+        self.assertEqual(150,input_cutoff(row))
+
     def test_historical_refill_band_excludes_tiny_sales_and_learns_resets(self):
         rows=[]
         for i,q in enumerate([1,2,1,2200,2300,2400,2500,2500,2500]):rows.extend([(i*20+1,0,'a'),(i*20+2,q,'a')])

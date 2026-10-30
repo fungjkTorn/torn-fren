@@ -4,7 +4,7 @@ The old headline metric grouped forecasts by matched continuous availability win
 
 ## Agreed policy
 
-`RECOMMENDED_DEPARTURE_FREEZE_V4` reconstructs the published recommendation stream chronologically. The currently recommended exact departure may change before departure; revisions, postponements, withdrawals and target changes are recorded separately. At that recommended departure, the trip freezes with its original departure, arrival and selected forecast. Later forecasts and outcomes cannot move it or replace a failed result. Repeated leave-now advice for the same target is not another trip. New qualified current-stock restocks, including surplus-to-base resets, can create a new target while availability remains continuous.
+`RECOMMENDED_DEPARTURE_FREEZE_V5` reconstructs the published recommendation stream chronologically. The currently recommended exact departure may change before departure; revisions, postponements, withdrawals and target changes are recorded separately. At that recommended departure, the trip freezes with its original departure, arrival and selected forecast. Later forecasts and outcomes cannot move it or replace a failed result. Repeated leave-now advice for the same target is not another trip. New qualified current-stock restocks, including surplus-to-base resets, can create a new target while availability remains continuous.
 
 A due departure is materialized when the next publication is processed, preserving the same ordering in backfill and incremental operation. Stale recommendations do not silently become trips. No actual player departure is required.
 
@@ -45,3 +45,21 @@ New regressions reproduce forgotten-target re-entry after window expiry and a re
 The second report, `torn-fren-planner-evidence-20261029T235346Z.json`, returned `EVIDENCE_REPAIR_BLOCKED`. The private reconstruction still found duplicate observed target identities across all ten items. The apply guard returned before backup, service stop, live-ledger reconciliation or unit/UI replacement. V3 remained active. The passing sampled research checks did not establish correctness for the real publication stream; another deployment must not be requested on that evidence alone.
 
 `deploy/Export_Planner_Evidence.ps1` collects an SQLite backup of the real planner ledger plus a sanitized export of up to 120 days of collector stock, polls, gaps and country clocks for the actual ten items. It downloads a private ZIP to the user's Desktop. It runs no model inference and changes no live service, database or deployment. The ledger includes preserved original forecasts and prior derived versions for reproducing the blocked audit. The existing stock export limits and integrity checks remain in force. This bundle is the required input for validating the next correction locally before another apply attempt.
+
+## V5 verified against the actual production export
+
+The uploaded diagnostic bundle contains 17,280 original item forecast rows from October 28, 12:57:01 PM ET through October 29, about 7:58 PM ET, with stock observations through 7:59:13 PM ET. V4's Ceibo duplicate was reproduced before changing the implementation. The source snapshot heartbeat for the problematic forecast was 1793225583, while the real opening was 1793225633 and the forecast issue clock was 1793225660. Although the opening preceded the issue clock, the saved model input still reported zero stock. Using issue time as the origin incorrectly shifted the future ordinal.
+
+V5 derives the input cutoff from the saved source heartbeat and the item's saved last quantity-change timestamp, capped at issue time. It resolves both earlier and newly published advice against the same available observations before comparing target identities; the prior implementation resolved only the earlier side. Known observed identities compare symmetrically across future/current recommendation forms. Predicted window expiry never discards completed identities. All original V3 records remain preserved under their original policy.
+
+Heather's pre-tracking history also exposed a quantity-grouping defect: isolating two tiny refills caused the first mixture pass to stop with a separate small-refill tail still inside the normal band. The same guarded split now repeats until stable. Heather's observed band is 9,668–9,999, with 30 small samples excluded, rather than 407–9,999 with only two excluded. Other live-ten learned bands are unchanged. The normal variable-band regression still preserves 1,000–2,500. Models and scheduling logic are unchanged.
+
+The production reconstruction contains 60 frozen simulated trips and zero duplicate target groups across all ten items. Four chronological checkpoint reconciliations equal the batch result exactly; repeating reconciliation produces no changed results or new trips. Every frozen departure and arrival matches an original published recommendation exactly, and all original evidence table fingerprints are preserved. No model inference was run. The aggregate result is checked in as `docs/PLANNER_TRACKING_VALIDATION_20261029.json`. Reproduce it with:
+
+```bash
+PYTHONPATH=. python research/validate_planner_evidence.py --ledger /path/to/forecasts.sqlite --stock /path/to/stock_history.sqlite --checkpoint 1793206900 --checkpoint 1793225700 --checkpoint 1793281940
+```
+
+Small denominators remain possible and correct. Most flower items have only a few qualified restocks during this roughly 31-hour record; revisions do not manufacture extra independent trips. Crocus has one success among four known frozen trips in this export. This is a small-sample beta result, not a reason to substitute later successful revisions or a new accuracy claim from historical model fitting.
+
+Deployment retains the duplicate guard in preview, final reconciliation, and new-publication verification. Runtime reporting also withholds the percentage if a duplicate identity appears, while the UI labels the result as under review. The upgrade and rollback checks retain the exact native model working directory. The VM still needs the reviewed V5 overlay applied using its existing Windows helper; GitHub preparation alone does not apply it.

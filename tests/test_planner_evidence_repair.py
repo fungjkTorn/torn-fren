@@ -11,6 +11,33 @@ from test_first_release_live import make_issue,SHA
 
 
 class PlannerRepairTests(unittest.TestCase):
+    def test_v3_upgrade_verifies_v5_publication_and_preserves_native_working_directory(self):
+        with tempfile.TemporaryDirectory() as td:
+            base=Path(td);unit=base/'publisher.service';js=base/'beta.js'
+            old_command=base/'reporting'/'98ebf83b2b87555dfca1'/'entry.py'
+            unit.write_text('WorkingDirectory=/immutable/native-models\nExecStart=python '+str(old_command)+' publish\n')
+            js.write_text('old UI');js.with_name('board.html').write_text('old board')
+            (base/'latest.json').write_text(json.dumps({'model_sha':SHA,'published_epoch':100}))
+            with sqlite3.connect(base/'forecasts.sqlite') as db:db.execute('CREATE TABLE original(value)')
+            archive=base/'patch.zip'
+            with zipfile.ZipFile(archive,'w') as z:
+                for name in ('first_release_evidence','restock_signatures','simulated_trip_evidence'):
+                    z.writestr('services/'+name+'.py',(Path('services')/(name+'.py')).read_bytes())
+                z.writestr('web/first_release_assets/beta.js','new UI')
+                z.writestr('web/first_release_assets/board.html','new board')
+            metrics={str(n):{'evidence_policy':'RECOMMENDED_DEPARTURE_FREEZE_V5','target_identity_audit':{'duplicate_target_groups':0}} for n in range(10)}
+            def run(args,timeout=30):
+                if args==['systemctl','start',unit.name]:
+                    (base/'latest.json').write_text(json.dumps({'model_sha':SHA,'published_epoch':200,'live_metrics':metrics}))
+                return ''
+            with patch.object(installer,'BASE',base),patch.object(installer,'UNIT',unit),patch.object(installer,'JS',js),patch.object(installer,'BACKUPS',base/'backups'),patch.object(installer,'preview',return_value=metrics),patch.object(installer,'reconcile',return_value=metrics),patch.object(installer.os,'geteuid',return_value=0),patch.object(installer,'run',side_effect=run):
+                result=installer.repair(archive,True)
+            self.assertEqual('EVIDENCE_REPAIR_APPLIED',result['status'])
+            self.assertEqual('RECOMMENDED_DEPARTURE_FREEZE_V5',result['evidence_policy'])
+            self.assertIn('WorkingDirectory=/immutable/native-models',unit.read_text())
+            self.assertNotIn(str(old_command),unit.read_text())
+            self.assertEqual('new UI',js.read_text());self.assertEqual('new board',js.with_name('board.html').read_text())
+
     def test_known_v3_overlay_upgrade_blocks_duplicate_preview_before_live_changes(self):
         with tempfile.TemporaryDirectory() as td:
             base=Path(td);unit=base/'publisher.service';js=base/'beta.js'

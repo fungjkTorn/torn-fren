@@ -10,6 +10,21 @@ import math
 
 
 def normal_quantity_group(quantities):
+    """Peel distinct lower populations until the normal band is stable.
+
+    Isolating a tiny 10-unit cluster must not prevent a separate 400-unit
+    sellback tail from being separated from recurring 10,000-unit refills.
+    The same separation guard applies at every step, including variable bands.
+    """
+    group=quantities;excluded=0
+    while True:
+        bulk,removed=_quantity_split(group)
+        excluded+=removed
+        if not removed:return bulk,excluded
+        group=bulk
+
+
+def _quantity_split(quantities):
     """Separate a small-quantity cluster from normal refills in log space.
 
     A decade of center separation OR a broad lower tail with tenfold greater
@@ -66,7 +81,7 @@ def learn(rows,gaps,cutoff):
         normal_samples=len(bulk),excluded_small_samples=split,
         reset_base=base if resets>=3 else None,reset_training_samples=resets,
         reset_candidate_base=base,classification_is_observational=True)
-    result['method']='LOG_QUANTITY_CLUSTER_WITH_OBSERVED_RANGE'
+    result['method']='ITERATED_LOG_QUANTITY_CLUSTER_WITH_OBSERVED_RANGE'
     return result
 
 

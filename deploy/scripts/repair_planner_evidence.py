@@ -91,7 +91,7 @@ def repair(archive,apply=False):
     old_command=found[0]
     before=json.loads(old_snapshot)
     result={'status':'EVIDENCE_REPAIR_PLAN','reporting_revision':revision,'model_sha':before['model_sha'],
-        'evidence_policy':'RECOMMENDED_DEPARTURE_FREEZE_V4',
+        'evidence_policy':'RECOMMENDED_DEPARTURE_FREEZE_V5',
         'collector_modified':False,'native_models_modified':False,'raw_evidence_deleted':False}
     if os.geteuid()!=0:raise PermissionError('root required for private evidence preview')
     folder=BASE/'reporting'/revision;folder.mkdir(parents=True,exist_ok=True)
@@ -123,7 +123,9 @@ def repair(archive,apply=False):
         dst=sqlite3.connect(backup/'forecasts.sqlite')
         try:src.backup(dst)
         finally:dst.close();src.close()
-        reconcile(folder,BASE/'forecasts.sqlite',COLLECTOR,before['model_sha'])
+        reconciled=reconcile(folder,BASE/'forecasts.sqlite',COLLECTOR,before['model_sha'])
+        if any(m.get('target_identity_audit',{}).get('duplicate_target_groups',1) for m in reconciled.values()):
+            raise ValueError('duplicate target identity during final reconciliation')
         new_unit=old_unit.replace(old_command,str(folder/'entry.py').encode())
         atomic(UNIT,new_unit);atomic(JS,js);atomic(board_path,board)
         run(['systemd-analyze','verify',str(UNIT)])
@@ -132,8 +134,10 @@ def repair(archive,apply=False):
         current=json.loads((BASE/'latest.json').read_text())
         if current['model_sha']!=before['model_sha'] or current['published_epoch']<=before['published_epoch']:
             raise ValueError('new publication identity/clock failed')
-        if len(current['live_metrics'])!=10 or not all(m.get('evidence_policy')=='RECOMMENDED_DEPARTURE_FREEZE_V4' for m in current['live_metrics'].values()):
+        if len(current['live_metrics'])!=10 or not all(m.get('evidence_policy')=='RECOMMENDED_DEPARTURE_FREEZE_V5' for m in current['live_metrics'].values()):
             raise ValueError('new evidence policy not active')
+        if any(m.get('target_identity_audit',{}).get('duplicate_target_groups',1) for m in current['live_metrics'].values()):
+            raise ValueError('duplicate target identity in new publication')
         result.update(status='EVIDENCE_REPAIR_APPLIED',published_epoch=current['published_epoch'],
             counts={k:{f:m.get(f) for f in fields} for k,m in current['live_metrics'].items()})
     except Exception as exc:

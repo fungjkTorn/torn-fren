@@ -10,7 +10,7 @@ import json
 import sqlite3
 from services.restock_signatures import learn,events,clean_pairs
 
-POLICY='RECOMMENDED_DEPARTURE_FREEZE_V4'
+POLICY='RECOMMENDED_DEPARTURE_FREEZE_V5'
 
 
 def initialize(db):
@@ -50,6 +50,15 @@ def profile(db,source,key,sha,start):
     return result
 
 
+def input_cutoff(row):
+    """What the saved inference snapshot knew, rather than today's history."""
+    issued=row['asof_epoch'];heartbeat=row.get('source_heartbeat_epoch')
+    if type(heartbeat) is not int:return issued
+    changed=(row.get('forecast') or {}).get('last_quantity_change_epoch')
+    # A stock write may precede the heartbeat that completes its poll cycle.
+    return min(issued,max(heartbeat,changed if type(changed) is int else heartbeat))
+
+
 def candidate(row,observed):
     d=row.get('decision') or {};dep=d.get('estimated_departure_epoch');arr=d.get('estimated_arrival_epoch')
     if type(dep) is not int or type(arr) is not int:return None
@@ -57,12 +66,12 @@ def candidate(row,observed):
     event=(f.get('current_stock_window') or {}) if selected==0 else next((e for e in d.get('forecast_events',[]) if e['index']==selected),{})
     start=event.get('predicted_restock_epoch',arr);end=event.get('predicted_stock_below_30_epoch',d.get('estimated_departure_deadline_epoch',dep)+(arr-dep))
     stamp=row.get('published_epoch',row['asof_epoch'])
-    # The native forecast only knew source data through its issue time.
-    # A restock between inference and publication must not shift event 1
-    # onto the following physical restock.
-    prior=[e for e in observed if e['epoch']<=row['asof_epoch']]
+    # The saved source may lag the issue clock. A restock not yet present in
+    # that snapshot must not shift event 1 onto the following physical restock.
+    known_until=input_cutoff(row)
+    prior=[e for e in observed if e['epoch']<=known_until]
     return {'departure_epoch':dep,'arrival_epoch':arr,'issued_epoch':row['asof_epoch'],
-        'published_epoch':stamp,'selected_event_index':selected,
+        'published_epoch':stamp,'selected_event_index':selected,'input_cutoff_epoch':known_until,
         'window_start':start,'window_end':max(end,arr),
         'restock_anchor':prior[-1]['epoch'] if selected==0 and prior and prior[-1]['epoch']>=row.get('_availability_anchor',0) else None,
         'episode_anchor':('restock:'+str(prior[-1]['epoch']) if prior and prior[-1]['epoch']>=row.get('_availability_anchor',0) else 'availability:'+str(row.get('_availability_anchor',0))) if selected==0 else None,
@@ -72,11 +81,17 @@ def candidate(row,observed):
         'reason':d.get('reason'),'forecast':event}
 
 
+def observed_identity(plan):
+    if plan.get('resolved_opening') is not None:return plan['resolved_opening']
+    if plan.get('episode_anchor') is not None:return int(plan['episode_anchor'].split(':',1)[1])
+    return None
+
+
 def same_episode(a,b):
     # A newly observed reset creates a fresh current-stock test, even if stock
     # never crossed 30. A future forecast becoming current remains one test.
-    if a.get('episode_anchor') is not None and b.get('episode_anchor') is not None:
-        return a['episode_anchor']==b['episode_anchor']
+    a_identity,b_identity=observed_identity(a),observed_identity(b)
+    if a_identity is not None and b_identity is not None:return a_identity==b_identity
     if a['selected_event_index']==0 and b['selected_event_index']!=0:return False
     if a['selected_event_index']!=0 and b['selected_event_index']==0 and a.get('resolved_opening') is not None:
         return a['resolved_opening']==b['origin_opening'] and (b['restock_anchor'] is None or b['restock_anchor']==b['origin_opening'])
@@ -90,12 +105,13 @@ def advance(state,row,observed,now):
     """Pure chronological state machine; no arrival outcomes influence choices."""
     state=deepcopy(state);changes=[];frozen=[]
     available=row.get('_availability_openings',[]) if row else []
-    for plan in state['completed']+([state['active']] if state.get('active') else []):
+    def resolve(plan):
         if plan.get('target_offset') and available:
             before=bisect.bisect_right(available,plan['origin_opening'])
             resolved=before+plan['target_offset']-1
             if resolved<len(available):plan['resolved_opening']=available[resolved]
             else:plan['remaining_offset']=plan['target_offset']-(len(available)-before)
+    for plan in state['completed']+([state['active']] if state.get('active') else []):resolve(plan)
     def change(kind,plan,**extra):changes.append(dict(kind=kind,id=plan['id'],**extra))
     def freeze(plan):
         if plan['departure_epoch']>plan['valid_until']:
@@ -113,6 +129,10 @@ def advance(state,row,observed,now):
         freeze(active);active=None
     if row is not None:
         new=candidate(row,observed)
+        # Resolve new advice against the same observations as earlier advice
+        # before comparing them. Resolving only the old side creates duplicates
+        # at a restock between source capture and publication.
+        if new:resolve(new)
         if new and new['departure_epoch']<now:
             new=None
         if new is None:
@@ -178,7 +198,7 @@ def summary(db,source,*,item_key,model_sha,cutoff):
     availability=[b[0] for a,b in clean_pairs(rows,gaps) if a[1]<=30<b[1]]
     for entry in entries:
         row=json.loads(entry[1]);row['published_epoch']=entry[2]
-        pos=bisect.bisect_right(availability,entry[0])-1
+        pos=bisect.bisect_right(availability,input_cutoff(row))-1
         row['_availability_anchor']=availability[pos] if pos>=0 else 0
         row['_availability_openings']=availability[:bisect.bisect_right(availability,entry[2])]
         state,frozen,changes=advance(state,row,observed,entry[2]);save(frozen,changes,entry[0])
@@ -211,7 +231,7 @@ def summary(db,source,*,item_key,model_sha,cutoff):
     return {'label':'Last 10 frozen simulated trips','evidence_policy':POLICY,'trips':latest,
         'known':known,'successes':counts['SUCCESS'],'failures':counts['FAILURE'],
         'unknown':counts['UNKNOWN'],'pending':counts['PENDING'],
-        'success_fraction':counts['SUCCESS']/known if known else None,
+        'success_fraction':counts['SUCCESS']/known if known and not duplicate_identities else None,
         'simulated_trips_total':len(trips),'recorded_forecast_revisions':db.execute('SELECT COUNT(*) FROM issues WHERE item=? AND model_sha=?',(key,sha)).fetchone()[0],
         'observed_restocks_since_start':len(restocks) if sig['status']=='LEARNED' else None,'restock_profile':sig,
         'restock_events':restocks[-10:],'revision_counts':changes,
@@ -221,5 +241,5 @@ def summary(db,source,*,item_key,model_sha,cutoff):
         'target_identity_audit':{'duplicate_target_groups':len(duplicate_identities),'duplicates':duplicate_identities,
             'retained_completed_identities':len(state['completed'])},
         'percentage_withheld_for_unmatched_misses':False,
-        'rate_status':'KNOWN_SIMULATED_TRIPS' if known else 'UNKNOWN_RESULTS' if counts['UNKNOWN'] else 'AWAITING_ARRIVALS' if counts['PENDING'] else 'AWAITING_DEPARTURE',
+        'rate_status':'DUPLICATE_TARGETS_REVIEW_REQUIRED' if duplicate_identities else 'KNOWN_SIMULATED_TRIPS' if known else 'UNKNOWN_RESULTS' if counts['UNKNOWN'] else 'AWAITING_ARRIVALS' if counts['PENDING'] else 'AWAITING_DEPARTURE',
         'actual_player_trips_required':False,'historical_rates_included':False}
