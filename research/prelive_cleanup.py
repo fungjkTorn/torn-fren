@@ -109,7 +109,7 @@ class NetRates:
             for rate,w in pairs:
                 acc+=w
                 if acc>=p*total:out[name]=rate;break
-        out.update(samples=len(self.rates),flat_blocks=sum(r==0 for r in self.rates),
+        out.update(latest_loss_rate=self.rates[-1],samples=len(self.rates),flat_blocks=sum(r==0 for r in self.rates),
             rising_blocks=sum(r<0 for r in self.rates),last_label_epoch=self.ends[-1],
             signature_training_cutoff=self.profile['training_cutoff'])
         return out
@@ -122,6 +122,8 @@ def current_transform(source,key,variant):
         if identity not in STORES:STORES[identity]=NetRates(Path(source).resolve(),key,variant,asof,rows,gaps)
         rates=STORES[identity].update(rows,gaps,asof)
         out=deepcopy(forecast);quantity=out.get('observed_current_quantity')
+        if rates:
+            rates['arrival_loss_rate_upper']=max(0.,rates['upper'],rates['latest_loss_rate'] if asof-rates['last_label_epoch']<=BLOCK+180 else 0.)
         out['net_stock_rates']=rates
         if type(quantity) is not int or quantity<=30:return out
         # Preserve the observed onset, including explicitly unknown onsets.
@@ -130,7 +132,7 @@ def current_transform(source,key,variant):
         if key=='uni:Xanax' or unknown_phase:
             out['current_stock_window']=None
             if rates:
-                upper=max(0.,rates['upper']);flight=TRAVEL_SECONDS[key.split(':')[0]]
+                upper=rates['arrival_loss_rate_upper'];flight=TRAVEL_SECONDS[key.split(':')[0]]
                 lower=quantity-upper*flight
                 out['current_stock_arrival_support']={'asof_epoch':asof,'arrival_epoch':asof+flight,
                     'quantity_at_issue':quantity,'loss_rate_upper':upper,
@@ -140,7 +142,7 @@ def current_transform(source,key,variant):
                 if lower>=31:out['status']='EVENT_TIMELINE_FORECAST_AVAILABLE'
         elif out.get('current_stock_window') and type(early_end) is int:
             end=early_end
-            if rates and rates['upper']>0:end=min(end,asof+math.ceil((quantity-30)/rates['upper']))
+            if rates and rates['arrival_loss_rate_upper']>0:end=min(end,asof+math.ceil((quantity-30)/rates['arrival_loss_rate_upper']))
             out['current_stock_window']['uncorrected_expected_stock_end_epoch']=out['current_stock_window']['predicted_stock_below_30_epoch']
             out['current_stock_window']['predicted_stock_below_30_epoch']=end
             out['current_stock_window']['end_estimate_basis']='PHASE_Q25_AND_NET_LOSS_Q75'

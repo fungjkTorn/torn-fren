@@ -29,7 +29,11 @@ native models. Full training history is retained.
    30. Include flat and rising quantities. Exclude learned refill/reset boundaries
    from net-rate windows. Refill signatures are learned before the first issue
    of the replay and retained, matching the evidence-profile convention.
-2. Estimate median and upper-quartile signed net loss rate. Labels close at least
+2. Estimate median and upper-quartile signed net loss rate. For arrival risk,
+   also honor the latest complete block when it is no older than one block plus
+   the 180-second confirmation allowance: use the maximum of its loss rate, the
+   historical upper quartile, and zero. This lets rapid current depletion affect
+   the current-stock estimate without depending on future gains. Labels close at least
    180 seconds before issue, permitting confirming observations without using
    future records. All qualifying older blocks remain available.
 3. UK consistently uses current-quantity arrival support, including when the
@@ -77,6 +81,11 @@ no later receipts. Twelve real-data midpoint forecasts matched continuous and
 resumed execution exactly. This is a reproducibility correction, not a change
 selected from accuracy results. The initial unscored partial runs are retained
 under `clean-full` and `clean-recent7`; comparative results will use fresh
-`clean-full-v2` / `clean-recent7-v2` directories and a single code checkpoint.
+`clean-full-v3` / `clean-recent7-v3` directories and a single code checkpoint.
 No forecast observations or saved forecast rows were edited or re-scored into a
 different recommendation.
+
+The V2 partial archives are also retained and excluded from final accuracy
+results. The latest-observed-loss response was completed during implementation
+review, before inspecting comparative arrival accuracy. No model settings were
+chosen from those partial outcomes. Final comparative archives use V3 paths.

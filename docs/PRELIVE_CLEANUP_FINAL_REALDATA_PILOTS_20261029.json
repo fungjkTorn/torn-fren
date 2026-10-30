@@ -1,0 +1,366 @@
+{
+  "source": "torn-fren-challenger-history-20261030T020202Z.sqlite",
+  "actual_data_only": true,
+  "checks": [
+    {
+      "variant": "clean-full",
+      "item": "uae:Camel Plushie",
+      "issued": 1792720800,
+      "status": "MODEL_ABSTAIN",
+      "selected_event": null,
+      "rate_samples": 340,
+      "seconds": 2.022,
+      "checks_passed": true
+    },
+    {
+      "variant": "clean-full",
+      "item": "uni:Nessie Plushie",
+      "issued": 1792720800,
+      "status": "MODEL_ABSTAIN",
+      "selected_event": null,
+      "rate_samples": 329,
+      "seconds": 1.63,
+      "checks_passed": true
+    },
+    {
+      "variant": "clean-full",
+      "item": "sou:Xanax",
+      "issued": 1792720800,
+      "status": "WAIT_FOR_ESTIMATED_DEPARTURE",
+      "selected_event": 1,
+      "rate_samples": 256,
+      "seconds": 1.179,
+      "checks_passed": true
+    },
+    {
+      "variant": "clean-full",
+      "item": "uni:Red Fox Plushie",
+      "issued": 1792720800,
+      "status": "ESTIMATED_DEPARTURE_WINDOW_OPEN",
+      "selected_event": 3,
+      "rate_samples": 338,
+      "seconds": 2.545,
+      "checks_passed": true
+    },
+    {
+      "variant": "clean-full",
+      "item": "chi:Panda Plushie",
+      "issued": 1792720800,
+      "status": "ESTIMATED_DEPARTURE_WINDOW_OPEN",
+      "selected_event": 4,
+      "rate_samples": 335,
+      "seconds": 2.923,
+      "checks_passed": true
+    },
+    {
+      "variant": "clean-full",
+      "item": "uni:Xanax",
+      "issued": 1792720800,
+      "status": "ESTIMATED_DEPARTURE_WINDOW_OPEN",
+      "selected_event": 0,
+      "rate_samples": 484,
+      "seconds": 0.346,
+      "checks_passed": true
+    },
+    {
+      "variant": "clean-full",
+      "item": "uae:Camel Plushie",
+      "issued": 1793023200,
+      "status": "WAIT_FOR_ESTIMATED_DEPARTURE",
+      "selected_event": 5,
+      "rate_samples": 619,
+      "seconds": 0.945,
+      "checks_passed": true
+    },
+    {
+      "variant": "clean-full",
+      "item": "uni:Nessie Plushie",
+      "issued": 1793023200,
+      "status": "WAIT_FOR_ESTIMATED_DEPARTURE",
+      "selected_event": 3,
+      "rate_samples": 584,
+      "seconds": 0.948,
+      "checks_passed": true
+    },
+    {
+      "variant": "clean-full",
+      "item": "sou:Xanax",
+      "issued": 1793023200,
+      "status": "WAIT_FOR_ESTIMATED_DEPARTURE",
+      "selected_event": 1,
+      "rate_samples": 420,
+      "seconds": 0.61,
+      "checks_passed": true
+    },
+    {
+      "variant": "clean-full",
+      "item": "uni:Red Fox Plushie",
+      "issued": 1793023200,
+      "status": "WAIT_FOR_ESTIMATED_DEPARTURE",
+      "selected_event": 3,
+      "rate_samples": 623,
+      "seconds": 0.878,
+      "checks_passed": true
+    },
+    {
+      "variant": "clean-full",
+      "item": "chi:Panda Plushie",
+      "issued": 1793023200,
+      "status": "WAIT_FOR_ESTIMATED_DEPARTURE",
+      "selected_event": 4,
+      "rate_samples": 596,
+      "seconds": 1.006,
+      "checks_passed": true
+    },
+    {
+      "variant": "clean-full",
+      "item": "uni:Xanax",
+      "issued": 1793023200,
+      "status": "ESTIMATED_DEPARTURE_WINDOW_OPEN",
+      "selected_event": 0,
+      "rate_samples": 856,
+      "seconds": 0.356,
+      "checks_passed": true
+    },
+    {
+      "variant": "clean-full",
+      "item": "uae:Camel Plushie",
+      "issued": 1793325600,
+      "status": "WAIT_FOR_ESTIMATED_DEPARTURE",
+      "selected_event": 4,
+      "rate_samples": 897,
+      "seconds": 1.162,
+      "checks_passed": true
+    },
+    {
+      "variant": "clean-full",
+      "item": "uni:Nessie Plushie",
+      "issued": 1793325600,
+      "status": "WAIT_FOR_ESTIMATED_DEPARTURE",
+      "selected_event": 3,
+      "rate_samples": 845,
+      "seconds": 1.287,
+      "checks_passed": true
+    },
+    {
+      "variant": "clean-full",
+      "item": "sou:Xanax",
+      "issued": 1793325600,
+      "status": "WAIT_FOR_ESTIMATED_DEPARTURE",
+      "selected_event": 1,
+      "rate_samples": 654,
+      "seconds": 0.859,
+      "checks_passed": true
+    },
+    {
+      "variant": "clean-full",
+      "item": "uni:Red Fox Plushie",
+      "issued": 1793325600,
+      "status": "WAIT_FOR_ESTIMATED_DEPARTURE",
+      "selected_event": 3,
+      "rate_samples": 919,
+      "seconds": 1.119,
+      "checks_passed": true
+    },
+    {
+      "variant": "clean-full",
+      "item": "chi:Panda Plushie",
+      "issued": 1793325600,
+      "status": "WAIT_FOR_ESTIMATED_DEPARTURE",
+      "selected_event": 4,
+      "rate_samples": 875,
+      "seconds": 1.329,
+      "checks_passed": true
+    },
+    {
+      "variant": "clean-full",
+      "item": "uni:Xanax",
+      "issued": 1793325600,
+      "status": "ESTIMATED_DEPARTURE_WINDOW_OPEN",
+      "selected_event": 0,
+      "rate_samples": 1229,
+      "seconds": 0.312,
+      "checks_passed": true
+    },
+    {
+      "variant": "clean-recent7",
+      "item": "uae:Camel Plushie",
+      "issued": 1792720800,
+      "status": "MODEL_ABSTAIN",
+      "selected_event": null,
+      "rate_samples": 340,
+      "seconds": 1.691,
+      "checks_passed": true
+    },
+    {
+      "variant": "clean-recent7",
+      "item": "uni:Nessie Plushie",
+      "issued": 1792720800,
+      "status": "MODEL_ABSTAIN",
+      "selected_event": null,
+      "rate_samples": 329,
+      "seconds": 1.79,
+      "checks_passed": true
+    },
+    {
+      "variant": "clean-recent7",
+      "item": "sou:Xanax",
+      "issued": 1792720800,
+      "status": "WAIT_FOR_ESTIMATED_DEPARTURE",
+      "selected_event": 2,
+      "rate_samples": 256,
+      "seconds": 0.816,
+      "checks_passed": true
+    },
+    {
+      "variant": "clean-recent7",
+      "item": "uni:Red Fox Plushie",
+      "issued": 1792720800,
+      "status": "ESTIMATED_DEPARTURE_WINDOW_OPEN",
+      "selected_event": 3,
+      "rate_samples": 338,
+      "seconds": 2.634,
+      "checks_passed": true
+    },
+    {
+      "variant": "clean-recent7",
+      "item": "chi:Panda Plushie",
+      "issued": 1792720800,
+      "status": "ESTIMATED_DEPARTURE_WINDOW_OPEN",
+      "selected_event": 4,
+      "rate_samples": 335,
+      "seconds": 2.803,
+      "checks_passed": true
+    },
+    {
+      "variant": "clean-recent7",
+      "item": "uni:Xanax",
+      "issued": 1792720800,
+      "status": "ESTIMATED_DEPARTURE_WINDOW_OPEN",
+      "selected_event": 0,
+      "rate_samples": 484,
+      "seconds": 0.51,
+      "checks_passed": true
+    },
+    {
+      "variant": "clean-recent7",
+      "item": "uae:Camel Plushie",
+      "issued": 1793023200,
+      "status": "WAIT_FOR_ESTIMATED_DEPARTURE",
+      "selected_event": 5,
+      "rate_samples": 619,
+      "seconds": 1.127,
+      "checks_passed": true
+    },
+    {
+      "variant": "clean-recent7",
+      "item": "uni:Nessie Plushie",
+      "issued": 1793023200,
+      "status": "WAIT_FOR_ESTIMATED_DEPARTURE",
+      "selected_event": 3,
+      "rate_samples": 584,
+      "seconds": 1.371,
+      "checks_passed": true
+    },
+    {
+      "variant": "clean-recent7",
+      "item": "sou:Xanax",
+      "issued": 1793023200,
+      "status": "WAIT_FOR_ESTIMATED_DEPARTURE",
+      "selected_event": 1,
+      "rate_samples": 420,
+      "seconds": 0.765,
+      "checks_passed": true
+    },
+    {
+      "variant": "clean-recent7",
+      "item": "uni:Red Fox Plushie",
+      "issued": 1793023200,
+      "status": "WAIT_FOR_ESTIMATED_DEPARTURE",
+      "selected_event": 2,
+      "rate_samples": 623,
+      "seconds": 1.163,
+      "checks_passed": true
+    },
+    {
+      "variant": "clean-recent7",
+      "item": "chi:Panda Plushie",
+      "issued": 1793023200,
+      "status": "WAIT_FOR_ESTIMATED_DEPARTURE",
+      "selected_event": 4,
+      "rate_samples": 596,
+      "seconds": 1.185,
+      "checks_passed": true
+    },
+    {
+      "variant": "clean-recent7",
+      "item": "uni:Xanax",
+      "issued": 1793023200,
+      "status": "ESTIMATED_DEPARTURE_WINDOW_OPEN",
+      "selected_event": 0,
+      "rate_samples": 856,
+      "seconds": 0.44,
+      "checks_passed": true
+    },
+    {
+      "variant": "clean-recent7",
+      "item": "uae:Camel Plushie",
+      "issued": 1793325600,
+      "status": "WAIT_FOR_ESTIMATED_DEPARTURE",
+      "selected_event": 4,
+      "rate_samples": 897,
+      "seconds": 1.195,
+      "checks_passed": true
+    },
+    {
+      "variant": "clean-recent7",
+      "item": "uni:Nessie Plushie",
+      "issued": 1793325600,
+      "status": "WAIT_FOR_ESTIMATED_DEPARTURE",
+      "selected_event": 2,
+      "rate_samples": 845,
+      "seconds": 1.467,
+      "checks_passed": true
+    },
+    {
+      "variant": "clean-recent7",
+      "item": "sou:Xanax",
+      "issued": 1793325600,
+      "status": "WAIT_FOR_ESTIMATED_DEPARTURE",
+      "selected_event": 1,
+      "rate_samples": 654,
+      "seconds": 1.186,
+      "checks_passed": true
+    },
+    {
+      "variant": "clean-recent7",
+      "item": "uni:Red Fox Plushie",
+      "issued": 1793325600,
+      "status": "ESTIMATED_DEPARTURE_WINDOW_OPEN",
+      "selected_event": 2,
+      "rate_samples": 919,
+      "seconds": 1.203,
+      "checks_passed": true
+    },
+    {
+      "variant": "clean-recent7",
+      "item": "chi:Panda Plushie",
+      "issued": 1793325600,
+      "status": "WAIT_FOR_ESTIMATED_DEPARTURE",
+      "selected_event": 4,
+      "rate_samples": 875,
+      "seconds": 1.494,
+      "checks_passed": true
+    },
+    {
+      "variant": "clean-recent7",
+      "item": "uni:Xanax",
+      "issued": 1793325600,
+      "status": "ESTIMATED_DEPARTURE_WINDOW_OPEN",
+      "selected_event": 0,
+      "rate_samples": 1229,
+      "seconds": 0.517,
+      "checks_passed": true
+    }
+  ]
+}

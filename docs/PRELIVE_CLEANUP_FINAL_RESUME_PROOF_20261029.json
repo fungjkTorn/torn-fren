@@ -1,0 +1,65 @@
+{
+  "actual_data_only": true,
+  "checks": [
+    {
+      "variant": "clean-full",
+      "item": "uae:Camel Plushie",
+      "exact_resume_match": true
+    },
+    {
+      "variant": "clean-full",
+      "item": "uni:Nessie Plushie",
+      "exact_resume_match": true
+    },
+    {
+      "variant": "clean-full",
+      "item": "sou:Xanax",
+      "exact_resume_match": true
+    },
+    {
+      "variant": "clean-full",
+      "item": "uni:Red Fox Plushie",
+      "exact_resume_match": true
+    },
+    {
+      "variant": "clean-full",
+      "item": "chi:Panda Plushie",
+      "exact_resume_match": true
+    },
+    {
+      "variant": "clean-full",
+      "item": "uni:Xanax",
+      "exact_resume_match": true
+    },
+    {
+      "variant": "clean-recent7",
+      "item": "uae:Camel Plushie",
+      "exact_resume_match": true
+    },
+    {
+      "variant": "clean-recent7",
+      "item": "uni:Nessie Plushie",
+      "exact_resume_match": true
+    },
+    {
+      "variant": "clean-recent7",
+      "item": "sou:Xanax",
+      "exact_resume_match": true
+    },
+    {
+      "variant": "clean-recent7",
+      "item": "uni:Red Fox Plushie",
+      "exact_resume_match": true
+    },
+    {
+      "variant": "clean-recent7",
+      "item": "chi:Panda Plushie",
+      "exact_resume_match": true
+    },
+    {
+      "variant": "clean-recent7",
+      "item": "uni:Xanax",
+      "exact_resume_match": true
+    }
+  ]
+}
