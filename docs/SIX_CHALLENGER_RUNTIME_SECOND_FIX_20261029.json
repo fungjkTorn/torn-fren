@@ -1,0 +1,47 @@
+{
+  "scope": "Local comparison, not VM runtime proof",
+  "source_sha256": "4fef31cf3ee0e4d079efabf5ed6f1de71e91fdc167a8c886e63860edbdd731f7",
+  "issue_epoch": 1793244234,
+  "results": [
+    {
+      "item_key": "arg:Monkey Plushie",
+      "previous_seconds": 0.608,
+      "optimized_seconds": 0.369,
+      "exact_output_match": true
+    },
+    {
+      "item_key": "can:Wolverine Plushie",
+      "previous_seconds": 0.617,
+      "optimized_seconds": 0.428,
+      "exact_output_match": true
+    },
+    {
+      "item_key": "cay:Stingray Plushie",
+      "previous_seconds": 0.574,
+      "optimized_seconds": 0.397,
+      "exact_output_match": true
+    },
+    {
+      "item_key": "chi:Peony",
+      "previous_seconds": 0.437,
+      "optimized_seconds": 0.293,
+      "exact_output_match": true
+    },
+    {
+      "item_key": "sou:African Violet",
+      "previous_seconds": 0.394,
+      "optimized_seconds": 0.31,
+      "exact_output_match": true
+    },
+    {
+      "item_key": "sou:Lion Plushie",
+      "previous_seconds": 0.619,
+      "optimized_seconds": 0.404,
+      "exact_output_match": true
+    }
+  ],
+  "last_vm_total_seconds": 80.676,
+  "vm_preflight_limit_seconds": 55,
+  "cpu_quota_previous_percent": 75,
+  "cpu_quota_new_percent": 100
+}

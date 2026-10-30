@@ -1,10 +1,11 @@
 """Exact history-query reuse within one immutable native inference only."""
+import bisect
 from contextlib import contextmanager
 from functools import lru_cache
 
 
 @contextmanager
-def immutable_history_queries(history):
+def immutable_history_queries(history, engine=None):
     """Keep one read-only connection; discard all caches after this inference.
 
     No model outputs, training rows, or query boundaries are changed. The caller
@@ -18,6 +19,20 @@ def immutable_history_queries(history):
     connect=history._connect;mean=history._leave_one_out_mean
     connection=connect()
     peak_list=None;peak_sum=None
+    gap_queries={}
+    original_overlap=engine.overlaps_gap if engine is not None and hasattr(engine,"overlaps_gap") else None
+
+    def indexed_overlap(gaps,a,b):
+        identity=id(gaps)
+        cached=gap_queries.get(identity)
+        if cached is None:
+            starts=[];ends=[];maximum=float("-inf")
+            for start,end in gaps:
+                starts.append(start);maximum=max(maximum,end);ends.append(maximum)
+            cached=(gaps,starts,ends);gap_queries[identity]=cached
+        lo,hi=sorted((float(a),float(b)))
+        index=bisect.bisect_right(cached[1],hi)-1
+        return index>=0 and cached[2][index]>=lo
 
     @contextmanager
     def borrow():
@@ -36,6 +51,7 @@ def immutable_history_queries(history):
         return quotient if remainder==0 else numerator/count
 
     try:
+        if original_overlap is not None:engine.overlaps_gap=indexed_overlap
         history._connect=borrow
         history._leave_one_out_mean=exact_mean
         for name,fn in saved.items():setattr(history,name,lru_cache(maxsize=100000)(fn))
@@ -43,4 +59,5 @@ def immutable_history_queries(history):
     finally:
         for name,fn in saved.items():setattr(history,name,fn)
         history._connect=connect;history._leave_one_out_mean=mean
+        if original_overlap is not None:engine.overlaps_gap=original_overlap
         connection.close()

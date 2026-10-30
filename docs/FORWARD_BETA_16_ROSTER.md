@@ -75,3 +75,26 @@ from 10.448 to 3.200 seconds. These are local measurements, not VM guarantees.
 See `SIX_CHALLENGER_RUNTIME_VALIDATION_20261029.json`. The VM must still pass the
 55-second limit; the report now includes per-item and whole-run timing, including
 source refresh, if it exceeds that budget. No cadence or freshness rule is relaxed.
+
+### Measured VM retry and second runtime correction
+
+The 01:20 UTC report measured 80.676 seconds: individual model children took
+13.282, 16.222, 12.519, 4.586, 0.974 and 12.852 seconds. All six forecasts were
+prepared privately; activation remained blocked. The previous local speedup
+was insufficient on the VM.
+
+The follow-up removes a quadratic scan for bridged tiny cycles, preserving
+strict boundary comparisons. Native gap overlap checks now use sorted interval
+indexes with prefix maximum ends, scoped to immutable inference. Both include
+regression comparisons against the original scans. The private sanitized DB
+gets timestamp/coverage indexes; the collector is never indexed or modified.
+Preflight and the dedicated challenger service now share CPUQuota=100% (one CPU
+core maximum, previously 75%), retaining Nice=19 and the 1 GiB memory limit.
+The 55-second deployment guard, one-minute timer, model configurations, training
+history, scheduling sequence and evidence definitions remain unchanged.
+
+All six historical forecast outputs again match exactly against the previously
+pushed implementation. Local combined native runtime was 3.249 versus 2.201
+seconds, before accounting for the VM quota change. This is evidence of reduced
+work, not confirmation of VM readiness. Evidence runtime is now disclosed
+separately. The next guarded run must establish actual VM cadence.

@@ -104,6 +104,7 @@ def publish(source, state, *, model_sha, item_runner=None, clock=time.time,
         poll_age = published-health["last_successful_heartbeat"]
         if published-issued >= 180 or poll_age > 180:
             raise ValueError("source expired while preparing publication")
+        evidence_started = time.monotonic()
         with closing(readonly(frozen)) as src, closing(evidence.connect(state/"forecasts.sqlite")) as ledger:
             # Reproject publication-time flight geometry. Never display a
             # departure already past or shift the landing by a grace period.
@@ -154,7 +155,7 @@ def publish(source, state, *, model_sha, item_runner=None, clock=time.time,
     return {"status":"SIX_ITEM_SNAPSHOT_PUBLISHED" if challenger_cohort else "TEN_ITEM_SNAPSHOT_PUBLISHED","asof_epoch":issued,
             "publisher_sha":publisher_sha or model_sha,"source_refresh":source_refresh,
             "published_epoch":published,"items":len(model_roster),"model_sha":model_sha,
-            "elapsed_seconds":int(clock())-started,"item_runtime_seconds":item_runtimes,"snapshot_sha256":digest}
+            "elapsed_seconds":int(clock())-started,"item_runtime_seconds":item_runtimes,"evidence_runtime_seconds":round(time.monotonic()-evidence_started,3),"snapshot_sha256":digest}
 
 
 def main():

@@ -1,4 +1,5 @@
 import sqlite3
+import bisect
 import math
 import time
 import statistics
@@ -1708,6 +1709,7 @@ def _build_validated_cycles(rows, country: str = None, item_name: str = None):
     wait_samples = []
     completed_cycles = [cycle for cycle in cycles if cycle.get("complete")]
     normal_cycles = [cycle for cycle in completed_cycles if not cycle.get("tiny_restock")]
+    tiny_restock_times = sorted(cycle["restock_time"] for cycle in completed_cycles if cycle.get("tiny_restock"))
 
     for i in range(1, len(normal_cycles)):
         previous = normal_cycles[i - 1]
@@ -1721,12 +1723,9 @@ def _build_validated_cycles(rows, country: str = None, item_name: str = None):
         gap = coverage["max_gap_seconds"]
 
         # Count any tiny cycles that occurred between these two normal boundaries.
-        bridged_tiny_count = sum(
-            1
-            for cycle in completed_cycles
-            if cycle.get("tiny_restock")
-            and previous["depletion_time"] < cycle["restock_time"] < current_cycle["restock_time"]
-        )
+        bridged_tiny_count = max(0,
+            bisect.bisect_left(tiny_restock_times, current_cycle["restock_time"])
+            - bisect.bisect_right(tiny_restock_times, previous["depletion_time"]))
 
         reasons = []
         if country and item_name:

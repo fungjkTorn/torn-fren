@@ -86,7 +86,7 @@ Environment=MKL_NUM_THREADS=1
 Environment=TORNFREN_REPLAY_PINNED_RESEARCH={BASE}/no-legacy-stage
 ExecStart=/usr/bin/flock -n {STATE}/publisher.lock {PYTHON} -B -m services.challenger_live --collector {COLLECTOR} --state {STATE} --model-sha {sha}
 Nice=19
-CPUQuota=75%
+CPUQuota=100%
 MemoryMax=1024M
 TimeoutStartSec=140
 TimeoutStopSec=15
@@ -181,12 +181,14 @@ def deploy(archive,sha,apply=False):
         run(['runuser','-u','ubuntu','--',PYTHON,'-B','-c',"import os; os.chdir("+repr(str(release))+"); "+command],timeout=90)
         if source.exists():source.rename(source.with_name('stock-history-previous-'+str(time.time_ns())+'.sqlite'))
         seed.rename(source)
+    command="from services.challenger_live import prepare_private_indexes; import json; print(json.dumps(prepare_private_indexes("+repr(str(source))+")))"
+    run(['runuser','-u','ubuntu','--',PYTHON,'-B','-c',"import os; os.chdir("+repr(str(release))+"); "+command],timeout=90)
     # The private preflight cannot seed the public cohort's forward-trip ledger.
     with tempfile.TemporaryDirectory(prefix='.challenger-preview-',dir=STATE) as td:
         os.chown(td,account.pw_uid,account.pw_gid)
         transient='torn-fren-challengers-preview-'+str(int(time.time()))
         raw=run(['systemd-run','--quiet','--wait','--pipe','--collect','--unit='+transient,
-            '--uid=ubuntu','--property=WorkingDirectory='+str(release),'--property=CPUQuota=75%',
+            '--uid=ubuntu','--property=WorkingDirectory='+str(release),'--property=CPUQuota=100%',
             '--property=Nice=19','--property=MemoryMax=1024M','--property=RuntimeMaxSec=135',
             '--setenv=PYTHONDONTWRITEBYTECODE=1','--setenv=OPENBLAS_NUM_THREADS=1','--setenv=OMP_NUM_THREADS=1','--setenv=MKL_NUM_THREADS=1',
             '--setenv=TORNFREN_REPLAY_PINNED_RESEARCH='+str(BASE/'no-legacy-stage'),

@@ -12,7 +12,7 @@ import zipfile
 from services.forward_beta_roster import CHALLENGER_MODELS
 from services.first_release_schedule import FIRST_RELEASE_MODELS
 from services.first_release_live import publish
-from services.challenger_live import bootstrap
+from services.challenger_live import bootstrap, prepare_private_indexes
 from web.first_release_bridge import read_board
 from deploy.scripts import add_forward_challengers as installer
 
@@ -61,6 +61,8 @@ class ForwardChallengerTests(unittest.TestCase):
                 db.execute("INSERT INTO poll_heartbeats(timestamp,mode,success) VALUES(?,'poll-cycle',1)",(now-10,))
             before=source.read_bytes();result=bootstrap(source,p/'private.sqlite')
             self.assertFalse(result['history_truncated']);self.assertEqual(before,source.read_bytes())
+            prepare_private_indexes(p/'private.sqlite')
+            self.assertEqual(before,source.read_bytes())
             with sqlite3.connect(p/'private.sqlite') as db:
                 self.assertEqual(12,db.execute('SELECT COUNT(*) FROM stock_history').fetchone()[0])
                 self.assertIsNone(db.execute("SELECT 1 FROM sqlite_master WHERE name='api_secrets'").fetchone())
@@ -101,7 +103,7 @@ class ForwardChallengerTests(unittest.TestCase):
             for key in CHALLENGER_MODELS:
                 args=dict(now=1790000000,flight_seconds=TRAVEL_SECONDS[key.split(':')[0]],
                     model_roster=CHALLENGER_MODELS,timing_full_history=True)
-                with patch('services.native_history_acceleration.immutable_history_queries',side_effect=lambda h:nullcontext()):
+                with patch('services.native_history_acceleration.immutable_history_queries',side_effect=lambda h,*a:nullcontext()):
                     baseline=forecast_first_release_item(FirstReleaseNativeTests.source,key,**args)
                 accelerated=forecast_first_release_item(FirstReleaseNativeTests.source,key,**args)
                 self.assertEqual(baseline,accelerated,key)
@@ -164,6 +166,8 @@ class ForwardChallengerTests(unittest.TestCase):
             self.assertEqual('original ten unit',primary.read_text())
             self.assertIn(['systemctl','enable','--now',timer.name],calls)
             self.assertTrue(unit.exists());self.assertTrue(timer.exists())
+            self.assertIn('CPUQuota=100%',unit.read_text())
+            self.assertNotIn('CPUQuota=75%',unit.read_text())
             for name in originals:self.assertEqual('new '+name,(root/name).read_text())
 
     def test_slow_preflight_blocks_before_new_units_or_website_changes(self):

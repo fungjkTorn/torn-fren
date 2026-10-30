@@ -144,7 +144,7 @@ def native_timing_choice(db, *, model_roster=FIRST_RELEASE_MODELS,
     try:
         _install_frozen_readonly_history(history_service, db)
         from services.native_history_acceleration import immutable_history_queries
-        with immutable_history_queries(history_service) if full_history else nullcontext():
+        with immutable_history_queries(history_service,engine) if full_history else nullcontext():
             country, item = request["item_key"].split(":", 1)
             quantity = request["min_quantity"]
             loaded = engine.load_item(country, item, quantity)

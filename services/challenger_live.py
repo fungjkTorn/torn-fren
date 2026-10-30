@@ -12,6 +12,14 @@ from services.first_release_live import publish
 from services.first_release_source import refresh_tail
 
 
+def prepare_private_indexes(source):
+    """Index only the writable sanitized copy, never the collector."""
+    with sqlite3.connect(source) as db:
+        db.execute('CREATE INDEX IF NOT EXISTS idx_challenger_stock_time ON stock_history(timestamp,id)')
+        db.execute('CREATE INDEX IF NOT EXISTS idx_challenger_poll_coverage ON poll_heartbeats(mode,success,timestamp)')
+    return {'status':'PRIVATE_SOURCE_INDEXED','collector_modified':False}
+
+
 def bootstrap(collector,output):
     """Copy only stock evidence, all available causal history, never secrets."""
     from deploy.research_runner.export_snapshot import DDL
