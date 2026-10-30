@@ -1,5 +1,7 @@
 # Nearest zero/restock boundary miss audit
 
+Historical evaluation preserved below. The same saved forecasts have since been rescored with the live V5 freeze-at-recommended-departure policy; see [the V5 rescore](CHALLENGER_V5_RESCORE_20261029.md). Its frozen-trip rates and miss counts use a different evaluation unit.
+
 Classify each known failed landing by the closer preceding clean >0-to-zero depletion or subsequent clean zero-to-positive restock. Ties stay ties. Positive stock of 1–30 remains a purchase failure but is not sold out. Missing/conflicting boundaries remain unknown. Boundary times are observed poll times, not exact game transition times.
 
 All failed forecast revisions are retained in nearest_boundary_misses.json; the table below counts only first forecasts per matched physical opportunity.

@@ -1,5 +1,7 @@
 # Corrected seven-challenger replay
 
+Historical evaluation preserved below. The same saved forecasts have since been rescored with the live V5 freeze-at-recommended-departure policy; see [the V5 rescore](CHALLENGER_V5_RESCORE_20261029.md). Its frozen-trip rates and miss counts use a different evaluation unit.
+
 Window: Oct 21, 2026 11:20 PM ET to Oct 28, 2026 11:20 PM ET.
 
 All seven items completed all 2,017 issue clocks: 14,119 item evaluations in total, with no native model errors. Every clock is present exactly once. Source hash and complete first-forecast chronology were checked independently.

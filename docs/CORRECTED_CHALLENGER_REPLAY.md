@@ -156,3 +156,7 @@ new models have been deployed into the live evidence recorder.
 Tests cover future and current target continuity, conflicting switches, gaps,
 mixed-provider arrival grades staying unknown, and an earlier failure winning
 over a later successful revision even when input rows arrive out of order.
+
+## V5 rescore of the saved week
+
+The original first-forecast matched-opportunity evaluation remains reproducible above. The completed archive has also been evaluated with the corrected live `RECOMMENDED_DEPARTURE_FREEZE_V5` tracking implementation, without rerunning any model. See [the V5 rescore](CHALLENGER_V5_RESCORE_20261029.md) and `research/rescore_saved_challengers.py`. It retains the sampled issue clocks and validity deadlines, including no-advice withdrawals, and invents no one-minute refreshes. The evaluation unit is the recommendation that freezes at departure, so the old conditional matched-window percentages do not directly measure improvement against the new rates.
