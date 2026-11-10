@@ -54,7 +54,7 @@ def _delays(earliest, latest, now):
 
 def build_first_release_decision(forecast, *, now, flight_seconds,
                                  poll_age_seconds, timing_choice=None,
-                                 model_roster=FIRST_RELEASE_MODELS):
+                                 model_roster=FIRST_RELEASE_MODELS, allow_minute_refinement=False):
     """Pure decision policy. timing_choice may only select from supplied delays.
 
     Forecasts must explicitly model >=31. Model confidence is advisory, not
@@ -95,9 +95,13 @@ def build_first_release_decision(forecast, *, now, flight_seconds,
             result["timing_refinement_status"] = "UNAVAILABLE_USING_EVENT_ESTIMATE"
         elif (isinstance(proposal, dict)
               and type(proposal.get("departure")) is int
-              and proposal["departure"] - now in delays):
+              and (proposal["departure"] - now in delays
+                   or (allow_minute_refinement and proposal.get("minute_refined") is True
+                       and earliest <= proposal["departure"] <= latest))):
             departure = proposal["departure"]
-            result["timing_refinement_status"] = "REFINED_WITHIN_FIRST_EVENT"
+            result["timing_refinement_status"] = (
+                "ONE_MINUTE_STOCK_SCORE" if proposal.get("minute_refined") is True
+                else "REFINED_WITHIN_FIRST_EVENT")
             result["advisory_timing_score"] = proposal.get("score")
         else:
             result["timing_refinement_status"] = "REJECTED_OUTSIDE_FIRST_EVENT"
@@ -115,7 +119,7 @@ def build_first_release_decision(forecast, *, now, flight_seconds,
 
 
 def native_timing_choice(db, *, model_roster=FIRST_RELEASE_MODELS,
-                         full_history=False, **request):
+                         full_history=False, refine_minute=False, **request):
     """Run exactly one frozen configuration against a read-only source.
 
     Use in an isolated publisher process: the legacy engines share a module
@@ -163,11 +167,14 @@ def native_timing_choice(db, *, model_roster=FIRST_RELEASE_MODELS,
                 float(request["now"]), points, [p.t for p in points],
                 timeline, deps, features, config, list(request["delays"]),
                 request["flight_seconds"], 0,
+                **({"refine_minute": True} if refine_minute and request["generation"] == "v20" else {}),
             )
             if proposal is None:
                 return None
-            return {"departure": int(proposal["departure_time"]),
-                    "score": proposal.get("probability")}
+            result = {"departure": int(proposal["departure_time"]), "score": proposal.get("probability")}
+            if proposal.get("minute_refined") is True:
+                result["minute_refined"] = True
+            return result
     finally:
         for name, value in saved.items():
             setattr(history_service, name, value)
@@ -175,7 +182,7 @@ def native_timing_choice(db, *, model_roster=FIRST_RELEASE_MODELS,
 
 def forecast_first_release_item(source, item_key, *, now, flight_seconds,
                                 model_roster=FIRST_RELEASE_MODELS,
-                                timing_full_history=False):
+                                timing_full_history=False, event_forecaster=None, refine_minute=False):
     """Fresh, causal, read-only one-item pipeline; no production writes.
 
     Shared empirical stocked/depleted phases generate the event timeline.
@@ -205,7 +212,7 @@ def forecast_first_release_item(source, item_key, *, now, flight_seconds,
         ).fetchall()
     phases = provider_continuous_phases(
         rows, asof=now, gaps=gaps, min_qty=MIN_QUANTITY)
-    forecast = predict_events(
+    forecast = (event_forecaster or predict_events)(
         item_key, phases, asof=now, horizon=None, min_qty=MIN_QUANTITY)
     forecast["phase_definition"] = "STOCK_ABOVE_30_PURCHASE_AVAILABILITY"
     # Legacy field names say below_30; expose the actual >=31 semantics too.
@@ -215,8 +222,8 @@ def forecast_first_release_item(source, item_key, *, now, flight_seconds,
         forecast, now=now, flight_seconds=flight_seconds,
         poll_age_seconds=now - health["last_successful_heartbeat"],
         timing_choice=lambda **kw: native_timing_choice(source,model_roster=model_roster,
-            full_history=timing_full_history,**kw),
-        model_roster=model_roster,
+            full_history=timing_full_history,refine_minute=refine_minute,**kw),
+        model_roster=model_roster,allow_minute_refinement=refine_minute,
     )
     return {"item_key": item_key, "asof_epoch": now,
             "forecast": forecast, "decision": decision,

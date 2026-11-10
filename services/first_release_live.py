@@ -18,6 +18,7 @@ from services.first_release_schedule import (
     FIRST_RELEASE_MODELS, build_first_release_decision, forecast_first_release_item,
 )
 from services import first_release_evidence as evidence
+from services.travel_decision_contract_v166 import STATUS_WAIT
 
 
 def atomic_json(path, payload):
@@ -116,6 +117,36 @@ def publish(source, state, *, model_sha, item_runner=None, clock=time.time,
                     timing_choice=lambda **kw: ({"departure":native_departure,
                         "score":old.get("advisory_timing_score")} if type(native_departure) is int and native_departure>=published else None),
                     model_roster=model_roster)
+                if key == "cay:Stingray Plushie":
+                    d["publication_timing_policy"] = "STINGRAY_PRESERVE_VALID_V1"
+                    # Publication can shift the candidate grid. Keep a
+                    # still-reachable departure for the same event off-grid.
+                    if (d["timing_refinement_status"] == "REJECTED_OUTSIDE_FIRST_EVENT"
+                            and d["selected_restock_event_index"] == old.get("selected_restock_event_index")
+                            and d["estimated_departure_epoch"] < native_departure <= d["estimated_departure_deadline_epoch"]):
+                        arrival = native_departure + old["player_flight_seconds"]
+                        d.update(estimated_departure_epoch=native_departure,
+                                 estimated_arrival_epoch=arrival,
+                                 estimated_arrival_plus_grace_epoch=arrival,
+                                 departure_countdown_seconds=native_departure-published,
+                                 status=STATUS_WAIT,
+                                 timing_refinement_status="PRESERVED_AT_PUBLICATION",
+                                 advisory_timing_score=old.get("advisory_timing_score"))
+                from services.monkey_combined import KEY as MONKEY, POLICY as MONKEY_POLICY
+                if key == MONKEY and row["forecast"].get("monkey_model_policy") == MONKEY_POLICY:
+                    d["monkey_model_policy"] = MONKEY_POLICY
+                    if (d["selected_restock_event_index"] is not None
+                            and d["selected_restock_event_index"] == old.get("selected_restock_event_index")
+                            and type(native_departure) is int
+                            and type(d["estimated_departure_epoch"]) is int
+                            and d["estimated_departure_epoch"] <= native_departure <= d["estimated_departure_deadline_epoch"]):
+                        arrival = native_departure + old["player_flight_seconds"]
+                        d.update(estimated_departure_epoch=native_departure,
+                                 estimated_arrival_epoch=arrival, estimated_arrival_plus_grace_epoch=arrival,
+                                 departure_countdown_seconds=native_departure-published,
+                                 status=STATUS_WAIT if native_departure>published else d["status"],
+                                 timing_refinement_status=old["timing_refinement_status"],
+                                 advisory_timing_score=old.get("advisory_timing_score"))
                 row["decision"] = d
                 row["published_epoch"] = published
                 row["source_heartbeat_epoch"] = health["last_successful_heartbeat"]
@@ -174,6 +205,9 @@ def main():
         if args.challenger_cohort:
             from services.forward_beta_roster import CHALLENGER_MODELS,FULL_HISTORY
             extra=dict(model_roster=CHALLENGER_MODELS,timing_full_history=FULL_HISTORY)
+            from services import monkey_combined
+            if args.key == monkey_combined.KEY:
+                extra.update(event_forecaster=monkey_combined.forecast, refine_minute=True)
         value=forecast_first_release_item(args.source,args.key,now=args.issued,flight_seconds=args.flight,**extra)
     else:
         value=publish(args.source,args.state,model_sha=args.model_sha,
