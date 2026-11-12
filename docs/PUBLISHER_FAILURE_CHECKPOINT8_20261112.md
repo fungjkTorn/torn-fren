@@ -32,3 +32,16 @@ Next step is a single *read-only* source-health and fixed-whitelist exception-re
 - Legacy V85 systemd service/timer removal **was completed and verified** in a separate operator step; its historical source and data were retained. Do not confuse it with these two currently enabled failing services.
 
 **No repair or merge approved on diagnostic categories alone.**
+
+
+## Additional static source-fingerprint discrepancy (pending live verification)
+
+The current VM wrapper's **SHA-256** `775e3f04b24ce18ce2ab7cdbf1ad71001fcdab01a08d1e49d6f8dc21b487e2c7` exactly matches the *generated* wrapper body in the archived `Repair-TornFrenPublishers.py` source. This wrapper checks the AST hash of `research.v128_full24_earliest_shadow._read_item` before setting `reader.MAX_ITEM_ROWS=200000` and calling the final-pair publisher.
+
+- Expected AST hash embedded in installed wrapper: `732b5802ccb2ddffa61088590393b78a30dc36d091115cbed80a8baf843128ac`.
+- Actual AST hash calculated **offline from the captured November 11 versioned final-pair release source**: `a06b3b5b21c3d727e8d99d652110b0bf509795a9dd3fb2a7de7e1139622d77d7`.
+- Public review source Git blob `research/v128_full24_earliest_shadow.py` is byte-identical to that captured release file, Git SHA `52c93b57e5959afeff093d55df1acd89e3e446bf`.
+
+**Interpretation:** There is a reproducible incompatibility between the archived/source-captured reader and the installed wrapper's expected fingerprint. **This does not yet prove it causes the current VM failure**, because the live reader file may have changed since capture and the journal reason summary contains no precise assertion traceback. The correct next step is to compute the on-VM reader's AST fingerprint (read-only) and compare it with the wrapper's embedded expected hash. If they differ, do not simply remove the assertion: construct a new guarded wrapper for the verified source revision with a backup, stage-test it, and verify model health and snapshot freshness.
+
+A single read-only root-cause script was prepared to report the current reader/wrapper fingerprints, input-heartbeat age, latest snapshot metadata and exact **whitelisted** error categories without exporting source content, full journal messages, raw commands, databases, keys or environment values. No VM repair has been executed.
