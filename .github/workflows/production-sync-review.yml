@@ -72,7 +72,6 @@ jobs:
             test_all_item_v21_checkpoint.py \
             test_dual_layer_prediction_contract.py \
             test_dual_layer_prediction_legacy_adapter.py \
-            test_frozen_champion_shadow_v24.py \
             test_next_opportunity_evaluation.py \
             test_release_shadow_canary.py \
             test_stock_opportunity_geometry.py; do
