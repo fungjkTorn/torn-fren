@@ -65,7 +65,12 @@ def candidate(row,observed):
     selected=d.get('selected_restock_event_index');f=row.get('forecast') or {}
     event=(f.get('current_stock_window') or {}) if selected==0 else next((e for e in d.get('forecast_events',[]) if e['index']==selected),{})
     start=event.get('predicted_restock_epoch',arr);end=event.get('predicted_stock_below_30_epoch',d.get('estimated_departure_deadline_epoch',dep)+(arr-dep))
+    if type(start) is not int:start=row.get('published_epoch',row['asof_epoch'])
+    if type(end) is not int:end=arr
     stamp=row.get('published_epoch',row['asof_epoch'])
+    if selected==0 and f.get('current_stock_arrival_support') and not f.get('current_stock_window'):
+        event={'current_stock_arrival_support':deepcopy(f['current_stock_arrival_support'])}
+        start=stamp;end=arr
     # The saved source may lag the issue clock. A restock not yet present in
     # that snapshot must not shift event 1 onto the following physical restock.
     known_until=input_cutoff(row)
@@ -165,16 +170,16 @@ def grade_trip(arrival,rows,polls,gaps,cutoff,country_receipts):
     if arrival-before>180 or after-arrival>180:return {'status':'UNKNOWN','reason':'MISSING_ARRIVAL_POLLS'}
     if any(lo<=after and (hi is None or hi>=before) for lo,hi in gaps):return {'status':'UNKNOWN','reason':'ARRIVAL_COLLECTION_GAP'}
     receipts=[r for r in country_receipts if r[0]<=arrival]
-    if not receipts or receipts[-1][2]!='REPORTED' or receipts[-1][1] is None or not 0<=arrival-receipts[-1][1]<=180 or arrival-receipts[-1][0]>180:
+    if not __import__('services.provider_freshness',fromlist=['ProviderFreshness']).ProviderFreshness([(r[0],r[3],r[1],r[2]) for r in receipts]).fresh(arrival):
         return {'status':'UNKNOWN','reason':'COUNTRY_EVIDENCE_UNAVAILABLE_AT_ARRIVAL'}
     times=[r[0] for r in rows];a=bisect.bisect_right(times,before)-1;b=bisect.bisect_right(times,after)-1
     if a<0 or b<0:return {'status':'UNKNOWN','reason':'NO_ITEM_STATE_AT_ARRIVAL'}
     segment=rows[a:b+1]
-    if len({r[1]>30 for r in segment})!=1:return {'status':'UNKNOWN','reason':'AVAILABILITY_CHANGED_INSIDE_POLL_BRACKET'}
-    return {'status':'SUCCESS' if segment[0][1]>30 else 'FAILURE',
+    if len({r[1]>=30 for r in segment})!=1:return {'status':'UNKNOWN','reason':'AVAILABILITY_CHANGED_INSIDE_POLL_BRACKET'}
+    return {'status':'SUCCESS' if segment[0][1]>=30 else 'FAILURE',
         'reason':'POLL_BACKED_SIMULATED_ARRIVAL','pre_quantity':rows[a][1],
         'post_quantity':rows[b][1],'pre_poll':before,'post_poll':after,
-        'failure_class':None if segment[0][1]>30 else 'ZERO_STOCK' if all(r[1]==0 for r in segment) else 'LOW_STOCK_1_TO_30'}
+        'failure_class':None if segment[0][1]>=30 else 'ZERO_STOCK' if all(r[1]==0 for r in segment) else 'LOW_STOCK_1_TO_30'}
 
 
 def summary(db,source,*,item_key,model_sha,cutoff):
@@ -209,7 +214,7 @@ def summary(db,source,*,item_key,model_sha,cutoff):
     # execution follow exactly the same revision order.
     polls=[r[0] for r in source.execute("SELECT timestamp FROM poll_heartbeats WHERE mode='poll-cycle' AND success=1 AND timestamp<=? ORDER BY timestamp",(cutoff,))]
     has_clock=source.execute("SELECT 1 FROM sqlite_master WHERE name='country_stock_observations'").fetchone()
-    receipts=source.execute('SELECT received_epoch,country_update_epoch,clock_status FROM country_stock_observations WHERE country=? AND received_epoch<=? ORDER BY received_epoch,id',(key.split(':')[0],cutoff)).fetchall() if has_clock else []
+    receipts=source.execute('SELECT received_epoch,country_update_epoch,clock_status,source FROM country_stock_observations WHERE country=? AND received_epoch<=? ORDER BY received_epoch,id',(key.split(':')[0],cutoff)).fetchall() if has_clock else []
     trips=[]
     for entry in db.execute('SELECT id,payload FROM simulated_trips WHERE item=? AND model_sha=? AND policy=?',args).fetchall():
         trip=json.loads(entry[1]);old=db.execute('SELECT payload FROM simulated_trip_outcomes WHERE item=? AND model_sha=? AND policy=? AND id=? ORDER BY cutoff DESC LIMIT 1',(*args,entry[0])).fetchone()
