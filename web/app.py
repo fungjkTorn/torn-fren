@@ -10,7 +10,6 @@ from fastapi.responses import FileResponse
 
 from services.history_service import DB_PATH, get_item_history_since, get_stock_catalog, get_stock_graph_analysis, get_latest_item_snapshot, get_collector_recovery_status
 from services.prediction_v2_live import build_live_prediction_v2
-from services.v2_departure_window import departure_window
 from services.admin_health import build_admin_health
 from services.forecast_auditor import get_recent_active_forecasts
 from services.profitability import enrich_items_with_profitability, profitability_for_item
@@ -117,15 +116,47 @@ def _prediction_key(country, item):
 
 
 def _latest_safe_leave_timestamp(prediction):
-    """Return a real, reachability-safe leave deadline, or abstain.
-
-    Delegate to the same stock-depletion geometry as the prediction engine.
-    The end of a restock *estimate* is not the end of the stocked interval;
-    missing or impossible depletion evidence must never become a fabricated
-    single-instant GO recommendation.
     """
-    window = departure_window(prediction)
-    return window["latest_departure_epoch"] if window else None
+    Reproduce the browser's modeled departure window without rebuilding the
+    forecast. Reachability is clock-dependent; point estimates are not.
+    """
+    if not prediction:
+        return None
+
+    estimate = prediction.get("estimate_timestamp")
+    calibrated_arrival = prediction.get("recommended_arrival_timestamp")
+    late_restock_bound = prediction.get("window_end_timestamp")
+    depletion = prediction.get("target_depletion_timestamp")
+    lifetime = prediction.get("expected_stock_lifetime_seconds")
+    travel = prediction.get("travel_seconds")
+
+    if not travel:
+        return None
+
+    earliest_arrival = max(
+        calibrated_arrival or estimate or 0,
+        late_restock_bound or estimate or 0,
+    )
+    if not earliest_arrival:
+        return None
+
+    depletion_buffer = (
+        max(60, min(300, round(float(lifetime) * 0.10)))
+        if lifetime else 60
+    )
+    latest_arrival = (
+        float(depletion) - depletion_buffer
+        if depletion is not None else None
+    )
+    if latest_arrival is None or latest_arrival <= earliest_arrival:
+        latest_arrival = (
+            late_restock_bound or calibrated_arrival or estimate
+        )
+    if latest_arrival is None:
+        return None
+    latest_arrival = max(float(latest_arrival), float(earliest_arrival))
+    return latest_arrival - float(travel)
+
 
 def _roll_prediction_to_now(prediction_v2, now=None):
     """
@@ -350,9 +381,6 @@ def api_history(
         analysis["baseline_prediction"] = analysis.get("prediction")
         analysis["prediction_v2"] = prediction_v2
         analysis["prediction_v2_stale"] = bool(prediction_stale)
-        # Time when the API checked the cached model, not when the model was
-        # fitted or issued. Do not substitute this for model provenance.
-        analysis["prediction_v2_checked_at"] = int(time.time())
 
         display = prediction_v2.get("display_prediction") if prediction_v2 else None
         if display and display.get("estimate_timestamp"):
@@ -381,33 +409,8 @@ def api_history(
             since_timestamp=int(time.time()) - minutes * 60,
             limit=16,
         )
-        # Preserve the optional pre-existing V2 timeline preview. Avoid
-        # running historical V2 work during the production light-graph mode.
-        if not light_request and os.environ.get("TORN_FREN_V2_BETA_TIMELINE") == "1":
-            try:
-                from research.v2_beta_departure_bridge import build_item_timeline
-                analysis["beta_item_timeline"] = build_item_timeline(
-                    f"{country}:{item}", prediction_v2,
-                    now=int(time.time()),
-                    issued_at=(
-                        prediction_v2.get("forecast_model_computed_at")
-                        if isinstance(prediction_v2, dict) else None
-                    ),
-                    stock_as_of=analysis.get("collector_last_success_timestamp"),
-                    forecast_stale=bool(prediction_stale),
-                )
-            except (ValueError, TypeError, KeyError) as bridge_error:
-                analysis["beta_item_timeline"] = {
-                    "status": "BETA_PREVIEW_UNAVAILABLE",
-                    "reason": type(bridge_error).__name__,
-                    "first_reachable": None,
-                }
     except Exception as exc:
         analysis["prediction_v2_error"] = str(exc)
-
-    if os.environ.get('TORN_FREN_TRAVEL_DECISIONS_BETA')=='1':
-        from web.travel_decisions_router import shared_item
-        analysis['shared_departure_preview']=shared_item(country,item,now=int(time.time()))
 
     return {
         "country": country,
@@ -444,26 +447,6 @@ def api_catalog():
     if os.environ.get("TORN_FREN_V38_CATALOG_CACHE") == "1":
         return _V38_CATALOG_CACHE.get(_build_catalog_uncached)
     return _build_catalog_uncached()
-
-
-@app.get("/api/research/v38/predictions")
-def api_v38_research_predictions(country: str | None = None, item: str | None = None):
-    """Opt-in legacy sidecar; no champion or V2 computation in the web handler."""
-    if os.environ.get("TORN_FREN_V38_EXPERIMENTAL_API") != "1":
-        raise HTTPException(status_code=404, detail="Experimental API disabled")
-    location = os.environ.get("TORN_FREN_V38_SNAPSHOT_DB")
-    if not location:
-        return {"experimental": True, "status": "SIDECAR_NOT_CONFIGURED",
-                "fallback_required": True}
-    if bool(country) != bool(item):
-        raise HTTPException(status_code=400, detail="country and item must be paired")
-    key = f"{country.strip().lower()}:{item.strip()}" if country and item else None
-    # Lazy import keeps the public production app independent of the archived
-    # research module while this explicitly gated endpoint is disabled.
-    from research.v38_prediction_store import read as read_v38_snapshots
-    snapshot = read_v38_snapshots(location, int(time.time()), key=key, limit=236)
-    return {"experimental": True, "probability_calibrated": False,
-            "source": "PRECOMPUTED_SIDECAR_ONLY", "latest": snapshot}
 
 
 @app.get("/api/experimental/v41/predictions")
@@ -512,11 +495,6 @@ def admin_page():
 # This does not replace /api/history V2 or alter profitability graph routes.
 app.add_api_route("/api/research/champion-shadow", champion_shadow,
                   methods=["GET"], include_in_schema=False)
-
-# Keep the optional shared travel-decision routes from the November 10 release.
-# The live beta middleware remains authoritative for the public three-page UI.
-from web.travel_decisions_router import router as travel_decisions_router
-app.include_router(travel_decisions_router)
 
 app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="static")
 # First ten live beta bridge (guarded owner deployment).

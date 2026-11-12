@@ -5,8 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Torn Fren — Stock History</title>
 
-  <link rel="stylesheet" href="/site_shell.css">
-  <script defer src="/site_shell.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
 
@@ -31,13 +29,13 @@
 
     body {
       margin: 0;
-      padding: 0;
+      padding: 8px 10px;
       background: var(--bg);
       color: var(--text);
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
 
-    .page { width: 100%; margin: 0 auto; padding: 10px 10px 8px; }
+    .page { width: 100%; margin: 0 auto; }
 
     h1 {
       margin: 0 0 4px;
@@ -591,8 +589,7 @@
     }
 
     @media (max-width: 760px) {
-      body { padding: 0; }
-      .page { padding: 10px; }
+      body { padding: 10px; }
 
       button {
         min-height: 42px;
@@ -638,10 +635,9 @@
   </style>
 </head>
 <body>
-  <a class="tf-skip" href="#main-content">Skip to content</a>
-  <header class="tf-shell"><a class="tf-brand" href="/experimental">TORN<span>-FREN</span></a><button class="tf-menu" type="button" aria-expanded="false" aria-label="Toggle navigation">☰</button><nav class="tf-nav" aria-label="Main navigation"><a data-tf-section="overview" href="/experimental">Overview</a><a data-tf-section="detail" href="/">Item detail</a><a data-tf-section="travel" href="/travel-decisions">Travel decisions</a></nav><div class="tf-shell-status"><span class="tf-beta">Research preview</span></div></header>
-  <main class="page" id="main-content">
-    <div class="tf-page-heading"><div><div class="tf-eyebrow">Item detail</div><h1 id="title">Loading...</h1><div id="subtitle" class="tf-page-subtitle"></div></div><div class="tf-context-actions"><a class="tf-action-link" href="/experimental">Browse all items</a><a class="tf-action-link primary" href="/travel-decisions">Plan a trip</a></div></div>
+  <main class="page">
+    <h1 id="title">Loading...</h1>
+    <div id="subtitle"></div>
 
     <div class="controls">
       <div class="timeframes" id="timeframes">
@@ -665,17 +661,16 @@
 
       <div class="right-controls">
         <span class="live-state" id="liveState">Loading…</span>
-        <button id="legacyV2Button" type="button" hidden aria-pressed="false" title="Temporarily enable the CPU-heavy legacy predictor">V2 backup: Off</button>
+        <button id="legacyV2Button" type="button" hidden title="Temporarily enable the CPU-heavy legacy predictor">V2 backup: Off</button>
         <button id="refreshButton" type="button">↻ Refresh</button>
         <button id="insights-toggle" type="button" aria-expanded="false">Stats & prediction</button>
         <button id="latestButton" type="button">Jump to latest</button>
       </div>
     </div>
 
-    <div id="sharedDeparturePreview" hidden role="status" style="padding:12px 20px;color:#b8ef76"></div>
     <section id="insights-panel" aria-live="polite">
       <div class="insight-section" id="history-section">
-        <div class="insight-title">Stock history</div>
+        <div class="insight-title">Observed history</div>
         <div class="metrics">
           <div class="metric"><div class="metric-label">Current stock</div><div class="metric-value" id="currentStock">—</div></div>
           <div class="metric"><div class="metric-label">Foreign buy price</div><div class="metric-value" id="currentCost">—</div><div class="metric-subvalue" id="currentCostMeta"></div></div>
@@ -698,7 +693,7 @@
 
       <div class="insight-section" id="prediction-section">
         <div class="prediction-header-row">
-          <div class="insight-title">Restock forecast</div>
+          <div class="insight-title">Prediction v2</div>
         </div>
 
         <div class="prediction-main" id="predictionEstimate">Not enough data</div>
@@ -706,22 +701,22 @@
 
         <div class="prediction-primary-grid">
           <div class="prediction-kpi">
-            <div class="prediction-kpi-label">Target stock window</div>
+            <div class="prediction-kpi-label">Target arrival window</div>
             <div class="prediction-kpi-value" id="predictionArrivalValue">—</div>
           </div>
           <div class="prediction-kpi">
-            <div class="prediction-kpi-label">Recommended leave window</div>
+            <div class="prediction-kpi-label">Best departure window</div>
             <div class="prediction-kpi-value" id="predictionLeaveByValue">—</div>
           </div>
           <div class="prediction-kpi">
-            <div class="prediction-kpi-label">Historical evidence</div>
+            <div class="prediction-kpi-label">Travel reliability</div>
             <div class="prediction-kpi-value"><span class="reliability-badge insufficient" id="predictionReliabilityBadge">—</span></div>
           </div>
         </div>
 
         <div class="success-row">
           <div class="success-box">
-            <div class="success-label">Arrival success</div>
+            <div class="success-label">Historical trip success</div>
             <div class="success-value" id="predictionLifetimeSuccess">—</div>
             <div class="success-help">All resolved trips</div>
           </div>
@@ -768,7 +763,6 @@
     <div id="hint">Scroll or swipe left/right for older data · hover on PC or tap on mobile for exact recorded values</div>
   </main>
 
-  <script src="/shared_departure_preview.js"></script>
   <script>
     const params = new URLSearchParams(window.location.search);
     let country = (params.get("country") || "uni").toLowerCase();
@@ -822,12 +816,11 @@
     let currentAnalysis = null;
     let catalog = { countries: [] };
     let autoRefreshTimer = null;
-    let legacyV2UntilMs = 0; // Explicit 10-minute, non-persistent backup session.
+    let legacyV2UntilMs = 0; // Explicitly requested legacy backup times out after 10 minutes
     let loadingData = false;
     let loadGeneration = 0;
     let previousActivePrediction = null;
     let lastFetchCompletedAt = null;
-    let predictionRefreshFailed = false;
     let cachedRows = [];
     let cachedAnalysis = null;
     let cachedFetchMinutes = 0;
@@ -1140,13 +1133,11 @@
       const depletionBuffer = lifetime
         ? Math.max(60, Math.min(300, Math.round(lifetime * 0.10)))
         : 60;
-      // The restock-window end is NOT an upper bound on available stock.
-      // If the predicted stocked interval closes before our conservative
-      // arrival, there is no feasible flight; never invent zero-width GO.
-      const latestArrival = depletion ? depletion - depletionBuffer : null;
-      if (!Number.isFinite(latestArrival) || latestArrival <= earliestArrival) {
-        return null;
+      let latestArrival = depletion ? depletion - depletionBuffer : null;
+      if (!latestArrival || latestArrival <= earliestArrival) {
+        latestArrival = prediction.window_end_timestamp || calibratedArrival || estimate;
       }
+      if (!latestArrival || latestArrival < earliestArrival) latestArrival = earliestArrival;
 
       return {
         earliestArrival,
@@ -1169,36 +1160,35 @@
 
       for (const candidate of predictions) {
         const window = departureWindowForPrediction(candidate, flightSeconds);
-        if (!window) {
-          candidate.usable_for_departure = false;
-          continue;
-        }
+        if (!window) continue;
         candidate.usable_for_departure = nowSeconds <= window.latestLeave;
         if (!next && candidate.usable_for_departure) next = candidate;
       }
 
       const current = analysis.prediction;
-      const changed = next
-        ? (!current?.estimate_timestamp ||
-           next.prediction_number !== current.prediction_number ||
-           next.estimate_timestamp !== current.estimate_timestamp)
-        : Boolean(current?.estimate_timestamp);
+      const changed = Boolean(
+        next?.estimate_timestamp &&
+        (
+          !current?.estimate_timestamp ||
+          next.prediction_number !== current.prediction_number ||
+          next.estimate_timestamp !== current.estimate_timestamp
+        )
+      );
 
       if (!changed) return false;
 
       previousActivePrediction = current ? { ...current } : null;
       analysis.prediction_v2.display_prediction = next;
-      analysis.prediction_v2.active_prediction_number =
-        next?.prediction_number ?? null;
-      analysis.prediction_v2.cycles_before_active_target = next
-        ? Math.max(0, (next.prediction_number || 1) - 1) : null;
-      analysis.prediction = next ? {
+      analysis.prediction_v2.active_prediction_number = next.prediction_number;
+      analysis.prediction_v2.cycles_before_active_target =
+        Math.max(0, (next.prediction_number || 1) - 1);
+      analysis.prediction = {
         ...next,
         confidence: next.travel_reliability,
         sample_count: v2.model_evidence_tier,
         excluded_sample_count: null,
         note: v2.note,
-      } : null;
+      };
 
       // Redraw all target-dependent UI immediately; no model rebuild/network
       // request is needed just because the clock crossed a departure deadline.
@@ -1208,30 +1198,8 @@
     }
 
 
-    function departureGuidanceBlock(analysis, nowSeconds, refreshFailed) {
-      if (refreshFailed) return "Refresh failed; recheck before departing.";
-      if (!analysis || analysis.prediction_v2_stale !== false) {
-        return "Forecast is refreshing or unavailable; recheck before departing.";
-      }
-      // A successful HTTP request cannot renew the underlying forecast or
-      // certify per-country provider freshness. Bound reuse of this response.
-      const checked = analysis.prediction_v2_checked_at;
-      const heartbeat = analysis.collector_last_success_timestamp;
-      if (!Number.isFinite(checked) || checked <= 0 || checked > nowSeconds ||
-          nowSeconds - checked >= 300) {
-        return "Forecast response expired; refresh before departing.";
-      }
-      if (!Number.isFinite(heartbeat) || heartbeat <= 0 || heartbeat > nowSeconds ||
-          nowSeconds - heartbeat > 180) {
-        return "Collector evidence is stale or unknown; recheck before departing.";
-      }
-      return null;
-    }
-
     function updateFlightTicker() {
-      const guidanceBlock = departureGuidanceBlock(
-        currentAnalysis, Date.now() / 1000, predictionRefreshFailed);
-      if (!guidanceBlock && rollPredictionTargetClientSide()) return;
+      if (rollPredictionTargetClientSide()) return;
 
       const flightMinutes = PI_PILOT_FLIGHT_MINUTES[country];
       const prediction = currentAnalysis?.prediction;
@@ -1257,14 +1225,6 @@
         return;
       }
 
-      if (guidanceBlock) {
-        flightDeadlineEl.textContent = "RECHECK REQUIRED";
-        flightCountdownEl.textContent = "--:--:--";
-        flightStatusEl.textContent = guidanceBlock;
-        flightMetaEl.textContent = `${countryName} · PI + pilot ${formatFlightMinutes(flightMinutes)} · last forecast retained for reference`;
-        return;
-      }
-
       const nowSeconds = Date.now() / 1000;
       const etaIfLeavingNow = nowSeconds + flightSeconds;
       const targetNumber = prediction.prediction_number || 1;
@@ -1278,20 +1238,20 @@
         const wait = window.earliestLeave - nowSeconds;
         flightDeadlineEl.textContent = "TOO EARLY";
         flightCountdownEl.textContent = formatDurationSeconds(wait);
-        flightStatusEl.textContent = `Wait ~${formatCompactDuration(wait)} before the modeled departure range opens; recheck near departure.`;
+        flightStatusEl.textContent = `Wait ~${formatCompactDuration(wait)} before the current safe departure range opens.`;
         if (wait <= 15 * 60) flightSection.classList.add("flight-urgent");
       } else if (nowSeconds <= window.latestLeave) {
         const remaining = window.latestLeave - nowSeconds;
         flightSection.classList.add("flight-urgent");
-        flightDeadlineEl.textContent = "MODELED DEPARTURE WINDOW";
+        flightDeadlineEl.textContent = "GOOD TO LEAVE";
         flightCountdownEl.textContent = formatDurationSeconds(remaining);
-        flightStatusEl.textContent = `ETA is inside the modeled window for P${targetNumber}; ≥30 stock at landing and country-feed freshness are unverified.`;
+        flightStatusEl.textContent = `ETA is inside the current modeled stock-available window for P${targetNumber}.`;
       } else {
         const late = nowSeconds - window.latestLeave;
         flightSection.classList.add("flight-missed");
         flightDeadlineEl.textContent = "LATE";
         flightCountdownEl.textContent = `+${formatDurationSeconds(late)}`;
-        flightStatusEl.textContent = `Leaving now is past the modeled departure range for P${targetNumber}; depletion risk is rising.`;
+        flightStatusEl.textContent = `Leaving now is past the modeled safe departure range for P${targetNumber}; depletion risk is rising.`;
       }
 
       const windowText = window
@@ -1437,7 +1397,7 @@
               ? "Waiting for clean live anchor"
               : "No active restock target";
         windowEl.textContent = backup
-          ? "Click V2 backup to run the older predictor for up to 10 minutes."
+          ? "Click V2 backup to run the older predictor for 10 minutes."
           : warming
             ? "Stock history is ready; Prediction v2 is warming in the background."
             : "—";
@@ -1751,7 +1711,6 @@
 
         const data = await response.json();
         if (requestId !== loadGeneration || requestedSelectionKey !== selectionKey()) return;
-        window.dispatchEvent(new CustomEvent('torn-shared-departure',{detail:data.analysis?.shared_departure_preview||null}));
         cachedRows = data.rows || [];
         cachedAnalysis = data.analysis || null;
         const hasBackup = Boolean(data.analysis?.legacy_v2_backup_available);
@@ -1759,13 +1718,11 @@
         if (hasBackup) {
           const active = legacyV2UntilMs > Date.now();
           legacyV2Button.classList.toggle("active", active);
-          legacyV2Button.setAttribute("aria-pressed", String(active));
           legacyV2Button.textContent = active ? "V2 backup: On (10m max)" : "V2 backup: Off";
         }
         cachedFetchMinutes = requestedFetchMinutes;
         cachedSelectionKey = requestedSelectionKey;
         previousActivePrediction = oldPrediction;
-        predictionRefreshFailed = false;
         updateInsights(data.analysis);
         scheduleWarmRefresh(data.analysis);
         updateChartSize(minutes, data.analysis, currentFetchMinutes);
@@ -1805,9 +1762,6 @@
       } catch (error) {
         if (requestId !== loadGeneration || requestedSelectionKey !== selectionKey()) return;
         console.error(error);
-        window.sharedDeparturePreview.clear();
-        predictionRefreshFailed = true;
-        updateFlightTicker();
         liveStateEl.className = "live-state offline";
         liveStateEl.textContent = "Refresh failed";
         statusEl.textContent = "Could not load stock history. Make sure the FastAPI server is running.";
@@ -1891,18 +1845,13 @@
     }
 
     async function changeSelection(nextCountry, nextItem = null) {
-      window.sharedDeparturePreview.clear();
       country = nextCountry.toLowerCase();
-      // Restrict costly backup inference to the item explicitly requested.
-      legacyV2UntilMs = 0;
-      legacyV2Button.setAttribute("aria-pressed", "false");
       if (nextItem !== null) item = nextItem;
       populateItemSelect();
       if (nextItem === null) item = itemSelect.value || "";
       syncLocationAndTitle();
 
       previousActivePrediction = null;
-      predictionRefreshFailed = false;
       currentAnalysis = null;
       loadGeneration += 1;
       loadingData = false;
@@ -1950,12 +1899,12 @@
     });
 
     legacyV2Button.addEventListener("click", () => {
-      // No persistence; expires automatically after 10 minutes at most.
+      // A bounded, explicit backup session: never silently re-enable
+      // heavy V2 requests after browser reload or 10 minutes.
       legacyV2UntilMs = legacyV2UntilMs > Date.now() ? 0 : Date.now() + 10 * 60 * 1000;
-      const active = legacyV2UntilMs > Date.now();
-      legacyV2Button.classList.toggle("active", active);
-      legacyV2Button.setAttribute("aria-pressed", String(active));
-      legacyV2Button.textContent = active ? "V2 backup: On (10m max)" : "V2 backup: Off";
+      legacyV2Button.classList.toggle("active", legacyV2UntilMs > Date.now());
+      legacyV2Button.textContent = legacyV2UntilMs > Date.now()
+        ? "V2 backup: On (10m max)" : "V2 backup: Off";
       loadData(currentMinutes, { keepView: true });
     });
 
@@ -2014,7 +1963,6 @@
 
     window.addEventListener("resize", () => updateChartSize(currentMinutes, currentAnalysis, currentFetchMinutes));
 
-    window.addEventListener('torn-shared-departure-tick',()=>{if(chart)chart.draw();});
     setInterval(updateFlightTicker, 1000);
 
     (async function boot() {

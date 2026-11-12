@@ -1,5 +1,4 @@
 import sqlite3
-import bisect
 import math
 import time
 import statistics
@@ -17,21 +16,18 @@ _DB_READY = False
 
 # Missing successful poll coverage longer than this is a real collection gap.
 GENERIC_COLLECTION_GAP_SECONDS = 180
-
-# This scan repairs an already-fixed September collector incident, rather
-# than monitoring active ordinary polling. Avoid an old-data table scan every
-# 30 seconds; scan on first use, periodically, and immediately on poll failure.
 _LEGACY_GAP_RECONCILE_INTERVAL_SECONDS = 600
 _LEGACY_GAP_LAST_CHECK_MONOTONIC = None
 
 
 
 class _ClosingConnection(sqlite3.Connection):
-    """SQLite transaction context which also deterministically closes FDs.
+    """SQLite context manager that *also* releases OS file descriptors.
 
-    The standard sqlite3 Connection.__exit__ manages the transaction but
-    leaves DB and WAL handles open. Reusing its exit semantics before close
-    prevents exhausting the collector's RLIMIT_NOFILE under load.
+    sqlite3.Connection.__exit__ only commits/rolls back; it does not close.
+    The collector and forecast workers call `with _connect()` thousands
+    of times, so hold database/WAL/SHM handles for no longer than a query.
+    Preserve normal transaction success/rollback semantics before closing.
     """
 
     def __exit__(self, exc_type, exc_value, traceback):
@@ -52,7 +48,9 @@ def _connect():
     millisecond-scale writer collision as a fatal error.
     """
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(DB_PATH, timeout=30.0, factory=_ClosingConnection)
+    conn = sqlite3.connect(
+        DB_PATH, timeout=30.0, factory=_ClosingConnection
+    )
     try:
         conn.execute("PRAGMA busy_timeout = 30000")
     except BaseException:
@@ -83,16 +81,14 @@ def init_db():
         with _connect() as conn:
             # WAL is persistent for the database and is much friendlier to the
             # poller + web + Discord + analysis read/write pattern.
+            for country_clock_statement in country_freshness.DDL.split(';'):
+                if country_clock_statement.strip():
+                    conn.execute(country_clock_statement)
             conn.execute("PRAGMA journal_mode = WAL")
             conn.execute("PRAGMA synchronous = NORMAL")
-            # Append-only country clocks also cover polls with no item delta.
-            # Keep observed stock timestamps and all existing cycle semantics.
-            for statement in country_freshness.DDL.split(';'):
-                if statement.strip():conn.execute(statement)
 
-            # Persist routine audit work in the same SQLite transaction as
-            # stock changes. The external timer drains the queue; the poller
-            # never executes predictions inline.
+            # Routine V2/audit work is written transactionally alongside
+            # stock changes and drained only by a quota-limited systemd job.
             from services.durable_audit_queue_v39 import ensure_schema
             ensure_schema(conn)
 
@@ -358,8 +354,6 @@ def _reconcile_heartbeat_collection_gaps_conn(conn):
             """,
             (previous_ts, recovery_ts, reason, now, now),
         )
-
-
 
 
 def _maybe_reconcile_legacy_collection_gaps_conn(conn, *, unsuccessful_poll=False):
@@ -797,9 +791,6 @@ def save_snapshot(country: str):
     changed_items = []
 
     with _connect() as conn:
-        # Legacy list-only fetch cannot supply country/export clocks. Record
-        # that absence explicitly without a second provider request.
-        country_freshness.record(conn,country,{'stocks':stock},'yata',timestamp)
         for item in stock:
             item_id = item["id"]
             item_name = item["name"]
@@ -836,7 +827,7 @@ def save_snapshot(country: str):
         f"at {time.strftime('%H:%M:%S', time.localtime(timestamp))}"
     )
 
-def save_snapshot_from_export(country: str, country_data: dict, source: str, *, provider_export_epoch=None):
+def save_snapshot_from_export(country: str, country_data: dict, source: str):
     """
     Save one country's snapshot from an already-fetched export object.
 
@@ -854,7 +845,7 @@ def save_snapshot_from_export(country: str, country_data: dict, source: str, *, 
     changed_items = []
 
     with _connect() as conn:
-        country_freshness.record(conn,country,country_data,source,timestamp,provider_export_epoch)
+        country_freshness.record(conn,country,country_data,source,timestamp)
         for item in stock:
             item_id = item["id"]
             item_name = item["name"]
@@ -890,7 +881,7 @@ def save_snapshot_from_export(country: str, country_data: dict, source: str, *, 
             # not represent a new restock/depletion observation.
             if quantity_changed:
                 from services.durable_audit_queue_v39 import enqueue
-                enqueue(conn, country, item_name, timestamp)
+                enqueue(conn,country,item_name,timestamp)
                 changed_items.append(item_name)
 
     print(f"{country}: inserted {inserted}, skipped {skipped} unchanged")
@@ -979,8 +970,7 @@ def save_all_snapshots(export: dict):
 
     changed_by_country = {}
     for country, country_data in stocks.items():
-        changed = save_snapshot_from_export(country, country_data, source,
-            provider_export_epoch=export.get('timestamp'))
+        changed = save_snapshot_from_export(country, country_data, source)
         if changed:
             changed_by_country[country] = changed
 
@@ -1717,7 +1707,6 @@ def _build_validated_cycles(rows, country: str = None, item_name: str = None):
     wait_samples = []
     completed_cycles = [cycle for cycle in cycles if cycle.get("complete")]
     normal_cycles = [cycle for cycle in completed_cycles if not cycle.get("tiny_restock")]
-    tiny_restock_times = sorted(cycle["restock_time"] for cycle in completed_cycles if cycle.get("tiny_restock"))
 
     for i in range(1, len(normal_cycles)):
         previous = normal_cycles[i - 1]
@@ -1731,9 +1720,12 @@ def _build_validated_cycles(rows, country: str = None, item_name: str = None):
         gap = coverage["max_gap_seconds"]
 
         # Count any tiny cycles that occurred between these two normal boundaries.
-        bridged_tiny_count = max(0,
-            bisect.bisect_left(tiny_restock_times, current_cycle["restock_time"])
-            - bisect.bisect_right(tiny_restock_times, previous["depletion_time"]))
+        bridged_tiny_count = sum(
+            1
+            for cycle in completed_cycles
+            if cycle.get("tiny_restock")
+            and previous["depletion_time"] < cycle["restock_time"] < current_cycle["restock_time"]
+        )
 
         reasons = []
         if country and item_name:
