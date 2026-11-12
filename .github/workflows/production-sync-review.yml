@@ -48,7 +48,7 @@ jobs:
           python - <<'PY'
           from pathlib import Path
           from web.app import app
-          paths={getattr(route, 'path', None) for route in app.routes}
+          paths={path for route in app.routes if isinstance((path := getattr(route, 'path', None)), str)}
           for path in ("/","/experimental","/travel-decisions","/api/history","/api/catalog","/api/admin/health"):
               assert path in paths, (path,sorted(paths))
           for path in ("web/static/index.html","web/static/experimental.html",
