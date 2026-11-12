@@ -23,8 +23,10 @@ ROSTER=frozenset(("arg:Ceibo Flower","can:Crocus","cay:Banana Orchid","haw:Orchi
  "uae:Tribulus Omanense","uni:Heather"))
 CHALLENGER_ROSTER=frozenset(('arg:Monkey Plushie','can:Wolverine Plushie','cay:Stingray Plushie',
     'chi:Peony','sou:African Violet','sou:Lion Plushie'))
+NEXT_SIX_ROSTER=frozenset(('uae:Camel Plushie','uni:Nessie Plushie','uni:Red Fox Plushie','chi:Panda Plushie','uni:Xanax','sou:Xanax'))
+FINAL_PAIR_ROSTER=frozenset(('can:Xanax','swi:Chamois Plushie'))
 ASSETS=Path(__file__).with_name("first_release_assets")
-UI_REVISION="forward-beta-six-v1"
+UI_REVISION="forward-beta-24-v1"
 
 
 def _read_single_board(*,now=None,path=None,roster=ROSTER):
@@ -61,26 +63,26 @@ def _read_single_board(*,now=None,path=None,roster=ROSTER):
             "stock_success_rule":s["stock_success_rule"],"flight_profile":s["flight_profile"]}
 
 
-def read_board(*,now=None,path=None,challenger_path=None):
+def read_board(*,now=None,path=None,challenger_path=None,next_six_path=None,final_pair_path=None):
     board=_read_single_board(now=now,path=path)
-    extra=Path(challenger_path or os.environ.get('TORN_FREN_CHALLENGER_SNAPSHOT','/var/lib/torn-fren-live-beta/challengers/latest.json'))
     board['cohorts']={'incumbents':{'status':board['status'],'items':len(board['rows']),'model_sha':board['model_sha']}}
-    # Default original-ten fixtures and installations remain valid until a
-    # separately verified challenger publisher is installed.
-    if not extra.exists():return board
-    try:
-        added=_read_single_board(now=now,path=extra,roster=CHALLENGER_ROSTER)
-    except (OSError,ValueError,KeyError,TypeError):
-        board['cohorts']['challengers']={'status':'UNAVAILABLE','items':0}
-        return board
-    if added['stock_success_rule']!=board['stock_success_rule'] or added['flight_profile']!=board['flight_profile']:
-        board['cohorts']['challengers']={'status':'INCOMPATIBLE','items':0}
-        return board
     for row in board['rows']:row['cohort']='incumbents'
-    for row in added['rows']:row['cohort']='challengers'
-    board['rows']=sorted(board['rows']+added['rows'],key=lambda r:r['item_key'])
-    board['cohorts']['challengers']={'status':added['status'],'items':len(added['rows']),
-        'model_sha':added['model_sha'],'published_epoch':added['published_epoch']}
+    sources=(('challengers',challenger_path,'TORN_FREN_CHALLENGER_SNAPSHOT','challengers',CHALLENGER_ROSTER),
+             ('next_six',next_six_path,'TORN_FREN_NEXT_SIX_SNAPSHOT','next-six',NEXT_SIX_ROSTER),
+             ('final_pair',final_pair_path,'TORN_FREN_FINAL_PAIR_SNAPSHOT','final-pair',FINAL_PAIR_ROSTER))
+    for name,provided,env,directory,roster in sources:
+        extra=Path(provided or os.environ.get(env,'/var/lib/torn-fren-live-beta/'+directory+'/latest.json'))
+        if not extra.exists():continue
+        try:added=_read_single_board(now=now,path=extra,roster=roster)
+        except (OSError,ValueError,KeyError,TypeError):
+            board['cohorts'][name]={'status':'UNAVAILABLE','items':0};continue
+        if added['stock_success_rule']!=board['stock_success_rule'] or added['flight_profile']!=board['flight_profile']:
+            board['cohorts'][name]={'status':'INCOMPATIBLE','items':0};continue
+        for row in added['rows']:row['cohort']=name
+        board['rows'].extend(added['rows'])
+        board['cohorts'][name]={'status':added['status'],'items':len(added['rows']),
+            'model_sha':added['model_sha'],'published_epoch':added['published_epoch']}
+    board['rows'].sort(key=lambda r:r['item_key'])
     return board
 
 
@@ -198,7 +200,7 @@ def _history_summary_cached(path,country,item,bucket):
 def read_history_summary(country,item,*,path=None):
     if country not in {'arg','can','cay','haw','jap','mex','swi','uae','uni','chi','sou'} or not item or len(item)>120 or '\x00' in item:
         raise ValueError('invalid item selection')
-    source=path or (os.environ.get('TORN_FREN_CHALLENGER_HISTORY','/var/lib/torn-fren-live-beta/challengers/stock_history.sqlite') if country+':'+item in CHALLENGER_ROSTER else os.environ.get('TORN_FREN_HISTORY_SUMMARY_SOURCE','/var/lib/torn-fren-research/stock_history_forward.db'))
+    source=path or (os.environ.get('TORN_FREN_FINAL_PAIR_HISTORY','/var/lib/torn-fren-live-beta/final-pair/stock_history.sqlite') if country+':'+item in FINAL_PAIR_ROSTER else os.environ.get('TORN_FREN_NEXT_SIX_HISTORY','/var/lib/torn-fren-live-beta/next-six/stock_history.sqlite') if country+':'+item in NEXT_SIX_ROSTER else os.environ.get('TORN_FREN_CHALLENGER_HISTORY','/var/lib/torn-fren-live-beta/challengers/stock_history.sqlite') if country+':'+item in CHALLENGER_ROSTER else os.environ.get('TORN_FREN_HISTORY_SUMMARY_SOURCE','/var/lib/torn-fren-research/stock_history_forward.db'))
     return dict(_history_summary_cached(str(source),country,item,int(time.time())//300))
 
 
