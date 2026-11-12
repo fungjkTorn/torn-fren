@@ -1,8 +1,4 @@
 from pathlib import Path
-import os
-from research.v38_prediction_store import read as read_v38_snapshots
-from web.catalog_cache_v38 import CatalogCache
-from web.v38_revision_fingerprint import revision as v38_source_revision
 import copy
 import threading
 import time
@@ -12,16 +8,22 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
-from services.history_service import DB_PATH, get_item_history_since, get_stock_catalog, get_stock_graph_analysis, get_latest_item_snapshot
+from services.history_service import DB_PATH, get_item_history_since, get_stock_catalog, get_stock_graph_analysis, get_latest_item_snapshot, get_collector_recovery_status
 from services.prediction_v2_live import build_live_prediction_v2
 from services.admin_health import build_admin_health
 from services.forecast_auditor import get_recent_active_forecasts
 from services.profitability import enrich_items_with_profitability, profitability_for_item
 from web.private_shadow_v29 import champion_shadow
+from web.v38_revision_fingerprint import revision as v38_source_revision
+from web.catalog_cache_v38 import CatalogCache
+from web.history_cache_v39 import HistoryCache
+from web.v41_champion_cache import read_snapshots as read_v41_champions, read_live_poll_heartbeat
+import os
 
 app = FastAPI(title="Torn Fren Stock Graph")
 
 _V38_CATALOG_CACHE = CatalogCache(ttl=30, max_stale=180)
+_V39_HISTORY_CACHE = HistoryCache(max_entries=64)
 
 STATIC_DIR = Path(__file__).parent / "static"
 
@@ -146,11 +148,13 @@ def _latest_safe_leave_timestamp(prediction):
         float(depletion) - depletion_buffer
         if depletion is not None else None
     )
-    # The end of a restock prediction interval is not the end of the stocked
-    # interval. A nonexistent/negative arrival window is NOT an executable
-    # departure and must not collapse to a fabricated single instant.
     if latest_arrival is None or latest_arrival <= earliest_arrival:
+        latest_arrival = (
+            late_restock_bound or calibrated_arrival or estimate
+        )
+    if latest_arrival is None:
         return None
+    latest_arrival = max(float(latest_arrival), float(earliest_arrival))
     return latest_arrival - float(travel)
 
 
@@ -284,6 +288,7 @@ def api_history(
     country: str = Query(..., min_length=3, max_length=3),
     item: str = Query(..., min_length=1),
     minutes: int = Query(1440, ge=1, le=10080),
+    legacy_v2: bool = False,
 ):
     country = country.lower().strip()
     item = item.strip()
@@ -292,21 +297,36 @@ def api_history(
         raise HTTPException(status_code=400, detail="Item name is required.")
 
     hours = minutes / 60
-    rows = get_item_history_since(country, item, hours)
+    # Stock graph + profitability continue to work in V40 lightweight mode.
+    # Full V2 and historical cycle scoring are explicitly requested as a
+    # limited backup rather than scheduled every 30 seconds per open browser.
+    light_graph_enabled = os.environ.get("TORN_FREN_V40_LIGHT_GRAPH") == "1"
+    light_request = light_graph_enabled and not legacy_v2
     latest_item_state = get_latest_item_snapshot(country, item) or {}
     research_cache = os.environ.get("TORN_FREN_V38_REVISION_CACHE") == "1"
     source_status, revision_token = ("DISABLED", None)
+    now_ts=time.time()
     if research_cache:
         source_status, revision_token = v38_source_revision(
             DB_PATH,country=country,item=item,
-            item_state=latest_item_state,now=int(time.time()))
-    if research_cache and source_status != "FRESH":
+            item_state=latest_item_state,now=int(now_ts))
+    if research_cache and source_status == "FRESH":
+        rows = _V39_HISTORY_CACHE.get(
+            country,item,minutes,revision_token,
+            get_item_history_since,now=now_ts)
+    else:
+        rows = get_item_history_since(country, item, hours)
+    if light_request:
+        # Intentionally do not enqueue either historical-cycle analysis or
+        # V2 profile recomputation. Returned raw graph points are unchanged.
+        base_analysis, analysis_warming = None, False
+    elif research_cache and source_status != "FRESH":
         base_analysis, analysis_warming = None, True
     else:
         base_analysis, analysis_warming = _get_analysis_nonblocking(
             country, item,revision=revision_token)
     analysis = _analysis_for_window(base_analysis, minutes) if base_analysis else {
-        "current_stock": rows[-1]["quantity"] if rows else None,
+        "current_stock": latest_item_state.get("quantity", rows[-1]["quantity"] if rows else None),
         "current_cost": latest_item_state.get("cost"),
         "current_cost_timestamp": latest_item_state.get("timestamp"),
         "current_cost_source": latest_item_state.get("source"),
@@ -316,6 +336,14 @@ def api_history(
         "analysis_warming": True,
     }
     analysis["analysis_warming"] = bool(analysis_warming)
+    if light_request:
+        # The browser's Live indicator must continue reflecting verified
+        # polling even when full cycle statistics are intentionally paused.
+        recovery = get_collector_recovery_status()
+        analysis["collector_last_success_timestamp"] = recovery.get("last_success_timestamp")
+        analysis["collector_last_success_source"] = "poll-cycle"
+    analysis["legacy_v2_backup_available"] = light_graph_enabled
+    analysis["light_graph_mode"] = bool(light_request)
     # Price is a cheap latest-state lookup and should appear immediately even
     # while historical stats / Prediction v2 are warming in the background.
     analysis["current_cost"] = latest_item_state.get("cost")
@@ -331,13 +359,15 @@ def api_history(
     # Prediction v2 is isolated from the base history analysis so a model-side
     # issue cannot take the graph down.  The old prediction is retained as
     # baseline_prediction for diagnostics.
-    analysis["baseline_prediction"] = analysis.get("prediction")
-    analysis["prediction"] = None
-    analysis["prediction_v2_stale"] = True
-    # Response validation time, NOT a new model issue or country-feed timestamp.
-    analysis["prediction_v2_checked_at"] = int(time.time())
     try:
-        if research_cache and source_status != "FRESH":
+        if light_request:
+            prediction_v2 = {
+                "status":"backup_available","display_prediction":None,
+                "predictions":[],
+                "note":"V2 is paused to save CPU. Use Legacy V2 backup to request it temporarily."
+            }
+            prediction_stale = True
+        elif research_cache and source_status != "FRESH":
             prediction_v2 = {
                 "status":source_status, "display_prediction":None,"predictions":[],
                 "note":"Verified stock source unavailable; no live departure forecast."
@@ -348,6 +378,7 @@ def api_history(
                 country,item,revision=revision_token)
         else:
             prediction_v2, prediction_stale = _get_prediction_nonblocking(country,item)
+        analysis["baseline_prediction"] = analysis.get("prediction")
         analysis["prediction_v2"] = prediction_v2
         analysis["prediction_v2_stale"] = bool(prediction_stale)
 
@@ -369,17 +400,18 @@ def api_history(
             # current Prediction v2 result while the expensive profile warms.
             analysis["prediction"] = None
 
-        analysis["forecast_history"] = get_recent_active_forecasts(
+        # The historical audit DB is preserved and keeps receiving updates
+        # from the independent V39 worker. Don't query/render archived V2
+        # overlays on every lightweight stock-only chart request.
+        analysis["forecast_history"] = [] if light_request else get_recent_active_forecasts(
             country,
             item,
             since_timestamp=int(time.time()) - minutes * 60,
             limit=16,
         )
-
-        # Optional, READ-ONLY shared candidate contract for the future two-view
-        # beta. Disabled by default. The V2 computation time is frozen by the
-        # model, NOT replaced with the timestamp of this HTTP request.
-        if os.environ.get("TORN_FREN_V2_BETA_TIMELINE") == "1":
+        # Preserve the optional pre-existing V2 timeline preview. Avoid
+        # running historical V2 work during the production light-graph mode.
+        if not light_request and os.environ.get("TORN_FREN_V2_BETA_TIMELINE") == "1":
             try:
                 from research.v2_beta_departure_bridge import build_item_timeline
                 analysis["beta_item_timeline"] = build_item_timeline(
@@ -444,7 +476,7 @@ def api_catalog():
 
 @app.get("/api/research/v38/predictions")
 def api_v38_research_predictions(country: str | None = None, item: str | None = None):
-    """Opt-in beta: SQLite snapshot reads only. No champion/V2 computation."""
+    """Opt-in legacy sidecar; no champion or V2 computation in the web handler."""
     if os.environ.get("TORN_FREN_V38_EXPERIMENTAL_API") != "1":
         raise HTTPException(status_code=404, detail="Experimental API disabled")
     location = os.environ.get("TORN_FREN_V38_SNAPSHOT_DB")
@@ -454,9 +486,44 @@ def api_v38_research_predictions(country: str | None = None, item: str | None = 
     if bool(country) != bool(item):
         raise HTTPException(status_code=400, detail="country and item must be paired")
     key = f"{country.strip().lower()}:{item.strip()}" if country and item else None
+    # Lazy import keeps the public production app independent of the archived
+    # research module while this explicitly gated endpoint is disabled.
+    from research.v38_prediction_store import read as read_v38_snapshots
     snapshot = read_v38_snapshots(location, int(time.time()), key=key, limit=236)
     return {"experimental": True, "probability_calibrated": False,
             "source": "PRECOMPUTED_SIDECAR_ONLY", "latest": snapshot}
+
+
+@app.get("/api/experimental/v41/predictions")
+def api_v41_champion_predictions(country: str | None = None, item: str | None = None):
+    """Precomputed read-only beta, opt-in; no expensive web request forecasting."""
+    if os.environ.get("TORN_FREN_V41_CHAMPION_BETA") != "1":
+        raise HTTPException(status_code=404, detail="Experimental beta disabled")
+    location = os.environ.get("TORN_FREN_V41_SNAPSHOT_DB")
+    if not location:
+        return {"experimental": True, "status": "SIDECAR_NOT_CONFIGURED",
+                "fallback_required": True}
+    if bool(country) != bool(item):
+        raise HTTPException(status_code=400, detail="country and item must be paired")
+    if country and (len(country) > 20 or len(item) > 120):
+        raise HTTPException(status_code=400, detail="invalid item selector")
+    key = f"{country.strip().lower()}:{item.strip()}" if country and item else None
+    now = int(time.time())
+    heartbeat = read_live_poll_heartbeat(DB_PATH)
+    latest = read_v41_champions(location, now=now, live_heartbeat=heartbeat, key=key)
+    response = {"experimental": True, "prediction_accuracy_verified": False,
+                "source": "PRECOMPUTED_READ_ONLY_SIDECAR", "latest": latest}
+    if os.environ.get("TORN_FREN_V87_EXPERIMENTAL24_PREVIEW") == "1":
+        from web.v87_experimental24_overlay import overlay_response
+        return overlay_response(response, key=key, now=now)
+    return response
+
+
+@app.get("/experimental")
+def champion_experimental_page():
+    if os.environ.get("TORN_FREN_V41_CHAMPION_BETA") != "1":
+        raise HTTPException(status_code=404, detail="Experimental beta disabled")
+    return FileResponse(STATIC_DIR / "experimental.html")
 
 
 @app.get("/api/admin/health")
@@ -474,8 +541,12 @@ def admin_page():
 app.add_api_route("/api/research/champion-shadow", champion_shadow,
                   methods=["GET"], include_in_schema=False)
 
-# Additive research-only discovery routes. No changes to either legacy view.
+# Keep the optional shared travel-decision routes from the November 10 release.
+# The live beta middleware remains authoritative for the public three-page UI.
 from web.travel_decisions_router import router as travel_decisions_router
 app.include_router(travel_decisions_router)
 
 app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="static")
+# First ten live beta bridge (guarded owner deployment).
+from web.first_release_bridge import install_first_release
+install_first_release(app)
