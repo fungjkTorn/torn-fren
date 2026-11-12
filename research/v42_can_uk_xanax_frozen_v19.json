@@ -1,0 +1,49 @@
+{
+  "schema": "v42_can_uk_xanax_frozen_v19_research_candidates",
+  "provenance": "research/all_236_champions_v26.json original_all_item_selection; config identical to services/plushie_flower_dynamic_planner_v18.py configs dyn3/dyn8",
+  "warning": "research-only; no verified live success rate; native generic v19 max_wait=21600s, replan=300s",
+  "results": {
+    "can:Xanax": {
+      "status": "complete",
+      "selected_on_training": {
+        "config": {
+          "name": "dyn8",
+          "k": 40,
+          "lookback_points": null,
+          "same_state": true,
+          "live_weight": 0.62,
+          "cycle_weight": 0.3,
+          "tod_weight": 0.08,
+          "age_scale": 900,
+          "frac_scale": 0.38,
+          "slope_scale": 0.025,
+          "eta_scale": 40,
+          "prior_strength": 4,
+          "earliest_margin": 0.03,
+          "delay_penalty_per_hour": 0.005
+        }
+      }
+    },
+    "uni:Xanax": {
+      "status": "complete",
+      "selected_on_training": {
+        "config": {
+          "name": "dyn3",
+          "k": 48,
+          "lookback_points": 2000,
+          "same_state": true,
+          "live_weight": 0.62,
+          "cycle_weight": 0.3,
+          "tod_weight": 0.08,
+          "age_scale": 1200,
+          "frac_scale": 0.45,
+          "slope_scale": 0.03,
+          "eta_scale": 50,
+          "prior_strength": 5,
+          "earliest_margin": 0.03,
+          "delay_penalty_per_hour": 0
+        }
+      }
+    }
+  }
+}

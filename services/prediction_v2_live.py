@@ -1,5 +1,6 @@
 import json
 import math
+import sqlite3
 import statistics
 import threading
 import time
@@ -12,6 +13,7 @@ from services.cycle_feature_lab import (
     build_cycle_feature_rows,
 )
 from services.history_service import (
+    DB_PATH,
     _build_validated_cycles,
     _get_all_item_rows_with_source,
     _prediction_anchor_is_currently_trustworthy,
@@ -25,6 +27,7 @@ from services.medium_model_lab import (
     analyze_advanced_item,
 )
 from services.prediction_v2_preflight import build_prediction_v2_preflight
+from services.v2_departure_window import departure_window
 
 
 _PROFILE_CACHE = {}
@@ -32,7 +35,6 @@ _PROFILE_REFRESHING = set()
 _PROFILE_LOCK = threading.Lock()
 PROFILE_TTL_SECONDS = 10 * 60
 DISK_PROFILE_SOFT_TTL_SECONDS = 60 * 60
-DISK_PROFILE_MAX_STALE_SECONDS = 24 * 60 * 60
 PROFILE_SCHEMA_VERSION = "v2.4"
 _PROFILE_CACHE_FILE = Path(__file__).parent.parent / "data" / "prediction_v2_profiles.json"
 
@@ -73,7 +75,7 @@ def _current_state(country, item_name):
     if not rows:
         return None
 
-    cycles, active_cycle, wait_samples = _build_validated_cycles(rows)
+    cycles, active_cycle, wait_samples = _build_validated_cycles(rows, country, item_name)
     completed = [
         c for c in cycles
         if c.get("complete") and not c.get("tiny_restock")
@@ -344,39 +346,149 @@ def _profile(country, item_name, force=False):
     ):
         return cached["value"]
 
-    # Persistent cache prevents a browser refresh from waiting ~10-20 seconds
-    # for the full walk-forward selector after every server restart.
+    # Persistent cache prevents a browser request from ever paying the full
+    # historical model-selection cost merely because a profile is old.
+    #
+    # Historical profiles are safe to serve stale: live stock state, anchors,
+    # projected cycles, and departure timing are still recalculated separately.
+    # When a profile is older than the soft TTL, return it immediately and
+    # refresh it asynchronously for the next request.
     if not force:
         disk = _read_disk_profiles().get(disk_key)
         if disk and disk.get("value"):
             age = now - float(disk.get("generated_at") or 0)
-            if age <= DISK_PROFILE_MAX_STALE_SECONDS:
-                value = disk["value"]
-                _PROFILE_CACHE[mem_key] = {
-                    "cached_at": now,
-                    "value": value,
-                }
+            value = disk["value"]
+            _PROFILE_CACHE[mem_key] = {
+                "cached_at": now,
+                "value": value,
+            }
 
-                # Serve the known-good profile immediately, then refresh it in
-                # the background when it is over an hour old. This lets rolling
-                # metrics improve without making the graph request block.
-                if age > DISK_PROFILE_SOFT_TTL_SECONDS:
-                    with _PROFILE_LOCK:
-                        if disk_key not in _PROFILE_REFRESHING:
-                            _PROFILE_REFRESHING.add(disk_key)
-                            threading.Thread(
-                                target=_background_refresh_profile,
-                                args=(country, item_name, disk_key),
-                                daemon=True,
-                            ).start()
-                return value
+            if age > DISK_PROFILE_SOFT_TTL_SECONDS:
+                with _PROFILE_LOCK:
+                    if disk_key not in _PROFILE_REFRESHING:
+                        _PROFILE_REFRESHING.add(disk_key)
+                        threading.Thread(
+                            target=_background_refresh_profile,
+                            args=(country, item_name, disk_key),
+                            daemon=True,
+                        ).start()
+            return value
 
-    # First-ever calculation for an item is necessarily slower. The result is
-    # persisted so subsequent graph/bot processes can reuse it immediately.
+    # Only a genuinely missing/schema-new profile must pay the expensive first
+    # calculation. The profile warmer seeds these ahead of user traffic.
     value = _calculate_profile(country, item_name)
     _PROFILE_CACHE[mem_key] = {"cached_at": now, "value": value}
     _write_disk_profile(disk_key, value)
     return value
+
+
+# Empirical horizon confidence uses resolved forecast audits, excluding the
+# 2026 Travel Day window (double capacity materially changes depletion behavior).
+TRAVEL_DAY_START_TS = 1790308800  # 2026-09-25 00:00 ET
+TRAVEL_DAY_END_TS = 1790568000    # 2026-09-28 00:00 ET
+_HORIZON_METRIC_CACHE = {}
+HORIZON_METRIC_TTL_SECONDS = 10 * 60
+
+
+def _reliability_rank(label):
+    order = ["insufficient", "unreliable", "marginal", "good", "excellent"]
+    try:
+        return order.index(label)
+    except ValueError:
+        return 0
+
+
+def _worse_reliability(a, b):
+    order = ["insufficient", "unreliable", "marginal", "good", "excellent"]
+    return order[min(_reliability_rank(a), _reliability_rank(b))]
+
+
+def _empirical_horizon_metrics(country, item_name, projection_depth):
+    key = (country.lower(), item_name.lower(), int(projection_depth or 0))
+    now = time.time()
+    cached = _HORIZON_METRIC_CACHE.get(key)
+    if cached and now - cached["cached_at"] < HORIZON_METRIC_TTL_SECONDS:
+        return cached["value"]
+
+    try:
+        with sqlite3.connect(DB_PATH, timeout=5.0) as conn:
+            row = conn.execute(
+                """
+                SELECT
+                    COUNT(p.arrival_hit),
+                    AVG(p.arrival_hit),
+                    AVG(p.window_hit),
+                    AVG(p.absolute_error_seconds)
+                FROM forecast_audit_points p
+                JOIN forecast_audit_runs r ON r.id = p.run_id
+                WHERE LOWER(r.country) = LOWER(?)
+                  AND LOWER(r.item_name) = LOWER(?)
+                  AND p.projection_depth = ?
+                  AND p.status = 'resolved'
+                  AND p.ground_truth_valid = 1
+                  AND p.arrival_hit IS NOT NULL
+                  AND p.actual_restock_timestamp IS NOT NULL
+                  AND NOT (
+                      p.actual_restock_timestamp >= ?
+                      AND p.actual_restock_timestamp < ?
+                  )
+                """,
+                (
+                    country, item_name, int(projection_depth or 0),
+                    TRAVEL_DAY_START_TS, TRAVEL_DAY_END_TS,
+                ),
+            ).fetchone()
+    except Exception:
+        return None
+
+    if not row:
+        return None
+    samples = int(row[0] or 0)
+    arrival_rate = float(row[1]) if row[1] is not None else None
+    window_rate = float(row[2]) if row[2] is not None else None
+    mae_seconds = float(row[3]) if row[3] is not None else None
+    value = {
+        "samples": samples,
+        "arrival_success_rate": arrival_rate,
+        "window_hit_rate": window_rate,
+        "mean_absolute_error_seconds": mae_seconds,
+    }
+    _HORIZON_METRIC_CACHE[key] = {"cached_at": now, "value": value}
+    return value
+
+
+def _empirical_label(metrics):
+    if not metrics or metrics.get("samples", 0) < 20:
+        return None
+    rate = metrics.get("arrival_success_rate")
+    if rate is None:
+        return None
+    if rate >= 0.85:
+        return "excellent"
+    if rate >= 0.70:
+        return "good"
+    if rate >= 0.55:
+        return "marginal"
+    return "unreliable"
+
+
+def _apply_empirical_horizon_confidence(country, item_name, predictions):
+    for prediction in predictions or []:
+        depth = int(prediction.get("projection_depth") or 0)
+        metrics = _empirical_horizon_metrics(country, item_name, depth)
+        if not metrics:
+            continue
+        prediction["empirical_horizon_samples"] = metrics.get("samples")
+        prediction["empirical_horizon_arrival_success_rate"] = metrics.get("arrival_success_rate")
+        prediction["empirical_horizon_window_hit_rate"] = metrics.get("window_hit_rate")
+        prediction["empirical_horizon_mae_seconds"] = _safe_int(metrics.get("mean_absolute_error_seconds"))
+        empirical = _empirical_label(metrics)
+        if empirical:
+            old = prediction.get("travel_reliability") or "insufficient"
+            prediction["travel_reliability_heuristic"] = old
+            prediction["travel_reliability_empirical"] = empirical
+            prediction["travel_reliability"] = _worse_reliability(old, empirical)
+    return predictions
 
 def _conditional_zero_wait(feature_rows, elapsed):
     """
@@ -419,6 +531,7 @@ def _make_prediction(
     recent20=None,
     recent10=None,
     now=None,
+    expected_stock_lifetime=None,
 ):
     now = time.time() if now is None else now
     arrival = (
@@ -432,15 +545,7 @@ def _make_prediction(
         else None
     )
 
-    usable = True
-    if leave_by is not None and leave_by <= now:
-        usable = False
-    if window_end is not None and travel_seconds is not None:
-        latest_possible_leave = window_end - travel_seconds
-        if latest_possible_leave <= now:
-            usable = False
-
-    return {
+    prediction = {
         "prediction_number": number,
         "estimate_timestamp": _safe_int(estimate),
         "window_start_timestamp": _safe_int(window_start),
@@ -456,8 +561,15 @@ def _make_prediction(
         "arrival_success_rate": success_rate,
         "recent20_arrival_success_rate": recent20,
         "recent10_arrival_success_rate": recent10,
-        "usable_for_departure": bool(usable),
+        "usable_for_departure": False,
     }
+    if estimate is not None and expected_stock_lifetime:
+        prediction['target_depletion_timestamp']=_safe_int(estimate+expected_stock_lifetime)
+        prediction['expected_stock_lifetime_seconds']=_safe_int(expected_stock_lifetime)
+    window=departure_window(prediction)
+    prediction['usable_for_departure']=bool(window and now<=window['latest_departure_epoch'])
+    prediction['latest_safe_leave_timestamp']=_safe_int(window['latest_departure_epoch']) if window else None
+    return prediction
 
 
 def _annotate_arrival_source(prediction, profile):
@@ -471,7 +583,7 @@ def _annotate_arrival_source(prediction, profile):
 
 
 
-def _annotate_target_depletion(predictions, median_lifetime):
+def _annotate_target_depletion(predictions, median_lifetime, *, now=None):
     """
     Add the expected sellout time for each forecasted restock cycle.
 
@@ -487,6 +599,7 @@ def _annotate_target_depletion(predictions, median_lifetime):
         return predictions
 
     lifetime = float(median_lifetime)
+    now=time.time() if now is None else now
     for prediction in predictions or []:
         estimate = prediction.get("estimate_timestamp")
         if estimate is None:
@@ -495,6 +608,9 @@ def _annotate_target_depletion(predictions, median_lifetime):
         target_depletion = float(estimate) + lifetime
         prediction["target_depletion_timestamp"] = _safe_int(target_depletion)
         prediction["expected_stock_lifetime_seconds"] = _safe_int(lifetime)
+        window=departure_window(prediction)
+        prediction['usable_for_departure']=bool(window and now<=window['latest_departure_epoch'])
+        prediction['latest_safe_leave_timestamp']=_safe_int(window['latest_departure_epoch']) if window else None
 
         arrival = prediction.get("recommended_arrival_timestamp")
         if arrival is not None:
@@ -651,6 +767,7 @@ def _project_future_chain(
             recent20=None,
             recent10=None,
             now=now,
+            expected_stock_lifetime=median_lifetime,
         )
         nxt = _annotate_arrival_source(nxt, profile)
         nxt["projection_depth"] = projection_depth
@@ -692,6 +809,108 @@ def _forecast_chain_summary(chain, active):
         ),
         "active_prediction_number": active_number,
     }
+
+
+def _estimate_active_depletion(country, item_name, state, fallback_lifetime):
+    """
+    Adaptive active-cycle depletion estimate.
+
+    Japan Xanax has enough evidence to benefit from quantity + time-of-day sell
+    rate plus the live slope of the current drop. Future unknown drops still use
+    the broader lifetime model because their quantity/slope do not exist yet.
+    """
+    active = state.get("active_cycle")
+    if not active or not fallback_lifetime:
+        return None
+
+    restock = active.get("restock_time")
+    peak = active.get("peak_quantity")
+    peak_time = active.get("peak_time") or restock
+    if not restock or not peak or peak <= 0:
+        return None
+
+    # Keep this targeted until the tournament proves the same policy elsewhere.
+    if country.lower() != "jap" or item_name.lower() != "xanax":
+        return {
+            "estimated_depletion_timestamp": float(restock) + float(fallback_lifetime),
+            "expected_lifetime_seconds": float(fallback_lifetime),
+            "method": "median stock lifetime",
+            "historical_rate_per_minute": None,
+            "live_rate_per_minute": None,
+            "live_weight": 0.0,
+        }
+
+    completed = [
+        c for c in state.get("valid_completed", [])
+        if c.get("peak_quantity") and c.get("lifetime_seconds") and c.get("lifetime_seconds") > 0
+    ]
+    restock_hour = (float(restock) % 86400) / 3600
+
+    def hour_distance(a, b):
+        return abs(((a - b + 12) % 24) - 12)
+
+    historical = []
+    for cycle in completed[-60:]:
+        cycle_hour = (float(cycle["restock_time"]) % 86400) / 3600
+        if hour_distance(cycle_hour, restock_hour) <= 3:
+            rate = float(cycle["peak_quantity"]) / (float(cycle["lifetime_seconds"]) / 60.0)
+            if rate > 0:
+                historical.append(rate)
+
+    if len(historical) < 5:
+        historical = [
+            float(c["peak_quantity"]) / (float(c["lifetime_seconds"]) / 60.0)
+            for c in completed[-30:]
+            if c.get("peak_quantity") and c.get("lifetime_seconds")
+        ]
+
+    historical_rate = _median(historical)
+    if not historical_rate or historical_rate <= 0:
+        historical_lifetime = float(fallback_lifetime)
+    else:
+        historical_lifetime = float(peak) / (float(historical_rate) / 60.0)
+
+    historical_depletion = float(restock) + historical_lifetime
+    result = {
+        "estimated_depletion_timestamp": historical_depletion,
+        "expected_lifetime_seconds": historical_lifetime,
+        "method": "Japan Xanax quantity + time-of-day historical sell rate",
+        "historical_rate_per_minute": historical_rate,
+        "live_rate_per_minute": None,
+        "live_weight": 0.0,
+    }
+
+    rows = state.get("rows") or []
+    latest_ts = state.get("latest_timestamp")
+    current_stock = state.get("current_stock")
+    if not latest_ts or current_stock is None or current_stock <= 0 or not peak_time:
+        return result
+
+    elapsed = float(latest_ts) - float(peak_time)
+    sold = float(peak) - float(current_stock)
+    if elapsed < 300 or sold <= 0:
+        return result
+
+    live_rate_per_second = sold / elapsed
+    if live_rate_per_second <= 0:
+        return result
+    live_rate_per_minute = live_rate_per_second * 60.0
+    live_depletion = float(latest_ts) + float(current_stock) / live_rate_per_second
+
+    # Backtesting showed raw slope is early-biased. Blend rather than replace:
+    # 50% live at 5m, ramping to 75% live by 10m and thereafter.
+    progress = min(1.0, max(0.0, (elapsed - 300.0) / 300.0))
+    live_weight = 0.50 + 0.25 * progress
+    blended = (1.0 - live_weight) * historical_depletion + live_weight * live_depletion
+
+    result.update({
+        "estimated_depletion_timestamp": blended,
+        "expected_lifetime_seconds": max(60.0, blended - float(restock)),
+        "method": "Japan Xanax historical activity + live depletion slope blend",
+        "live_rate_per_minute": live_rate_per_minute,
+        "live_weight": live_weight,
+    })
+    return result
 
 
 def _build_live_prediction_v2_impl(country, item_name, now_timestamp=None, force_profile=False):
@@ -762,7 +981,7 @@ def _build_live_prediction_v2_impl(country, item_name, now_timestamp=None, force
 
         anchor = current["anchor_timestamp"]
         trustworthy, reason = _prediction_anchor_is_currently_trustworthy(
-            anchor, int(now)
+            country, item_name, anchor, int(now)
         )
         if not trustworthy:
             base["status"] = "waiting_for_clean_anchor"
@@ -843,6 +1062,7 @@ def _build_live_prediction_v2_impl(country, item_name, now_timestamp=None, force
             recent20=profile["recent20_success_rate"],
             recent10=profile["recent10_success_rate"],
             now=now,
+            expected_stock_lifetime=median_lifetime,
         )
         p1 = _annotate_arrival_source(p1, profile)
         base["prediction_1"] = p1
@@ -863,7 +1083,8 @@ def _build_live_prediction_v2_impl(country, item_name, now_timestamp=None, force
             start_number=1,
             first_is_projected=False,
         )
-        _annotate_target_depletion(chain, median_lifetime)
+        _annotate_target_depletion(chain, median_lifetime,now=now)
+        _apply_empirical_horizon_confidence(country, item_name, chain)
         base["predictions"] = chain
         base["prediction_1"] = chain[0] if chain else None
         base["prediction_2"] = chain[1] if len(chain) > 1 else None
@@ -915,8 +1136,22 @@ def _build_live_prediction_v2_impl(country, item_name, now_timestamp=None, force
     )
 
     if last_restock and median_lifetime and median_wait:
-        estimated_depletion = last_restock + median_lifetime
+        active_depletion = _estimate_active_depletion(
+            country, item_name, state, median_lifetime
+        )
+        estimated_depletion = (
+            active_depletion["estimated_depletion_timestamp"]
+            if active_depletion
+            else last_restock + median_lifetime
+        )
+        active_lifetime = (
+            active_depletion["expected_lifetime_seconds"]
+            if active_depletion
+            else median_lifetime
+        )
         next_restock = estimated_depletion + median_wait
+        if active_depletion:
+            base["active_depletion_model"] = active_depletion
 
         life_mad = (
             statistics.median(abs(v - median_lifetime) for v in lifetimes)
@@ -944,14 +1179,20 @@ def _build_live_prediction_v2_impl(country, item_name, now_timestamp=None, force
             reliability=projected_reliability,
             evidence_tier=profile["model_evidence_tier"],
             model_name="projected next cycle",
-            method="actual restock + median lifetime + median depletion→restock wait",
+            method=(
+                f"actual restock + {active_depletion['method']} + median depletion→restock wait"
+                if active_depletion
+                else "actual restock + median lifetime + median depletion→restock wait"
+            ),
             projected=True,
             success_rate=None,
             recent20=None,
             recent10=None,
             now=now,
+            expected_stock_lifetime=median_lifetime,
         )
         p1["estimated_depletion_timestamp"] = _safe_int(estimated_depletion)
+        p1["estimated_active_lifetime_seconds"] = _safe_int(active_lifetime)
         p1["projection_depth"] = 1
         p1 = _annotate_arrival_source(p1, profile)
 
@@ -967,7 +1208,8 @@ def _build_live_prediction_v2_impl(country, item_name, now_timestamp=None, force
             start_number=1,
             first_is_projected=True,
         )
-        _annotate_target_depletion(chain, median_lifetime)
+        _annotate_target_depletion(chain, median_lifetime,now=now)
+        _apply_empirical_horizon_confidence(country, item_name, chain)
         base["predictions"] = chain
         base["prediction_1"] = chain[0] if chain else None
         base["prediction_2"] = chain[1] if len(chain) > 1 else None
@@ -1041,15 +1283,27 @@ def build_live_prediction_v2(
         force_profile=force_profile,
     )
 
+    # A model computation has its OWN issuance. This is not the HTTP
+    # response-check timestamp, which can refresh without a model refit.
+    # Preserve this timestamp through /api/history prediction caching.
+    # Historical replay callers must not construe it as a past as-of issue.
+    result["forecast_model_computed_at"] = int(time.time())
+
     if record_audit:
         try:
             from services.forecast_auditor import record_forecast_snapshot
-            record_forecast_snapshot(
+            audit_result = record_forecast_snapshot(
                 country,
                 item_name,
                 result,
                 source=audit_source,
             )
+            issued_at = audit_result.get("created_at") if audit_result else None
+            if issued_at:
+                result["forecast_snapshot_created_at"] = int(issued_at)
+                display = result.get("display_prediction")
+                if display is not None:
+                    display["issued_at_timestamp"] = int(issued_at)
         except Exception as exc:
             # Keep live prediction independent from audit persistence.
             result["forecast_audit_warning"] = str(exc)

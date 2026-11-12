@@ -1,0 +1,18 @@
+name: Execution timing calibration safeguards
+on:
+  push:
+    branches: [research/v38-full-roster-live-prep-20261009]
+    paths: ['research/execution_offset_study.py', 'tests/test_execution_offset_study.py', '.github/workflows/execution-offset.yml']
+permissions:
+  contents: read
+jobs:
+  safeguards:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install numpy==1.26.4
+      - run: python -m unittest discover -s tests -p test_execution_offset_study.py -v

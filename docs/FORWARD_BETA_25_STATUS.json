@@ -1,0 +1,109 @@
+{
+  "original_items": 25,
+  "currently_confirmed_live": 10,
+  "prepared_additions": 6,
+  "target_live_after_deployment": 16,
+  "remaining_after_deployment": 9,
+  "items": {
+    "arg:Ceibo Flower": {
+      "status": "Existing live ten",
+      "detail": "v18 dyn3"
+    },
+    "arg:Monkey Plushie": {
+      "status": "Ready for six-item deployment",
+      "detail": "v20 traj3; full history"
+    },
+    "can:Crocus": {
+      "status": "Existing live ten",
+      "detail": "v18 dyn5"
+    },
+    "can:Wolverine Plushie": {
+      "status": "Ready for six-item deployment",
+      "detail": "v20 traj12; full history"
+    },
+    "can:Xanax": {
+      "status": "Remaining",
+      "detail": "Further challenger work"
+    },
+    "cay:Banana Orchid": {
+      "status": "Existing live ten",
+      "detail": "v18 dyn7"
+    },
+    "cay:Stingray Plushie": {
+      "status": "Ready for six-item deployment",
+      "detail": "v20 traj5; full history"
+    },
+    "chi:Panda Plushie": {
+      "status": "Remaining",
+      "detail": "Scheduling corrected; actual-data pilot/week replay pending refreshed export"
+    },
+    "chi:Peony": {
+      "status": "Ready for six-item deployment",
+      "detail": "v20 traj12; full history"
+    },
+    "haw:Orchid": {
+      "status": "Existing live ten",
+      "detail": "v18 dyn3"
+    },
+    "jap:Cherry Blossom": {
+      "status": "Existing live ten",
+      "detail": "v19 dyn2"
+    },
+    "jap:Xanax": {
+      "status": "Remaining",
+      "detail": "Further challenger work; Japan Xanax needs its separate short-window approach"
+    },
+    "mex:Dahlia": {
+      "status": "Existing live ten",
+      "detail": "v18 dyn2"
+    },
+    "mex:Jaguar Plushie": {
+      "status": "Existing live ten",
+      "detail": "v18 dyn3"
+    },
+    "sou:African Violet": {
+      "status": "Ready for six-item deployment",
+      "detail": "v20 traj11; full history"
+    },
+    "sou:Lion Plushie": {
+      "status": "Ready for six-item deployment",
+      "detail": "v20 traj12; full history"
+    },
+    "sou:Xanax": {
+      "status": "Remaining",
+      "detail": "Scheduling corrected; actual-data pilot/week replay pending refreshed export"
+    },
+    "swi:Chamois Plushie": {
+      "status": "Remaining",
+      "detail": "Further challenger work"
+    },
+    "swi:Edelweiss": {
+      "status": "Existing live ten",
+      "detail": "v19 dyn9"
+    },
+    "uae:Camel Plushie": {
+      "status": "Remaining",
+      "detail": "Scheduling corrected; actual-data pilot/week replay pending refreshed export"
+    },
+    "uae:Tribulus Omanense": {
+      "status": "Existing live ten",
+      "detail": "v18 dyn3"
+    },
+    "uni:Heather": {
+      "status": "Existing live ten",
+      "detail": "v18 dyn3"
+    },
+    "uni:Nessie Plushie": {
+      "status": "Remaining",
+      "detail": "Scheduling corrected; actual-data pilot/week replay pending refreshed export"
+    },
+    "uni:Red Fox Plushie": {
+      "status": "Remaining",
+      "detail": "Scheduling corrected; actual-data pilot/week replay pending refreshed export"
+    },
+    "uni:Xanax": {
+      "status": "Remaining",
+      "detail": "Fix and validate current-stock continuation / long-phase handling"
+    }
+  }
+}

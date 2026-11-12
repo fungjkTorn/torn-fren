@@ -1,0 +1,18 @@
+name: Matched champion audit safeguards
+on:
+  push:
+    branches: [research/v38-full-roster-live-prep-20261009]
+    paths: ['research/matched_champion_audit.py', 'tests/test_matched_champion_audit.py', '.github/workflows/matched-champion-audit.yml']
+permissions:
+  contents: read
+jobs:
+  safeguards:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install numpy==1.26.4
+      - run: OPENBLAS_NUM_THREADS=1 python -m unittest discover -s tests -p test_matched_champion_audit.py -v

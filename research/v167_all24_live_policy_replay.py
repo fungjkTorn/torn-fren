@@ -1,0 +1,617 @@
+"""V167 all-24 event-driven live-policy replay and V2 telemetry.
+
+This is a research replay of the intended beta operating contract:
+- exact 24-item roster
+- current best-known per-item route
+- decisions recomputed every five minutes
+- NO product 8-hour lookahead rule
+- forecast forward by RESTOCK EVENTS until the first reachable event is found
+- preserve V2 lifecycle telemetry at every issue
+- score sealed future truth only after the causal decision is made
+
+Some recovered legacy specialist wrappers contain an 8h MAX_WAIT. V167 treats
+that as a local/direct specialist advice horizon only, not the system's future
+event horizon. A causal event projector carries the item's observed cycle
+process farther forward; whenever direct specialist advice exists it is kept
+as the item's local model advice and compared/aligned to the selected event.
+
+Defensive bounds (MAX_EVENTS / MAX_LOOKAHEAD_DAYS) prevent runaway compute;
+they are not product recommendation horizons.
+"""
+from __future__ import annotations
+
+import argparse
+import bisect
+import json
+import math
+import statistics
+import tempfile
+from collections import Counter
+from contextlib import closing
+from pathlib import Path
+
+from research.japan_xanax.renewal_shadow import History, rate_plan, source_data
+from research.plushie_champions.common import TRAVEL_SECONDS, STEP, GRACE
+from research.quantity_rate_cycles import QuantityRateCycles
+from deploy.scripts.v163_readonly_event_first_preview import OBS
+from research.v164_evidence_routed_earliest_restock import (
+    _truth_rows, _clean_windows, _earliest_reachable_window,
+)
+from research.v166_seven_specialist_earliest_replay import (
+    CausalMirror, specialist_plan as seven_specialist_plan,
+    SEVEN, MODEL_FREEZE_EPOCH,
+)
+from research.v145_provider_continuous_phases import provider_continuous_phases
+from research.v128_full24_earliest_shadow import _gap_index
+from deploy.scripts.v163_readonly_event_first_preview import predict_events as v163_predict_events
+from research.v167_event_candidate_scoring import (
+    CHAMPION_KIND, choose_event, earliest_event_candidates,
+)
+from research.v172_verified_arrival_target_score import grade_target_window
+from research.v169_incremental_checkpoint_selector import (
+    IncrementalCheckpointSelector, TARGETS as CHECKPOINT_TARGETS,
+)
+
+MAX_EVENTS=64
+MIN_QTY=30
+
+# Current all-24 champion identity. These are the source-pinned models we
+# spent prior research selecting; V167 tests them on one common live-policy
+# replay contract rather than replacing them from a short forward sample.
+ROUTES={
+    key:{
+        "primary":"champion",
+        "champion_kind":kind,
+        "rationale":"source-pinned incumbent champion on common V167 replay",
+    }
+    for key,kind in CHAMPION_KIND.items()
+}
+if len(ROUTES)!=25:
+    raise ValueError("V169 requires 24 beta items plus South Africa Xanax")
+
+
+def _ro(path):
+    p=Path(path).expanduser().resolve(strict=True)
+    db=sqlite3.connect(p.as_uri()+"?mode=ro",uri=True,timeout=30)
+    db.execute("PRAGMA query_only=ON")
+    return db
+
+
+# sqlite3 imported lazily in several helpers to keep module import cheap.
+import sqlite3
+
+
+def _crosses(gaps,a,b):
+    for start,end in gaps:
+        if start>b: break
+        if start<=b and (end is None or end>=a):
+            return True
+    return False
+
+
+def _cycles(rows,gaps,asof):
+    """Clean >=30 lifecycle cycles available causally at asof."""
+    rows=[r for r in rows if r[0]<=asof]
+    cycles=[]
+    prev=None
+    restock=None
+    peak=None
+    excluded=0
+    last_restock=None
+    for t,q,provider in rows:
+        if prev is not None:
+            pt,pq,pp=prev
+            broken=(provider!=pp or _crosses(gaps,pt,t))
+            if broken:
+                if restock is not None: excluded+=1
+                restock=peak=None
+            elif pq<MIN_QTY<=q:
+                restock=t;peak=q
+            elif restock is not None and q>=MIN_QTY:
+                peak=max(peak or q,q)
+            elif pq>=MIN_QTY>q and restock is not None:
+                cycles.append({
+                    "restock":restock,"depletion":t,
+                    "stocked_lifetime":t-restock,
+                    "batch_size":peak,
+                    "restock_interval":(
+                        restock-last_restock if last_restock is not None else None),
+                })
+                last_restock=restock
+                restock=peak=None
+        prev=(t,q,provider)
+    return cycles,excluded
+
+
+def _mean(xs):
+    return sum(xs)/len(xs) if xs else None
+
+
+def lifecycle_telemetry(rows,gaps,asof):
+    """V2-compatible lifecycle statistics from evidence <= asof only."""
+    cycles,excluded=_cycles(rows,gaps,asof)
+    times=[r[0] for r in rows]
+    i=bisect.bisect_right(times,asof)-1
+    last=rows[i] if i>=0 else None
+    lifetimes=[c["stocked_lifetime"] for c in cycles if c["stocked_lifetime"]>0]
+    intervals=[c["restock_interval"] for c in cycles if c["restock_interval"]]
+    batches=[c["batch_size"] for c in cycles if c["batch_size"] is not None]
+
+    # V2 zero->restock wait: find clean >=30 losses followed by next >=30 restock.
+    waits=[]
+    last_depletion=None
+    last_restock=None
+    prev=None
+    zero_anchor=None
+    for t,q,p in rows:
+        if t>asof: break
+        if prev is not None:
+            pt,pq,pp=prev
+            if p!=pp or _crosses(gaps,pt,t):
+                zero_anchor=None
+            elif pq>=MIN_QTY>q:
+                last_depletion=t
+                zero_anchor=t
+            elif pq<MIN_QTY<=q:
+                last_restock=t
+                if zero_anchor is not None and t>zero_anchor:
+                    waits.append(t-zero_anchor)
+                zero_anchor=None
+        prev=(t,q,p)
+
+    phase=None;phase_start=None
+    if last is not None:
+        high=last[1]>=MIN_QTY
+        phase="STOCKED" if high else "DEPLETED"
+        # walk backwards to the last threshold change in this same clean segment
+        j=i
+        phase_start=rows[j][0]
+        while j>0:
+            a,b=rows[j-1],rows[j]
+            if b[2]!=a[2] or _crosses(gaps,a[0],b[0]):
+                break
+            if (a[1]>=MIN_QTY)!=(b[1]>=MIN_QTY):
+                phase_start=b[0]
+                break
+            phase_start=a[0];j-=1
+
+    return {
+        "asof_epoch":asof,
+        "current_quantity":last[1] if last else None,
+        "current_phase":phase,
+        "current_phase_started_epoch":phase_start,
+        "current_phase_age_seconds":asof-phase_start if phase_start else None,
+        "last_observation_epoch":last[0] if last else None,
+        "last_restock_epoch":last_restock,
+        "last_depletion_epoch":last_depletion,
+        "avg_stocked_lifetime_seconds":_mean(lifetimes),
+        "median_stocked_lifetime_seconds":statistics.median(lifetimes) if lifetimes else None,
+        "avg_zero_to_restock_seconds":_mean(waits),
+        "median_zero_to_restock_seconds":statistics.median(waits) if waits else None,
+        "avg_restock_interval_seconds":_mean(intervals),
+        "median_restock_interval_seconds":statistics.median(intervals) if intervals else None,
+        "avg_batch_size":_mean(batches),
+        "median_batch_size":statistics.median(batches) if batches else None,
+        "valid_cycles":len(cycles),
+        "excluded_cycles":excluded,
+    }
+
+
+def _q(values,p):
+    if not values:return None
+    values=sorted(int(v) for v in values if v>0)
+    if not values:return None
+    return values[max(0,min(len(values)-1,math.ceil(len(values)*p)-1))]
+
+
+def project_events(item,phases,asof,*,max_events=MAX_EVENTS):
+    """Event-driven causal cycle projection with no product time horizon.
+
+    max_events is only a runaway-compute guard. It is not a time horizon and
+    does not suppress a reachable event merely because it is days away.
+    """
+    high=list(phases.get("stocked_durations") or [])
+    low=list(phases.get("depleted_durations") or [])
+    phase=phases.get("phase")
+    onset=phases.get("phase_onset")
+    if phase not in ("HIGH","LOW") or not isinstance(onset,int):
+        return []
+    if min(len(high),len(low))<3:
+        return []
+
+    high_med=int(statistics.median(high));low_med=int(statistics.median(low))
+    high_early=_q(high,.25) or high_med
+    high_late=_q(high,.75) or high_med
+    low_early=_q(low,.25) or low_med
+    low_late=_q(low,.75) or low_med
+    age=max(0,asof-onset)
+    active=high if phase=="HIGH" else low
+    survivors=[x-age for x in active if x>age]
+    if not survivors:return []
+    residual=int(statistics.median(survivors))
+
+    if phase=="LOW":
+        first=asof+residual
+    else:
+        first=asof+residual+low_med
+
+    flight=TRAVEL_SECONDS[item.split(":",1)[0]]
+    events=[]
+    restock=first
+    for idx in range(max_events):
+        stocked_end=restock+high_med
+        earliest_depart=max(asof,restock-flight-GRACE)
+        arrival=earliest_depart+flight+GRACE
+        reachable=(arrival>=restock and arrival<stocked_end)
+        events.append({
+            "event_index":idx+1,
+            "predicted_restock_epoch":restock,
+            "predicted_depletion_epoch":stocked_end,
+            "predicted_restock_early_epoch":restock-(low_med-low_early),
+            "predicted_restock_late_epoch":restock+(low_late-low_med),
+            "predicted_stocked_lifetime_seconds":high_med,
+            "earliest_departure_epoch":earliest_depart if reachable else None,
+            "predicted_arrival_epoch":arrival if reachable else None,
+            "reachable":reachable,
+        })
+        restock+=high_med+low_med
+    return events
+
+
+def first_reachable(events):
+    return next((e for e in events if e["reachable"]),None)
+
+
+def _forecast_to_candidates(forecast,issued):
+    """Normalize current stock + physical future events into candidate events."""
+    events=[]
+    current=forecast.get("current_stock_window")
+    if isinstance(current,dict):
+        dep=current.get("expected_departure_epoch")
+        end=current.get("predicted_stock_below_30_epoch")
+        if isinstance(dep,int) and isinstance(end,int):
+            events.append({
+                "event_index":0,
+                "current_stock":True,
+                "predicted_restock_epoch":issued,
+                "predicted_depletion_epoch":end,
+                "predicted_restock_early_epoch":issued,
+                "predicted_restock_late_epoch":issued,
+                "predicted_stocked_lifetime_seconds":max(0,end-issued),
+                "earliest_departure_epoch":dep,
+                "latest_departure_epoch":current.get(
+                    "expected_latest_departure_epoch",dep),
+                "predicted_arrival_epoch":current.get("expected_arrival_epoch"),
+                "reachable":True,
+            })
+    for raw in forecast.get("restock_events") or []:
+        dep=raw.get("expected_departure_epoch")
+        events.append({
+            "event_index":int(raw.get("event_index") or len(events)+1),
+            "current_stock":False,
+            "predicted_restock_epoch":raw.get("predicted_restock_epoch"),
+            "predicted_depletion_epoch":raw.get("predicted_stock_below_30_epoch"),
+            "predicted_restock_early_epoch":raw.get("restock_early_epoch"),
+            "predicted_restock_late_epoch":raw.get("restock_late_epoch"),
+            "predicted_stocked_lifetime_seconds":raw.get("estimated_stocked_duration_seconds"),
+            "earliest_departure_epoch":dep,
+            "latest_departure_epoch":raw.get("expected_latest_departure_epoch"),
+            "predicted_arrival_epoch":raw.get("expected_arrival_epoch"),
+            "reachable":dep is not None,
+        })
+    return events
+
+
+def event_timeline_for_issue(key,causal_rows,gaps,issued):
+    """Champion-independent physical event candidates, horizon-free."""
+    crosses=_gap_index(gaps,issued)
+    if key=="jap:Xanax":
+        tracker=QuantityRateCycles(crosses)
+        for row in causal_rows:
+            tracker.add(OBS(*row))
+        forecast=tracker.forecast(key,asof=issued)
+    else:
+        phases=provider_continuous_phases(
+            [OBS(*r) for r in causal_rows],asof=issued,gaps=gaps)
+        forecast=v163_predict_events(
+            key,phases,asof=issued,horizon=None,max_events=64)
+    return forecast,_forecast_to_candidates(forecast,issued)
+
+
+def generic_plan(source,key,issued,mode):
+    rows,polls,crosses,_,cutoff=source_data(source,now=issued,item_key=key)
+    h=History(crosses);rate=QuantityRateCycles(crosses)
+    for row in rows:
+        h.add(row);rate.add(OBS(*row))
+    i=bisect.bisect_right(polls,issued)-1
+    age=issued-polls[i] if i>=0 else None
+    flight=TRAVEL_SECONDS[key.split(":",1)[0]]
+    selected=h.plans(issued,poll_age=age,flight_seconds=flight)
+    selected["rate_current_quarter"]=rate_plan(rate,key,issued,age)
+    p=selected.get(mode)
+    return {
+        "status":p.get("status") if p else "MODE_UNAVAILABLE",
+        "departure":p.get("departure") if p else None,
+        "source_cutoff":cutoff,
+    }
+
+
+def routed_champion_plan(causal_db,key,issued,events,checkpoint_selection=None):
+    """Choose the earliest reachable event the champion can actually support."""
+    reachable=sorted(
+        [e for e in events if e.get("reachable")],
+        key=lambda e:(e.get("event_index",10**9),
+                      e.get("predicted_restock_epoch",10**18)))
+    attempts=[]
+    for rank,event in enumerate(reachable,1):
+        candidates=earliest_event_candidates([event],issued)
+        result=choose_event(
+            causal_db,key,issued,candidates,
+            checkpoint_selection=checkpoint_selection)
+        attempts.append({
+            "reachable_rank":rank,
+            "event_index":event.get("event_index"),
+            "status":result.get("status"),
+        })
+        if result.get("departure") is not None:
+            return {
+                "model":"champion",
+                "champion_kind":CHAMPION_KIND[key],
+                "status":result.get("status"),
+                "departure":result.get("departure"),
+                "selected_event_index":result.get("selected_event_index"),
+                "selected_reachable_rank":rank,
+                "model_score":result.get("score"),
+                "event_attempts":attempts,
+                "diagnostic":result,
+            }
+    return {
+        "model":"champion",
+        "champion_kind":CHAMPION_KIND[key],
+        "status":attempts[-1]["status"] if attempts else "NO_REACHABLE_EVENTS",
+        "departure":None,
+        "selected_event_index":None,
+        "selected_reachable_rank":None,
+        "model_score":None,
+        "event_attempts":attempts,
+        "diagnostic":None,
+    }
+
+def score_decision(key,issued,departure,truth_cutoff,truth_rows,truth_gaps,evidence):
+    flight=TRAVEL_SECONDS[key.split(":",1)[0]]
+    target=_earliest_reachable_window(
+        truth_rows,truth_gaps,issued,flight,truth_cutoff)
+    result={"actual_target_status":target["status"]}
+    if departure is None:return result
+    arrival=departure+flight
+    state=evidence.score(arrival)[0]
+    result.update(arrival_epoch=arrival,arrival_state=state)
+    if target["status"]=="EARLIEST_REACHABLE_FOUND":
+        result.update(
+            actual_target_restock_epoch=target["restock"],
+            actual_target_depletion_epoch=target["depletion"],
+            oracle_earliest_departure_epoch=target["oracle_earliest_departure"],
+            departure_minus_oracle_seconds=departure-target["oracle_earliest_departure"],
+            arrival_minus_actual_restock_seconds=arrival-target["restock"],
+        )
+    grade,reason=grade_target_window(
+        arrival=arrival,state=state,
+        restock=target.get("restock") if target["status"]=="EARLIEST_REACHABLE_FOUND" else None,
+        depletion=target.get("depletion") if target["status"]=="EARLIEST_REACHABLE_FOUND" else None,
+        grace=GRACE,
+    )
+    result["verified_earliest_target_hit"]=grade
+    result["verified_earliest_target_evidence"]=reason
+    return result
+
+
+def replay_item(*,source,key,start,end,workdir):
+    if key not in ROUTES:raise ValueError("not in all24 route")
+    truth_cutoff=source_data(source,item_key=key)[4]
+    max_flight=max(TRAVEL_SECONDS.values())
+    if end+max_flight+GRACE>truth_cutoff:
+        raise ValueError("immature replay end")
+
+    scratch=Path(workdir)/(key.replace(":","__").replace(" ","_")+".sqlite")
+    mirror=CausalMirror(source,scratch,start)
+    truth_rows,truth_gaps=_truth_rows(source,key,truth_cutoff)
+    truth_evidence=source_data(source,now=truth_cutoff,item_key=key)[3]
+    issue_rows,_,_,_,_=source_data(source,now=end,item_key=key)
+    # use truth gap boundaries but only phases built from <=issue rows later
+    records=[]
+    previous_target=None
+    checkpoint_selector=(
+        IncrementalCheckpointSelector(key) if key in CHECKPOINT_TARGETS else None)
+    try:
+        for issued in range(start,end+1,STEP):
+            mirror.advance(issued)
+            causal_rows=[r for r in issue_rows if r[0]<=issued]
+            with closing(sqlite3.connect(scratch.as_uri()+"?mode=ro",uri=True)) as db:
+                db.execute("PRAGMA query_only=ON")
+                gaps=db.execute("SELECT start_timestamp,end_timestamp FROM collection_gaps ORDER BY start_timestamp").fetchall()
+
+            forecast,events=event_timeline_for_issue(
+                key,causal_rows,gaps,issued)
+            baseline_target=first_reachable(events)
+            checkpoint_selection=(
+                checkpoint_selector.update_and_select(scratch,issued)
+                if checkpoint_selector is not None else None)
+            local=routed_champion_plan(
+                scratch,key,issued,events,
+                checkpoint_selection=checkpoint_selection)
+            selected_index=local.get("selected_event_index")
+            target=next((e for e in events if e["event_index"]==selected_index),None)
+            dep=local.get("departure") if target is not None else None
+            local_dep=local.get("departure")
+            aligned=target is not None and dep is not None
+
+            telemetry=lifecycle_telemetry(causal_rows,gaps,issued)
+            scored=score_decision(
+                key,issued,dep,truth_cutoff,truth_rows,truth_gaps,truth_evidence)
+            target_id=(target["event_index"],target["predicted_restock_epoch"]) if target else None
+            stable=(previous_target is not None and target_id is not None and
+                    target_id[0]==previous_target[0] and
+                    abs(target_id[1]-previous_target[1])<=900)
+            records.append({
+                "item_key":key,"issued_epoch":issued,
+                "route_model":ROUTES[key]["primary"],
+                "champion_kind":CHAMPION_KIND[key],
+                "route_status":local.get("status"),
+                "selected_reachable_rank":local.get("selected_reachable_rank"),
+                "event_attempts":local.get("event_attempts"),
+                "checkpoint_selector":checkpoint_selection,
+                "champion_score":local.get("model_score"),
+                "event_forecast_status":forecast.get("status"),
+                "baseline_first_reachable_event":baseline_target,
+                "local_model_departure_epoch":local_dep,
+                "local_model_aligned_to_selected_event":aligned,
+                "selected_event":target,
+                "recommended_departure_epoch":dep,
+                "target_stable_from_previous_replan":stable,
+                "event_count_projected":len(events),
+                "lifecycle":telemetry,
+                **scored,
+            })
+            previous_target=target_id
+    finally:
+        try:scratch.unlink()
+        except OSError:pass
+
+    # Separate raw five-minute advice from what would become actionable.
+    # A departure is counted once when it falls inside the next replan slot and
+    # either the target was reconfirmed from the prior tick or it is current
+    # stock (event 0). This avoids treating repeated WAIT rows as flights.
+    executions=[]
+    seen_departures=set()
+    for r in records:
+        dep=r.get("recommended_departure_epoch")
+        target=r.get("selected_event")
+        if dep is None or target is None:
+            continue
+        issued=r["issued_epoch"]
+        actionable=(issued<=dep<issued+STEP and
+                    (r.get("target_stable_from_previous_replan")
+                     or target.get("event_index")==0))
+        if not actionable:
+            continue
+        rounded=dep//STEP
+        if rounded in seen_departures:
+            continue
+        seen_departures.add(rounded)
+        executions.append({
+            "issued_epoch":issued,
+            "departure_epoch":dep,
+            "arrival_epoch":r.get("arrival_epoch"),
+            "selected_event_index":target.get("event_index"),
+            "predicted_restock_epoch":target.get("predicted_restock_epoch"),
+            "arrival_state":r.get("arrival_state"),
+            "actual_target_status":r.get("actual_target_status"),
+            "actual_target_restock_epoch":r.get("actual_target_restock_epoch"),
+            "actual_target_depletion_epoch":r.get("actual_target_depletion_epoch"),
+            "departure_minus_oracle_seconds":r.get("departure_minus_oracle_seconds"),
+            "arrival_minus_actual_restock_seconds":r.get("arrival_minus_actual_restock_seconds"),
+            "verified_earliest_target_hit":r.get("verified_earliest_target_hit"),
+            "verified_earliest_target_evidence":r.get("verified_earliest_target_evidence"),
+        })
+
+    c=Counter()
+    dep_errors=[];restock_errors=[]
+    for r in records:
+        c["issues"]+=1
+        if r["recommended_departure_epoch"] is None:
+            c["abstain"]+=1;continue
+        c["proposals"]+=1
+        if r.get("arrival_state") in ("SUCCESS","FAILURE"):
+            c["arrival_known"]+=1
+            c["arrival_success"]+=int(r["arrival_state"]=="SUCCESS")
+        if r.get("verified_earliest_target_hit") is not None:
+            c["verified_earliest_target_scored"]+=1
+            c["verified_earliest_target_hit"]+=int(r["verified_earliest_target_hit"])
+        if r.get("actual_target_restock_epoch") is not None:
+            c["earliest_target_scored"]+=1
+            arr=r["arrival_epoch"]+GRACE
+            ok=(arr>=r["actual_target_restock_epoch"] and
+                (r["actual_target_depletion_epoch"] is None or arr<r["actual_target_depletion_epoch"]))
+            c["earliest_target_hit"]+=int(ok)
+            dep_errors.append(r["departure_minus_oracle_seconds"])
+            restock_errors.append(r["selected_event"]["predicted_restock_epoch"]-r["actual_target_restock_epoch"])
+        c["stable_replans"]+=int(r["target_stable_from_previous_replan"])
+        c["local_aligned"]+=int(r["local_model_aligned_to_selected_event"])
+
+    ec=Counter()
+    for e in executions:
+        ec["executions"]+=1
+        if e.get("arrival_state") in ("SUCCESS","FAILURE"):
+            ec["arrival_known"]+=1
+            ec["arrival_success"]+=int(e["arrival_state"]=="SUCCESS")
+        if e.get("verified_earliest_target_hit") is not None:
+            ec["verified_earliest_target_scored"]+=1
+            ec["verified_earliest_target_hit"]+=int(e["verified_earliest_target_hit"])
+        if e.get("actual_target_restock_epoch") is not None:
+            ec["earliest_target_scored"]+=1
+            arr=e["arrival_epoch"]+GRACE
+            ok=(arr>=e["actual_target_restock_epoch"] and
+                (e["actual_target_depletion_epoch"] is None or
+                 arr<e["actual_target_depletion_epoch"]))
+            ec["earliest_target_hit"]+=int(ok)
+
+    return {
+        "item_key":key,"route":ROUTES[key],"start":start,"end":end,
+        "counts":dict(c),
+        "arrival_success_fraction":c["arrival_success"]/c["arrival_known"] if c["arrival_known"] else None,
+        "earliest_target_hit_fraction":(
+            c["verified_earliest_target_hit"]/c["verified_earliest_target_scored"]
+            if c["verified_earliest_target_scored"] else None),
+        "legacy_earliest_target_temporal_proxy_fraction":(
+            c["earliest_target_hit"]/c["earliest_target_scored"]
+            if c["earliest_target_scored"] else None),
+        "proposal_coverage":c["proposals"]/c["issues"] if c["issues"] else None,
+        "execution_counts":dict(ec),
+        "execution_arrival_success_fraction":(
+            ec["arrival_success"]/ec["arrival_known"] if ec["arrival_known"] else None),
+        "execution_earliest_target_hit_fraction":(
+            ec["verified_earliest_target_hit"]/ec["verified_earliest_target_scored"]
+            if ec["verified_earliest_target_scored"] else None),
+        "execution_legacy_earliest_target_temporal_proxy_fraction":(
+            ec["earliest_target_hit"]/ec["earliest_target_scored"]
+            if ec["earliest_target_scored"] else None),
+        "earliest_target_scoring_version":"V172_EVIDENCE_QUALIFIED",
+        "legacy_temporal_proxy_is_not_stock_at_arrival_proof":True,
+        "actionable_executions":executions,
+        "mean_departure_minus_oracle_seconds":_mean(dep_errors),
+        "median_departure_minus_oracle_seconds":statistics.median(dep_errors) if dep_errors else None,
+        "mean_predicted_minus_actual_restock_seconds":_mean(restock_errors),
+        "median_predicted_minus_actual_restock_seconds":statistics.median(restock_errors) if restock_errors else None,
+        "records":records,
+        "latest_lifecycle_telemetry":records[-1]["lifecycle"] if records else None,
+        "product_horizon_type":"EVENT_DRIVEN_FIRST_REACHABLE",
+        "product_time_horizon_seconds":None,
+        "defensive_max_events":MAX_EVENTS,
+        "defensive_time_horizon_seconds":None,
+        "production_modified":False,
+    }
+
+
+def main():
+    p=argparse.ArgumentParser(description=__doc__)
+    p.add_argument("--source",required=True)
+    p.add_argument("--item-key",required=True,choices=tuple(sorted(ROUTES)))
+    p.add_argument("--start-epoch",required=True,type=int)
+    p.add_argument("--end-epoch",required=True,type=int)
+    p.add_argument("--output",required=True)
+    a=p.parse_args()
+    if a.start_epoch<MODEL_FREEZE_EPOCH:
+        raise SystemExit("V167 refuses pre-freeze evaluation")
+    out=Path(a.output).expanduser().resolve();out.parent.mkdir(parents=True,exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix="v167-") as td:
+        result=replay_item(source=a.source,key=a.item_key,start=a.start_epoch,
+                           end=a.end_epoch,workdir=td)
+    out.write_text(json.dumps(result,indent=2,sort_keys=True)+"\n",encoding="utf-8")
+    print(json.dumps({k:result[k] for k in (
+        "item_key","arrival_success_fraction","earliest_target_hit_fraction",
+        "proposal_coverage","mean_departure_minus_oracle_seconds",
+        "mean_predicted_minus_actual_restock_seconds")},sort_keys=True))
+
+
+if __name__=="__main__":
+    main()

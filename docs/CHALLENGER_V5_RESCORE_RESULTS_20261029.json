@@ -1,0 +1,584 @@
+{
+  "status": "SAVED_CHALLENGERS_RESCORED",
+  "evidence_policy": "RECOMMENDED_DEPARTURE_FREEZE_V5",
+  "research_identity": "ab2bdc1a01f06155871bf0e02f6242df9fe5e98c",
+  "start_epoch": 1792639200,
+  "cutoff_epoch": 1793244000,
+  "source_sha256": "4fef31cf3ee0e4d079efabf5ed6f1de71e91fdc167a8c886e63860edbdd731f7",
+  "saved_forecast_hashes": {
+    "manifest.json": "d3d702e3c75b0027bbde576617e7d6d076841b4541b0e57afdbdc0529d140138",
+    "arg__Monkey_Plushie.jsonl": "4964a1a772ebe0361bb386e47ff41c77bd1c06db29a8c7a765598218af8084a5",
+    "can__Wolverine_Plushie.jsonl": "c47ac415504165abecbbb4a402c76a50bf43635d5d04054559ef106d2bbc21c1",
+    "cay__Stingray_Plushie.jsonl": "1395b9d37dc89de0631dc02655ea2c104b5d57d5f513859b135c7f43ea6234a8",
+    "chi__Peony.jsonl": "9ed1eb9e2cce930d1f7fa6ad53beb164d625086f283a15139dd209cc96448b72",
+    "sou__African_Violet.jsonl": "afec6fcdbc2e731bdc46b1595cb9f67f9462c2c879deb0742f5ec1ac168fa989",
+    "sou__Lion_Plushie.jsonl": "4792d018b092e4e19678cd1949f58279b6eab4a559ec6fcd86b18a4b5822f6eb",
+    "uni__Xanax.jsonl": "e5d9e2c3b845c9ef696729ab9c8a6aac7ec066c41ffd3eba3357450f7165ddd8"
+  },
+  "original_models": {
+    "arg:Monkey Plushie": [
+      "v20",
+      "traj3"
+    ],
+    "can:Wolverine Plushie": [
+      "v20",
+      "traj12"
+    ],
+    "cay:Stingray Plushie": [
+      "v20",
+      "traj5"
+    ],
+    "chi:Peony": [
+      "v20",
+      "traj12"
+    ],
+    "sou:African Violet": [
+      "v20",
+      "traj11"
+    ],
+    "sou:Lion Plushie": [
+      "v20",
+      "traj12"
+    ],
+    "uni:Xanax": [
+      "v19",
+      "dyn8"
+    ]
+  },
+  "training_policy": "ALL_AVAILABLE_CAUSAL_HISTORY_NO_ROLLING_LOOKBACK",
+  "sampling_seconds": 300,
+  "publication_clock": "SAMPLED_ISSUE_TIME_NO_MEASURED_SERVER_LATENCY",
+  "advice_expiry_preserved": true,
+  "unrecorded_refreshes_assumed": false,
+  "model_inference_run": false,
+  "production_modified": false,
+  "arrival_timing_changed": false,
+  "items": {
+    "arg:Monkey Plushie": {
+      "model": [
+        "v20",
+        "traj3"
+      ],
+      "issue_clocks": 2017,
+      "advice_issue_clocks": 1666,
+      "simulated_trips": 134,
+      "successes": 95,
+      "failures": 31,
+      "known": 126,
+      "unknown": 6,
+      "pending": 2,
+      "known_success_fraction": 0.753968253968254,
+      "target_identity_audit": {
+        "duplicate_target_groups": 0,
+        "duplicates": {},
+        "retained_completed_identities": 134
+      },
+      "restock_profile": {
+        "training_cutoff": 1792639200,
+        "zero_refill_samples": 1136,
+        "status": "LEARNED",
+        "normal_min": 2019,
+        "normal_max": 2500,
+        "reset_base": null,
+        "reset_training_samples": 0,
+        "normal_samples": 1005,
+        "excluded_small_samples": 131,
+        "reset_candidate_base": 2500,
+        "classification_is_observational": true,
+        "method": "ITERATED_LOG_QUANTITY_CLUSTER_WITH_OBSERVED_RANGE"
+      },
+      "qualified_restocks": 138,
+      "revision_counts": {
+        "FROZEN_AT_RECOMMENDED_DEPARTURE": 134,
+        "NEW_RECOMMENDATION": 212,
+        "POSTPONED_BEFORE_DEPARTURE": 409,
+        "REVISED_BEFORE_DEPARTURE": 741,
+        "WITHDRAWN_NO_ADVICE": 55,
+        "WITHDRAWN_STALE_BEFORE_DEPARTURE": 19,
+        "WITHDRAWN_TARGET_CHANGED": 4
+      },
+      "no_advice_clock_statuses": {
+        "STALE_COUNTRY_DATA": 167,
+        "MODEL_ABSTAIN": 184
+      },
+      "nearest_qualified_boundary_misses": {
+        "counts": {
+          "EARLY": 12,
+          "LATE": 13,
+          "UNKNOWN_ZERO_BOUNDARY": 2,
+          "UNKNOWN": 3,
+          "POSITIVE_STOCK_AT_OR_BELOW_30": 1
+        },
+        "median_late_minutes": 4.85,
+        "median_early_minutes": 3.966666666666667
+      },
+      "latest_ten": {
+        "known": 7,
+        "successes": 5,
+        "failures": 2,
+        "unknown": 1,
+        "pending": 2,
+        "success_fraction": 0.7142857142857143
+      },
+      "active_recommendation_at_cutoff": null
+    },
+    "can:Wolverine Plushie": {
+      "model": [
+        "v20",
+        "traj12"
+      ],
+      "issue_clocks": 2017,
+      "advice_issue_clocks": 1817,
+      "simulated_trips": 163,
+      "successes": 155,
+      "failures": 6,
+      "known": 161,
+      "unknown": 2,
+      "pending": 0,
+      "known_success_fraction": 0.9627329192546584,
+      "target_identity_audit": {
+        "duplicate_target_groups": 0,
+        "duplicates": {},
+        "retained_completed_identities": 163
+      },
+      "restock_profile": {
+        "training_cutoff": 1792639200,
+        "zero_refill_samples": 1080,
+        "status": "LEARNED",
+        "normal_min": 2136,
+        "normal_max": 2500,
+        "reset_base": null,
+        "reset_training_samples": 0,
+        "normal_samples": 926,
+        "excluded_small_samples": 154,
+        "reset_candidate_base": 2500,
+        "classification_is_observational": true,
+        "method": "ITERATED_LOG_QUANTITY_CLUSTER_WITH_OBSERVED_RANGE"
+      },
+      "qualified_restocks": 163,
+      "revision_counts": {
+        "FROZEN_AT_RECOMMENDED_DEPARTURE": 163,
+        "NEW_RECOMMENDATION": 205,
+        "POSTPONED_BEFORE_DEPARTURE": 554,
+        "REVISED_BEFORE_DEPARTURE": 871,
+        "WITHDRAWN_NO_ADVICE": 13,
+        "WITHDRAWN_STALE_BEFORE_DEPARTURE": 26,
+        "WITHDRAWN_TARGET_CHANGED": 3
+      },
+      "no_advice_clock_statuses": {
+        "MODEL_ABSTAIN": 150,
+        "STALE_COUNTRY_DATA": 50
+      },
+      "nearest_qualified_boundary_misses": {
+        "counts": {
+          "LATE": 3,
+          "UNKNOWN": 2,
+          "EARLY": 1
+        },
+        "median_late_minutes": 3.75,
+        "median_early_minutes": 6.583333333333333
+      },
+      "latest_ten": {
+        "known": 10,
+        "successes": 10,
+        "failures": 0,
+        "unknown": 0,
+        "pending": 0,
+        "success_fraction": 1.0
+      },
+      "active_recommendation_at_cutoff": null
+    },
+    "cay:Stingray Plushie": {
+      "model": [
+        "v20",
+        "traj5"
+      ],
+      "issue_clocks": 2017,
+      "advice_issue_clocks": 1754,
+      "simulated_trips": 162,
+      "successes": 153,
+      "failures": 5,
+      "known": 158,
+      "unknown": 3,
+      "pending": 1,
+      "known_success_fraction": 0.9683544303797469,
+      "target_identity_audit": {
+        "duplicate_target_groups": 0,
+        "duplicates": {},
+        "retained_completed_identities": 162
+      },
+      "restock_profile": {
+        "training_cutoff": 1792639200,
+        "zero_refill_samples": 1079,
+        "status": "LEARNED",
+        "normal_min": 2089,
+        "normal_max": 2500,
+        "reset_base": null,
+        "reset_training_samples": 0,
+        "normal_samples": 946,
+        "excluded_small_samples": 133,
+        "reset_candidate_base": 2500,
+        "classification_is_observational": true,
+        "method": "ITERATED_LOG_QUANTITY_CLUSTER_WITH_OBSERVED_RANGE"
+      },
+      "qualified_restocks": 154,
+      "revision_counts": {
+        "FROZEN_AT_RECOMMENDED_DEPARTURE": 162,
+        "NEW_RECOMMENDATION": 212,
+        "POSTPONED_BEFORE_DEPARTURE": 645,
+        "REVISED_BEFORE_DEPARTURE": 937,
+        "SUPPRESSED_ALREADY_TESTED_TARGET": 3,
+        "WITHDRAWN_NO_ADVICE": 35,
+        "WITHDRAWN_STALE_BEFORE_DEPARTURE": 10,
+        "WITHDRAWN_TARGET_CHANGED": 1
+      },
+      "no_advice_clock_statuses": {
+        "MODEL_ABSTAIN": 176,
+        "STALE_COUNTRY_DATA": 87
+      },
+      "nearest_qualified_boundary_misses": {
+        "counts": {
+          "UNKNOWN": 1,
+          "LATE": 2,
+          "EARLY": 2
+        },
+        "median_late_minutes": 6.916666666666666,
+        "median_early_minutes": 4.633333333333333
+      },
+      "latest_ten": {
+        "known": 9,
+        "successes": 9,
+        "failures": 0,
+        "unknown": 0,
+        "pending": 1,
+        "success_fraction": 1.0
+      },
+      "active_recommendation_at_cutoff": {
+        "departure_epoch": 1793244610,
+        "arrival_epoch": 1793245990,
+        "issued_epoch": 1793244000,
+        "published_epoch": 1793244000,
+        "selected_event_index": 1,
+        "input_cutoff_epoch": 1793244000,
+        "window_start": 1793245990,
+        "window_end": 1793247760,
+        "restock_anchor": null,
+        "episode_anchor": null,
+        "origin_opening": 1793243194,
+        "target_offset": 1,
+        "valid_until": 1793244144,
+        "reason": "FIRST_REACHABLE_WINDOW_SELECTED",
+        "forecast": {
+          "calibration_state": "UNCALIBRATED",
+          "early_stock_end_epoch": null,
+          "estimated_arrival_epoch": 1793245990,
+          "estimated_arrival_plus_grace_epoch": 1793245990,
+          "estimated_departure_start_epoch": 1793244610,
+          "estimated_latest_departure_epoch": 1793246379,
+          "flight_reachable": true,
+          "forecast_horizon_seconds": 1990,
+          "index": 1,
+          "item_quantity_threshold": 31,
+          "model_proven_success": false,
+          "predicted_restock_epoch": 1793245990,
+          "predicted_stock_below_30_epoch": 1793247760,
+          "predicted_true_depletion_epoch": null,
+          "reason": "ESTIMATED_STOCKED_PHASE_REACHABLE",
+          "restock_early_epoch": 1793245586,
+          "restock_late_epoch": 1793246530
+        },
+        "remaining_offset": 1,
+        "id": "1793243700"
+      }
+    },
+    "chi:Peony": {
+      "model": [
+        "v20",
+        "traj12"
+      ],
+      "issue_clocks": 2017,
+      "advice_issue_clocks": 1785,
+      "simulated_trips": 16,
+      "successes": 16,
+      "failures": 0,
+      "known": 16,
+      "unknown": 0,
+      "pending": 0,
+      "known_success_fraction": 1.0,
+      "target_identity_audit": {
+        "duplicate_target_groups": 0,
+        "duplicates": {},
+        "retained_completed_identities": 16
+      },
+      "restock_profile": {
+        "training_cutoff": 1792639200,
+        "zero_refill_samples": 181,
+        "status": "LEARNED",
+        "normal_min": 9567,
+        "normal_max": 9999,
+        "reset_base": null,
+        "reset_training_samples": 0,
+        "normal_samples": 128,
+        "excluded_small_samples": 53,
+        "reset_candidate_base": 9999,
+        "classification_is_observational": true,
+        "method": "ITERATED_LOG_QUANTITY_CLUSTER_WITH_OBSERVED_RANGE"
+      },
+      "qualified_restocks": 15,
+      "revision_counts": {
+        "FROZEN_AT_RECOMMENDED_DEPARTURE": 16,
+        "NEW_RECOMMENDATION": 63,
+        "POSTPONED_BEFORE_DEPARTURE": 645,
+        "REVISED_BEFORE_DEPARTURE": 877,
+        "SUPPRESSED_ALREADY_TESTED_TARGET": 4,
+        "WITHDRAWN_NO_ADVICE": 36,
+        "WITHDRAWN_TARGET_CHANGED": 7
+      },
+      "no_advice_clock_statuses": {
+        "MODEL_ABSTAIN": 161,
+        "STALE_COUNTRY_DATA": 71
+      },
+      "nearest_qualified_boundary_misses": {
+        "counts": {},
+        "median_late_minutes": null,
+        "median_early_minutes": null
+      },
+      "latest_ten": {
+        "known": 10,
+        "successes": 10,
+        "failures": 0,
+        "unknown": 0,
+        "pending": 0,
+        "success_fraction": 1.0
+      },
+      "active_recommendation_at_cutoff": null
+    },
+    "sou:African Violet": {
+      "model": [
+        "v20",
+        "traj11"
+      ],
+      "issue_clocks": 2017,
+      "advice_issue_clocks": 1277,
+      "simulated_trips": 13,
+      "successes": 13,
+      "failures": 0,
+      "known": 13,
+      "unknown": 0,
+      "pending": 0,
+      "known_success_fraction": 1.0,
+      "target_identity_audit": {
+        "duplicate_target_groups": 0,
+        "duplicates": {},
+        "retained_completed_identities": 13
+      },
+      "restock_profile": {
+        "training_cutoff": 1792639200,
+        "zero_refill_samples": 156,
+        "status": "LEARNED",
+        "normal_min": 9338,
+        "normal_max": 9999,
+        "reset_base": null,
+        "reset_training_samples": 0,
+        "normal_samples": 116,
+        "excluded_small_samples": 40,
+        "reset_candidate_base": 9999,
+        "classification_is_observational": true,
+        "method": "ITERATED_LOG_QUANTITY_CLUSTER_WITH_OBSERVED_RANGE"
+      },
+      "qualified_restocks": 14,
+      "revision_counts": {
+        "FROZEN_AT_RECOMMENDED_DEPARTURE": 13,
+        "NEW_RECOMMENDATION": 44,
+        "POSTPONED_BEFORE_DEPARTURE": 493,
+        "REVISED_BEFORE_DEPARTURE": 679,
+        "SUPPRESSED_ALREADY_TESTED_TARGET": 2,
+        "WITHDRAWN_NO_ADVICE": 28
+      },
+      "no_advice_clock_statuses": {
+        "STALE_COUNTRY_DATA": 42,
+        "MODEL_ABSTAIN": 698
+      },
+      "nearest_qualified_boundary_misses": {
+        "counts": {},
+        "median_late_minutes": null,
+        "median_early_minutes": null
+      },
+      "latest_ten": {
+        "known": 10,
+        "successes": 10,
+        "failures": 0,
+        "unknown": 0,
+        "pending": 0,
+        "success_fraction": 1.0
+      },
+      "active_recommendation_at_cutoff": {
+        "departure_epoch": 1793244600,
+        "arrival_epoch": 1793256420,
+        "issued_epoch": 1793244000,
+        "published_epoch": 1793244000,
+        "selected_event_index": 0,
+        "input_cutoff_epoch": 1793244000,
+        "window_start": 1793244000,
+        "window_end": 1793257259,
+        "restock_anchor": 1793236714,
+        "episode_anchor": "restock:1793236714",
+        "origin_opening": 1793236714,
+        "target_offset": 0,
+        "valid_until": 1793244144,
+        "reason": "FIRST_REACHABLE_WINDOW_SELECTED",
+        "forecast": {
+          "conservative_estimate_available": false,
+          "conservative_estimate_departure_epoch": null,
+          "estimated_stocked_duration_seconds": 13259,
+          "expected_arrival_epoch": 1793255830,
+          "expected_departure_epoch": 1793244000,
+          "expected_departure_reachable": true,
+          "expected_latest_departure_epoch": 1793245428,
+          "predicted_restock_epoch": 1793244000,
+          "predicted_stock_below_30_epoch": 1793257259,
+          "reason": "MODELED_REACHABLE_RECONFIRM",
+          "restock_early_epoch": 1793244000,
+          "restock_late_epoch": 1793244000
+        },
+        "id": "1793232900"
+      }
+    },
+    "sou:Lion Plushie": {
+      "model": [
+        "v20",
+        "traj12"
+      ],
+      "issue_clocks": 2017,
+      "advice_issue_clocks": 1837,
+      "simulated_trips": 141,
+      "successes": 103,
+      "failures": 31,
+      "known": 134,
+      "unknown": 5,
+      "pending": 2,
+      "known_success_fraction": 0.7686567164179104,
+      "target_identity_audit": {
+        "duplicate_target_groups": 0,
+        "duplicates": {},
+        "retained_completed_identities": 141
+      },
+      "restock_profile": {
+        "training_cutoff": 1792639200,
+        "zero_refill_samples": 1122,
+        "status": "LEARNED",
+        "normal_min": 2126,
+        "normal_max": 2501,
+        "reset_base": null,
+        "reset_training_samples": 0,
+        "normal_samples": 936,
+        "excluded_small_samples": 186,
+        "reset_candidate_base": 2500,
+        "classification_is_observational": true,
+        "method": "ITERATED_LOG_QUANTITY_CLUSTER_WITH_OBSERVED_RANGE"
+      },
+      "qualified_restocks": 139,
+      "revision_counts": {
+        "FROZEN_AT_RECOMMENDED_DEPARTURE": 141,
+        "NEW_RECOMMENDATION": 218,
+        "POSTPONED_BEFORE_DEPARTURE": 558,
+        "REVISED_BEFORE_DEPARTURE": 940,
+        "WITHDRAWN_NO_ADVICE": 24,
+        "WITHDRAWN_STALE_BEFORE_DEPARTURE": 15,
+        "WITHDRAWN_TARGET_CHANGED": 38
+      },
+      "no_advice_clock_statuses": {
+        "STALE_COUNTRY_DATA": 42,
+        "MODEL_ABSTAIN": 138
+      },
+      "nearest_qualified_boundary_misses": {
+        "counts": {
+          "EARLY": 19,
+          "LATE": 11,
+          "UNKNOWN": 1
+        },
+        "median_late_minutes": 3.75,
+        "median_early_minutes": 3.316666666666667
+      },
+      "latest_ten": {
+        "known": 8,
+        "successes": 5,
+        "failures": 3,
+        "unknown": 0,
+        "pending": 2,
+        "success_fraction": 0.625
+      },
+      "active_recommendation_at_cutoff": null
+    },
+    "uni:Xanax": {
+      "model": [
+        "v19",
+        "dyn8"
+      ],
+      "issue_clocks": 2017,
+      "advice_issue_clocks": 460,
+      "simulated_trips": 1,
+      "successes": 1,
+      "failures": 0,
+      "known": 1,
+      "unknown": 0,
+      "pending": 0,
+      "known_success_fraction": 1.0,
+      "target_identity_audit": {
+        "duplicate_target_groups": 0,
+        "duplicates": {},
+        "retained_completed_identities": 1
+      },
+      "restock_profile": {
+        "training_cutoff": 1792639200,
+        "zero_refill_samples": 97,
+        "status": "LEARNED",
+        "normal_min": 2388,
+        "normal_max": 2500,
+        "reset_base": null,
+        "reset_training_samples": 1,
+        "normal_samples": 78,
+        "excluded_small_samples": 19,
+        "reset_candidate_base": 2500,
+        "classification_is_observational": true,
+        "method": "ITERATED_LOG_QUANTITY_CLUSTER_WITH_OBSERVED_RANGE"
+      },
+      "qualified_restocks": 0,
+      "revision_counts": {
+        "FROZEN_AT_RECOMMENDED_DEPARTURE": 1,
+        "NEW_RECOMMENDATION": 3,
+        "POSTPONED_BEFORE_DEPARTURE": 132,
+        "REVISED_BEFORE_DEPARTURE": 197,
+        "SUPPRESSED_ALREADY_TESTED_TARGET": 1,
+        "WITHDRAWN_NO_ADVICE": 1
+      },
+      "no_advice_clock_statuses": {
+        "STALE_COUNTRY_DATA": 68,
+        "MODEL_ABSTAIN": 1489
+      },
+      "nearest_qualified_boundary_misses": {
+        "counts": {},
+        "median_late_minutes": null,
+        "median_early_minutes": null
+      },
+      "latest_ten": {
+        "known": 1,
+        "successes": 1,
+        "failures": 0,
+        "unknown": 0,
+        "pending": 0,
+        "success_fraction": 1.0
+      },
+      "active_recommendation_at_cutoff": null
+    }
+  },
+  "scoring_code_sha256": {
+    "research/rescore_saved_challengers.py": "378a3521c5db3828b9888b64116f7117f456e6c556f0b55c43c464783c496ead",
+    "services/simulated_trip_evidence.py": "bf0384742e3c84e55f24f594dd8c0a4344958ace6e0d3a9ffcedf5841ccfa20d",
+    "services/restock_signatures.py": "b872c5abab3d6e26882541fc7417903f3781c70c3580608ddf325773eb6abbd5",
+    "research/nearest_stock_boundary_misses.py": "d140e55b491bc6aea5f7fe0ed7f32d585e31ebc5ff5d139f69fc29f8d12eda71"
+  },
+  "idempotency_verified": true,
+  "saved_geometry_preserved": true,
+  "original_inputs_unchanged": true
+}

@@ -1,0 +1,33 @@
+name: V35 museum and Japan private pilot
+
+on:
+  push:
+    branches: [release/v35-flower-plushie-japan-pilot-20261008]
+  pull_request:
+    paths:
+      - 'services/private_v18_champion_worker_v35.py'
+      - 'services/private_challenger_adapter_v31.py'
+      - 'research/v33_private_shadow_sampler.py'
+      - 'deploy/systemd/torn-fren-shadow-capture.service'
+      - 'tests/test_v35_museum_japan_private_pilot.py'
+      - '.github/workflows/v35-museum-japan-pilot.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  champions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: python -m pip install -r requirements.txt httpx
+      - run: python -m unittest discover -s tests -p 'test_v35_museum_japan_private_pilot.py' -v
+      - run: python -m unittest discover -s tests -p 'test_v33_private_shadow_sampler.py' -v
+      - run: python -m unittest discover -s tests -p 'test_v33_systemd_units.py' -v
+      - run: python -m unittest discover -s tests -p 'test_v31_private_challenger.py' -v
+      - run: python -m unittest discover -s tests -p 'test_v34_prospective_ops_audit.py' -v
+      - run: python -m py_compile services/private_v18_champion_worker_v35.py services/private_challenger_adapter_v31.py research/v33_private_shadow_sampler.py

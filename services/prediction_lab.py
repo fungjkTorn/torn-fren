@@ -5,6 +5,7 @@ from dataclasses import dataclass
 
 from services.history_service import (
     DB_PATH,
+    _ClosingConnection,
     _build_validated_cycles,
     _collection_coverage,
     _get_all_item_rows_with_source,
@@ -139,7 +140,7 @@ def extract_prediction_samples(country: str, item_name: str):
             "valid_cycles": 0,
         }
 
-    cycles, _active, wait_samples = _build_validated_cycles(rows)
+    cycles, _active, wait_samples = _build_validated_cycles(rows, country, item_name)
     completed = [cycle for cycle in cycles if cycle.get("complete")]
     valid_cycles = [cycle for cycle in completed if cycle.get("valid_lifetime")]
     valid_waits = [sample for sample in wait_samples if sample.get("valid")]
@@ -251,7 +252,7 @@ def walk_forward_backtest(country: str, item_name: str, min_train: int = 3):
 
 
 def list_tracked_items(min_rows: int = 1):
-    with sqlite3.connect(DB_PATH) as conn:
+    with sqlite3.connect(DB_PATH, factory=_ClosingConnection) as conn:
         rows = conn.execute(
             """
             SELECT country, item_name, COUNT(*) AS row_count

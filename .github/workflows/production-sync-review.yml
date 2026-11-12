@@ -1,0 +1,139 @@
+name: Production reconciliation review
+
+on:
+  pull_request:
+    branches:
+      - release/monkey-combined-20261110
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-sync-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  offline-review-contracts:
+    name: Python contracts, imports and static JS
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install public web dependencies
+        run: python -m pip install --disable-pip-version-check -r requirements.txt -r research/plushie_champions/requirements-research.txt httpx
+      - name: Compile Python source (no execution)
+        run: python -m compileall -q bot services web research tests tools poller.py run.py
+      - name: Check production reconciliation contracts
+        run: |
+          set -eu
+          for pattern in \
+            test_poller_collector_contract.py \
+            test_durable_audit_queue_contract.py \
+            test_provider_freshness_contract.py \
+            test_history_cache_contract.py \
+            test_v41_champion_cache_contract.py \
+            test_cohort_schedule_contract.py \
+            test_final_pair_interface_contract.py \
+            test_final_pair_bootstrap_contract.py \
+            test_chamois_receipt_projection.py \
+            test_private_threshold_helper_compatibility.py \
+            test_pending_evidence_deduplication.py \
+            test_versioned_release_metadata.py \
+            test_source_sync_cutover.py \
+            test_simulated_trip_threshold.py \
+            test_source_reference_audit.py \
+            test_web_live_sync_contract.py; do
+            echo "===== ${pattern} ====="
+            python -m unittest discover -s tests -p "${pattern}" -v
+          done
+      - name: Run active publisher and web regression matrix
+        run: |
+          set -eu
+          for pattern in \
+            test_first_release_live.py \
+            test_first_release_schedule.py \
+            test_first_release_source.py \
+            test_first_release_graph_contract.py \
+            test_first_release_history_summary.py \
+            test_admin_live_beta_health.py \
+            test_travel_decisions_router.py \
+            test_v38_heartbeat_fastpath.py \
+            test_v38_catalog_cache.py \
+            test_v38_revision_fingerprint.py \
+            test_native_history_acceleration.py \
+            test_v143_v2_window_web_parity.py \
+            test_v2_beta_history_preview.py; do
+            echo "===== ${pattern} ====="
+            python -m unittest discover -s tests -p "${pattern}" -v
+          done
+      - name: Verify retained original-main historical contracts
+        run: |
+          set -eu
+          for pattern in \
+            test_all_item_v21_checkpoint.py \
+            test_dual_layer_prediction_contract.py \
+            test_dual_layer_prediction_legacy_adapter.py \
+            test_next_opportunity_evaluation.py \
+            test_release_shadow_canary.py \
+            test_stock_opportunity_geometry.py; do
+            echo "===== ${pattern} ====="
+            python -m unittest discover -s tests -p "${pattern}" -v
+          done
+      - name: Verify website route and required assets
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from fastapi.testclient import TestClient
+          from web.app import app
+          paths={path for route in app.routes if isinstance((path := getattr(route, 'path', None)), str)}
+          for path in ("/api/history","/api/catalog","/api/admin/health"):
+              assert path in paths, (path,sorted(paths))
+          # The beta bridge serves travel-decisions through middleware rather than
+          # a FastAPI APIRoute. Exercise the actual HTTP surface in the test app.
+          with TestClient(app) as client:
+              for path in ("/","/experimental","/travel-decisions"):
+                  response=client.get(path)
+                  assert response.status_code==200, (path,response.status_code,response.text[:300])
+                  assert "text/html" in response.headers.get("content-type",""), path
+          for path in ("web/static/index.html","web/static/experimental.html",
+                       "web/static/admin.html","web/first_release_assets/board.html",
+                       "web/first_release_assets/beta.js","web/first_release_assets/beta.css"):
+              assert Path(path).is_file(), path
+          print("Website route table and assets verified")
+          PY
+      - name: Inventory possible historical modules (no deletions)
+        run: |
+          python tools/audit_source_references.py \
+            --root . \
+            --entry services.challenger_live \
+            --entry services.final_pair_live \
+            --entry services.daily_forward_report \
+            --entry services.checkpoint4_state \
+            --json-output source-reachability-review.json
+      - name: Save non-destructive reachability report
+        uses: actions/upload-artifact@v4
+        with:
+          name: source-reachability-review
+          path: source-reachability-review.json
+          retention-days: 7
+      - name: Parse inline browser JavaScript without network calls
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re,subprocess,tempfile
+          for name in ["web/static/index.html","web/static/experimental.html",
+                       "web/static/admin.html","web/first_release_assets/board.html"]:
+              src=Path(name).read_text(encoding="utf-8")
+              snippets=re.findall(r'<script(?![^>]*\\bsrc=)[^>]*>(.*?)</script>',src,re.I|re.S)
+              for number,code in enumerate(snippets,1):
+                  if not code.strip():continue
+                  with tempfile.NamedTemporaryFile(suffix=".js",mode="w",encoding="utf-8") as tmp:
+                      tmp.write(code);tmp.flush()
+                      subprocess.run(["node","--check",tmp.name],check=True)
+              print(name,len(snippets),"inline scripts checked")
+          PY

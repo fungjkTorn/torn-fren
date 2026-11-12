@@ -1,0 +1,24 @@
+[Unit]
+Description=Torn Fren isolated rotating museum and Japan research capture
+After=network.target torn-fren-web.service
+ConditionPathExists=/opt/torn-fren/data/stock_history.db
+
+[Service]
+Type=oneshot
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/opt/torn-fren
+StateDirectory=torn-fren-shadow
+StateDirectoryMode=0700
+UMask=0077
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+Nice=15
+CPUQuota=50%
+MemoryMax=512M
+TimeoutStartSec=75
+# V36: one item per tick, four items rotated over 20m. No secret env file.
+# Native V18 in a read-only child; V2 via bounded public history read only.
+ExecStart=/usr/bin/python3 -m research.v36_isolated_museum_sampler --db /opt/torn-fren/data/stock_history.db --evidence-db /var/lib/torn-fren-shadow/capture.db --experiment pilot-museum-japan-v36 --rotate

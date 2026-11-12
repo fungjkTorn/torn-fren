@@ -1,0 +1,34 @@
+[Unit]
+Description=Torn Fren V160 localhost-only live 24-item research beta board
+After=local-fs.target
+ConditionPathExists=/var/lib/torn-fren-v38/v160_v151_prospective24.db
+ConditionPathExists=/home/ubuntu/torn-fren-private-models/v160_stage/pinned/research/v38_roster.json
+ConditionPathExists=/home/ubuntu/torn-fren-private-models/v160_beta_board.py
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+ExecStart=/usr/bin/python3 -I /home/ubuntu/torn-fren-private-models/v160_beta_board.py --port 8765
+WorkingDirectory=/home/ubuntu/torn-fren-private-models
+Environment=PYTHONDONTWRITEBYTECODE=1
+Restart=on-failure
+RestartSec=10
+Nice=19
+CPUQuota=5%
+MemoryMax=128M
+TasksMax=12
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=read-only
+PrivateTmp=yes
+PrivateDevices=yes
+RestrictAddressFamilies=AF_INET AF_UNIX
+UMask=0077
+# This unit ONLY reads the separate V160 private research ledger.
+# No collector writes, public listener, website edits, or game automation.
+ReadOnlyPaths=/var/lib/torn-fren-v38
+ReadOnlyPaths=/home/ubuntu/torn-fren-private-models
+
+[Install]
+WantedBy=multi-user.target

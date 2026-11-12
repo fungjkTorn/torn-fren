@@ -41,7 +41,8 @@ class CanaryIsolationTests(unittest.TestCase):
                      "/api/research/champion-shadow"):
             self.assertIn(name,paths)
         from web.app import api_history
-        self.assertIn("build_live_prediction_v2",api_history.__code__.co_names)
+        self.assertIn("_get_prediction_nonblocking",api_history.__code__.co_names)
+        self.assertNotIn("build_live_prediction_v2",api_history.__code__.co_names)
         self.assertNotIn("research_candidate",api_history.__code__.co_names)
 
     def test_private_auth_requires_new_nonweak_secret(self):

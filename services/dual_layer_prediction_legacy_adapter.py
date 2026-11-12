@@ -19,7 +19,14 @@ def from_legacy_v2(
 ):
     v2 = prediction_v2 or {}
     chain = v2.get("predictions") or []
-    display = v2.get("display_prediction") or v2.get("prediction_1") or {}
+    # Older V2 output sometimes supplied only a predictions list. Reconstruct
+    # its legacy display entry *only* when the display key was truly omitted.
+    # An explicitly null display means the current planner abstained; never
+    # resurface the earliest historical cycle as actionable advice.
+    if "display_prediction" in v2:
+        display = v2.get("display_prediction") or {}
+    else:
+        display = v2.get("prediction_1") or (chain[0] if chain else {})
     if not chain and display:
         chain = [display]
 

@@ -408,7 +408,8 @@ def _trajectory_neighbors(q, history_points, history_times, timeline, cfg, max_f
     return chosen, weights, sw, ne
 
 
-def plan(qtime, history_points, history_times, timeline, dep_times, cycle_feats, cfg, delays, travel, grace):
+def plan(qtime, history_points, history_times, timeline, dep_times, cycle_feats, cfg, delays, travel, grace,
+         *, refine_minute=False):
     q = context_at(qtime, timeline, dep_times, cycle_feats)
     if q is None:
         return None
@@ -490,7 +491,27 @@ def plan(qtime, history_points, history_times, timeline, dep_times, cycle_feats,
     else:
         chosen_point = best
 
-    return {
+    minute_refined = False
+    if refine_minute and len(delays) > 1:
+        # Reuse the same neighbor set and its existing verified horizon.
+        original = int(chosen_point["delay"])
+        lo = max(min(delays), original-600)
+        hi = min(max(delays), original+600)
+        candidates = {delay for delay in delays if lo <= delay <= hi}
+        candidates.update(range(lo, hi+1, 60))
+        candidates.add(hi)
+
+        def immediate_probability(delay):
+            raw = sum(w * int(timeline.success(p.t + delay + travel, grace))
+                      for w, (_distance, p) in zip(weights, chosen)) / sw
+            return (raw * ne + cfg.prior_strength * 0.5) / (ne + cfg.prior_strength)
+
+        probability, negative_delay = max((immediate_probability(d), -d) for d in candidates)
+        if probability >= chosen_point["prob"] + .03:
+            chosen_point = dict(chosen_point, delay=-negative_delay, prob=probability)
+            minute_refined = True
+
+    result = {
         "query_time": float(qtime),
         "departure_time": float(qtime) + chosen_point["delay"],
         "arrival_time": float(qtime) + chosen_point["delay"] + travel,
@@ -498,6 +519,9 @@ def plan(qtime, history_points, history_times, timeline, dep_times, cycle_feats,
         "robust_probability": chosen_point["robust_prob"],
         "support": chosen_point["support"],
     }
+    if minute_refined:
+        result["minute_refined"] = True
+    return result
 
 def simulate_session(start, planner, timeline, travel, grace, replan_step, max_wait):
     t = float(start)

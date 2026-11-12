@@ -1,0 +1,312 @@
+{
+  "status": "LIVE_LEDGER_TRACKING_VALIDATED",
+  "evidence_policy": "RECOMMENDED_DEPARTURE_FREEZE_V5",
+  "model_sha": "45d14b5e931458e41dc31e551310994caf4f8a1d",
+  "first_issued": 1793206621,
+  "source_cutoff": 1793318353,
+  "incremental_checkpoints": [
+    1793206900,
+    1793225700,
+    1793281940,
+    1793318353
+  ],
+  "frozen_trips": 60,
+  "duplicate_target_groups": 0,
+  "batch_equals_incremental": true,
+  "repeated_reconciliation_unchanged": true,
+  "published_geometry_preserved": true,
+  "original_evidence_preserved": true,
+  "model_inference_run": false,
+  "items": {
+    "arg:Ceibo Flower": {
+      "simulated_trips_total": 4,
+      "successes": 3,
+      "known": 3,
+      "failures": 0,
+      "unknown": 0,
+      "pending": 1,
+      "success_fraction": 1.0,
+      "observed_restocks_since_start": 3,
+      "restock_profile": {
+        "training_cutoff": 1793206621,
+        "zero_refill_samples": 189,
+        "status": "LEARNED",
+        "normal_min": 9575,
+        "normal_max": 9999,
+        "reset_base": null,
+        "reset_training_samples": 0,
+        "normal_samples": 153,
+        "excluded_small_samples": 36,
+        "reset_candidate_base": 9999,
+        "classification_is_observational": true,
+        "method": "ITERATED_LOG_QUANTITY_CLUSTER_WITH_OBSERVED_RANGE"
+      },
+      "target_identity_audit": {
+        "duplicate_target_groups": 0,
+        "duplicates": {},
+        "retained_completed_identities": 4
+      }
+    },
+    "can:Crocus": {
+      "simulated_trips_total": 4,
+      "successes": 1,
+      "known": 4,
+      "failures": 3,
+      "unknown": 0,
+      "pending": 0,
+      "success_fraction": 0.25,
+      "observed_restocks_since_start": 3,
+      "restock_profile": {
+        "training_cutoff": 1793206621,
+        "zero_refill_samples": 182,
+        "status": "LEARNED",
+        "normal_min": 9661,
+        "normal_max": 9999,
+        "reset_base": null,
+        "reset_training_samples": 0,
+        "normal_samples": 138,
+        "excluded_small_samples": 44,
+        "reset_candidate_base": 9999,
+        "classification_is_observational": true,
+        "method": "ITERATED_LOG_QUANTITY_CLUSTER_WITH_OBSERVED_RANGE"
+      },
+      "target_identity_audit": {
+        "duplicate_target_groups": 0,
+        "duplicates": {},
+        "retained_completed_identities": 4
+      }
+    },
+    "cay:Banana Orchid": {
+      "simulated_trips_total": 4,
+      "successes": 4,
+      "known": 4,
+      "failures": 0,
+      "unknown": 0,
+      "pending": 0,
+      "success_fraction": 1.0,
+      "observed_restocks_since_start": 3,
+      "restock_profile": {
+        "training_cutoff": 1793206621,
+        "zero_refill_samples": 175,
+        "status": "LEARNED",
+        "normal_min": 9588,
+        "normal_max": 9999,
+        "reset_base": null,
+        "reset_training_samples": 0,
+        "normal_samples": 137,
+        "excluded_small_samples": 38,
+        "reset_candidate_base": 9999,
+        "classification_is_observational": true,
+        "method": "ITERATED_LOG_QUANTITY_CLUSTER_WITH_OBSERVED_RANGE"
+      },
+      "target_identity_audit": {
+        "duplicate_target_groups": 0,
+        "duplicates": {},
+        "retained_completed_identities": 4
+      }
+    },
+    "haw:Orchid": {
+      "simulated_trips_total": 3,
+      "successes": 3,
+      "known": 3,
+      "failures": 0,
+      "unknown": 0,
+      "pending": 0,
+      "success_fraction": 1.0,
+      "observed_restocks_since_start": 3,
+      "restock_profile": {
+        "training_cutoff": 1793206621,
+        "zero_refill_samples": 209,
+        "status": "LEARNED",
+        "normal_min": 9557,
+        "normal_max": 9999,
+        "reset_base": null,
+        "reset_training_samples": 0,
+        "normal_samples": 151,
+        "excluded_small_samples": 58,
+        "reset_candidate_base": 9999,
+        "classification_is_observational": true,
+        "method": "ITERATED_LOG_QUANTITY_CLUSTER_WITH_OBSERVED_RANGE"
+      },
+      "target_identity_audit": {
+        "duplicate_target_groups": 0,
+        "duplicates": {},
+        "retained_completed_identities": 3
+      }
+    },
+    "jap:Cherry Blossom": {
+      "simulated_trips_total": 4,
+      "successes": 4,
+      "known": 4,
+      "failures": 0,
+      "unknown": 0,
+      "pending": 0,
+      "success_fraction": 1.0,
+      "observed_restocks_since_start": 2,
+      "restock_profile": {
+        "training_cutoff": 1793206621,
+        "zero_refill_samples": 210,
+        "status": "LEARNED",
+        "normal_min": 9597,
+        "normal_max": 9999,
+        "reset_base": null,
+        "reset_training_samples": 0,
+        "normal_samples": 149,
+        "excluded_small_samples": 61,
+        "reset_candidate_base": 9999,
+        "classification_is_observational": true,
+        "method": "ITERATED_LOG_QUANTITY_CLUSTER_WITH_OBSERVED_RANGE"
+      },
+      "target_identity_audit": {
+        "duplicate_target_groups": 0,
+        "duplicates": {},
+        "retained_completed_identities": 4
+      }
+    },
+    "mex:Dahlia": {
+      "simulated_trips_total": 4,
+      "successes": 3,
+      "known": 4,
+      "failures": 1,
+      "unknown": 0,
+      "pending": 0,
+      "success_fraction": 0.75,
+      "observed_restocks_since_start": 3,
+      "restock_profile": {
+        "training_cutoff": 1793206621,
+        "zero_refill_samples": 177,
+        "status": "LEARNED",
+        "normal_min": 9581,
+        "normal_max": 9999,
+        "reset_base": null,
+        "reset_training_samples": 0,
+        "normal_samples": 143,
+        "excluded_small_samples": 34,
+        "reset_candidate_base": 9999,
+        "classification_is_observational": true,
+        "method": "ITERATED_LOG_QUANTITY_CLUSTER_WITH_OBSERVED_RANGE"
+      },
+      "target_identity_audit": {
+        "duplicate_target_groups": 0,
+        "duplicates": {},
+        "retained_completed_identities": 4
+      }
+    },
+    "mex:Jaguar Plushie": {
+      "simulated_trips_total": 22,
+      "successes": 7,
+      "known": 8,
+      "failures": 1,
+      "unknown": 1,
+      "pending": 1,
+      "success_fraction": 0.875,
+      "observed_restocks_since_start": 22,
+      "restock_profile": {
+        "training_cutoff": 1793206621,
+        "zero_refill_samples": 1191,
+        "status": "LEARNED",
+        "normal_min": 2117,
+        "normal_max": 2500,
+        "reset_base": null,
+        "reset_training_samples": 0,
+        "normal_samples": 1065,
+        "excluded_small_samples": 126,
+        "reset_candidate_base": 2500,
+        "classification_is_observational": true,
+        "method": "ITERATED_LOG_QUANTITY_CLUSTER_WITH_OBSERVED_RANGE"
+      },
+      "target_identity_audit": {
+        "duplicate_target_groups": 0,
+        "duplicates": {},
+        "retained_completed_identities": 22
+      }
+    },
+    "swi:Edelweiss": {
+      "simulated_trips_total": 7,
+      "successes": 5,
+      "known": 6,
+      "failures": 1,
+      "unknown": 0,
+      "pending": 1,
+      "success_fraction": 0.8333333333333334,
+      "observed_restocks_since_start": 6,
+      "restock_profile": {
+        "training_cutoff": 1793206621,
+        "zero_refill_samples": 198,
+        "status": "LEARNED",
+        "normal_min": 9635,
+        "normal_max": 9999,
+        "reset_base": null,
+        "reset_training_samples": 0,
+        "normal_samples": 176,
+        "excluded_small_samples": 22,
+        "reset_candidate_base": 9999,
+        "classification_is_observational": true,
+        "method": "ITERATED_LOG_QUANTITY_CLUSTER_WITH_OBSERVED_RANGE"
+      },
+      "target_identity_audit": {
+        "duplicate_target_groups": 0,
+        "duplicates": {},
+        "retained_completed_identities": 7
+      }
+    },
+    "uae:Tribulus Omanense": {
+      "simulated_trips_total": 3,
+      "successes": 2,
+      "known": 2,
+      "failures": 0,
+      "unknown": 1,
+      "pending": 0,
+      "success_fraction": 1.0,
+      "observed_restocks_since_start": 1,
+      "restock_profile": {
+        "training_cutoff": 1793206621,
+        "zero_refill_samples": 184,
+        "status": "LEARNED",
+        "normal_min": 9573,
+        "normal_max": 9999,
+        "reset_base": null,
+        "reset_training_samples": 0,
+        "normal_samples": 144,
+        "excluded_small_samples": 40,
+        "reset_candidate_base": 9999,
+        "classification_is_observational": true,
+        "method": "ITERATED_LOG_QUANTITY_CLUSTER_WITH_OBSERVED_RANGE"
+      },
+      "target_identity_audit": {
+        "duplicate_target_groups": 0,
+        "duplicates": {},
+        "retained_completed_identities": 3
+      }
+    },
+    "uni:Heather": {
+      "simulated_trips_total": 5,
+      "successes": 5,
+      "known": 5,
+      "failures": 0,
+      "unknown": 0,
+      "pending": 0,
+      "success_fraction": 1.0,
+      "observed_restocks_since_start": 4,
+      "restock_profile": {
+        "training_cutoff": 1793206621,
+        "zero_refill_samples": 171,
+        "status": "LEARNED",
+        "normal_min": 9668,
+        "normal_max": 9999,
+        "reset_base": null,
+        "reset_training_samples": 0,
+        "normal_samples": 141,
+        "excluded_small_samples": 30,
+        "reset_candidate_base": 9999,
+        "classification_is_observational": true,
+        "method": "ITERATED_LOG_QUANTITY_CLUSTER_WITH_OBSERVED_RANGE"
+      },
+      "target_identity_audit": {
+        "duplicate_target_groups": 0,
+        "duplicates": {},
+        "retained_completed_identities": 5
+      }
+    }
+  }
+}

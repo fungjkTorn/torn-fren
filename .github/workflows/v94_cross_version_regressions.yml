@@ -1,0 +1,51 @@
+name: V94 cross-version research regression matrix
+
+on:
+  push:
+    branches: [research/v38-full-roster-live-prep-20261009]
+    paths:
+      - '.github/workflows/v94_cross_version_regressions.yml'
+      - 'research/v88_poll_state_forward_report.py'
+      - 'research/v89_pending_horizon_diagnostic.py'
+      - 'research/v91_travel_decision_contract.py'
+      - 'research/v93_arrival_observation_policy.py'
+      - 'tests/test_v92_stress_decision_engine.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  historical-isolation-regressions:
+    name: Previous 20-24 item research integrations
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install research-only dependencies
+        run: python -m pip install -r requirements.txt -r research/plushie_champions/requirements-research.txt
+      - name: V65-V76 isolation and forward-proxy safeguards
+        run: |
+          set -e
+          for name in test_v65_private_mirror_shadow_tick.py \
+                      test_v66_monkey_readonly_selector_probe.py \
+                      test_v68_monkey_isolated_canary.py \
+                      test_v69_full20_isolated_smoke.py \
+                      test_v74_chamois_isolated_canary.py \
+                      test_v74_chamois_selector_parity.py \
+                      test_v75_private21_chamois_smoke.py \
+                      test_v76_forward_research_report.py; do
+            echo "===== $name ====="
+            python -m unittest discover -s tests -p "$name" -v
+          done
+      - name: Pair comparison and report replay contracts
+        run: |
+          set -e
+          for name in test_v81_pair_forward_comparison.py \
+                      test_v83_pair_forward_report.py; do
+            echo "===== $name ====="
+            python -m unittest discover -s tests -p "$name" -v
+          done

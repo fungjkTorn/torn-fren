@@ -1,0 +1,13 @@
+[Unit]
+Description=Torn V85 Japan Xanax independent private capture every five minutes
+# 40s after V82's :04/:09/:14 runs; V84 defers if V75/V82 is still running.
+
+[Timer]
+OnCalendar=*-*-* *:04/5:40
+AccuracySec=1s
+RandomizedDelaySec=0
+Persistent=no
+Unit=torn-fren-v85-japan-forward.service
+
+[Install]
+WantedBy=timers.target

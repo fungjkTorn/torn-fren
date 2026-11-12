@@ -1,0 +1,25 @@
+# Bounded publication tolerance preview
+
+A separate `publication_delay_30s_v1` execution policy is now implemented alongside the original default `strict_point_v1`. Numerical departure-model predictions are unchanged. No production configuration, active Camel/Chamois test, routine approved source pin, or existing candidate profile was changed.
+
+Only a model's original leave-now point (departure equal to issue time) can receive up to30seconds of publication tolerance. Future points retain strict deadlines: the delay audit did not test adding30seconds after a future point. The deadline is anchored to the original issue, capped by cumulative source freshness, and never renewed by HTTP requests. Stale source, issue expiry, custom-flight mismatch, abstention or missed deadline clears departure and landing. Actual landing is actual departure plus flight; ten-second evaluation grace remains separate.
+
+The staged alternative profile is `deploy/research_runner/flowers_plushies_tolerance30_candidate_20261016.json`. It enables the same14candidate flower/plushie models as the earlier profile, while the other10items remain disabled. The original profile remains strict and available for comparison. This is not a14-item release certificate: coverage, unknown outcomes, consistency and operational integration still need review.
+
+The shared read model requires historical evidence to match the selected execution policy as well as item model, flight, source and departure policy. A strict-point percentage cannot be displayed as evidence for the tolerance policy. The graph panel now advances its displayed landing from the actual current permitted departure during the allowance; both views clear clocks at expiry. Restock/depletion event provenance remains independent and physical depletion remains exactly zero.
+
+Tests cover actual departures at0/5/15/30seconds, rejection at31seconds, source-limited shorter windows, future-point rejection, unchanged inputs, incompatible flights and evidence separation. The actual consumer was compared with the fixed historical late arm over100combinations of original120second-grid points, source ages and0–30second publication delays. The publisher tests both profiles and rejects unsupported execution assignments.
+
+`research/publication_snapshot_probe.py` also measures real offline snapshot build time on a sanitized historical snapshot. It projects both strict and selected profiles at the simulated publication finish time without changing the original issue. Tests show that35seconds of preparation exhausts a30second allowance, while10seconds can preserve a fresh immediate recommendation. Network/user delay is additional and is not measured by that probe.
+
+The earlier seven-day diagnostic remains exploratory historical evidence, not new forward certification or permission to delay every future point. This preview must not be promoted merely because it exposes more clocks. Real feed cadence, compute cost, publication latency and the deployed experimental adapter remain release gates. No new background service is installed by these changes.
+
+## Verified build-cost result
+
+Implementation source `eb11e7118dfafc5b1f12f15c9aacb221e0b17a77` passed153causal/contract tests, five latency tests, Chromium and all compatibility workflows. Private run38938374693 succeeded; artifact12061518733 ZIP60328bytes SHA256 `8b0943af16af8485de01eb7a39ea01192ed6bee0226991503f65a064bf392611` verified. Preparing the14-candidate profile took6.258seconds on the research runner. At simulated publication finish, the tolerance profile retained8immediate clocks and3future clocks; strict retained0immediate and3future clocks.13rows abstained in both. Source age at finish was30seconds. This is one offline timing sample, excludes network/user delay, and does not establish worst-case latency, refresh cadence or live arrival accuracy.
+
+The recommendation consumers now refresh every10seconds. Travel Decisions rejects out-of-order responses, and the V2 graph uses a separate bounded lightweight snapshot request rather than increasing history/model requests. Item changes and failures invalidate that feed. The prepared experimental renderer uses the same shorter cadence and response-generation guard. These are client refresh changes, not proof of a continuously running producer: owner-side snapshot generation cadence and loaded runtime latency remain unverified.
+
+## Final verification
+
+Final consumer source `615ee78f38e2b9fe0ed0dad1330c9d27d155872f` passed run38939851836:158tests across34causal/contract suites plus both Chromium cases (Travel Decisions/V2 graph and prepared experimental owner page). V35, profitability and V38 compatibility workflows also passed. Browser checks include the lightweight ten-second refresh and rejection of delayed responses after a new selection. All changes remain staged; no VM service, source pin or production model assignment was changed.

@@ -1,0 +1,28 @@
+[Unit]
+Description=Torn V82 isolated Lion/Panda forward research comparison (never public)
+After=local-fs.target
+ConditionPathExists=/home/ubuntu/torn-fren-private-models/lion_selector_artifact.json
+ConditionPathExists=/home/ubuntu/torn-fren-private-models/panda_selector_artifact.json
+ConditionPathExists=/opt/torn-fren/data/stock_history.db
+
+[Service]
+Type=oneshot
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/home/ubuntu/torn-fren-v38-probe
+ExecStart=/home/ubuntu/torn-fren-v38-probe/.venv/bin/python -m research.v81_pair_forward_comparison
+Environment=PYTHONDONTWRITEBYTECODE=1
+Environment=OMP_NUM_THREADS=1
+Environment=OPENBLAS_NUM_THREADS=1
+Environment=MKL_NUM_THREADS=1
+CPUQuota=15%
+MemoryMax=640M
+TimeoutStartSec=180s
+TimeoutStopSec=20s
+Nice=15
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+NoNewPrivileges=yes
+PrivateTmp=yes
+UMask=0077
+Restart=no

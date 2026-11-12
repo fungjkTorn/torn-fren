@@ -1,0 +1,85 @@
+{
+  "description": "Minimal actual Ceibo publication handoff, stock-only forecast fields. No outcome is used to select or suppress a target.",
+  "openings": [
+    1793187682,
+    1793225633
+  ],
+  "rows": [
+    {
+      "item_key": "arg:Ceibo Flower",
+      "asof_epoch": 1793221940,
+      "published_epoch": 1793221955,
+      "source_heartbeat_epoch": 1793221853,
+      "forecast": {
+        "observed_current_quantity": 0,
+        "last_quantity_change_epoch": 1793221823
+      },
+      "decision": {
+        "estimated_departure_epoch": 1793221955,
+        "estimated_arrival_epoch": 1793228615,
+        "estimated_departure_deadline_epoch": 1793234153,
+        "selected_restock_event_index": 1,
+        "valid_until_epoch": 1793222033,
+        "forecast_events": [
+          {
+            "calibration_state": "UNCALIBRATED",
+            "early_stock_end_epoch": null,
+            "estimated_arrival_epoch": 1793228615,
+            "estimated_arrival_plus_grace_epoch": 1793228615,
+            "estimated_departure_start_epoch": 1793221955,
+            "estimated_latest_departure_epoch": 1793234153,
+            "flight_reachable": true,
+            "forecast_horizon_seconds": 3514,
+            "index": 1,
+            "item_quantity_threshold": 31,
+            "model_proven_success": false,
+            "predicted_restock_epoch": 1793225454,
+            "predicted_stock_below_30_epoch": 1793240814,
+            "predicted_true_depletion_epoch": null,
+            "reason": "ESTIMATED_STOCKED_PHASE_REACHABLE",
+            "restock_early_epoch": 1793225276,
+            "restock_late_epoch": 1793225633
+          }
+        ]
+      }
+    },
+    {
+      "item_key": "arg:Ceibo Flower",
+      "asof_epoch": 1793225660,
+      "published_epoch": 1793225675,
+      "source_heartbeat_epoch": 1793225583,
+      "forecast": {
+        "observed_current_quantity": 0,
+        "last_quantity_change_epoch": 1793221823
+      },
+      "decision": {
+        "estimated_departure_epoch": 1793225675,
+        "estimated_arrival_epoch": 1793232335,
+        "estimated_departure_deadline_epoch": 1793233733,
+        "selected_restock_event_index": 1,
+        "valid_until_epoch": 1793225763,
+        "forecast_events": [
+          {
+            "calibration_state": "UNCALIBRATED",
+            "early_stock_end_epoch": null,
+            "estimated_arrival_epoch": 1793232335,
+            "estimated_arrival_plus_grace_epoch": 1793232335,
+            "estimated_departure_start_epoch": 1793225675,
+            "estimated_latest_departure_epoch": 1793233733,
+            "flight_reachable": true,
+            "forecast_horizon_seconds": 124,
+            "index": 1,
+            "item_quantity_threshold": 31,
+            "model_proven_success": false,
+            "predicted_restock_epoch": 1793225784,
+            "predicted_stock_below_30_epoch": 1793240394,
+            "predicted_true_depletion_epoch": null,
+            "reason": "ESTIMATED_STOCKED_PHASE_REACHABLE",
+            "restock_early_epoch": 1793225721,
+            "restock_late_epoch": 1793225813
+          }
+        ]
+      }
+    }
+  ]
+}

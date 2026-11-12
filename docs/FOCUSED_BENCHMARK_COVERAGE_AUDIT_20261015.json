@@ -1,0 +1,30 @@
+{
+  "all_items_same_legacy_coverage": true,
+  "artifact_id": 12016434330,
+  "artifact_sha256": "10a197a3a4bbea0866f0bf2cfa8bc7735975244b8dfb44c9c005591cc3ef1bea",
+  "artifact_verified": true,
+  "asof_epoch": 1792110328,
+  "automatic_promotion": false,
+  "focused_zero": true,
+  "items_evaluated": 24,
+  "legacy_candidate_policies_absent": [
+    "late_onset_all_history",
+    "midpoint_all_history",
+    "midpoint_recent_8",
+    "phase_analog_current_quarter",
+    "phase_analog_midpoint",
+    "phase_analog_quarter",
+    "quarter_buffer_all_history",
+    "quarter_with_current_stock"
+  ],
+  "legacy_candidate_policies_present": [
+    "v166_all_history"
+  ],
+  "new_zero_and_path_policies_in_legacy_gate": false,
+  "raw_legacy_gate_status_counts": {
+    "MORE_RESEARCH_REQUIRED": 23,
+    "PROMISING_BELOW_TARGET": 1
+  },
+  "source_sha": "a73adb6d786e0e7e710fcc99ec8c70e9e8319885",
+  "status": "LEGACY_COMPATIBILITY_GATE_NOT_FULL_ARRIVAL_SCORECARD"
+}

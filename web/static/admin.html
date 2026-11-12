@@ -116,9 +116,20 @@
     </section>
 
     <section class="card">
-      <h2>Disk</h2>
+      <h2>Disk free</h2>
       <div id="diskFree" class="metric">—</div>
       <div id="diskMeta" class="small">—</div>
+    </section>
+
+    <section class="card wide">
+      <h2>Live beta publisher</h2>
+      <div id="liveBeta" class="rows"></div>
+      <div id="liveBetaIssues" class="small"></div>
+    </section>
+
+    <section class="card">
+      <h2>Country source freshness</h2>
+      <div id="countryClocks" class="rows"></div>
     </section>
 
     <section class="card wide">
@@ -137,8 +148,9 @@
     </section>
 
     <section class="card">
-      <h2>Forecast auditor</h2>
+      <h2>Legacy forecast auditor</h2>
       <div id="audits" class="rows"></div>
+      <div class="small">Archived system counters; separate from live beta evidence.</div>
     </section>
 
     <section class="card wide">
@@ -186,8 +198,9 @@
   }
 
   function addRows(target, rows) {
+    const escape = value => String(value ?? '—').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
     target.innerHTML = rows.map(([k,v]) =>
-      `<div class="row"><span>${k}</span><span>${v ?? "—"}</span></div>`
+      `<div class="row"><span>${escape(k)}</span><span>${escape(v)}</span></div>`
     ).join("");
   }
 
@@ -222,6 +235,24 @@
 
       $("statusPill").className = `status ${data.health || ""}`;
       $("statusPill").textContent = (data.health || "unknown").toUpperCase();
+
+      const beta = data.live_beta || {};
+      addRows($("liveBeta"), [
+        ["Publisher health", beta.status || "unavailable"],
+        ["Last publication", beta.published_epoch ? `${fmtDuration(beta.publication_age_seconds)} ago` : "Unknown"],
+        ["Items", `${beta.item_count ?? '—'} / ${beta.expected_items ?? '—'}`],
+        ["With departure advice", beta.items_with_advice],
+        ["Without advice", beta.items_without_advice],
+        ["Evidence ledger", beta.ledger_status],
+        ["Ledger size", fmtBytes(beta.ledger_bytes)],
+        ["Publisher timer", beta.timer?.ActiveState || "unknown"],
+        ["Last service result", beta.service?.Result || "unknown"],
+        ["Model version", beta.model_sha?.slice(0, 12)],
+        ["Publisher version", beta.publisher_sha?.slice(0, 12)],
+      ]);
+      $("liveBetaIssues").textContent = (beta.issues || []).join(' · ') || 'A missing departure can be a model decision; it is not automatically a publisher failure.';
+      const countries = Object.entries(beta.countries || {}).sort();
+      addRows($("countryClocks"), countries.length ? countries.map(([country,status]) => [country.toUpperCase(), status]) : [["Sources", "Unverified"]]);
 
       const c = data.collector || {};
       $("collectorAge").textContent = c.last_success_age_seconds == null
@@ -259,6 +290,7 @@
         ["Last size", fmtBytes(backups.last_backup_size_bytes)],
         ["Backup count", backups.count],
         ["Backup storage", fmtBytes(backups.total_bytes)],
+        ["Oldest backup", fmtTime(backups.oldest_backup_timestamp)],
         ["Timer", backups.timer_active === true ? "ACTIVE" : (backups.timer_active === false ? "INACTIVE" : "UNKNOWN")],
         ["Next scheduled", backups.next_backup || "—"],
       ]);
@@ -272,8 +304,8 @@
 
       addRows($("runtime"), [
         ["Python", runtime.python],
-        ["Git branch", runtime.git_branch],
-        ["Git commit", runtime.git_commit],
+        ["Web Git branch", runtime.git_branch],
+        ["Web Git commit", runtime.git_commit],
         ["Web PID", runtime.pid],
       ]);
 

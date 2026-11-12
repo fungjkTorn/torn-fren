@@ -37,7 +37,7 @@ def _incoming_lifetimes(country, item_name):
     raw = _get_all_item_rows_with_source(country, item_name)
     cleaned, _ = _suppress_provider_bounces(raw)
     rows = [(ts, qty) for ts, qty, _source in cleaned]
-    cycles, _active, _waits = _build_validated_cycles(rows)
+    cycles, _active, _waits = _build_validated_cycles(rows, country, item_name)
     result = {}
     for cycle in cycles:
         if (

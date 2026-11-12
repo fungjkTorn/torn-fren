@@ -1,0 +1,146 @@
+{
+  "arg:Ceibo Flower": {
+    "event_history": "true_zero_all",
+    "flight_adapter": "median",
+    "departure_policy": "zero_path_analog70",
+    "execution_policy": "publication_delay_30s_v1"
+  },
+  "arg:Monkey Plushie": {
+    "event_history": "true_zero_all",
+    "flight_adapter": "median",
+    "departure_policy": "disabled",
+    "execution_policy": "strict_point_v1"
+  },
+  "can:Crocus": {
+    "event_history": "true_zero_all",
+    "flight_adapter": "median",
+    "departure_policy": "zero_path_analog70",
+    "execution_policy": "publication_delay_30s_v1"
+  },
+  "can:Wolverine Plushie": {
+    "event_history": "true_zero_all",
+    "flight_adapter": "median",
+    "departure_policy": "zero_path_analog70",
+    "execution_policy": "publication_delay_30s_v1"
+  },
+  "can:Xanax": {
+    "event_history": "true_zero_all",
+    "flight_adapter": "median",
+    "departure_policy": "disabled",
+    "execution_policy": "strict_point_v1"
+  },
+  "cay:Banana Orchid": {
+    "event_history": "true_zero_all",
+    "flight_adapter": "median",
+    "departure_policy": "zero_path_analog70",
+    "execution_policy": "publication_delay_30s_v1"
+  },
+  "cay:Stingray Plushie": {
+    "event_history": "true_zero_all",
+    "flight_adapter": "median",
+    "departure_policy": "zero_path_analog70",
+    "execution_policy": "publication_delay_30s_v1"
+  },
+  "chi:Panda Plushie": {
+    "event_history": "true_zero_all",
+    "flight_adapter": "median",
+    "departure_policy": "disabled",
+    "execution_policy": "strict_point_v1"
+  },
+  "chi:Peony": {
+    "event_history": "true_zero_all",
+    "flight_adapter": "median",
+    "departure_policy": "zero_path_analog70",
+    "execution_policy": "publication_delay_30s_v1"
+  },
+  "haw:Orchid": {
+    "event_history": "true_zero_all",
+    "flight_adapter": "median",
+    "departure_policy": "zero_path_analog70",
+    "execution_policy": "publication_delay_30s_v1"
+  },
+  "jap:Cherry Blossom": {
+    "event_history": "true_zero_all",
+    "flight_adapter": "median",
+    "departure_policy": "zero_path_analog80",
+    "execution_policy": "publication_delay_30s_v1"
+  },
+  "jap:Xanax": {
+    "event_history": "true_zero_all",
+    "flight_adapter": "median",
+    "departure_policy": "disabled",
+    "execution_policy": "strict_point_v1"
+  },
+  "mex:Dahlia": {
+    "event_history": "true_zero_all",
+    "flight_adapter": "median",
+    "departure_policy": "zero_path_analog70",
+    "execution_policy": "publication_delay_30s_v1"
+  },
+  "mex:Jaguar Plushie": {
+    "event_history": "true_zero_all",
+    "flight_adapter": "median",
+    "departure_policy": "zero_path_analog70",
+    "execution_policy": "publication_delay_30s_v1"
+  },
+  "sou:African Violet": {
+    "event_history": "true_zero_all",
+    "flight_adapter": "median",
+    "departure_policy": "zero_path_analog70",
+    "execution_policy": "publication_delay_30s_v1"
+  },
+  "sou:Lion Plushie": {
+    "event_history": "true_zero_all",
+    "flight_adapter": "median",
+    "departure_policy": "disabled",
+    "execution_policy": "strict_point_v1"
+  },
+  "swi:Chamois Plushie": {
+    "event_history": "true_zero_all",
+    "flight_adapter": "median",
+    "departure_policy": "disabled",
+    "execution_policy": "strict_point_v1"
+  },
+  "swi:Edelweiss": {
+    "event_history": "true_zero_all",
+    "flight_adapter": "median",
+    "departure_policy": "zero_path_analog70",
+    "execution_policy": "publication_delay_30s_v1"
+  },
+  "uae:Camel Plushie": {
+    "event_history": "true_zero_all",
+    "flight_adapter": "median",
+    "departure_policy": "disabled",
+    "execution_policy": "strict_point_v1"
+  },
+  "uae:Tribulus Omanense": {
+    "event_history": "true_zero_all",
+    "flight_adapter": "median",
+    "departure_policy": "zero_path_analog70",
+    "execution_policy": "publication_delay_30s_v1"
+  },
+  "uni:Heather": {
+    "event_history": "true_zero_all",
+    "flight_adapter": "median",
+    "departure_policy": "zero_path_analog70",
+    "execution_policy": "publication_delay_30s_v1"
+  },
+  "uni:Nessie Plushie": {
+    "event_history": "true_zero_all",
+    "flight_adapter": "median",
+    "departure_policy": "disabled",
+    "execution_policy": "strict_point_v1"
+  },
+  "uni:Red Fox Plushie": {
+    "event_history": "true_zero_all",
+    "flight_adapter": "median",
+    "departure_policy": "disabled",
+    "execution_policy": "strict_point_v1"
+  },
+  "uni:Xanax": {
+    "event_history": "true_zero_all",
+    "flight_adapter": "median",
+    "departure_policy": "disabled",
+    "execution_policy": "strict_point_v1"
+  }
+}
