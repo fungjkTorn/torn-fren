@@ -40,7 +40,7 @@ def latest_fully_resolved_start(timeline,gs,ge,country,now):
         return start
     return None
 
-def simulate_one(planner,timeline,start,travel):
+def simulate_one(planner,timeline,start,travel,*,grace=GRACE,label_at_arrival=None):
     q=float(start);deadline=float(start+MAX_WAIT);sched=None
     while q<=deadline:
         z=planner(q)
@@ -48,10 +48,11 @@ def simulate_one(planner,timeline,start,travel):
             sched=z
         if sched and sched[0]<=q+STEP:
             dep=max(q,sched[0])
-            return {"status":"RESOLVED_EXPERT_DECISION",
-                    "success":int(timeline.success(dep+travel,GRACE)),
+            label=(int(timeline.success(dep+travel,grace)) if label_at_arrival is None else label_at_arrival(int(dep+travel+grace)))
+            return {"status":"RESOLVED_EXPERT_DECISION" if label is not None else "UNKNOWN_EXPERT_LABEL",
+                    "success":label,
                     "departure":int(dep),"arrival":int(dep+travel),
-                    "resolved_at":int(dep+travel+GRACE)}
+                    "resolved_at":int(dep+travel+grace) if label is not None else None}
         q+=STEP
     return {"status":"NO_RESOLVED_EXPERT_DECISION",
             "success":None,"resolved_at":None}
