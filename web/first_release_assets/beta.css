@@ -35,7 +35,7 @@ body.beta-graph #legacyV2Button{display:none!important}body.beta-graph .right-co
 /* Restore the observed history beside the plan without reviving old predictors. */
 .beta-graph-overview{display:grid;grid-template-columns:minmax(340px,.9fr) minmax(0,1.1fr);gap:12px;margin:0 0 14px;align-items:stretch}
 .beta-graph-overview .beta-history{margin:0;background:var(--beta-panel);padding:13px 16px;color:var(--beta-text)}.beta-graph-overview .beta-history>summary{font-weight:650;font-size:12px}.beta-graph-overview #history-section{padding:0;margin:10px 0 0!important}.beta-graph-overview #history-section>.insight-title{display:none}.beta-graph-overview .metrics{gap:12px 14px!important}.beta-graph-overview .metric-label{font-size:10px}.beta-graph-overview .metric-value{font-size:13px}.beta-graph-overview .metric-subvalue{font-size:10px}.beta-graph-overview .beta-inline{margin:0;padding:16px 20px}
-.beta-plan-heading{display:flex;justify-content:space-between;gap:20px;align-items:start}.beta-plan-heading .beta-leave{display:block;font-size:24px;margin:4px 0}.beta-travel-ranges{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:16px 0}.beta-travel-ranges>div{padding:12px;border:1px solid var(--beta-border);border-radius:7px;background:#101923}.beta-travel-ranges span{display:block;font-size:11px;color:var(--beta-muted)}.beta-travel-ranges strong{display:block;margin-top:4px;font-size:16px;font-variant-numeric:tabular-nums;color:#edc578}.beta-travel-ranges>div:last-child strong{color:var(--beta-accent)}.beta-plan-results{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:11px}.beta-plan-results .beta-dots{margin:0}.beta-plan-results a{margin-left:auto;font-size:11px}.beta-window-note{font-size:10px;color:var(--beta-muted);margin:12px 0 0}.legend .beta-legend-departure::before{background:#edc578}.legend .beta-legend-arrival::before{background:#82dbc2}body.beta-graph #chart-stage{height:clamp(320px,calc(100dvh - 445px),620px)!important}
+.beta-plan-heading{display:flex;justify-content:space-between;gap:20px;align-items:start}.beta-plan-heading .beta-leave{display:block;font-size:24px;margin:4px 0}.beta-travel-ranges{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:16px 0}.beta-travel-ranges>div{padding:12px;border:1px solid var(--beta-border);border-radius:7px;background:#101923}.beta-travel-ranges span{display:block;font-size:11px;color:var(--beta-muted)}.beta-travel-ranges strong{display:block;margin-top:4px;font-size:16px;font-variant-numeric:tabular-nums;color:#edc578}.beta-travel-ranges>div:last-child strong{color:var(--beta-accent)}.beta-plan-results{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:11px}.beta-plan-results .beta-dots{margin:0}.beta-plan-results a{margin-left:auto;font-size:11px}.beta-window-note{font-size:10px;color:var(--beta-muted);margin:12px 0 0}.legend .beta-legend-restock::before{width:3px;height:10px;border-left:2px dotted #8da8ca;border-radius:0;vertical-align:middle}.legend .beta-legend-buyable::before{background:#69dabc44;border:1px solid #82dbc2;border-radius:2px;vertical-align:middle}body.beta-graph #chart-stage{height:clamp(320px,calc(100dvh - 445px),620px)!important}
 @media(max-width:1100px){.beta-graph-overview{grid-template-columns:1fr}.beta-graph-overview .beta-inline{grid-row:1}.beta-graph-overview .metrics{grid-template-columns:repeat(4,minmax(0,1fr))!important}}
 @media(max-width:650px){.beta-graph-overview .beta-inline{padding:14px}.beta-travel-ranges{grid-template-columns:1fr;gap:8px;margin:12px 0}.beta-travel-ranges strong{font-size:15px}.beta-plan-heading .beta-leave{font-size:22px}.beta-plan-heading{gap:12px}.beta-plan-results{gap:8px}.beta-graph-overview .metrics{grid-template-columns:repeat(2,minmax(0,1fr))!important}body.beta-graph #chart-stage{height:380px!important}}
 /* Fit the desktop viewport by using space, not reducing legibility. */
@@ -44,3 +44,57 @@ body.beta-graph .beta-graph-nav{height:44px}body.beta-graph #title{margin-top:10
 .beta-money-grid{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:16px!important;margin:12px 0!important}.beta-money-grid dt{font-size:11px;color:var(--beta-muted)}.beta-money-grid dd{font-size:16px;color:var(--beta-text);font-weight:600;margin-top:3px!important}.beta-prices strong,.beta-profit strong{font-size:13px;font-weight:550}.beta-prices small,.beta-profit small{color:var(--beta-muted);font-weight:400;font-size:10px}.beta-table td{padding-top:10px;padding-bottom:10px}.beta-table .beta-sub{line-height:1.45}.beta-table .beta-actions{gap:10px}.beta-main{padding-top:20px;padding-bottom:12px}.beta-heading{margin-bottom:16px}.beta-main h1{font-size:28px}.beta-eyebrow{display:none}.beta-summary{margin-bottom:16px;padding:10px 18px}.beta-summary strong{font-size:21px}.beta-filters{padding:12px 16px;gap:10px}.beta-list-meta{padding:9px 16px;gap:12px}#beta-prices-status{margin-left:auto;font-size:10px}.beta-footnote{margin:10px 0;font-size:11px}
 @media(min-width:1100px){.beta-filters label{font-size:0;gap:0}.beta-filters label input,.beta-filters label select{font-size:13px}.beta-heading .beta-intro{font-size:13px}.beta-table th{padding-top:9px;padding-bottom:9px}.beta-table td{padding-left:12px;padding-right:12px}.beta-nav{padding-top:14px;padding-bottom:14px}}
 @media(max-width:760px){.beta-money-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}.beta-table td{padding:0!important}.beta-table .beta-prices strong,.beta-table .beta-profit strong{font-size:14px}#beta-prices-status{margin-left:0}.beta-list-meta>span:last-child{display:none}}
+
+.beta-forecast-cards{grid-template-columns:repeat(auto-fit,minmax(min(100%,120px),1fr))}.beta-forecast-cards:empty{display:none}.beta-forecast-cards.beta-travel-ranges>div strong{color:var(--beta-text)}.beta-forecast-cards>div.beta-target-card{border-color:var(--beta-accent)}.beta-forecast-cards.beta-travel-ranges>div.beta-target-card strong{color:var(--beta-accent)}
+
+/* Flight choice and prominent SA guidance. */
+.beta-sa-callout{border:1px solid #cda955;border-left:5px solid #edc578;border-radius:9px;background:#30291d;padding:13px 15px;margin:0 0 15px;color:#f5ead4;font-size:14px;line-height:1.55}
+.beta-sa-callout>strong{display:block;font-size:17px;color:#ffe0a0;margin-bottom:5px}
+.beta-sa-callout p{margin:5px 0 0;font-size:14px;line-height:1.55;color:#f5ead4}
+.beta-flight-label{display:flex;align-items:center;gap:9px;flex-wrap:wrap;font-size:13px;margin-bottom:6px;color:#c9daef}
+.beta-flight-label select,.beta-flight-custom input{background:#101923;color:#ecf4fa;border:1px solid #546b83;border-radius:6px;padding:7px 9px;font:inherit;max-width:100%}
+.beta-flight-label>strong{font-size:14px!important;font-weight:600!important;display:inline!important;color:#c9daef!important}
+.beta-flight-hint{display:block;color:#aebed0;font-size:12px;margin-bottom:9px}
+.beta-flight-custom{display:flex;gap:8px;align-items:center;margin:8px 0;font-size:13px}.beta-flight-custom input{width:90px}
+.beta-flight-explanation{padding:9px 11px;border:1px solid #415974;border-radius:6px;font-size:13px;line-height:1.5;color:#caddf0}.beta-flight-evidence{font-size:12px;color:#b6c8dc;margin:12px 0 6px}
+@media(max-width:600px){.beta-sa-callout{padding:11px 12px}.beta-flight-label select{max-width:100%;width:100%}.beta-sa-callout>strong{font-size:16px}}
+
+/* Compact graph overview: keep the chart close to the recommendation. */
+.beta-graph-overview{align-items:start}
+.beta-graph-overview .beta-inline{padding:11px 16px}
+.beta-graph-overview .beta-plan-heading{gap:12px}
+.beta-graph-overview .beta-flight-label{margin-bottom:3px;gap:8px}
+.beta-graph-overview .beta-flight-label select{padding:4px 8px}
+.beta-graph-overview .beta-flight-hint{font-size:10px;margin:0 0 4px}
+.beta-graph-overview .beta-plan-heading .beta-leave{font-size:22px;margin:2px 0}
+.beta-graph-overview .beta-sa-callout{margin:8px 0;padding:8px 11px;border-left-width:3px;font-size:12px;line-height:1.45}
+.beta-graph-overview .beta-sa-callout>strong{font-size:14px;margin:0 0 2px}
+.beta-graph-overview .beta-sa-callout p{font-size:12px;line-height:1.45;margin:0}
+.beta-sa-callout details{margin-top:3px;font-size:11px}
+.beta-sa-callout summary{cursor:pointer;color:#ffe0a0}
+.beta-sa-callout details p{margin-top:5px!important}
+.beta-graph-overview .beta-flight-explanation{border:0;border-left:2px solid #6c8bad;border-radius:0;background:transparent;padding:3px 8px;margin:6px 0;font-size:12px;line-height:1.4}
+.beta-graph-overview .beta-travel-ranges{margin:8px 0;gap:8px}
+.beta-graph-overview .beta-travel-ranges>div{padding:7px 10px}
+.beta-graph-overview .beta-travel-ranges strong{font-size:15px;margin-top:2px}
+.beta-graph-overview .beta-window-note{margin-top:5px;line-height:1.35}
+.beta-graph-overview .beta-plan-results{gap:7px}
+@media(max-width:650px){.beta-graph-overview .beta-inline{padding:10px 12px}.beta-graph-overview .beta-travel-ranges{grid-template-columns:repeat(3,minmax(0,1fr));gap:5px}.beta-graph-overview .beta-travel-ranges>div{padding:6px}.beta-graph-overview .beta-travel-ranges strong{font-size:13px}.beta-graph-overview .beta-travel-ranges span{font-size:10px}.beta-graph-overview .beta-flight-label select{width:auto;max-width:100%}.beta-graph-overview .beta-sa-callout{padding:7px 9px}}
+
+/* Use both overview columns and budget the chart for borders, scrollbar and padding. */
+.beta-overview-left{min-width:0}
+.beta-packing-advice{margin:7px 0 0;padding:7px 10px;border:1px solid #665537;border-radius:6px;background:#211f1a;color:#e8d7b6;font-size:12px;line-height:1.45}
+.beta-packing-advice summary{cursor:pointer;font-weight:600;color:#f3d393}
+.beta-packing-advice p{margin:6px 0 0;font-size:12px}
+#beta-overview-advice:empty{display:none}
+.beta-graph-overview #beta-overview-advice .beta-sa-callout{margin:9px 0 0}
+@media(max-width:1100px){.beta-graph-overview .beta-overview-left{grid-row:2}.beta-graph-overview>.beta-inline{grid-row:1}}
+
+/* Shared row: waiting on the left, medicine on the right. */
+.beta-graph-overview>#beta-overview-advice{grid-column:1/-1;display:grid;grid-template-columns:minmax(340px,.9fr) minmax(0,1.1fr);gap:12px;align-items:stretch}
+.beta-graph-overview>#beta-overview-advice:empty{display:none}
+.beta-graph-overview #beta-overview-advice .beta-sa-callout,.beta-graph-overview #beta-overview-advice .beta-packing-advice{margin:0;padding:8px 11px;border-radius:7px;border:1px solid #cda955;border-left:3px solid #edc578;background:#30291d;color:#f5ead4;font:12px/1.45 system-ui,sans-serif}
+.beta-graph-overview #beta-overview-advice strong{display:block;font-size:14px;line-height:1.4;margin-bottom:2px;color:#ffe0a0}
+.beta-graph-overview #beta-overview-advice p{margin:0;font-size:12px;line-height:1.45}
+.beta-graph-overview #beta-overview-advice p b{display:inline;font-size:inherit;color:inherit}
+@media(max-width:1100px){.beta-graph-overview>#beta-overview-advice{grid-template-columns:1fr;grid-row:3}}
