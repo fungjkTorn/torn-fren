@@ -90,6 +90,12 @@ def init_db():
             for statement in country_freshness.DDL.split(';'):
                 if statement.strip():conn.execute(statement)
 
+            # Persist routine audit work in the same SQLite transaction as
+            # stock changes. The external timer drains the queue; the poller
+            # never executes predictions inline.
+            from services.durable_audit_queue_v39 import ensure_schema
+            ensure_schema(conn)
+
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS stock_history (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -883,6 +889,8 @@ def save_snapshot_from_export(country: str, country_data: dict, source: str, *, 
             # A price-only row is persisted for pricing/profit history but does
             # not represent a new restock/depletion observation.
             if quantity_changed:
+                from services.durable_audit_queue_v39 import enqueue
+                enqueue(conn, country, item_name, timestamp)
                 changed_items.append(item_name)
 
     print(f"{country}: inserted {inserted}, skipped {skipped} unchanged")
