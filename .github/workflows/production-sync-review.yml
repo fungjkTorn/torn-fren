@@ -1,0 +1,78 @@
+name: Production reconciliation review
+
+on:
+  push:
+    branches:
+      - sync/production-reconciliation-20261112
+  pull_request:
+    branches:
+      - release/monkey-combined-20261110
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-sync-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  offline-review-contracts:
+    name: Python contracts, imports and static JS
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install public web dependencies
+        run: python -m pip install --disable-pip-version-check -r requirements.txt
+      - name: Compile Python source (no execution)
+        run: python -m compileall -q bot services web research tests tools poller.py run.py
+      - name: Check production reconciliation contracts
+        run: |
+          set -eu
+          for pattern in \
+            test_poller_collector_contract.py \
+            test_durable_audit_queue_contract.py \
+            test_provider_freshness_contract.py \
+            test_history_cache_contract.py \
+            test_v41_champion_cache_contract.py \
+            test_cohort_schedule_contract.py \
+            test_simulated_trip_threshold.py \
+            test_source_reference_audit.py \
+            test_web_live_sync_contract.py; do
+            echo "===== ${pattern} ====="
+            python -m unittest discover -s tests -p "${pattern}" -v
+          done
+      - name: Verify website route and required assets
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from web.app import app
+          paths={route.path for route in app.routes}
+          for path in ("/","/experimental","/travel-decisions","/api/history","/api/catalog","/api/admin/health"):
+              assert path in paths, (path,sorted(paths))
+          for path in ("web/static/index.html","web/static/experimental.html",
+                       "web/static/admin.html","web/first_release_assets/board.html",
+                       "web/first_release_assets/beta.js","web/first_release_assets/beta.css"):
+              assert Path(path).is_file(), path
+          print("Website route table and assets verified")
+          PY
+      - name: Parse inline browser JavaScript without network calls
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re,subprocess,tempfile
+          for name in ["web/static/index.html","web/static/experimental.html",
+                       "web/static/admin.html","web/first_release_assets/board.html"]:
+              src=Path(name).read_text(encoding="utf-8")
+              snippets=re.findall(r'<script(?![^>]*\\bsrc=)[^>]*>(.*?)</script>',src,re.I|re.S)
+              for number,code in enumerate(snippets,1):
+                  if not code.strip():continue
+                  with tempfile.NamedTemporaryFile(suffix=".js",mode="w",encoding="utf-8") as tmp:
+                      tmp.write(code);tmp.flush()
+                      subprocess.run(["node","--check",tmp.name],check=True)
+              print(name,len(snippets),"inline scripts checked")
+          PY
