@@ -118,7 +118,18 @@ class PublisherTests(unittest.TestCase):
             self.assertEqual(10,len(b["rows"]))
             payload=attach_history({"country":"mex","item":"Dahlia","analysis":{"prediction_v2":{"arrival_success_rate":.99}}},b)
             self.assertIsNone(payload["analysis"]["prediction_v2"]["arrival_success_rate"])
-            self.assertTrue(payload["analysis"]["prediction"]["first_release"])
+            advice=payload["analysis"]["prediction"]
+            if advice is None:
+                # A modern publisher may abstain when the model has no
+                # currently reachable stock-at-arrival opportunity. The
+                # middleware must never fabricate old V2 advice instead.
+                self.assertIsNone(payload["analysis"]["first_release"]["decision"]["estimated_departure_epoch"])
+                self.assertIsNone(payload["analysis"]["prediction_v2"]["display_prediction"])
+                self.assertEqual(payload["analysis"]["prediction_v2"]["status"],
+                                 payload["analysis"]["first_release"]["decision"]["status"])
+            else:
+                self.assertTrue(advice["first_release"])
+                self.assertIsNotNone(advice["departure_epoch"])
             stale=read_board(now=NOW+301,path=state/"latest.json")
             self.assertTrue(all(r["decision"]["estimated_departure_epoch"] is None for r in stale["rows"]))
 
