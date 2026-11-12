@@ -1,9 +1,6 @@
 name: Production reconciliation review
 
 on:
-  push:
-    branches:
-      - sync/production-reconciliation-20261112
   pull_request:
     branches:
       - release/monkey-combined-20261110
