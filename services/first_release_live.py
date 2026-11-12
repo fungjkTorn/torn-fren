@@ -45,7 +45,8 @@ def readonly(path):
 
 def publish(source, state, *, model_sha, item_runner=None, clock=time.time,
             live_source=None, publisher_sha=None, model_roster=FIRST_RELEASE_MODELS,
-            time_budget_seconds=45, item_timeout_seconds=15, challenger_cohort=False, next_six_cohort=False):
+            time_budget_seconds=45, item_timeout_seconds=15, challenger_cohort=False, next_six_cohort=False,
+            current_stock_leave_now=False):
     if not re.fullmatch("[0-9a-f]{40}",model_sha):
         raise ValueError("immutable source revision required")
     if publisher_sha is not None and not re.fullmatch("[0-9a-f]{40}",publisher_sha):
@@ -117,7 +118,8 @@ def publish(source, state, *, model_sha, item_runner=None, clock=time.time,
                     flight_seconds=old["player_flight_seconds"],poll_age_seconds=poll_age,
                     timing_choice=lambda **kw: ({"departure":native_departure,
                         "score":old.get("advisory_timing_score")} if type(native_departure) is int and native_departure>=published else None),
-                    model_roster=model_roster,current_stock_leave_now=next_six_cohort)
+                    model_roster=model_roster,
+                    current_stock_leave_now=(next_six_cohort or current_stock_leave_now))
                 # Preserve the November 10 Stingray off-grid executable departure
                 # when the same opportunity remains reachable at publication.
                 if key == "cay:Stingray Plushie":
