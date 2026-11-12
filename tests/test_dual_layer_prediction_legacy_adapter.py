@@ -32,6 +32,25 @@ class LegacyAdapterTest(unittest.TestCase):
         self.assertIsNone(x["travel"]["probabilities"]["p_arrival"])
         self.assertEqual(x["travel"]["historical_arrival_success_rate"], .91)
 
+    def test_explicit_no_active_prediction_does_not_reactivate_history(self):
+        x = from_legacy_v2(
+            country="uni", item_name="Xanax", as_of_timestamp=10000,
+            last_observed_timestamp=9980,
+            prediction_v2={
+                "status": "no_reachable_cycle",
+                "display_prediction": None,
+                "predictions": [{
+                    "estimate_timestamp": 17000,
+                    "target_depletion_timestamp": 21000,
+                    "recommended_leave_by_timestamp": 11240,
+                    "travel_seconds": 6360,
+                }],
+            },
+        )
+        self.assertIsNone(x["travel"]["leave_by_timestamp"])
+        self.assertIsNone(x["travel"]["recommended_leave_timestamp"])
+        self.assertEqual(len(x["forecast"]["events"]), 1)
+
     def test_gap_anchor_is_not_silently_high_confidence(self):
         x = from_legacy_v2(
             country="jap", item_name="Xanax", as_of_timestamp=10000,
