@@ -10,8 +10,8 @@ from research.true_zero_cycles import ZeroCycles, model
 
 
 class QuantityRateCycles(ZeroCycles):
-    def __init__(self,crosses):
-        super().__init__(crosses)
+    def __init__(self,crosses,*,min_qty=30):
+        super().__init__(crosses,min_qty=min_qty)
         self.rates=deque(maxlen=64)
         self.segment=deque(maxlen=128)
         self.rate_batch=None
@@ -85,12 +85,12 @@ class QuantityRateCycles(ZeroCycles):
         if len(self.rates)<model.MIN_BOUNDED or not self.restock_quantities:
             return self.available_durations[-64:]
         quantity=median(self.restock_quantities[-64:])
-        return [max(1,round(max(0,quantity-29)/r)) for r in self.rates]
+        return [max(1,round(max(0,quantity-(self.min_qty-1))/r)) for r in self.rates]
 
     def _current_available(self,asof,availability):
         if len(self.rates)<model.MIN_BOUNDED:
             return super()._current_available(asof,availability)
-        remaining=[max(1,round(max(0,self.last.quantity-29)/r))
+        remaining=[max(1,round(max(0,self.last.quantity-(self.min_qty-1))/r))
                    for r in self._current_rates(asof)]
         return model.phase_quantiles(remaining)
 

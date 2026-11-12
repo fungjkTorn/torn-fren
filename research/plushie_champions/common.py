@@ -52,7 +52,8 @@ def clean_rows(con,country,item,bounce_seconds=180):
     return [x for k,x in enumerate(rows) if k not in bad]
 
 class Timeline:
-    def __init__(self,con,gs,ge,country,item):
+    def __init__(self,con,gs,ge,country,item,*,min_qty=MIN_QTY):
+        self.min_qty=min_qty
         self.country,self.item=country,item;self.gs,self.ge=gs,ge
         rows=clean_rows(con,country,item)
         if not rows:raise ValueError(f'no rows for {country}:{item}')
@@ -60,7 +61,7 @@ class Timeline:
         self.windows=[];trans=[];active=None;start=None;prev=None
         for ts,q,_ in rows:
             if prev is not None and gap_overlap(gs,ge,prev,ts):active,start=None,None
-            z=q>=MIN_QTY
+            z=q>=self.min_qty
             if active is None or z!=active:
                 trans.append((float(ts),bool(z)))
                 if z:start=float(ts)
@@ -76,7 +77,7 @@ class Timeline:
         if np.any(ok):
             ii=idx[ok];obs,tt=self.ts[ii],t[ok];inv=np.zeros(len(tt),bool)
             for n,(a,b) in enumerate(zip(obs,tt)):inv[n]=gap_overlap(self.gs,self.ge,a,b)
-            q=self.q[ii].copy();a=(q>=MIN_QTY).astype(float);q[inv]=np.nan;a[inv]=np.nan;act[ok]=a;qty[ok]=q
+            q=self.q[ii].copy();a=(q>=self.min_qty).astype(float);q[inv]=np.nan;a[inv]=np.nan;act[ok]=a;qty[ok]=q
             ti=np.searchsorted(self.trans_t,tt,'right')-1;ag=tt-self.trans_t[np.maximum(ti,0)];ag[(ti<0)|inv]=np.nan;age[ok]=ag
         return act,qty,age
     def success_many(self,t,grace=GRACE):

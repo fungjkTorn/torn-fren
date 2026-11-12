@@ -7,7 +7,9 @@ from deploy.scripts import v163_readonly_event_first_preview as model
 
 
 class ZeroCycles:
-    def __init__(self,crosses):
+    def __init__(self,crosses,*,min_qty=30):
+        if type(min_qty) is not int or min_qty<1:raise ValueError('invalid purchase threshold')
+        self.min_qty=min_qty
         self.crosses=crosses
         self.physical=model._ReplayPhases(crosses)
         self.availability=model._ReplayPhases(crosses)
@@ -37,13 +39,13 @@ class ZeroCycles:
             self.first_unavailable=None
             self.availability_valid=True
         elif self.batch_start is not None:
-            if (prev.quantity>=30)!=(obs.quantity>=30) and obs.source!=prev.source:
+            if (prev.quantity>=self.min_qty)!=(obs.quantity>=self.min_qty) and obs.source!=prev.source:
                 self.availability_valid=False
-            if prev.quantity>=30>obs.quantity and self.first_unavailable is None:
+            if prev.quantity>=self.min_qty>obs.quantity and self.first_unavailable is None:
                 self.first_unavailable=obs.epoch
             if prev.quantity>0 and obs.quantity==0:
                 self.zero_onset_bracket={'after_epoch':prev.epoch,'by_epoch':obs.epoch}
-                if (self.batch_quantity>=30 and self.first_unavailable is not None
+                if (self.batch_quantity>=self.min_qty and self.first_unavailable is not None
                     and self.availability_valid):
                     duration=self.first_unavailable-self.batch_start
                     if duration>0:self.available_durations.append(duration)
@@ -52,7 +54,7 @@ class ZeroCycles:
         # identify physical positive/zero phases without altering its legacy
         # >=30 baseline. Keep the real last quantity in the external contract.
         self.physical.add(model.OBS(obs.epoch,200 if positive else 0,obs.source))
-        self.availability.add(obs)
+        self.availability.add(obs if self.min_qty==30 else model.OBS(obs.epoch,200 if obs.quantity>=self.min_qty else 0,obs.source))
         self.last=obs
 
     def _physical_state(self,asof):
@@ -69,9 +71,9 @@ class ZeroCycles:
             raise ValueError('future physical stock observation')
         state=self._physical_state(asof)
         state['last_observation']=self.last
-        result=model.predict_events(key,state,asof=asof)
+        result=model.predict_events(key,state,asof=asof,min_qty=self.min_qty)
         result.update(model_name='true_zero_anchored_cycles_v1',cycle_window='true_zero_all',
-            depletion_stock_quantity=0,arrival_stock_threshold=30,
+            depletion_stock_quantity=0,arrival_stock_threshold=self.min_qty,
             restock_timer_anchor='FIRST_OBSERVED_ZERO_AFTER_POSITIVE_STOCK',
             physical_phase_onset_epoch=state['phase_onset'],
             physical_inventory_phase={'HIGH':'NONZERO','LOW':'EMPTY'}.get(state['phase'],'UNKNOWN'),
@@ -104,7 +106,7 @@ class ZeroCycles:
             return result
         if self.restock_quantities:
             result['median_observed_restock_quantity']=model.quantile(self.restock_quantities,.5)
-        if result.get('median_observed_restock_quantity',0)<30:
+        if result.get('median_observed_restock_quantity',0)<self.min_qty:
             result['status']='RESTOCK_QUANTITY_TARGET_UNSUPPORTED'
             return result
         if len(self._available_history())<model.MIN_BOUNDED:
@@ -122,7 +124,7 @@ class ZeroCycles:
             result['restock_events'].append(window)
         # Residual 1..29 stock never creates a current >=30 opportunity.
         a=self.availability.asof()
-        if self.last is not None and self.last.quantity>=30 and a['phase_onset'] is not None:
+        if self.last is not None and self.last.quantity>=self.min_qty and a['phase_onset'] is not None:
             remaining=self._current_available(asof,a)
             if remaining and physical_current:
                 zero=physical_current['predicted_stock_below_30_epoch']
