@@ -4,6 +4,7 @@ on:
   pull_request:
     branches:
       - release/monkey-combined-20261110
+      - main
   workflow_dispatch:
 
 permissions:
@@ -63,6 +64,19 @@ jobs:
             test_native_history_acceleration.py \
             test_v143_v2_window_web_parity.py \
             test_v2_beta_history_preview.py; do
+            echo "===== ${pattern} ====="
+            python -m unittest discover -s tests -p "${pattern}" -v
+          done
+      - name: Verify retained original-main historical contracts
+        run: |
+          set -eu
+          for pattern in \
+            test_all_item_v21_checkpoint.py \
+            test_dual_layer_prediction_contract.py \
+            test_dual_layer_prediction_legacy_adapter.py \
+            test_next_opportunity_evaluation.py \
+            test_release_shadow_canary.py \
+            test_stock_opportunity_geometry.py; do
             echo "===== ${pattern} ====="
             python -m unittest discover -s tests -p "${pattern}" -v
           done
