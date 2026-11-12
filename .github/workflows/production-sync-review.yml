@@ -24,7 +24,7 @@ jobs:
         with:
           python-version: '3.13'
       - name: Install public web dependencies
-        run: python -m pip install --disable-pip-version-check -r requirements.txt httpx
+        run: python -m pip install --disable-pip-version-check -r requirements.txt -r research/plushie_champions/requirements-research.txt httpx
       - name: Compile Python source (no execution)
         run: python -m compileall -q bot services web research tests tools poller.py run.py
       - name: Check production reconciliation contracts
