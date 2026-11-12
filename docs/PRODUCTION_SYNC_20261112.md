@@ -27,8 +27,8 @@ The source capture inventoried **1,148** source files across the production root
 | `poller.py` | `3e43d74a5148d00afead8a194872753a825d21a2ca414f22c93fb339b6404396` |
 | `web/first_release_assets/beta.js` | `ac2b98c86a4d2077558b0a253299ea51d1f931e0c15a31dfe3d76efe64363304` |
 | `web/first_release_assets/beta.css` | `9fe8bad697e011e92944b74eb84212fe4ba5166787c4d3a8acfc9254d75f56ef` |
-| `web/app.py` | `f4fc8b90254378b4df913c8d3086486491d9694137b9c2e389ff1b6c3302d90e` |
-| `web/first_release_bridge.py` | `acfa71ad6b49 (prefix only; verify full digest from capture manifest)` (see capture manifest; **do not use this abbreviated placeholder for validation**) |
+| `web/app.py` | `c7a2066b3afc1a23e97bf7fe4034eaf062d56db869e4d1ab51b856207a3e500c` |
+| `web/first_release_bridge.py` | `acfa71ad6b49c4ac5e0c367614df7bea2ed1c1355c0cd8830d679198d6fba8d9` |
 
 **Important:** The bridge digest is intentionally not certified in this document; use the exact checksum from the read-only capture manifest instead of treating this shortened placeholder as a valid digest.
 
