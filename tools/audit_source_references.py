@@ -74,7 +74,51 @@ def imported_modules(path, current, known):
     return found, uncertain
 
 
-def scan(root, extra_seeds=()):
+def active_vm_roots(inventory):
+    """Use sanitized *actual VM* timer targets, never infer from file ages.
+
+    A static service is live when an enabled timer targets it. Disabled legacy
+    timers do not make their service an active root, but are not delete-safe
+    merely because this inventory omits them.
+    """
+    if inventory is None:
+        return {'timer_targets': [], 'services': [],
+                'modules': [], 'external_scripts': []}
+    if inventory.get('schema') != 'TORNFREN_SANITIZED_SYSTEMD_DEPENDENCIES_V1':
+        raise ValueError('invalid sanitized VM unit-inventory schema')
+    units = inventory.get('units')
+    if not isinstance(units, list):
+        raise ValueError('sanitized VM inventory lacks units')
+    targets = {
+        u.get('timer_target') for u in units
+        if u.get('unit', '').endswith('.timer')
+        and u.get('enabled') == 'enabled'
+        and isinstance(u.get('timer_target'), str)
+    }
+    services = [
+        u for u in units if u.get('unit', '').endswith('.service')
+        and (u.get('enabled') == 'enabled' or u.get('unit') in targets)
+    ]
+    modules, external_scripts = set(), set()
+    for u in services:
+        modules.update(m for m in u.get('entry_modules', [])
+                       if isinstance(m, str) and m not in ('uvicorn',))
+        for script in u.get('entry_py_scripts', []):
+            if not isinstance(script, str):
+                continue
+            if script.startswith('/opt/torn-fren/') and script.endswith('.py'):
+                modules.add(script[len('/opt/torn-fren/'): -3].replace('/', '.'))
+            else:
+                external_scripts.add(script)
+        if u.get('unit') == 'torn-fren-web.service':
+            modules.add('web.app')
+    return {'timer_targets': sorted(targets),
+            'services': sorted(u['unit'] for u in services),
+            'modules': sorted(modules),
+            'external_scripts': sorted(external_scripts)}
+
+
+def scan(root, extra_seeds=(), vm_units=None):
     known = modules(root)
     edges = {}
     dynamic = set()
@@ -84,7 +128,8 @@ def scan(root, extra_seeds=()):
         if uncertain:
             dynamic.add(module)
 
-    roots = set(SEEDS) | set(extra_seeds)
+    vm = active_vm_roots(vm_units)
+    roots = set(SEEDS) | set(extra_seeds) | set(vm['modules'])
     unit_refs = {}
     for path in root.rglob('*'):
         if not path.is_file():
@@ -121,6 +166,11 @@ def scan(root, extra_seeds=()):
         'schema': 'torn-fren-readonly-source-reference-audit-v1',
         'scope_root': str(root),
         'source_files': len(known),
+        'actual_vm_enabled_timer_targets': vm['timer_targets'],
+        'actual_vm_active_service_units': vm['services'],
+        'actual_vm_entry_modules': vm['modules'],
+        'actual_vm_modules_absent_from_checkout': sorted(set(vm['modules']) - known.keys()),
+        'actual_vm_external_entry_scripts': vm['external_scripts'],
         'reachable_static': sorted(visited),
         'dynamic_import_modules': sorted(dynamic),
         'systemd_source_references': unit_refs,
@@ -137,9 +187,14 @@ def main(argv=None):
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('--root', type=Path, default=Path('.'))
     p.add_argument('--entry', action='append', default=[], help='Extra production or research module root')
+    p.add_argument('--vm-unit-report', type=Path, default=None,
+                   help='Sanitized read-only systemd JSON; never raw unit contents')
     p.add_argument('--json-output', type=Path, default=None)
     args = p.parse_args(argv)
-    result = scan(args.root.resolve(), extra_seeds=args.entry)
+    vm_units = None
+    if args.vm_unit_report:
+        vm_units = json.loads(args.vm_unit_report.read_text(encoding='utf-8-sig'))
+    result = scan(args.root.resolve(), extra_seeds=args.entry, vm_units=vm_units)
     print(f"Scanned {result['source_files']} modules; "
           f"{len(result['reachable_static'])} statically reachable; "
           f"{len(result['possible_unreferenced_review_only'])} require manual review; "
