@@ -10,6 +10,7 @@ from fastapi.responses import FileResponse
 
 from services.history_service import DB_PATH, get_item_history_since, get_stock_catalog, get_stock_graph_analysis, get_latest_item_snapshot, get_collector_recovery_status
 from services.prediction_v2_live import build_live_prediction_v2
+from services.v2_departure_window import departure_window
 from services.admin_health import build_admin_health
 from services.forecast_auditor import get_recent_active_forecasts
 from services.profitability import enrich_items_with_profitability, profitability_for_item
@@ -116,47 +117,15 @@ def _prediction_key(country, item):
 
 
 def _latest_safe_leave_timestamp(prediction):
+    """Return a real, reachability-safe leave deadline, or abstain.
+
+    Delegate to the same stock-depletion geometry as the prediction engine.
+    The end of a restock *estimate* is not the end of the stocked interval;
+    missing or impossible depletion evidence must never become a fabricated
+    single-instant GO recommendation.
     """
-    Reproduce the browser's modeled departure window without rebuilding the
-    forecast. Reachability is clock-dependent; point estimates are not.
-    """
-    if not prediction:
-        return None
-
-    estimate = prediction.get("estimate_timestamp")
-    calibrated_arrival = prediction.get("recommended_arrival_timestamp")
-    late_restock_bound = prediction.get("window_end_timestamp")
-    depletion = prediction.get("target_depletion_timestamp")
-    lifetime = prediction.get("expected_stock_lifetime_seconds")
-    travel = prediction.get("travel_seconds")
-
-    if not travel:
-        return None
-
-    earliest_arrival = max(
-        calibrated_arrival or estimate or 0,
-        late_restock_bound or estimate or 0,
-    )
-    if not earliest_arrival:
-        return None
-
-    depletion_buffer = (
-        max(60, min(300, round(float(lifetime) * 0.10)))
-        if lifetime else 60
-    )
-    latest_arrival = (
-        float(depletion) - depletion_buffer
-        if depletion is not None else None
-    )
-    if latest_arrival is None or latest_arrival <= earliest_arrival:
-        latest_arrival = (
-            late_restock_bound or calibrated_arrival or estimate
-        )
-    if latest_arrival is None:
-        return None
-    latest_arrival = max(float(latest_arrival), float(earliest_arrival))
-    return latest_arrival - float(travel)
-
+    window = departure_window(prediction)
+    return window["latest_departure_epoch"] if window else None
 
 def _roll_prediction_to_now(prediction_v2, now=None):
     """
