@@ -25,12 +25,9 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          python-version: '3.13'
       - name: Install public web dependencies
-        run: |
-          # Python 3.12 still includes stdlib audioop; audioop-lts requires 3.13+.
-          sed '/^audioop-lts==/d' requirements.txt > /tmp/requirements-py312.txt
-          python -m pip install --disable-pip-version-check -r /tmp/requirements-py312.txt
+        run: python -m pip install --disable-pip-version-check -r requirements.txt httpx
       - name: Compile Python source (no execution)
         run: python -m compileall -q bot services web research tests tools poller.py run.py
       - name: Check production reconciliation contracts
