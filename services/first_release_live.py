@@ -45,7 +45,7 @@ def readonly(path):
 
 def publish(source, state, *, model_sha, item_runner=None, clock=time.time,
             live_source=None, publisher_sha=None, model_roster=FIRST_RELEASE_MODELS,
-            time_budget_seconds=45, item_timeout_seconds=15, challenger_cohort=False):
+            time_budget_seconds=45, item_timeout_seconds=15, challenger_cohort=False, next_six_cohort=False):
     if not re.fullmatch("[0-9a-f]{40}",model_sha):
         raise ValueError("immutable source revision required")
     if publisher_sha is not None and not re.fullmatch("[0-9a-f]{40}",publisher_sha):
@@ -83,6 +83,7 @@ def publish(source, state, *, model_sha, item_runner=None, clock=time.time,
                         "--source",str(frozen),"--key",key,"--issued",str(issued),
                         "--flight",str(flight)]
                     if challenger_cohort:command.append('--challenger-cohort')
+                    if next_six_cohort:command.append('--next-six-cohort')
                     child = subprocess.run(command,text=True,capture_output=True,
                         timeout=min(item_timeout_seconds,max(1,time_budget_seconds-(int(clock())-started))))
                     if child.returncode:
@@ -116,13 +117,15 @@ def publish(source, state, *, model_sha, item_runner=None, clock=time.time,
                     flight_seconds=old["player_flight_seconds"],poll_age_seconds=poll_age,
                     timing_choice=lambda **kw: ({"departure":native_departure,
                         "score":old.get("advisory_timing_score")} if type(native_departure) is int and native_departure>=published else None),
-                    model_roster=model_roster)
+                    model_roster=model_roster,current_stock_leave_now=next_six_cohort)
+                # Preserve the November 10 Stingray off-grid executable departure
+                # when the same opportunity remains reachable at publication.
                 if key == "cay:Stingray Plushie":
                     d["publication_timing_policy"] = "STINGRAY_PRESERVE_VALID_V1"
-                    # Publication can shift the candidate grid. Keep a
-                    # still-reachable departure for the same event off-grid.
                     if (d["timing_refinement_status"] == "REJECTED_OUTSIDE_FIRST_EVENT"
                             and d["selected_restock_event_index"] == old.get("selected_restock_event_index")
+                            and type(native_departure) is int
+                            and type(d["estimated_departure_epoch"]) is int
                             and d["estimated_departure_epoch"] < native_departure <= d["estimated_departure_deadline_epoch"]):
                         arrival = native_departure + old["player_flight_seconds"]
                         d.update(estimated_departure_epoch=native_departure,
@@ -156,7 +159,7 @@ def publish(source, state, *, model_sha, item_runner=None, clock=time.time,
                 # where available, are reported without inventing per-item age.
                 country = key.split(":",1)[0]
                 has_clock = src.execute("SELECT 1 FROM sqlite_master WHERE name='country_stock_observations'").fetchone()
-                receipt = src.execute("SELECT received_epoch,country_update_epoch,clock_status FROM country_stock_observations WHERE country=? AND received_epoch<=? ORDER BY received_epoch DESC,id DESC LIMIT 1",(country,issued)).fetchone() if has_clock else None
+                receipt = __import__("services.provider_freshness",fromlist=["receipt_for"]).receipt_for(src,country,issued,published)
                 row["country_clock"] = dict(received_epoch=receipt[0],reported_update_epoch=receipt[1],clock_status=receipt[2]) if receipt else None
                 # An explicitly stale or invalid upstream report must not
                 # become a departure merely because the global poll succeeded.
@@ -174,7 +177,7 @@ def publish(source, state, *, model_sha, item_runner=None, clock=time.time,
                 "asof_epoch":issued,"published_epoch":published,
                 "source_heartbeat_epoch":health["last_successful_heartbeat"],
                 "valid_until_epoch":min(issued+300,health["last_successful_heartbeat"]+180),
-                "stock_success_rule":"quantity > 30 at calculated landing",
+                "stock_success_rule":"quantity >= 30 at calculated landing",
                 "flight_profile":"PI + pilot","items":rows,"live_metrics":metrics,
                 "historical_accuracy_included":False,"actual_player_flights_required":False}
             snapshot["recent_publications"] = [{"issued_epoch":issued,"published_epoch":published}]+[
@@ -183,7 +186,7 @@ def publish(source, state, *, model_sha, item_runner=None, clock=time.time,
             ledger.execute("INSERT INTO publications VALUES(?,?,?)",(issued,published,digest))
             ledger.commit()
         os.chmod(state/"forecasts.sqlite",0o600)
-    return {"status":"SIX_ITEM_SNAPSHOT_PUBLISHED" if challenger_cohort else "TEN_ITEM_SNAPSHOT_PUBLISHED","asof_epoch":issued,
+    return {"status":"SIX_ADDITIONS_SNAPSHOT_PUBLISHED" if next_six_cohort else "SIX_ITEM_SNAPSHOT_PUBLISHED" if challenger_cohort else "TEN_ITEM_SNAPSHOT_PUBLISHED","asof_epoch":issued,
             "publisher_sha":publisher_sha or model_sha,"source_refresh":source_refresh,
             "published_epoch":published,"items":len(model_roster),"model_sha":model_sha,
             "elapsed_seconds":int(clock())-started,"item_runtime_seconds":item_runtimes,"evidence_runtime_seconds":round(time.monotonic()-evidence_started,3),"snapshot_sha256":digest}
@@ -195,7 +198,9 @@ def main():
     item=sub.add_parser("item"); item.add_argument("--source",required=True)
     item.add_argument("--key",required=True); item.add_argument("--issued",type=int,required=True)
     item.add_argument("--flight",type=int,required=True)
-    item.add_argument('--challenger-cohort',action='store_true')
+    cohort=item.add_mutually_exclusive_group()
+    cohort.add_argument('--challenger-cohort',action='store_true')
+    cohort.add_argument('--next-six-cohort',action='store_true')
     pub=sub.add_parser("publish"); pub.add_argument("--source",required=True)
     pub.add_argument("--state",required=True); pub.add_argument("--model-sha",required=True)
     pub.add_argument("--live-source");pub.add_argument("--publisher-sha")
@@ -205,10 +210,15 @@ def main():
         if args.challenger_cohort:
             from services.forward_beta_roster import CHALLENGER_MODELS,FULL_HISTORY
             extra=dict(model_roster=CHALLENGER_MODELS,timing_full_history=FULL_HISTORY)
+            # Preserve the combined Monkey depletion + one-minute timing model.
             from services import monkey_combined
             if args.key == monkey_combined.KEY:
                 extra.update(event_forecaster=monkey_combined.forecast, refine_minute=True)
-        value=forecast_first_release_item(args.source,args.key,now=args.issued,flight_seconds=args.flight,**extra)
+        if args.next_six_cohort:
+            from services.forward_beta_roster import forecast_next_six
+            value=forecast_next_six(args.source,args.key,now=args.issued,flight_seconds=args.flight)
+        else:
+            value=forecast_first_release_item(args.source,args.key,now=args.issued,flight_seconds=args.flight,**extra)
     else:
         value=publish(args.source,args.state,model_sha=args.model_sha,
                       live_source=args.live_source,publisher_sha=args.publisher_sha)
