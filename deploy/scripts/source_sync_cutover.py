@@ -175,6 +175,7 @@ def apply(bundle,report_path):
   unit='torn-fren-'+name+'.service';p=properties(unit)
   if p.get('LoadState')!='loaded' or p.get('User')!='ubuntu':raise ValueError('UNEXPECTED_SERVICE_IDENTITY')
   old_args=tokens(p['ExecStart']);old_work=p.get('WorkingDirectory')
+  if name in LONG and p.get('ActiveState')!='active':raise ValueError('MAIN_SERVICE_NOT_RUNNING')
   if name in (*LONG,*WORKERS):
    if old_work!='/opt/torn-fren':raise ValueError('WEB_ROOT_DRIFT')
   elif old_work!=baseline['units'][unit]['WorkingDirectory']:raise ValueError('PUBLISHER_ROOT_DRIFT')
@@ -192,6 +193,7 @@ def apply(bundle,report_path):
    if option(old_args,'--state')!=str(Path('/var/lib/torn-fren-live-beta')/suffix):raise ValueError('LIVE_STATE_PATH_DRIFT')
    if option(old_args,'--model-sha')!=baseline['snapshots'][label]['model_sha']:raise ValueError('MODEL_IDENTITY_DRIFT')
    if ('--private-japan' in args)!=(name=='japan-private'):raise ValueError('PRIVATE_MODE_FLAG_DRIFT')
+  if name not in (*LONG,*WORKERS) and properties('torn-fren-'+name+'.timer').get('ActiveState')!='active':raise ValueError('PUBLISHER_TIMER_INACTIVE')
   plan['units'][unit]={'old_work':old_work,'old_args':old_args,'new_work':str(work),'new_args':args}
   if name in LONG:plan['long_units'].append(unit)
   else:
@@ -236,7 +238,7 @@ def apply(bundle,report_path):
    system('start','torn-fren-'+family+'.service')
    if not healthy(label,baseline['snapshots'][label]['model_sha']):raise ValueError('LIVE_SNAPSHOT_INVALID')
    manual[label]=snap(label)['published']
-  verify_services(plan);result.update(verify_web(manifest))
+  verify_services(plan);verify_web(manifest,require_fresh=False)
   for timer,active in plan['timers'].items():
    if active:system('start',timer)
   print(json.dumps({'status':'VERIFYING_NEXT_SCHEDULED_PUBLICATIONS'}),flush=True)
