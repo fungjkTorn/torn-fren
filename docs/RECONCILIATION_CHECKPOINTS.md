@@ -36,9 +36,21 @@ Changes currently on the review branch include:
 
 **Local test checkpoint:** 12 targeted tests passed from the captured production helper sources, using isolated module stubs and no VM/network/DB. This is **not** a full GitHub branch test suite pass, not integration validation, and not deployment approval.
 
+## Checkpoint 4 — 2026-11-12, publisher interface reconciliation
+
+**Committed:** `services/first_release_schedule.py` and `services/first_release_live.py` have now been merged on the review branch from the captured active next-six release while restoring November 10's Monkey one-minute timing refinement and Stingray off-grid departure preservation. `next_six_cohort`, full-history and current-stock leave-now handling are retained.
+
+**Review-branch commit:** `d6e7513dc1176bfb4a09e3115cb019264c400eb3` (publisher logic), followed by `b5fefe1c1d407d8901637ae5ea958a0a893ea10b` (contract tests).
+
+**Targeted offline tests:** **15/15 passing** on a local staging copy of the captured source and reconstructed publisher contracts (12 existing isolated collector/cache/freshness checks and 3 additional AST publisher contract checks). This is still **not** full suite or live deployment validation.
+
+**Remaining**: production integration replay/route checks, first-release evidence schema compatibility, next-six batch execution with sample state/DB, bot and runtime timer reachability, legacy archiving classification. No deletes, merges, deployment or VM changes.
+
+---
+
 ## Checkpoint 3 — current handoff / outstanding gates
 
-- [ ] Compare `services/first_release_live.py`, `first_release_schedule.py`, `first_release_evidence.py` and the next-six publisher with the production capture. **Critical:** the next-six entry point needs `next_six_cohort=True` and associated publisher/scheduler interfaces absent from the original November 10 implementation. Merely adding `next_six_live.py` is not enough to make the branch deployable.
+- [x] Reconcile `services/first_release_live.py` and `first_release_schedule.py` publisher interfaces for Monkey one-minute refinement and the next-six cohort (Checkpoint 4). **Still required:** evidence schema integration and actual sample publisher replay before deployment.
 - [ ] Verify `services/reviewed_foundation.py` and `research/current_stock_continuation.py` are connected to the correct source-selected forecast chain.
 - [ ] Verify the merged web app/bridge imports and routes as a complete package, including `/`, `/experimental`, `/travel-decisions`, and legacy opt-in routes.
 - [ ] Run full branch tests / static import checks, inspect missing dynamic imports, publisher model provenance, stale-data behavior, and bot integration.
