@@ -20,7 +20,7 @@ def prepare_private_indexes(source):
     return {'status':'PRIVATE_SOURCE_INDEXED','collector_modified':False}
 
 
-def bootstrap(collector,output):
+def bootstrap(collector,output,*,model_roster=CHALLENGER_MODELS):
     """Copy only stock evidence, all available causal history, never secrets."""
     from deploy.research_runner.export_snapshot import DDL
     output=Path(output)
@@ -30,7 +30,7 @@ def bootstrap(collector,output):
         cutoff=min(int(time.time()),src.execute("SELECT MAX(timestamp) FROM poll_heartbeats WHERE mode='poll-cycle' AND success=1").fetchone()[0])
         with closing(sqlite3.connect(output)) as dst:
             dst.executescript(DDL)
-            for key in CHALLENGER_MODELS:
+            for key in model_roster:
                 country,item=key.split(':',1)
                 rows=src.execute('SELECT timestamp,country,item_name,quantity,source FROM stock_history WHERE country=? AND lower(item_name)=lower(?) AND timestamp<=? ORDER BY timestamp,id LIMIT 200001',(country,item,cutoff)).fetchall()
                 if not rows or len(rows)>200000:raise ValueError('missing or excessive item history: '+key)
@@ -41,7 +41,7 @@ def bootstrap(collector,output):
             gaps=src.execute('SELECT start_timestamp,CASE WHEN end_timestamp>? THEN NULL ELSE end_timestamp END FROM collection_gaps WHERE start_timestamp<=? LIMIT 10001',(cutoff,cutoff)).fetchall()
             if len(gaps)>10000:raise ValueError('gap history exceeds bounded export')
             dst.executemany('INSERT INTO collection_gaps VALUES(?,?)',gaps)
-            for country in sorted({k.split(':')[0] for k in CHALLENGER_MODELS}):
+            for country in sorted({k.split(':')[0] for k in model_roster}):
                 receipts=src.execute('''SELECT received_epoch,country,source,country_update_epoch,clock_status FROM country_stock_observations WHERE country=? AND received_epoch<=? ORDER BY received_epoch,id LIMIT 500001''',(country,cutoff)).fetchall()
                 if not receipts or len(receipts)>500000:raise ValueError('country clock history unavailable or excessive')
                 dst.executemany("INSERT INTO country_stock_observations(received_epoch,country,source,country_update_epoch,clock_status,export_clock_status,item_count) VALUES(?,?,?,?,?,'UNVERIFIED',0)",receipts)
