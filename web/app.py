@@ -350,6 +350,9 @@ def api_history(
         analysis["baseline_prediction"] = analysis.get("prediction")
         analysis["prediction_v2"] = prediction_v2
         analysis["prediction_v2_stale"] = bool(prediction_stale)
+        # Time when the API checked the cached model, not when the model was
+        # fitted or issued. Do not substitute this for model provenance.
+        analysis["prediction_v2_checked_at"] = int(time.time())
 
         display = prediction_v2.get("display_prediction") if prediction_v2 else None
         if display and display.get("estimate_timestamp"):
