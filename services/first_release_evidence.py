@@ -187,6 +187,14 @@ def score(db, source, *, cutoff, model_sha):
         if key not in indexes:
             indexes[key] = TargetIndex(histories[key],gaps)
         evidence = grade(arrival, histories[key], polls, gaps, cutoff=cutoff)
+        # A pending trip remains represented by its immutable issue and first
+        # pending outcome. Do not append the same waiting status every poll.
+        # Mature SUCCESS/FAILURE/UNKNOWN evidence still resolves it normally.
+        if evidence.get("status") == "PENDING" and db.execute(
+            "SELECT 1 FROM outcomes WHERE item=? AND issued=? "
+            "AND json_extract(payload,'$.status')='PENDING' LIMIT 1",
+            (key,entry["issued"])).fetchone():
+            continue
         # Store explicit target timing where it is already observed. Later
         # matching can still be done from immutable issues and source records.
         target = target_for_issue(issue, histories[key], gaps, index=indexes[key])

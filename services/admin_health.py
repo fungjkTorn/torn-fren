@@ -44,30 +44,48 @@ def _latest_row(conn, query, args=()):
         return None
 
 
+def _release_metadata():
+    """Versioned deployments have immutable source metadata instead of .git."""
+    import json
+    import re
+    try:
+        path = ROOT / "DEPLOYED_RELEASE.json"
+        if path.stat().st_size > 16384:
+            return {}
+        value = json.loads(path.read_text())
+        source = value.get("source_commit")
+        main = value.get("github_main_merge_commit")
+        if not isinstance(source, str) or not re.fullmatch(r"[0-9a-f]{40}", source):
+            return {}
+        return {"source": source, "main": main if isinstance(main, str) and re.fullmatch(r"[0-9a-f]{40}", main) else source}
+    except (OSError, ValueError, TypeError, AttributeError):
+        return {}
+
+
 def _git_commit():
     try:
-        return subprocess.check_output(
-            ["git", "rev-parse", "--short", "HEAD"],
-            cwd=ROOT,
-            text=True,
-            stderr=subprocess.DEVNULL,
-            timeout=3,
-        ).strip() or None
+        current = subprocess.check_output(
+            ["git", "rev-parse", "--short", "HEAD"], cwd=ROOT,
+            text=True, stderr=subprocess.DEVNULL, timeout=3,
+        ).strip()
+        if current:
+            return current
     except Exception:
-        return None
+        pass
+    return (_release_metadata().get("main") or "")[:12] or None
 
 
 def _git_branch():
     try:
-        return subprocess.check_output(
-            ["git", "rev-parse", "--abbrev-ref", "HEAD"],
-            cwd=ROOT,
-            text=True,
-            stderr=subprocess.DEVNULL,
-            timeout=3,
-        ).strip() or None
+        current = subprocess.check_output(
+            ["git", "rev-parse", "--abbrev-ref", "HEAD"], cwd=ROOT,
+            text=True, stderr=subprocess.DEVNULL, timeout=3,
+        ).strip()
+        if current:
+            return current
     except Exception:
-        return None
+        pass
+    return "main (versioned release)" if _release_metadata() else None
 
 
 def _db_size_bytes():

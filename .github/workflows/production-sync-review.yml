@@ -42,6 +42,9 @@ jobs:
             test_final_pair_bootstrap_contract.py \
             test_chamois_receipt_projection.py \
             test_private_threshold_helper_compatibility.py \
+            test_pending_evidence_deduplication.py \
+            test_versioned_release_metadata.py \
+            test_source_sync_cutover.py \
             test_simulated_trip_threshold.py \
             test_source_reference_audit.py \
             test_web_live_sync_contract.py; do
