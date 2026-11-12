@@ -1,6 +1,7 @@
-"""Production-branch-specific contract for private canary adoption.
+"""Production compatibility contract for profitability and private canary.
 
-Do not modify profitability graph routes, Discord collector, or existing V2.
+Public history is now behind the live beta bridge: profitability remains
+visible, while obsolete V2 predictions must not leak as current advice.
 """
 from __future__ import annotations
 import os
@@ -51,7 +52,7 @@ class ProfitabilityCanaryTests(unittest.TestCase):
                     params={"country":"can","item":"Fire Hydrant"},headers=headers)
                 self.assertEqual(resp.status_code,403)
 
-    def test_existing_history_still_includes_v2_and_profitability(self):
+    def test_public_history_keeps_profitability_but_masks_legacy_v2(self):
         rows=[{"timestamp":1790000000,"quantity":54}]
         v2={"display_prediction":{"estimate_timestamp":1790001200,
             "recommended_arrival_timestamp":1790001200,
@@ -72,10 +73,15 @@ class ProfitabilityCanaryTests(unittest.TestCase):
               "country":"can","item":"Fire Hydrant","minutes":1440})
         self.assertEqual(resp.status_code,200,resp.text)
         data=resp.json()
-        self.assertEqual(data["analysis"]["prediction_v2"],v2)
+        # Under the active beta middleware this item has no approved model.
+        # The old V2 output must not become actionable through /api/history.
+        self.assertEqual(data["analysis"]["prediction_v2"]["status"],"ITEM_UNDER_REVIEW")
+        self.assertIsNone(data["analysis"]["prediction_v2"]["display_prediction"])
+        self.assertIsNone(data["analysis"]["prediction"])
+        self.assertEqual(data["analysis"]["forecast_history"],[])
+        # Legacy V2 suppression must never erase stock, costs or profitability.
         self.assertEqual(data["analysis"]["profitability"],{"net_profit":4567})
         self.assertEqual(data["analysis"]["current_cost"],350)
-        self.assertEqual(data["analysis"]["prediction"]["estimate_timestamp"],1790001200)
         self.assertNotIn("challenger",data["analysis"])
 
 if __name__=="__main__":
