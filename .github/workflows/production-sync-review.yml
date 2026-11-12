@@ -86,6 +86,21 @@ jobs:
               assert Path(path).is_file(), path
           print("Website route table and assets verified")
           PY
+      - name: Inventory possible historical modules (no deletions)
+        run: |
+          python tools/audit_source_references.py \
+            --root . \
+            --entry services.challenger_live \
+            --entry services.final_pair_live \
+            --entry services.daily_forward_report \
+            --entry services.checkpoint4_state \
+            --json-output source-reachability-review.json
+      - name: Save non-destructive reachability report
+        uses: actions/upload-artifact@v4
+        with:
+          name: source-reachability-review
+          path: source-reachability-review.json
+          retention-days: 7
       - name: Parse inline browser JavaScript without network calls
         run: |
           python - <<'PY'
