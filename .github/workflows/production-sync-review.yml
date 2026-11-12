@@ -43,6 +43,26 @@ jobs:
             echo "===== ${pattern} ====="
             python -m unittest discover -s tests -p "${pattern}" -v
           done
+      - name: Run active publisher and web regression matrix
+        run: |
+          set -eu
+          for pattern in \
+            test_first_release_live.py \
+            test_first_release_schedule.py \
+            test_first_release_source.py \
+            test_first_release_graph_contract.py \
+            test_first_release_history_summary.py \
+            test_admin_live_beta_health.py \
+            test_travel_decisions_router.py \
+            test_v38_heartbeat_fastpath.py \
+            test_v38_catalog_cache.py \
+            test_v38_revision_fingerprint.py \
+            test_native_history_acceleration.py \
+            test_v143_v2_window_web_parity.py \
+            test_v2_beta_history_preview.py; do
+            echo "===== ${pattern} ====="
+            python -m unittest discover -s tests -p "${pattern}" -v
+          done
       - name: Verify website route and required assets
         run: |
           python - <<'PY'
