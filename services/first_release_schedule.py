@@ -54,7 +54,8 @@ def _delays(earliest, latest, now):
 
 def build_first_release_decision(forecast, *, now, flight_seconds,
                                  poll_age_seconds, timing_choice=None,
-                                 model_roster=FIRST_RELEASE_MODELS, allow_minute_refinement=False):
+                                 model_roster=FIRST_RELEASE_MODELS, current_stock_leave_now=False,
+                                 allow_minute_refinement=False):
     """Pure decision policy. timing_choice may only select from supplied delays.
 
     Forecasts must explicitly model >=31. Model confidence is advisory, not
@@ -84,7 +85,9 @@ def build_first_release_decision(forecast, *, now, flight_seconds,
     earliest = selected["estimated_departure_start_epoch"]
     latest = selected["estimated_latest_departure_epoch"]
     departure = earliest
-    if timing_choice is not None:
+    if index == 0 and current_stock_leave_now:
+        result["timing_refinement_status"] = "CURRENT_STOCK_REACHABLE_LEAVE_NOW"
+    elif timing_choice is not None:
         delays = _delays(earliest, latest, now)
         proposal = timing_choice(
             item_key=key, generation=generation, config=config,
@@ -133,6 +136,7 @@ def native_timing_choice(db, *, model_roster=FIRST_RELEASE_MODELS,
     if model_roster.get(request["item_key"]) != (
             request["generation"], request["config"]):
         raise ValueError("frozen model identity mismatch")
+    if request['item_key']=='sou:Xanax':return None
     source = inspect_live_source(db, request["now"])
     if source["status"] != "FRESH":
         raise ValueError("native timing source is not fresh and causal: " + source["status"])
@@ -171,7 +175,8 @@ def native_timing_choice(db, *, model_roster=FIRST_RELEASE_MODELS,
             )
             if proposal is None:
                 return None
-            result = {"departure": int(proposal["departure_time"]), "score": proposal.get("probability")}
+            result = {"departure": int(proposal["departure_time"]),
+                      "score": proposal.get("probability")}
             if proposal.get("minute_refined") is True:
                 result["minute_refined"] = True
             return result
@@ -182,7 +187,9 @@ def native_timing_choice(db, *, model_roster=FIRST_RELEASE_MODELS,
 
 def forecast_first_release_item(source, item_key, *, now, flight_seconds,
                                 model_roster=FIRST_RELEASE_MODELS,
-                                timing_full_history=False, event_forecaster=None, refine_minute=False):
+                                timing_full_history=False, forecast_transform=None,
+                                current_stock_leave_now=False,event_forecaster=None,
+                                refine_minute=False):
     """Fresh, causal, read-only one-item pipeline; no production writes.
 
     Shared empirical stocked/depleted phases generate the event timeline.
@@ -212,18 +219,28 @@ def forecast_first_release_item(source, item_key, *, now, flight_seconds,
         ).fetchall()
     phases = provider_continuous_phases(
         rows, asof=now, gaps=gaps, min_qty=MIN_QUANTITY)
+    from services.reviewed_foundation import REVIEWED,calculate,sa_forecast
+    if item_key in REVIEWED:
+        with closing(sqlite3.connect(source.as_uri()+"?mode=ro",uri=True)) as evidence_db:
+            receipts=evidence_db.execute("SELECT received_epoch,country_update_epoch,clock_status FROM country_stock_observations WHERE country=? AND received_epoch<=? ORDER BY received_epoch,id",(item_key.split(':')[0],now)).fetchall()
+        phases=calculate(rows,gaps,receipts,now,item_key,phases)
+        if item_key=='sou:Xanax':event_forecaster=sa_forecast
     forecast = (event_forecaster or predict_events)(
         item_key, phases, asof=now, horizon=None, min_qty=MIN_QUANTITY)
+    if item_key in REVIEWED:forecast["reviewed_foundation_policy"]="REVIEWED_FOUNDATION_20261111_V1"
     forecast["phase_definition"] = "STOCK_ABOVE_30_PURCHASE_AVAILABILITY"
     # Legacy field names say below_30; expose the actual >=31 semantics too.
     for event in forecast["restock_events"]:
         event["predicted_stock_below_threshold_epoch"] = event["predicted_stock_below_30_epoch"]
+    if forecast_transform is not None:
+        forecast = forecast_transform(forecast,rows,gaps,now)
     decision = build_first_release_decision(
         forecast, now=now, flight_seconds=flight_seconds,
         poll_age_seconds=now - health["last_successful_heartbeat"],
         timing_choice=lambda **kw: native_timing_choice(source,model_roster=model_roster,
             full_history=timing_full_history,refine_minute=refine_minute,**kw),
-        model_roster=model_roster,allow_minute_refinement=refine_minute,
+        model_roster=model_roster,current_stock_leave_now=current_stock_leave_now,
+        allow_minute_refinement=refine_minute,
     )
     return {"item_key": item_key, "asof_epoch": now,
             "forecast": forecast, "decision": decision,
