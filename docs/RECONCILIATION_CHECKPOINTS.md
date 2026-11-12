@@ -67,3 +67,18 @@ Changes currently on the review branch include:
 5. Preserve uncommitted local `data/` and user historical audit text files; **never** use `git add .` indiscriminately.
 
 **This is intentionally an unmerged, non-deployable work-in-progress.**
+
+## Checkpoint 4 — 2026-11-12, verified review-branch state
+
+**Completed since checkpoint 3**
+- Production graph `beta.js` and `beta.css` copied to the remote review branch with exact expected Git blob hashes.
+- Production `web/first_release_bridge.py` captured to include next-six and final-pair cohorts; app routes merged to retain production light-graph behavior alongside existing feature-gated research APIs.
+- Reconciled publisher and schedule preserve both November Monkey minute refinement and current next-six leave-now model policy. Added the source-reviewed foundation and current-stock continuation helpers.
+- Production simulated-trip evidence now treats **quantity >= 30** as successful; added threshold regression tests.
+- Added read-only source reference audit tool and two tests; it labels unreferenced candidates as **review only**, never as deletion-approved.
+- Created archival checkpoint branch `archive/pre-production-sync-20261112` pointing to the original release commit; no files have been removed.
+- Current draft PR: https://github.com/fungjkTorn/torn-fren/pull/17; draft status remains enforced.
+
+**Test evidence:** 15 targeted collector/freshness/cache/publisher checks, 2 reference-audit checks and 3 arrival-threshold checks passed locally (20 total). These are isolated checks against captured production source / test copies, **not** full branch CI or live verification.
+
+**Outstanding:** full branch checkout and tests; all three website pages with current routes and assets; reconcile deployed `web/static/index.html` and bot contract; dynamic dependency analysis including enabled timer unit files; prove non-use before any legacy-code retirement PR. The user has **not authorized a merge or deployment**.
