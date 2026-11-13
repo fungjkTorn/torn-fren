@@ -47,7 +47,7 @@ ROUTE_V2='''            if path=="/experimental":
 
 
 def sha(raw): return hashlib.sha256(raw).hexdigest()
-def blob(raw): return hashlib.sha1(f"blob {len(raw)}\\0".encode().replace(b"\\\\0",b"\\0")+raw).hexdigest()
+def blob(raw): return hashlib.sha1(f"blob {len(raw)}".encode()+bytes([0])+raw).hexdigest()
 
 def regular(path,required=True):
     if path.is_symlink() or (required and not path.is_file()) or (path.exists() and not path.is_file()):
