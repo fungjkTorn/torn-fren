@@ -41,7 +41,7 @@ def _safe_send_text(text):
     # Discord message bodies have a 2,000-character limit.
     if len(text) <= 1950:
         return text
-    return text[:1880] + "\\n…More items available on the Torn-FREN website."
+    return text[:1880] + "\n…More items available on the Torn-FREN website."
 
 
 def setup_commands(bot):
@@ -110,10 +110,10 @@ def setup_commands(bot):
             ready = sum(site_feed.row_status(row) in site_feed.ALLOWED_DECISIONS for row in rows)
             stale = sum(site_feed.row_status(row) == "STALE_DATA" for row in rows)
             message = (
-                f"🤖 Torn-FREN bot online • Version {config.VERSION}\\n"
-                f"🌐 Website feed: {board.get('status')}\\n"
-                f"📊 Published items: {len(rows)}; actionable: {ready}; stale: {stale}\\n"
-                f"🔔 Observed-stock alerts: {'enabled' if config.RESTOCK_ALERTS_ENABLED else 'disabled'}\\n"
+                f"🤖 Torn-FREN bot online • Version {config.VERSION}\n"
+                f"🌐 Website feed: {board.get('status')}\n"
+                f"📊 Published items: {len(rows)}; actionable: {ready}; stale: {stale}\n"
+                f"🔔 Observed-stock alerts: {'enabled' if config.RESTOCK_ALERTS_ENABLED else 'disabled'}\n"
                 "Predicted departure alerts: not enabled"
             )
         except site_feed.FeedUnavailable:
@@ -127,13 +127,13 @@ def setup_commands(bot):
     @bot.tree.command(name="help", description="List Torn-FREN commands")
     async def help_command(interaction: discord.Interaction):
         await interaction.response.send_message(
-            "**📚 Torn-FREN Bot**\\n"
-            "`/stock` — observed stock by country (with freshness warning)\\n"
-            "`/predict` — approved website forecast (never legacy V2 fallback)\\n"
-            "`/history` — observed >30 stock windows, not prediction success rates\\n"
-            "`/site` — open the website\\n"
-            "`/alerts` — notification status\\n"
-            "`/status` — website feed and bot health\\n"
-            "`/ping` — bot responsiveness\\n"
+            "**📚 Torn-FREN Bot**\n"
+            "`/stock` — observed stock by country (with freshness warning)\n"
+            "`/predict` — approved website forecast (never legacy V2 fallback)\n"
+            "`/history` — observed >30 stock windows, not prediction success rates\n"
+            "`/site` — open the website\n"
+            "`/alerts` — notification status\n"
+            "`/status` — website feed and bot health\n"
+            "`/ping` — bot responsiveness\n"
             "Items without published models show under review; restock/departure estimates are not guaranteed."
         )
