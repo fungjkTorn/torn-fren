@@ -72,11 +72,14 @@ def setup_commands(bot):
     async def history_command(interaction: discord.Interaction, country: CountryCode, item_name: str):
         await interaction.response.defer(thinking=True)
         try:
-            board, summary = await asyncio.gather(
-                asyncio.to_thread(_board),
-                asyncio.to_thread(site_feed.fetch_history_summary, config.PUBLIC_BASE_URL, country, item_name),
+            summary = await asyncio.to_thread(
+                site_feed.fetch_history_summary, config.PUBLIC_BASE_URL, country, item_name
             )
-            row = site_feed.item_row(board, country, item_name)
+            try:
+                board = await asyncio.to_thread(_board)
+                row = site_feed.item_row(board, country, item_name)
+            except site_feed.FeedUnavailable:
+                row = None
             text = site_feed.format_history(country, item_name, summary, row)
         except site_feed.FeedUnavailable:
             text = ("⚠️ Website-backed history is unavailable. "
@@ -93,7 +96,7 @@ def setup_commands(bot):
 
     @bot.tree.command(name="alerts", description="Check whether observed stock notifications are active")
     async def alert_command(interaction: discord.Interaction):
-        if not config.RESTOCK_ALERTS_ENABLED:
+        if not config.RESTOCK_ALERTS_ENABLED or not config.RESTOCK_ALERT_ITEMS:
             message = "🔕 Observed-stock alerts are currently disabled. Forecast departure alerts are not enabled."
         else:
             message = ("🔔 Observed-stock alerts are enabled for configured tracked items. "
@@ -113,7 +116,7 @@ def setup_commands(bot):
                 f"🤖 Torn-FREN bot online • Version {config.VERSION}\n"
                 f"🌐 Website feed: {board.get('status')}\n"
                 f"📊 Published items: {len(rows)}; actionable: {ready}; stale: {stale}\n"
-                f"🔔 Observed-stock alerts: {'enabled' if config.RESTOCK_ALERTS_ENABLED else 'disabled'}\n"
+                f"🔔 Observed-stock alerts: {'enabled' if config.RESTOCK_ALERTS_ENABLED and config.RESTOCK_ALERT_ITEMS else 'disabled'}\n"
                 "Predicted departure alerts: not enabled"
             )
         except site_feed.FeedUnavailable:
