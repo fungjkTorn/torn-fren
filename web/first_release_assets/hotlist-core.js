@@ -23,9 +23,10 @@ function plan(row,profile,at){
 function economics(item,sale,capacity,seconds,waitSeconds=0){
  const buy=item.foreign_price??item.price;
  if(!Number.isFinite(buy)||buy<=0||!Number.isFinite(sale)||sale<=0||!Number.isInteger(capacity)||capacity<1||!Number.isFinite(seconds)||seconds<=0)return null;
- // User-entered bazaar proceeds; do not apply the Item Market's 5% fee.
- const profit=(sale-buy)*capacity,round=seconds*2;
- return {profit,unit:sale-buy,hourly:profit*3600/round,cycleHourly:profit*3600/(round+Math.max(0,waitSeconds))};
+ // Torn market-value reference, net of the existing 5% Item Market selling fee.
+ const netSale=sale*0.95;
+ const profit=(netSale-buy)*capacity,round=seconds*2;
+ return {profit,unit:netSale-buy,hourly:profit*3600/round,cycleHourly:profit*3600/(round+Math.max(0,waitSeconds))};
 }
 const api={flights,category,plan,economics};if(typeof module!=='undefined')module.exports=api;else root.TornHotList=api;
 })(typeof window==='undefined'?globalThis:window);
