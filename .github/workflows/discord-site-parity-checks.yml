@@ -1,0 +1,30 @@
+name: Discord parity & stock-alert unit tests
+
+on:
+  push:
+    branches:
+      - feature/discord-site-sync-restock-guards-20261112
+  pull_request:
+    branches:
+      - release/monkey-combined-20261110
+    paths:
+      - 'bot/**'
+      - 'modules/stock.py'
+      - 'tests/test_discord_*.py'
+
+permissions:
+  contents: read
+
+jobs:
+  focused-discord-checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile changed modules
+        run: python -m py_compile bot/site_feed.py bot/restock_monitor.py bot/commands.py bot/main.py bot/config.py modules/stock.py
+      - name: Focused contract tests (stdlib only)
+        run: python -m unittest discover -s tests -p 'test_discord_*.py' -v
