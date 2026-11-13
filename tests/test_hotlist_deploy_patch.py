@@ -4,6 +4,7 @@ import hashlib
 import importlib.util
 import tempfile
 import zipfile
+import subprocess
 
 ROOT=Path(__file__).resolve().parents[1]
 SCRIPT=ROOT/"deploy/scripts/relocate_hotlist.py"
@@ -24,6 +25,22 @@ for source in ("unexpected source", v1.replace(mod.ASSET_V1,mod.ASSET_V2)):
     except RuntimeError:pass
     else:raise AssertionError("Routing drift was not rejected")
 assert mod.blob(b"abc")==hashlib.sha1(b"blob 3"+bytes([0])+b"abc").hexdigest()
+
+# The V1 version was installed through a Windows Git archive, which can convert
+# LF to CRLF. Accept ONLY that byte-for-byte conversion of the pinned Git blob.
+v1_commit = "e4ddb3e5851e0080dd65261012d469da85f83879"
+for name in ("hotlist.css", "hotlist-core.js", "hotlist.html", "hotlist.js"):
+    filename = "web/first_release_assets/" + name
+    signed = subprocess.check_output(["git", "show", f"{v1_commit}:{filename}"], cwd=ROOT)
+    path = mod.ASSETS / name
+    crlf = signed.replace(b"\n", b"\r\n")
+    assert mod.blob(signed) == mod.V1_BLOBS[str(path)], name
+    assert mod.approved_v1(signed, path), name
+    assert mod.approved_v1(crlf, path), name
+    assert not mod.approved_v1(signed + b"X", path), name
+    assert not mod.approved_v1(crlf + b"X", path), name
+    assert not mod.approved_v1(crlf + b"\r", path), name
+    assert not mod.approved_v1(signed, mod.ASSETS / "unknown-file.js"), name
 assert set(mod.NAMES)=={"hotlist.html","hotlist.js","abroad-roster.json"}
 
 with tempfile.TemporaryDirectory() as folder:
@@ -36,4 +53,4 @@ with tempfile.TemporaryDirectory() as folder:
     files=mod.read_package(archive)
     assert len(files)==3
     assert (mod.ASSETS/"abroad-roster.json") in files
-print("PASS: route relocator supports only exact v1/v2, full roster, signed source guard")
+print("PASS: route relocator verifies exact v1/v2, 236 roster, LF or CRLF-only signed source guard")
