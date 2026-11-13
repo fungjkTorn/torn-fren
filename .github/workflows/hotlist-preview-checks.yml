@@ -1,0 +1,57 @@
+name: Hot List browser and pricing checks
+
+on:
+  pull_request:
+    paths:
+      - 'web/first_release_assets/hotlist*'
+      - 'tests/hotlist-core.test.cjs'
+      - 'tests/test_hotlist_browser.py'
+      - 'tests/test_first_release_live.py'
+      - '.github/workflows/hotlist-preview-checks.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'web/first_release_assets/hotlist*'
+      - 'tests/hotlist-core.test.cjs'
+      - 'tests/test_hotlist_browser.py'
+      - '.github/workflows/hotlist-preview-checks.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  browser:
+    name: Hot List Chromium smoke test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify JS syntax and numeric profitability contracts
+        run: |
+          node --check web/first_release_assets/hotlist-core.js
+          node --check web/first_release_assets/hotlist.js
+          node tests/hotlist-core.test.cjs
+      - name: Compile and validate guarded deployment patch
+        run: |
+          python -m py_compile deploy/scripts/install_hotlist_preview.py
+          python tests/test_hotlist_deploy_patch.py
+      - name: Install browser test dependencies
+        run: |
+          python -m pip install --disable-pip-version-check playwright
+          python -m playwright install --with-deps chromium
+      - name: Test actual rendered homepage at desktop and mobile sizes
+        run: python tests/test_hotlist_browser.py
+      - name: Save desktop review screenshot
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hotlist-desktop-screenshot
+          path: desktop-test.png
+          if-no-files-found: ignore
+          retention-days: 14
