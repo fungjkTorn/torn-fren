@@ -16,10 +16,9 @@ $commit = (& git -C $Repository rev-parse origin/main).Trim()
 if ($LASTEXITCODE -ne 0 -or !$commit) { throw 'Could not resolve origin/main.' }
 $files = @(
     'web/first_release_assets/hotlist.html',
-    'web/first_release_assets/hotlist.css',
     'web/first_release_assets/hotlist.js',
-    'web/first_release_assets/hotlist-core.js',
-    'deploy/scripts/install_hotlist_preview.py'
+    'web/first_release_assets/abroad-roster.json',
+    'deploy/scripts/relocate_hotlist.py'
 )
 foreach ($file in $files) {
     & git -C $Repository cat-file -e "${commit}:$file"
@@ -27,13 +26,13 @@ foreach ($file in $files) {
         throw "Hot List has not been merged into main or is incomplete: $file"
     }
 }
-$installer = & git -C $Repository show "${commit}:deploy/scripts/install_hotlist_preview.py"
+$installer = & git -C $Repository show "${commit}:deploy/scripts/relocate_hotlist.py"
 if ($LASTEXITCODE -ne 0 -or !$installer) { throw 'Could not retrieve the pinned installer.' }
 
 $stamp = [DateTime]::UtcNow.ToString('yyyyMMddTHHmmssZ')
-$archive = Join-Path $env:TEMP "torn-fren-hotlist-$stamp.zip"
-$remote = "/tmp/torn-fren-hotlist-$stamp.zip"
-$report = Join-Path $env:USERPROFILE "Desktop\torn-fren-hotlist-$stamp.json"
+$archive = Join-Path $env:TEMP "torn-fren-hotlist-route-$stamp.zip"
+$remote = "/tmp/torn-fren-hotlist-route-$stamp.zip"
+$report = Join-Path $env:USERPROFILE "Desktop\torn-fren-hotlist-route-$stamp.json"
 
 try {
     & git -C $Repository archive --format=zip "--output=$archive" $commit -- @files
@@ -51,15 +50,15 @@ try {
     if ($exitCode -ne 0) { throw 'Hot List check or deployment did not pass. Share the saved JSON report.' }
     $result = ($output -join "`n") | ConvertFrom-Json
     if ($Apply) {
-        if ($result.status -notin @('HOTLIST_DEPLOYED','HOTLIST_ALREADY_INSTALLED')) {
+        if ($result.status -notin @('HOTLIST_ROUTE_DEPLOYED','HOTLIST_ROUTE_ALREADY_INSTALLED')) {
             throw "Hot List was not deployed. Check report: $report"
         }
-        Write-Host "Hot List published: https://tornfren.duckdns.org/ (Ctrl+F5 to refresh)."
+        Write-Host "Hot List published: https://tornfren.duckdns.org/experimental (Ctrl+F5 to refresh)."
     } else {
-        if ($result.status -ne 'HOTLIST_PREFLIGHT_PASSED') {
+        if ($result.status -ne 'HOTLIST_ROUTE_PREFLIGHT_PASSED') {
             throw "Unexpected preflight result: $($result.status)"
         }
-        Write-Host 'Preflight passed. Run with -Apply to publish the Hot List.'
+        Write-Host 'Route correction preflight passed. Run with -Apply to update /experimental.'
     }
 }
 finally {
