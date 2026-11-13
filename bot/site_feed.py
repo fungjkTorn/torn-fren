@@ -183,8 +183,8 @@ def _duration(seconds):
 def format_history(country, item, summary, row):
     header = f"📚 **{item} — {country.upper()}**"
     if summary.get("status") != "AVAILABLE":
-        return header + "\\nObserved-history sample unavailable. This does not imply a supported prediction."
-    return "\\n".join([
+        return header + "\nObserved-history sample unavailable. This does not imply a supported prediction."
+    return "\n".join([
         header, "**Observed availability history** (stock >30; descriptive, not forecast accuracy)",
         f"🟢 Last observed opening: {format_epoch(summary.get('last_restock_timestamp'))}",
         f"📦 Typical stocked time (median): {_duration(summary.get('median_stocked_seconds'))}",
