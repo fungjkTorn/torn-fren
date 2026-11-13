@@ -148,3 +148,50 @@ def format_prediction(country, item, row, *, now=None):
         f"🕒 Forecast valid until: {format_epoch(row.get('valid_until_epoch'))}",
     ]
     return "\n".join(lines)
+
+
+def fetch_history_summary(base_url, country, item, *, timeout=5):
+    if not base_url:
+        raise FeedUnavailable("PUBLIC_BASE_URL is not configured")
+    parsed = urlsplit(base_url)
+    if parsed.scheme != "https" and not (
+        parsed.scheme == "http" and parsed.hostname in {"localhost", "127.0.0.1"}
+    ):
+        raise FeedUnavailable("Website history requires HTTPS")
+    url = site_url(base_url, "/api/first-release/history-summary", country=country, item=item)
+    try:
+        with urlopen(Request(url, headers={"Accept": "application/json", "User-Agent": "TornFren-Discord/1"}), timeout=timeout) as response:
+            data = response.read(65_537)
+        if len(data) > 65_536:
+            raise FeedUnavailable("History response exceeds limit")
+        result = json.loads(data)
+    except (OSError, ValueError, TimeoutError) as exc:
+        raise FeedUnavailable("Website observed history is unavailable") from exc
+    if not isinstance(result, dict):
+        raise FeedUnavailable("Invalid observed history response")
+    return result
+
+
+def _duration(seconds):
+    if type(seconds) not in (int, float) or seconds < 0:
+        return "Unavailable"
+    hours, remainder = divmod(int(seconds), 3600)
+    minutes = remainder // 60
+    return f"{hours}h {minutes}m" if hours else f"{minutes}m"
+
+
+def format_history(country, item, summary, row):
+    header = f"📚 **{item} — {country.upper()}**"
+    if summary.get("status") != "AVAILABLE":
+        return header + "\\nObserved-history sample unavailable. This does not imply a supported prediction."
+    return "\\n".join([
+        header, "**Observed availability history** (stock >30; descriptive, not forecast accuracy)",
+        f"🟢 Last observed opening: {format_epoch(summary.get('last_restock_timestamp'))}",
+        f"📦 Typical stocked time (median): {_duration(summary.get('median_stocked_seconds'))}",
+        f"⌛ Typical below-threshold time (median): {_duration(summary.get('median_unstocked_seconds'))}",
+        f"📊 Completed stocked windows: {summary.get('completed_stock_windows', 0)}",
+        f"⚠️ Uncertain boundaries: {summary.get('uncertain_boundaries', 0)}",
+        f"🕒 Sample end: {format_epoch(summary.get('sample_end_epoch'))}",
+        f"🎯 Model status: **{row_status(row).replace('_', ' ')}**",
+        "Use /predict for the published trip decision; history statistics are not success rates.",
+    ])
