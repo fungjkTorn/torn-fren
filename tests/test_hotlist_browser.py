@@ -24,10 +24,12 @@ with sync_playwright() as p:
  page.get_by_role('button',name='Drugs',exact=True).click();assert page.locator('#rows tr').count()==1
  page.get_by_role('button',name='All',exact=True).click();page.get_by_role('button',name='All Items',exact=True).click()
  page.locator('#capacity').fill('30');page.locator('#capacity').dispatch_event('change');assert '$2,700' in page.locator('#rows').inner_text()
+ detail_key=page.locator('[data-details]').first.get_attribute('data-details')
  page.locator('[data-details]').first.click()
  page.screenshot(path=str(root/'desktop-test.png'),full_page=True)
  detail_text=page.locator('#detail-body').inner_text()
- assert 'Net sale value after 5% Item Market fee' in detail_text,(detail_text,errors)
+ diagnostic=page.evaluate("({url:location.href,open:document.getElementById('details').open,html:document.getElementById('detail-body').innerHTML,clicked:document.querySelector('[data-details]')?.getAttribute('data-details')})")
+ assert 'Net sale value after 5% Item Market fee' in detail_text,(detail_key,diagnostic,detail_text,errors)
  assert page.locator('#detail-body input').count()==0
  page.locator('#details .beta-dialog-close').click()
  assert 'Item Market estimate · 5% fee' in page.locator('#rows').inner_text()
