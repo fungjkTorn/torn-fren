@@ -16,9 +16,9 @@ with sync_playwright() as p:
   elif path=='/api/first-release':r.fulfill(json={'rows':rows})
   elif path.startswith('/first-release-assets/'):
    f=root/'web/first_release_assets'/path.rsplit('/',1)[-1];r.fulfill(body=f.read_bytes(),content_type='text/css' if f.suffix=='.css' else 'application/javascript')
-  elif path=='/':r.fulfill(body=(root/'web/first_release_assets/hotlist.html').read_bytes(),content_type='text/html')
+  elif path=='/experimental':r.fulfill(body=(root/'web/first_release_assets/hotlist.html').read_bytes(),content_type='text/html')
   else:r.abort()
- page.route('**/*',route);page.goto('https://test.local/');page.wait_for_function("document.querySelectorAll('#rows tr').length===10")
+ page.route('**/*',route);page.goto('https://test.local/experimental');page.wait_for_function("document.querySelectorAll('#rows tr').length===10")
  assert 'Page 1 of 3' in page.locator('#page').inner_text()
  page.locator('#next').click();assert 'Page 2 of 3' in page.locator('#page').inner_text()
  page.get_by_role('button',name='Drugs',exact=True).click();assert page.locator('#rows tr').count()==1
