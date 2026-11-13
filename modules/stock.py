@@ -1,5 +1,6 @@
 import time
 import sqlite3
+from contextlib import closing
 
 from services.history_service import (
     get_item_history,
@@ -59,7 +60,7 @@ def _country_freshness_message(country):
     """Refresh health comes from country poll receipts, not change-only rows."""
     now = int(time.time())
     try:
-        with sqlite3.connect(DB_PATH.resolve(strict=True).as_uri() + "?mode=ro", uri=True, timeout=3) as db:
+        with closing(sqlite3.connect(DB_PATH.resolve(strict=True).as_uri() + "?mode=ro", uri=True, timeout=3)) as db:
             db.execute("PRAGMA query_only=ON")
             heartbeat = db.execute("""
                 SELECT MAX(timestamp) FROM poll_heartbeats
