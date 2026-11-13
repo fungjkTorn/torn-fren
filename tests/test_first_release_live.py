@@ -160,10 +160,17 @@ class WebBridgeTests(unittest.TestCase):
         install_first_release(app)
         board={"status":"LIVE_BETA","rows":[]}
         with patch('web.first_release_bridge.read_board',return_value=board),TestClient(app) as client:
-            for path in ('/','/experimental','/travel-decisions'):
+            homepage=client.get('/')
+            self.assertEqual(200,homepage.status_code)
+            self.assertIn('hotlist.js',homepage.text)
+            self.assertIn('Hot List',homepage.text)
+            for path in ('/experimental','/travel-decisions'):
                 r=client.get(path);self.assertEqual(200,r.status_code)
                 self.assertIn('beta.js',r.text)
-            self.assertIn('Original stock graph',client.get('/').text)
+            graph=client.get('/?country=mex&item=Dahlia')
+            self.assertEqual(200,graph.status_code)
+            self.assertIn('Original stock graph',graph.text)
+            self.assertIn('beta.js',graph.text)
             r=client.get('/api/history').json()
             self.assertEqual([{"quantity":55}],r['rows'])
             self.assertEqual('ITEM_UNDER_REVIEW',r['analysis']['first_release']['status'])
