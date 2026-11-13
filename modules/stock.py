@@ -1,10 +1,12 @@
 import time
+import sqlite3
 
 from services.history_service import (
     get_item_history,
     get_known_items,
     get_latest_stock_snapshot,
     get_restock_prediction,
+    DB_PATH,
 )
 
 
@@ -51,6 +53,32 @@ def _format_timestamp(timestamp):
         "%I:%M:%S %p",
         time.localtime(timestamp),
     )
+
+
+def _country_freshness_message(country):
+    """Refresh health comes from country poll receipts, not change-only rows."""
+    now = int(time.time())
+    try:
+        with sqlite3.connect(DB_PATH.resolve(strict=True).as_uri() + "?mode=ro", uri=True, timeout=3) as db:
+            db.execute("PRAGMA query_only=ON")
+            heartbeat = db.execute("""
+                SELECT MAX(timestamp) FROM poll_heartbeats
+                WHERE mode='poll-cycle' AND success=1
+            """).fetchone()[0]
+            row = db.execute("""
+                SELECT received_epoch, country_update_epoch, clock_status
+                FROM country_stock_observations
+                WHERE country=? ORDER BY received_epoch DESC, id DESC LIMIT 1
+            """, (country,)).fetchone()
+    except (OSError, sqlite3.Error):
+        return "⚠️ Country source freshness unavailable; stock could be stale."
+    if heartbeat is None or not 0 <= now - heartbeat <= 180:
+        return "⚠️ Global stock polling is delayed; quantities could be stale."
+    if not row or row[2] != "REPORTED" or row[1] is None:
+        return "⚠️ Country data freshness is unverified; latest stored values are not guaranteed current."
+    if not (0 <= now - row[0] <= 180 and 0 <= now - row[1] <= 180):
+        return "⚠️ Country stock observations are delayed; quantities could be stale."
+    return f"✅ Country observation updated {_format_age(row[1])} ago."
 
 
 def format_stock_message(country_code: str) -> str:
@@ -100,8 +128,9 @@ def format_stock_message(country_code: str) -> str:
     age_str = _format_age(latest_timestamp)
 
     lines = [
-        f"**{label} — Current Stock**",
-        f"_Latest recorded data: {age_str} ago via {latest_source}_",
+        f"**{label} — Latest Stored Stock**",
+        _country_freshness_message(country_code),
+        f"_Last recorded country item change: {age_str} ago via {latest_source}_",
         "",
     ]
 
