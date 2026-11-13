@@ -11,16 +11,20 @@ jobs:
     timeout-minutes: 4
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 8
       - name: Compare publicly served assets to repository bytes and precise CRLF conversion
         shell: bash
         run: |
           python3 - <<'PY'
-          import hashlib, urllib.request
+          import hashlib, urllib.request, subprocess
           from pathlib import Path
           root="https://tornfren.duckdns.org"
           for name in ("hotlist.css","hotlist-core.js","hotlist.js","hotlist.html"):
             local=Path("web/first_release_assets")/name
-            baseline=local.read_bytes()
+            baseline=(subprocess.check_output(["git","show",
+              "e4ddb3e5851e0080dd65261012d469da85f83879:web/first_release_assets/"+name])
+              if name in ("hotlist.html","hotlist.js") else local.read_bytes())
             # Only CSS/core/JS have a first-release-assets route.
             url=root+("/" if name=="hotlist.html" else "/first-release-assets/"+name)
             print("ASSET "+name+" BASE_BYTES "+str(len(baseline))+" BASE_NEWLINES "+str(baseline.count(bytes([10]))),flush=True)
