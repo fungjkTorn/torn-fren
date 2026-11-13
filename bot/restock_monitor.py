@@ -6,6 +6,7 @@ predicted restock, an in-stock increase, or a baseline state as a new event.
 from __future__ import annotations
 
 import json
+from contextlib import closing
 import os
 import sqlite3
 import tempfile
@@ -91,7 +92,7 @@ class StockAlertMonitor:
         after reconnects. Discord delivery is best-effort, not guaranteed.
         """
         now = int(self.clock())
-        with self._connect() as db:
+        with closing(self._connect()) as db:
             if not self.state_path.exists():
                 return self._baseline(db)
             try:
