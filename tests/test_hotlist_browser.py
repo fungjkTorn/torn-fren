@@ -25,7 +25,9 @@ with sync_playwright() as p:
  page.get_by_role('button',name='All',exact=True).click();page.get_by_role('button',name='All Items',exact=True).click()
  page.locator('#capacity').fill('30');page.locator('#capacity').dispatch_event('change');assert '$2,700' in page.locator('#rows').inner_text()
  page.locator('[data-details]').first.click()
- assert 'Net sale value after 5% Item Market fee' in page.locator('#detail-body').inner_text()
+ page.screenshot(path=str(root/'desktop-test.png'),full_page=True)
+ detail_text=page.locator('#detail-body').inner_text()
+ assert 'Net sale value after 5% Item Market fee' in detail_text,(detail_text,errors)
  assert page.locator('#detail-body input').count()==0
  page.locator('#details .beta-dialog-close').click()
  assert 'Item Market estimate · 5% fee' in page.locator('#rows').inner_text()
