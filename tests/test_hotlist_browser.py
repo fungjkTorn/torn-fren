@@ -22,11 +22,15 @@ with sync_playwright() as p:
  page.locator('#next').click();assert 'Page 2 of 3' in page.locator('#page').inner_text()
  page.get_by_role('button',name='Drugs',exact=True).click();assert page.locator('#rows tr').count()==1
  page.get_by_role('button',name='All',exact=True).click();page.get_by_role('button',name='All Items',exact=True).click()
- page.locator('#capacity').fill('30');page.locator('#capacity').dispatch_event('change');assert '$3,000' in page.locator('#rows').inner_text()
- page.locator('[data-details]').first.click();page.locator('#sale').fill('250');page.locator('#save-sale').click();assert 'Your bazaar price' in page.locator('#rows').inner_text()
+ page.locator('#capacity').fill('30');page.locator('#capacity').dispatch_event('change');assert '$2,700' in page.locator('#rows').inner_text()
+ page.locator('[data-details]').first.click()
+ assert 'Net sale value after 5% Item Market fee' in page.locator('#detail-body').inner_text()
+ assert page.locator('#detail-body input').count()==0
+ page.locator('#details .beta-dialog-close').click()
+ assert 'Item Market estimate · 5% fee' in page.locator('#rows').inner_text()
  assert page.locator('#rows .beta-dot').count()==0
  page.screenshot(path=str(root/'desktop-test.png'),full_page=True)
  page.set_viewport_size({'width':390,'height':844});assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
  assert not errors,errors
  browser.close()
-print('PASS: pagination, categories, capacity recalculation, bazaar override, no dots, mobile overflow, no JS errors')
+print('PASS: pagination, categories, capacity recalculation, automatic Item Market pricing, no dots, mobile overflow, no JS errors')
