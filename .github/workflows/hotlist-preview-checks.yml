@@ -37,6 +37,10 @@ jobs:
           node --check web/first_release_assets/hotlist-core.js
           node --check web/first_release_assets/hotlist.js
           node tests/hotlist-core.test.cjs
+      - name: Compile and validate guarded deployment patch
+        run: |
+          python -m py_compile deploy/scripts/install_hotlist_preview.py
+          python tests/test_hotlist_deploy_patch.py
       - name: Install browser test dependencies
         run: |
           python -m pip install --disable-pip-version-check playwright
