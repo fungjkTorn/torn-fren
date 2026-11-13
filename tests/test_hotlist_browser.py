@@ -15,14 +15,22 @@ with sync_playwright() as p:
   if path=='/api/catalog':r.fulfill(json={'countries':[{'country':'sou','items':items}]})
   elif path=='/api/first-release':r.fulfill(json={'rows':rows})
   elif path.startswith('/first-release-assets/'):
-   f=root/'web/first_release_assets'/path.rsplit('/',1)[-1];r.fulfill(body=f.read_bytes(),content_type='text/css' if f.suffix=='.css' else 'application/javascript')
+   f=root/'web/first_release_assets'/path.rsplit('/',1)[-1]
+   media='text/css' if f.suffix=='.css' else 'application/json' if f.suffix=='.json' else 'application/javascript'
+   r.fulfill(body=f.read_bytes(),content_type=media)
   elif path=='/experimental':r.fulfill(body=(root/'web/first_release_assets/hotlist.html').read_bytes(),content_type='text/html')
   else:r.abort()
- page.route('**/*',route);page.goto('https://test.local/experimental');page.wait_for_function("document.querySelectorAll('#rows tr').length===10")
- assert 'Page 1 of 3' in page.locator('#page').inner_text()
- page.locator('#next').click();assert 'Page 2 of 3' in page.locator('#page').inner_text()
- page.get_by_role('button',name='Drugs',exact=True).click();assert page.locator('#rows tr').count()==1
+ page.route('**/*',route);page.goto('https://test.local/experimental');page.wait_for_function("document.querySelectorAll('#rows tr').length===10 && document.querySelector('#health').textContent.includes('236 reference items')")
+ assert 'Page 1 of ' in page.locator('#page').inner_text()
+ page.locator('#next').click();assert 'Page 2 of ' in page.locator('#page').inner_text()
+ page.get_by_role('button',name='Drugs',exact=True).click();assert page.locator('#rows tr').count()>0
  page.get_by_role('button',name='All',exact=True).click();page.get_by_role('button',name='All Items',exact=True).click()
+ page.locator('#search').fill('Xanax')
+ page.wait_for_function("document.querySelectorAll('#rows tr').length===4")
+ xanax=page.locator('#rows').inner_text()
+ assert all(country in xanax for country in ('Japan','South Africa','United Kingdom','Canada')),xanax
+ assert 'No public departure forecast' in xanax
+ page.locator('#search').fill('')
  page.locator('#capacity').fill('30');page.locator('#capacity').dispatch_event('change');assert '$2,700' in page.locator('#rows').inner_text()
  detail_key=page.locator('[data-details]').first.get_attribute('data-details')
  page.evaluate("document.addEventListener('click',e=>{window.__lastHotClick={target:e.target.tagName,closest:e.target.closest('[data-details]')?.getAttribute('data-details'),button:e.target.outerHTML.slice(0,180)}},true)")
@@ -34,8 +42,10 @@ with sync_playwright() as p:
  page.locator('#details .beta-dialog-close').click()
  assert 'Item Market estimate · 5% fee' in page.locator('#rows').inner_text()
  assert page.locator('#rows .beta-dot').count()==0
+ page.locator('#search').fill('Orchid')
+ assert 'Hawaii' in page.locator('#rows').inner_text()
  page.screenshot(path=str(root/'desktop-test.png'),full_page=True)
  page.set_viewport_size({'width':390,'height':844});assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
  assert not errors,errors
  browser.close()
-print('PASS: pagination, categories, capacity recalculation, automatic Item Market pricing, no dots, mobile overflow, no JS errors')
+print('PASS: 236-reference All Items, four Xanax destinations, Orchid identity, price math, modal, mobile, no dots')
