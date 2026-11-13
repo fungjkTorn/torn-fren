@@ -10,7 +10,7 @@ function plan(row,profile,at){
  if(profile===1){if(!Number.isInteger(d.estimated_departure_epoch)||!Number.isInteger(d.estimated_departure_deadline_epoch)||at>d.estimated_departure_deadline_epoch)return null;return {departure:Math.max(at,d.estimated_departure_epoch),arrival:Math.max(at,d.estimated_departure_epoch)+seconds,seconds,index:d.selected_restock_event_index,preview:false};}
  // Same stock forecasts, earliest reachable batch. Different flights remain previews.
  const f=row.forecast||{},currentEnd=f.predicted_stock_below_30_epoch??f.current_stock_end_epoch;
- if(f.observed_current_quantity>=30&&Number.isInteger(currentEnd)&&at+seconds+10<=currentEnd)return {departure:at,arrival:at+seconds,seconds,index:0,preview:true};
+ if(f.observed_current_quantity>30&&Number.isInteger(currentEnd)&&at+seconds+10<=currentEnd)return {departure:at,arrival:at+seconds,seconds,index:0,preview:true};
  const events=f.restock_events?.length?f.restock_events:d.forecast_events||[];
  for(const e of [...events].sort((a,b)=>a.predicted_restock_epoch-b.predicted_restock_epoch)){
   const start=e.predicted_restock_epoch,end=e.predicted_stock_below_30_epoch;
