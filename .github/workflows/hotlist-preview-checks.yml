@@ -6,6 +6,11 @@ on:
       - 'web/first_release_assets/hotlist*'
       - 'tests/hotlist-core.test.cjs'
       - 'tests/test_hotlist_browser.py'
+      - 'tests/test_hotlist_deploy_patch.py'
+      - 'web/first_release_bridge.py'
+      - 'web/first_release_assets/abroad-roster.json'
+      - 'deploy/scripts/relocate_hotlist.py'
+      - 'deploy/Publish-HotList.ps1'
       - 'tests/test_first_release_live.py'
       - '.github/workflows/hotlist-preview-checks.yml'
   push:
@@ -14,6 +19,11 @@ on:
       - 'web/first_release_assets/hotlist*'
       - 'tests/hotlist-core.test.cjs'
       - 'tests/test_hotlist_browser.py'
+      - 'tests/test_hotlist_deploy_patch.py'
+      - 'web/first_release_bridge.py'
+      - 'web/first_release_assets/abroad-roster.json'
+      - 'deploy/scripts/relocate_hotlist.py'
+      - 'deploy/Publish-HotList.ps1'
       - '.github/workflows/hotlist-preview-checks.yml'
 
 permissions:
@@ -39,7 +49,7 @@ jobs:
           node tests/hotlist-core.test.cjs
       - name: Compile and validate guarded deployment patch
         run: |
-          python -m py_compile deploy/scripts/install_hotlist_preview.py
+          python -m py_compile deploy/scripts/relocate_hotlist.py
           python tests/test_hotlist_deploy_patch.py
       - name: Install browser test dependencies
         run: |
