@@ -8,7 +8,8 @@ names=['Camel Plushie','Xanax','African Violet','Bearer Bond']
 items=[{'item_name':names[i%4]+(' '+str(i) if i>=4 else ''),'item_id':i+1,'foreign_price':100,'market_price':200,'quantity':2500,'market_price_stale':False} for i in range(24)]
 rows=[{'item_key':'sou:'+i['item_name'],'valid_until_epoch':now+170,'source_heartbeat_epoch':now,'forecast':{'observed_current_quantity':2500},'decision':{'player_flight_seconds':11820,'estimated_departure_epoch':now,'estimated_departure_deadline_epoch':now+120,'selected_restock_event_index':1}} for i in items]
 with sync_playwright() as p:
- browser=p.chromium.launch(headless=True,executable_path='/usr/bin/chromium',args=['--no-sandbox']);page=browser.new_page(viewport={'width':1440,'height':1000});errors=[];page.on('pageerror',lambda e:errors.append(str(e)))
+ chromium_path='/usr/bin/chromium' if Path('/usr/bin/chromium').exists() else None
+ browser=p.chromium.launch(headless=True,executable_path=chromium_path,args=['--no-sandbox']);page=browser.new_page(viewport={'width':1440,'height':1000});errors=[];page.on('pageerror',lambda e:errors.append(str(e)))
  def route(r):
   path=r.request.url.split('https://test.local')[-1].split('?')[0]
   if path=='/api/catalog':r.fulfill(json={'countries':[{'country':'sou','items':items}]})
