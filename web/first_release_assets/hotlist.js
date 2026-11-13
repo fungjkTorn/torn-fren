@@ -20,5 +20,5 @@ for(const id of ['capacity','flight','sort','available','search'])$(id).addEvent
 $('prev').onclick=()=>{page--;render();};$('next').onclick=()=>{page++;render();};
 async function forecasts(){try{const res=await fetch('/api/first-release',{cache:'no-store'});if(!res.ok)throw Error();const d=await res.json();if(!Array.isArray(d.rows))throw Error();board=d.rows;refreshError=false;}catch(e){refreshError=true;}render();}
 async function prices(){try{const res=await fetch('/api/catalog',{cache:'no-store'});if(!res.ok)throw Error();const d=await res.json(),map=new Map();for(const c of d.countries||[])for(const item of c.items||[])map.set(c.country+':'+item.item_name,item);catalog=map;priceError=false;}catch(e){priceError=true;}render();}
-forecasts();prices();setInterval(forecasts,30000);setInterval(prices,300000);setInterval(render,10000);
+forecasts();prices();setInterval(forecasts,30000);setInterval(prices,300000);
 })();
