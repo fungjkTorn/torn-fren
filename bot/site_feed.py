@@ -18,7 +18,7 @@ ALLOWED_DECISIONS = {
     "WAIT_FOR_ESTIMATED_DEPARTURE",
     "ESTIMATED_DEPARTURE_WINDOW_OPEN",
 }
-MAX_FEED_BYTES = 2_000_000
+MAX_FEED_BYTES = 8 * 1024 * 1024
 
 
 def site_url(base_url, path="/", *, country=None, item=None):
@@ -109,6 +109,8 @@ def known_rate(row):
     audit = evidence.get("target_identity_audit") or {}
     if audit.get("duplicate_target_groups", 0):
         return None
+    if evidence.get("rate_status") not in (None, "KNOWN_SIMULATED_TRIPS"):
+        return None
     fraction = evidence.get("success_fraction")
     known = evidence.get("known", 0)
     if type(fraction) not in (float, int) or not 0 <= fraction <= 1 or type(known) is not int or known <= 0:
@@ -139,7 +141,7 @@ def format_prediction(country, item, row, *, now=None):
         "🧭 **Live-beta forecast** — targets **more than 30 items at landing**.",
         f"🎯 Target: {kind}",
         f"🛫 **Depart:** {format_epoch(decision['estimated_departure_epoch'])}",
-        f"⏰ **Latest safe departure:** {format_epoch(decision['estimated_departure_deadline_epoch'])}",
+        f"⏰ **Estimated departure deadline:** {format_epoch(decision['estimated_departure_deadline_epoch'])}",
         f"🛬 **Target arrival:** {format_epoch(decision['estimated_arrival_epoch'])}",
         f"📋 Status: **{status.replace('_', ' ')}**",
         f"📊 Last 10: **{rate}**" if rate else
@@ -186,7 +188,7 @@ def format_history(country, item, summary, row):
         return header + "\nObserved-history sample unavailable. This does not imply a supported prediction."
     return "\n".join([
         header, "**Observed availability history** (stock >30; descriptive, not forecast accuracy)",
-        f"🟢 Last observed opening: {format_epoch(summary.get('last_restock_timestamp'))}",
+        f"🟢 Last observed availability opening: {format_epoch(summary.get('last_restock_timestamp'))}",
         f"📦 Typical stocked time (median): {_duration(summary.get('median_stocked_seconds'))}",
         f"⌛ Typical below-threshold time (median): {_duration(summary.get('median_unstocked_seconds'))}",
         f"📊 Completed stocked windows: {summary.get('completed_stock_windows', 0)}",
