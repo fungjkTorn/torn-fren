@@ -49,6 +49,18 @@ ROUTE_V2='''            if path=="/experimental":
 def sha(raw): return hashlib.sha256(raw).hexdigest()
 def blob(raw): return hashlib.sha1(f"blob {len(raw)}".encode()+bytes([0])+raw).hexdigest()
 
+def approved_v1(raw, path):
+    """Allow exact V1 Git bytes or their CRLF-only conversion; reject all other drift."""
+    pinned = V1_BLOBS.get(str(path))
+    if not pinned or raw is None:
+        return False
+    if blob(raw) == pinned:
+        return True
+    if b"\r\n" not in raw:
+        return False
+    normalized = raw.replace(b"\r\n", b"\n")
+    return b"\r" not in normalized and blob(normalized) == pinned
+
 def regular(path,required=True):
     if path.is_symlink() or (required and not path.is_file()) or (path.exists() and not path.is_file()):
         raise RuntimeError("Unexpected or missing regular file: "+str(path))
@@ -150,8 +162,12 @@ def rollout(package,apply=False):
     for path in [BRIDGE,ASSETS/"hotlist-core.js",ASSETS/"hotlist.css",*map(lambda x:ASSETS/x,NAMES)]:
         regular(path,required=path.name!="abroad-roster.json")
     for path in (ASSETS/"hotlist.css",ASSETS/"hotlist-core.js"):
-        if blob(path.read_bytes())!=V1_BLOBS[str(path)]:
-            raise RuntimeError("Installed shared style or pricing core differs; refusing overwrite")
+        if not approved_v1(path.read_bytes(),path):
+            raise RuntimeError(
+                "Installed shared asset differs beyond CRLF normalization; refusing overwrite: "
+                + path.name + " observed_blob=" + blob(path.read_bytes())
+                + " expected_v1_blob=" + V1_BLOBS[str(path)]
+            )
     files=read_package(package)
     prior={BRIDGE:BRIDGE.read_bytes()}
     desired={BRIDGE:patch_bridge(prior[BRIDGE].decode("utf-8")).encode("utf-8"),**files}
@@ -160,8 +176,12 @@ def rollout(package,apply=False):
     for path,raw in prior.items():
         if raw is None:
             if path.name!="abroad-roster.json":raise RuntimeError("Expected preexisting V1 asset missing")
-        elif raw!=desired[path] and blob(raw)!=V1_BLOBS.get(str(path)):
-            raise RuntimeError("Changed or unknown installed web file: "+str(path))
+        elif raw!=desired[path] and not approved_v1(raw,path):
+            raise RuntimeError(
+                "Changed or unknown installed web file beyond CRLF normalization: "
+                + str(path) + " observed_blob=" + blob(raw)
+                + " expected_v1_blob=" + str(V1_BLOBS.get(str(path)))
+            )
     before=feed()
     observed_mode=mode()
     changed=[path for path in desired if prior[path]!=desired[path]]
