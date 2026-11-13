@@ -216,7 +216,7 @@ def install_first_release(app):
                     return JSONResponse({"status":"UNAVAILABLE","reason":"Historical sample is unavailable; live stock and forecasts are separate."},headers={"Cache-Control":"no-store"})
             if path.startswith("/first-release-assets/"):
                 name=path.rsplit("/",1)[-1]
-                if name in ("beta.js","beta.css","hotlist.js","hotlist-core.js","hotlist.css"):
+                if name in ("beta.js","beta.css","hotlist.js","hotlist-core.js","hotlist.css","abroad-roster.json"):
                     return FileResponse(ASSETS/name,headers={"Cache-Control":"no-cache"})
                 return Response(status_code=404)
             if path=="/experimental":
