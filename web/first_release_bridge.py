@@ -219,9 +219,9 @@ def install_first_release(app):
                 if name in ("beta.js","beta.css","hotlist.js","hotlist-core.js","hotlist.css"):
                     return FileResponse(ASSETS/name,headers={"Cache-Control":"no-cache"})
                 return Response(status_code=404)
-            if path=="/" and not (request.query_params.get("country") or request.query_params.get("item")):
+            if path=="/experimental":
                 return FileResponse(ASSETS/"hotlist.html",media_type="text/html",headers={"Cache-Control":"no-store"})
-            if path in ("/experimental","/travel-decisions"):
+            if path=="/travel-decisions":
                 return FileResponse(ASSETS/"board.html",media_type="text/html",headers={"Cache-Control":"no-store"})
             if path in ("/api/first-release","/api/travel-decisions","/api/experimental/v41/predictions"):
                 try:
