@@ -116,8 +116,8 @@ async def observed_stock_notifications():
             label = event["country"].upper()
             title = "Observed stock crossed 30 — " + item
             description = (
-                f"**{item} ({label})** now has **{event['quantity']:,}** observed units.\\n"
-                f"Recorded <t:{event['observed_epoch']}:R> · ID {event['event_id']}\\n"
+                f"**{item} ({label})** now has **{event['quantity']:,}** observed units.\n"
+                f"Recorded <t:{event['observed_epoch']}:R> · ID {event['event_id']}\n"
                 "This is an observed >30 threshold crossing, **not** a model forecast or a guarantee of stock at landing."
             )
             await alerts.send_alert(bot, config.RESTOCK_ALERT_CHANNEL_ID, title, description)
