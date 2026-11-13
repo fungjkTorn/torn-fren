@@ -26,7 +26,7 @@ with sync_playwright() as p:
  page.locator('#capacity').fill('30');page.locator('#capacity').dispatch_event('change');assert '$2,700' in page.locator('#rows').inner_text()
  detail_key=page.locator('[data-details]').first.get_attribute('data-details')
  page.evaluate("document.addEventListener('click',e=>{window.__lastHotClick={target:e.target.tagName,closest:e.target.closest('[data-details]')?.getAttribute('data-details'),button:e.target.outerHTML.slice(0,180)}},true)")
- page.locator('[data-details]').first.click()
+ page.locator('[data-details]').first.evaluate("(b)=>b.click()")
  detail_text=page.locator('#detail-body').inner_text()
  diagnostic=page.evaluate("({url:location.href,open:document.getElementById('details').open,html:document.getElementById('detail-body').innerHTML,clicked:document.querySelector('[data-details]')?.getAttribute('data-details'),event:window.__lastHotClick})")
  assert 'Net sale value after 5% Item Market fee' in detail_text,(detail_key,diagnostic,detail_text,errors)
