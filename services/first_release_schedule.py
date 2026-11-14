@@ -219,12 +219,13 @@ def forecast_first_release_item(source, item_key, *, now, flight_seconds,
         ).fetchall()
     phases = provider_continuous_phases(
         rows, asof=now, gaps=gaps, min_qty=MIN_QUANTITY)
-    from services.reviewed_foundation import REVIEWED,calculate,sa_forecast
+    from services.reviewed_foundation import REVIEWED,calculate,sa_forecast,camel_forecast,BASE_REVIEWED,BASE_POLICY
     if item_key in REVIEWED:
         with closing(sqlite3.connect(source.as_uri()+"?mode=ro",uri=True)) as evidence_db:
-            receipts=evidence_db.execute("SELECT received_epoch,country_update_epoch,clock_status FROM country_stock_observations WHERE country=? AND received_epoch<=? ORDER BY received_epoch,id",(item_key.split(':')[0],now)).fetchall()
+            receipts=evidence_db.execute("SELECT received_epoch,source,country_update_epoch,clock_status FROM country_stock_observations WHERE country=? AND received_epoch<=? ORDER BY received_epoch,id",(item_key.split(':')[0],now)).fetchall()
         phases=calculate(rows,gaps,receipts,now,item_key,phases)
         if item_key=='sou:Xanax':event_forecaster=sa_forecast
+        if item_key=='uae:Camel Plushie':event_forecaster=camel_forecast
     forecast = (event_forecaster or predict_events)(
         item_key, phases, asof=now, horizon=None, min_qty=MIN_QUANTITY)
     if item_key in REVIEWED:forecast["reviewed_foundation_policy"]="REVIEWED_FOUNDATION_20261111_V1"
@@ -234,10 +235,14 @@ def forecast_first_release_item(source, item_key, *, now, flight_seconds,
         event["predicted_stock_below_threshold_epoch"] = event["predicted_stock_below_30_epoch"]
     if forecast_transform is not None:
         forecast = forecast_transform(forecast,rows,gaps,now)
+    if item_key in BASE_REVIEWED:
+        forecast['reviewed_base_policy']=BASE_POLICY
+        if phases.get('withhold_new_advice'):
+            forecast=dict(forecast,restock_events=[],current_stock_window=None,status='PHASE_CONFIRMATION_PENDING')
     decision = build_first_release_decision(
         forecast, now=now, flight_seconds=flight_seconds,
         poll_age_seconds=now - health["last_successful_heartbeat"],
-        timing_choice=lambda **kw: native_timing_choice(source,model_roster=model_roster,
+        timing_choice=None if item_key in {"uae:Camel Plushie","sou:Lion Plushie"} else lambda **kw: native_timing_choice(source,model_roster=model_roster,
             full_history=timing_full_history,refine_minute=refine_minute,**kw),
         model_roster=model_roster,current_stock_leave_now=current_stock_leave_now,
         allow_minute_refinement=refine_minute,
@@ -288,3 +293,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

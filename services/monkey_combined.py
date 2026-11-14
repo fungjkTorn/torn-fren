@@ -5,7 +5,7 @@ from statistics import median
 from deploy.scripts.v163_readonly_event_first_preview import _window, predict_events
 
 KEY = "arg:Monkey Plushie"
-POLICY = "MONKEY_HOUR_LAST4_MINUTE_V1"
+POLICY = "MONKEY_HOUR_LAST4_MINUTE_BASE_REPAIR_V2"
 
 
 def forecast(item, phases, *, asof, horizon, min_qty):
@@ -37,7 +37,11 @@ def forecast(item, phases, *, asof, horizon, min_qty):
         older = completed[max(0, i-512):i]
         fallback = round(median(b-a for a,b in older))
         residuals.append(end-start-hourly(i, (start % 86400)//900, fallback))
-    correction = .5*median(residuals) if len(residuals) == 4 else 0
+    # Restored provider-bounded samples can make the recent-four residual
+    # positive without supporting a longer life for every future batch.
+    # Retain shorter-duration corrections; do not extend future lives from
+    # this short residual sequence alone.
+    correction = min(0, .5*median(residuals)) if len(residuals) == 4 else 0
     opening = raw[0]["predicted_restock_epoch"]
     expected_stock = raw[0]["estimated_stocked_duration_seconds"]
     empty = raw[1]["predicted_restock_epoch"]-opening-expected_stock

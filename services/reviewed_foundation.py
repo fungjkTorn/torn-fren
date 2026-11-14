@@ -544,3 +544,76 @@ def sa_forecast(item,state,*,asof,horizon=None,min_qty=31):
     f['sa_model_policy']='SA_RECENT4_HOUR_RATE_SUSTAINED_RISE_V1'
     f['reviewed_foundation_policy']=POLICY
     return f
+
+
+# Shared mechanics stay independent from the per-item estimator and flight.
+BASE_REVIEWED={'can:Wolverine Plushie','cay:Stingray Plushie','mex:Jaguar Plushie',
+               'arg:Monkey Plushie','sou:Lion Plushie','uae:Camel Plushie'}
+BASE_POLICY='REVIEWED_STOCKED_SAMPLES_AND_PHASE_GUARDS_20261114_V1'
+REVIEWED |= BASE_REVIEWED
+_original_calculate=calculate
+
+class _Recovery31(TransitionRecovery):
+    def add(self, obs):
+        return super().add(OBS(obs.epoch,200 if obs.quantity>=31 else 0,obs.source))
+
+def calculate(rows,gaps,receipts,asof,item,baseline):
+    from services.reviewed_stock_samples import repaired_stocked_windows,provisional_low_guard
+    from services.provider_freshness import ProviderFreshness
+    triples=[(r[0],r[2],r[3])if len(r)==4 else tuple(r)for r in receipts]
+    if item not in BASE_REVIEWED:
+        return _original_calculate(rows,gaps,triples,asof,item,baseline)
+    crosses=_gap_index(gaps,asof);rt=[r[0]for r in triples]
+    def verified(prior,obs):
+        j=bisect_left(rt,obs.epoch)-1
+        if j>=0:
+            at,updated,status=triples[j]
+            if status=='REPORTED'and updated is not None and 0<=at-updated<=180 and at>=prior.epoch:
+                return at
+        return prior.epoch
+    if receipts and len(receipts[0])==4:
+        fresh=ProviderFreshness(receipts).fresh
+    else:
+        def fresh(at):
+            j=bisect_right(rt,at)-1
+            if j<0:return False
+            received,updated,status=triples[j]
+            return status=='REPORTED'and updated is not None and 0<=at-updated<=180 and at-received<=180
+    if item in {'sou:Lion Plushie','uae:Camel Plushie'}:
+        bulk=Bulk(crosses,31);prior=bulk.tracker
+        clock=BriefClock(bulk,verified,recovery=False);bulk.tracker=_Recovery31(prior,verified)
+        for obs in rows:
+            if obs.epoch>asof:raise ValueError('future observation')
+            clock.add(obs)
+        clock.tick(asof,True);state=clock.state()
+        for field in ('stocked_durations','depleted_durations','observed_bounded_stocked_windows','observed_bounded_depleted_windows'):
+            state[field]=baseline[field]
+        state['_reviewed_clock']=clock
+    else:
+        state=_original_calculate(rows,gaps,triples,asof,item,baseline);clock=state['_reviewed_clock']
+    high=repaired_stocked_windows(rows,asof=asof,since=START,
+        retained_windows=baseline['observed_bounded_stocked_windows'],crosses_gap=crosses,
+        fresh=fresh,verified_through=verified,floor=asof-14*86400 if item=='mex:Jaguar Plushie'else None)
+    state['stocked_durations']=[b-a for a,b in high]
+    state['observed_bounded_stocked_windows']=high
+    state['reviewed_base_policy']=BASE_POLICY
+    state['withhold_new_advice']=provisional_low_guard(clock,rows)
+    return state
+
+def camel_forecast(item,state,*,asof,horizon=None,min_qty=31):
+    from copy import deepcopy
+    ph=deepcopy({k:v for k,v in state.items()if not k.startswith('_')})
+    high=[(a,b)for a,b in ph['observed_bounded_stocked_windows']if a>=START]
+    low=[(a,b)for a,b in ph['observed_bounded_depleted_windows']if a>=START]
+    ph['stocked_durations']=[b-a for a,b in high];ph['depleted_durations']=[b-a for a,b in low]
+    f=predict_events(item,ph,asof=asof,horizon=horizon,min_qty=min_qty)
+    values=sorted(b-a for a,b in high);shift=0
+    for e in f.get('restock_events',[]):
+        for field in ('predicted_restock_epoch','restock_early_epoch','restock_late_epoch'):
+            e[field]+=shift
+        old=e['estimated_stocked_duration_seconds'];duration=values[(len(values)-1)//2]if values else old
+        e['estimated_stocked_duration_seconds']=duration;e['predicted_stock_below_30_epoch']=e['predicted_restock_epoch']+duration
+        shift+=duration-old
+    if ph.get('last_observation')and ph['last_observation'].quantity<=30:
+        f['current_stock_window']=None
+    return f
