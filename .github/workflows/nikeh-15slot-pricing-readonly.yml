@@ -1,0 +1,42 @@
+name: Read-only Nikeh NPC five-item 15-slot market comparison
+on:
+  push:
+    branches:
+      - analysis/hotlist-15slots-20261113
+    paths:
+      - .github/workflows/nikeh-15slot-pricing-readonly.yml
+permissions:
+  contents: read
+jobs:
+  nikeh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - name: Read public catalog; compare five Nikeh fixed redemption prices
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json,urllib.request,time
+          price={"can:Bear Gall":35000,"chi:Pangolin Scales":205000,"haw:Shark Fin":66000,"chi:Tiger Bone Powder":70000,"jap:Whale Meat":40000}
+          minutes={"can":27,"chi":160,"haw":89,"jap":149}
+          req=urllib.request.Request("https://tornfren.duckdns.org/api/catalog",headers={"User-Agent":"Torn-FREN-ReadOnly-Nikeh-Compare/1","Cache-Control":"no-cache"})
+          with urllib.request.urlopen(req,timeout=20) as f:
+              data=json.load(f)
+          lookup={c["country"]+":"+i["item_name"]:i for c in data["countries"] for i in c["items"]}
+          print("SAMPLE_EPOCH",int(time.time()),"CATALOG_ROWS",len(lookup))
+          for key,payout in price.items():
+              item=lookup.get(key,{})
+              buy=item.get("foreign_price")
+              market=item.get("market_price")
+              try:
+                  buy=float(buy)
+                  total=(payout-buy)*15
+                  hour=total*60/(2*minutes[key.split(":")[0]])
+              except (TypeError,ValueError):
+                  total=hour=None
+              print("NIKEH "+json.dumps({"key":key,"foreign_buy":buy if buy is not None else None,"torn_market_reference":market,
+                    "npc_payout":payout,"net_profit_per_item":round(payout-buy,2) if total is not None else None,
+                    "profit_15":round(total) if total is not None else None,
+                    "theoretical_hour_15":round(hour) if hour is not None else None,
+                    "catalog_item_id":item.get("item_id"),"last_catalog_timestamp":item.get("latest_timestamp")}))
+          PY
