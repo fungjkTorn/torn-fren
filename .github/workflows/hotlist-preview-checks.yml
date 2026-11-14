@@ -123,6 +123,32 @@ jobs:
           python -m py_compile deploy/scripts/publish_beanstalk_hot_list.py
           PYTHONPATH=. python tests/test_publish_beanstalk_hot_list.py
           PYTHONPATH=. python tests/test_beanstalk_hot_list.py
+      - name: Preview seven selections against live public pricing feeds (read-only)
+        continue-on-error: true
+        run: |
+          PYTHONPATH=. python - <<'PY'
+          import json, time, urllib.request
+          from web.beanstalk_hot_list import build_hot_list
+          base="https://tornfren.duckdns.org"
+          def read(path):
+              with urllib.request.urlopen(base+path,timeout=16) as f:
+                  return json.load(f)
+          try:
+              body=build_hot_list(read("/api/catalog"),read("/api/first-release"),now=int(time.time()))
+              print("LIVE_PREVIEW "+json.dumps({
+                  "status":body["status"],"count":len(body["picks"]),
+                  "generated_at":body["generated_at"],
+                  "items":[{"item":p["item_key"],
+                            "hourly_profit":p["estimated_round_trip_profit_per_hour"],
+                            "departure":p["recommended_departure_time"]}
+                           for p in body["picks"]]},
+                  separators=(",",":")))
+              if body["status"]!="OK":
+                  raise RuntimeError("Current live market cannot yet produce seven eligible picks")
+          except Exception as ex:
+              print("LIVE_PREVIEW_UNAVAILABLE "+type(ex).__name__+": "+str(ex))
+              raise
+          PY
       - name: Install browser test dependencies
         run: |
           python -m pip install --disable-pip-version-check playwright
