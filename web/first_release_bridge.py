@@ -208,6 +208,21 @@ def install_first_release(app):
     class BetaMiddleware(BaseHTTPMiddleware):
         async def dispatch(self,request,call_next):
             path=request.url.path
+            if path=="/api/beanstalk-hot-list":
+                # Read-only Beanstalk drawer feed. No background prediction or mutation.
+                headers={"Cache-Control":"public, max-age=15",
+                         "Access-Control-Allow-Origin":"*"}
+                try:
+                    from web.beanstalk_hot_list import public_hot_list
+                    payload=await run_in_threadpool(public_hot_list)
+                    return JSONResponse(payload,
+                        status_code=200 if payload["status"]=="OK" else 503,
+                        headers=headers)
+                except (OSError,ValueError,KeyError,TypeError,RuntimeError):
+                    return JSONResponse(
+                        {"schema":"torn-fren-beanstalk-hot-list-v1",
+                         "status":"UNAVAILABLE","picks":[]},
+                        status_code=503,headers=headers)
             if path=="/api/first-release/history-summary":
                 try:
                     summary=await run_in_threadpool(read_history_summary,request.query_params.get('country',''),request.query_params.get('item',''))
