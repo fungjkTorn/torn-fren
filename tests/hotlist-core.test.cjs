@@ -19,7 +19,7 @@ const validPlan={departure:1100,arrival:1300};
 const positiveProfit={profit:100};
 assert.equal(c.hotEligible('arg:Monkey Plushie',{market_price:14999},validPlan,positiveProfit),false);
 assert.equal(c.hotEligible('arg:Monkey Plushie',{market_price:15000},validPlan,positiveProfit),true);
-assert.equal(c.hotEligible('arg:Monkey Plushie',{market_price:20000},null,positiveProfit),false);
+assert.equal(c.hotEligible('arg:Monkey Plushie',{market_price:20000},null,positiveProfit),true,'unforecasted profitable items remain eligible');
 assert.equal(c.hotEligible('arg:Monkey Plushie',{market_price:20000,market_price_stale:true},validPlan,positiveProfit),false);
 assert.equal(c.hotEligible('arg:Monkey Plushie',{market_price:20000},validPlan,{profit:-1}),false);
 for(const k of ['uni:Xanax','mex:Jaguar Plushie','haw:Orchid','cay:Banana Orchid']){
