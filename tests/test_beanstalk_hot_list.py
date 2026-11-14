@@ -80,7 +80,7 @@ class SevenPickTests(unittest.TestCase):
         self.assertEqual("OK", result["status"])
         self.assertEqual(15, result["inventory_slots"])
         self.assertEqual("PI + pilot", result["flight_profile"])
-        self.assertEqual("2026-11-13T", result["generated_at"][:11])
+        self.assertEqual("2026-11-14T", result["generated_at"][:11])  # 7:14 PM EST = next UTC day
         picks = result["picks"]
         self.assertEqual(7, len(picks))
         self.assertEqual(["xanax", "plushie", "plushie", "flower", "flower",
