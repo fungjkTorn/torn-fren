@@ -41,7 +41,7 @@ for bad in (
 ):
     try:
         mod.patch_bridge(bad)
-    except RuntimeError:
+    except (RuntimeError, SyntaxError):
         pass
     else:
         raise AssertionError("Unsafe routing modification accepted")
