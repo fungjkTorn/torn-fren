@@ -23,6 +23,12 @@ assert patched == approved, "Surgical bridge patch must match committed source"
 assert mod.patch_bridge(approved) == approved, "Route installation must be idempotent"
 assert patched.replace(mod.INSERT+mod.ANCHOR, mod.ANCHOR) == previous
 
+# VM may use Windows-style newlines after owner SSH deployment.
+windows_prior = previous.replace("\n", "\r\n")
+windows_updated = mod.patch_bridge(windows_prior)
+assert mod.patch_bridge(windows_updated) == windows_updated
+assert windows_updated.replace(mod.INSERT.replace("\n", "\r\n")+mod.ANCHOR,mod.ANCHOR) == windows_prior
+
 # Preserve custom VM code that is unrelated to the two exact routing anchors.
 custom = previous.replace('UI_REVISION="forward-beta-24-v1"',
                           'UI_REVISION="vm-independent-change"')
