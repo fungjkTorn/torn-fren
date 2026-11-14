@@ -1,0 +1,81 @@
+name: Read-only 15-slot Hot List opportunity audit
+on:
+  push:
+    branches:
+      - analysis/hotlist-15slots-20261113
+
+permissions:
+  contents: read
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch public Torn-FREN feeds and calculate 15-slot comparisons
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json, time, datetime, urllib.request
+          from pathlib import Path
+          from urllib.parse import quote
+          url="https://tornfren.duckdns.org"
+          def get(path):
+              req=urllib.request.Request(url+path,headers={"User-Agent":"TornFREN-Public-ReadOnly-HotList-15Slot-Audit/1","Cache-Control":"no-cache"})
+              with urllib.request.urlopen(req,timeout=20) as response:
+                  if response.status!=200: raise RuntimeError("HTTP status "+str(response.status))
+                  raw=response.read(2*1024*1024+1)
+                  if len(raw)>2*1024*1024: raise RuntimeError("Oversized public API result")
+                  return json.loads(raw)
+          stamp=int(time.time())
+          catalog=get("/api/catalog")
+          publisher=get("/api/first-release")
+          roster=json.loads(Path("research/v38_roster.json").read_text())
+          keys=sorted(set(roster["items"])|{"can:Xanax","uni:Xanax","sou:Xanax"})
+          assert len(keys)==25
+          byprice={str(c["country"])+":"+str(i["item_name"]):i
+                   for c in catalog.get("countries",[]) for i in c.get("items",[])}
+          bypub={str(i["item_key"]):i for i in publisher.get("rows",[])}
+          times={"arg":111,"can":27,"cay":23,"chi":160,"haw":89,"jap":149,"mex":17,"sou":197,"swi":116,"uae":180,"uni":106}
+          print("AUDIT_METADATA "+json.dumps({"sample_epoch":stamp,
+                      "sample_utc":datetime.datetime.fromtimestamp(stamp,datetime.timezone.utc).isoformat(),
+                      "price_basis":catalog.get("profitability"),
+                      "catalog_n":len(byprice),"publisher_n":len(bypub),
+                      "publisher_model":publisher.get("model_sha"),
+                      "publisher_asof":publisher.get("asof_epoch"),
+                      "publisher_valid_until":publisher.get("valid_until_epoch"),
+                      "published_epoch":publisher.get("published_epoch"),
+                      "all_xanax":[k for k in keys if k.endswith(":Xanax")],
+                      "roster":len(keys)},separators=(",",":")))
+          print("FIELDS key|foreign_cost|market_value|unit_profit|total_profit_15|theoretical_profit_hour_15|published_departure_epoch|published_arrival_epoch|decision_status|stock_quantity|market_stale|publisher_fresh|published_flight_seconds")
+          rows=[]
+          for key in keys:
+              price=byprice.get(key,{})
+              row=bypub.get(key,{})
+              country=key.split(":",1)[0]
+              buy=price.get("foreign_price",price.get("cost"))
+              market=price.get("market_price")
+              stale=price.get("market_price_stale")
+              def valid(x): return isinstance(x,(int,float)) and not isinstance(x,bool) and x>0
+              if valid(buy) and valid(market) and stale is not True:
+                  unit=round(market*0.95-buy)
+                  total=round((market*0.95-buy)*15)
+                  hourly=round((market*0.95-buy)*15*60/(2*times[country]))
+              else:
+                  unit=total=hourly=None
+              d=row.get("decision") or {}
+              dep=d.get("estimated_departure_epoch")
+              arr=d.get("estimated_arrival_epoch")
+              st=d.get("status")
+              until=row.get("valid_until_epoch",publisher.get("valid_until_epoch"))
+              hb=row.get("source_heartbeat_epoch",publisher.get("source_heartbeat_epoch"))
+              fresh=bool(isinstance(until,int) and until>=stamp and isinstance(hb,int) and 0<=stamp-hb<=180 and not str(st).startswith("STALE"))
+              dep=dep if fresh and isinstance(dep,int) and isinstance(d.get("estimated_departure_deadline_epoch"),int) and d["estimated_departure_deadline_epoch"]>=stamp else None
+              arr=arr if dep is not None else None
+              observed=(row.get("forecast") or {}).get("observed_current_quantity") if fresh else None
+              values=[key,buy,market,unit,total,hourly,dep,arr,st,observed,stale,fresh,d.get("player_flight_seconds")]
+              print("ITEM "+"|".join("" if v is None else str(v) for v in values))
+              rows.append((key,hourly))
+          print("AUDIT_COMPLETE calculated_profit_h_n="+str(sum(v is not None for k,v in rows)))
+          PY
