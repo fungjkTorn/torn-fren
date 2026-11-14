@@ -53,10 +53,10 @@ function Invoke-HotListRelease {
 # The older Hot List was deployed to / before its /experimental route correction.
 # Run that one-time migration from its immutable, already-reviewed commit only if needed.
 $headers = @{ 'Cache-Control' = 'no-cache' }
-$home = (Invoke-WebRequest -UseBasicParsing -Uri 'https://tornfren.duckdns.org/' -Headers $headers).Content
+$homepageHtml = (Invoke-WebRequest -UseBasicParsing -Uri 'https://tornfren.duckdns.org/' -Headers $headers).Content
 $experimental = (Invoke-WebRequest -UseBasicParsing -Uri 'https://tornfren.duckdns.org/experimental' -Headers $headers).Content
-$alreadyRouted = $home.Contains('beta.js') -and $experimental.Contains('hotlist.js')
-$needsMigration = $home.Contains('hotlist.js') -and $experimental.Contains('beta.js')
+$alreadyRouted = $homepageHtml.Contains('beta.js') -and $experimental.Contains('hotlist.js')
+$needsMigration = $homepageHtml.Contains('hotlist.js') -and $experimental.Contains('beta.js')
 if (!$alreadyRouted -and !$needsMigration) {
     throw 'Unexpected live routing. No changes were made; share the current site screenshots.'
 }
