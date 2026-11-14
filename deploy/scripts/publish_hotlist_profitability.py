@@ -25,10 +25,16 @@ PACKAGE_NAMES={*(f"web/first_release_assets/{n}" for n in NAMES),
                "deploy/scripts/publish_hotlist_profitability.py"}
 # Approved PR #25 / V2 web UI assets. Do not accept arbitrary VM changes.
 APPROVED_PRIOR_BLOBS={
- "hotlist.html":"396c288f79048ce196c10cda0f5cf4ea09fa3e1c",
- "hotlist.js":"a1b43cfe7fcf01fc8422f259f33a2c438e5e7ce1",
- "hotlist-core.js":"320678d633a8813460fc9249de7068f4f0375186",
- "hotlist.css":"d06b9cd60ea5881f380a5127676c73f2f46a1264",
+ "hotlist.html":("396c288f79048ce196c10cda0f5cf4ea09fa3e1c",),
+ "hotlist.js":(
+  "a1b43cfe7fcf01fc8422f259f33a2c438e5e7ce1",  # PR #25
+  "8be2046d2bb096f15b0a7a842babf396c1f6adae",  # PR #24 route release
+ ),
+ "hotlist-core.js":(
+  "320678d633a8813460fc9249de7068f4f0375186",  # PR #25 threshold
+  "629658ffa1a66eccf1e9f2ac3dd6f316dc3edbfa",  # PR #24 original core
+ ),
+ "hotlist.css":("d06b9cd60ea5881f380a5127676c73f2f46a1264",),
 }
 
 def sha(raw):
@@ -41,10 +47,10 @@ def signed_prior(raw,name):
     if raw is None:
         return False
     approved=APPROVED_PRIOR_BLOBS[name]
-    if blob(raw)==approved:
+    if blob(raw) in approved:
         return True
     converted=raw.replace(b"\r\n",b"\n")
-    return b"\r" not in converted and blob(converted)==approved
+    return b"\r" not in converted and blob(converted) in approved
 
 def request(path):
     with urllib.request.urlopen(SITE+path,timeout=15) as response:
@@ -151,7 +157,7 @@ def install(archive,apply):
             continue
         if not signed_prior(raw,path.name):
             raise RuntimeError("UI asset differs from approved V2 release: "+path.name+
-                               " observed_blob="+blob(raw)+" expected_blob="+APPROVED_PRIOR_BLOBS[path.name])
+                               " observed_blob="+blob(raw)+" expected_blobs="+",".join(APPROVED_PRIOR_BLOBS[path.name]))
     changed=[path for path in desired if desired[path]!=prior[path]]
     if not changed:
         return {"status":"HOTLIST_NIKEH_ALREADY_INSTALLED",
