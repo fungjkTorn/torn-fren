@@ -7,18 +7,20 @@ source=ROOT/"deploy/scripts/publish_hotlist_profitability.py"
 spec=importlib.util.spec_from_file_location("hotlist_nikeh",source)
 mod=importlib.util.module_from_spec(spec)
 spec.loader.exec_module(mod)
-prior_sha="542bca15a6af7880cf04e4f45dab21136a32e9e4"
+prior_shas=("542bca15a6af7880cf04e4f45dab21136a32e9e4",
+            "1db892dcd81059adfd809f0c4c062ccd4513a330")
 assets={}
-for name in mod.NAMES:
- path="web/first_release_assets/"+name
- approved=subprocess.check_output(["git","show",f"{prior_sha}:{path}"],cwd=ROOT)
- assets[name]=approved
- assert mod.blob(approved)==mod.APPROVED_PRIOR_BLOBS[name]
- assert mod.signed_prior(approved,name)
- assert mod.signed_prior(approved.replace(b"\n",b"\r\n"),name)
- assert not mod.signed_prior(approved+b"unsafe",name)
- assert not mod.signed_prior(approved.replace(b"\n",b"\r\n")+b"x",name)
- assert not mod.signed_prior(approved.replace(b"\n",b"\r\n")+b"\r",name)
+for j,prior_sha in enumerate(prior_shas):
+ for name in mod.NAMES:
+  path="web/first_release_assets/"+name
+  approved=subprocess.check_output(["git","show",f"{prior_sha}:{path}"],cwd=ROOT)
+  if j==0:assets[name]=approved
+  assert mod.blob(approved) in mod.APPROVED_PRIOR_BLOBS[name]
+  assert mod.signed_prior(approved,name)
+  assert mod.signed_prior(approved.replace(b"\n",b"\r\n"),name)
+  assert not mod.signed_prior(approved+b"unsafe",name)
+  assert not mod.signed_prior(approved.replace(b"\n",b"\r\n")+b"x",name)
+  assert not mod.signed_prior(approved.replace(b"\n",b"\r\n")+b"\r",name)
 
 with tempfile.TemporaryDirectory() as temp:
  base=Path(temp)
@@ -67,4 +69,12 @@ with tempfile.TemporaryDirectory() as temp:
  assert rejected_result["status"]=="HOTLIST_NIKEH_ROLLED_BACK",rejected_result
  assert all((deployed/name).read_bytes()==original[name] for name in mod.NAMES)
  mod.verify=verify
+ # Simulate the first-stage route migration which leaves PR #24 core and JS.
+ legacy="1db892dcd81059adfd809f0c4c062ccd4513a330"
+ for name in mod.NAMES:
+  signed=subprocess.check_output(["git","show",f"{legacy}:web/first_release_assets/{name}"],cwd=ROOT)
+  (deployed/name).write_bytes(signed.replace(b"\n",b"\r\n"))
+ assert mod.install(archive,False)["status"]=="HOTLIST_NIKEH_PREFLIGHT_PASSED"
+ migrated=mod.install(archive,True)
+ assert migrated["status"]=="HOTLIST_NIKEH_DEPLOYED",migrated
 print("PASS: exact signed previous assets, UI-only updates, idempotence, preflight, rollback, drift rejection")
