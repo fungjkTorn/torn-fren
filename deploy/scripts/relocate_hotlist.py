@@ -90,12 +90,44 @@ def mode():
         return "v2"
     raise RuntimeError("Unexpected website route layout; refusing change")
 
+def _route_ast_guard(source, asset_rule, route_rule):
+    """Verify both expected routing snippets occur once inside the live middleware."""
+    tree=ast.parse(source,filename=str(BRIDGE))
+    functions=[node for node in tree.body
+               if isinstance(node,(ast.FunctionDef,ast.AsyncFunctionDef))
+               and node.name=="install_first_release"]
+    if len(functions)!=1:
+        raise RuntimeError("Cannot find unique existing install_first_release function")
+    classes=[node for node in ast.walk(functions[0])
+             if isinstance(node,ast.ClassDef) and node.name=="BetaMiddleware"]
+    if len(classes)!=1:
+        raise RuntimeError("Cannot find unique existing web middleware class")
+    dispatch=[node for node in classes[0].body
+              if isinstance(node,ast.AsyncFunctionDef) and node.name=="dispatch"]
+    if len(dispatch)!=1:
+        raise RuntimeError("Cannot find unique existing web dispatch method")
+    section=ast.get_source_segment(source,dispatch[0])
+    if not section or asset_rule not in section or route_rule not in section:
+        raise RuntimeError("Expected Hot List routes are outside the live middleware")
+    if source.count(asset_rule)!=1 or source.count(route_rule)!=1:
+        raise RuntimeError("Ambiguous Hot List route blocks")
+    if "app.add_middleware(BetaMiddleware)" not in ast.get_source_segment(source,functions[0]):
+        raise RuntimeError("Live middleware installation hook differs")
+
+
 def patch_bridge(source):
+    """Only replace the two pinned route snippets, preserving ALL other VM source."""
     if ASSET_V1 in source and ROUTE_V1 in source and ASSET_V2 not in source and ROUTE_V2 not in source:
+        _route_ast_guard(source,ASSET_V1,ROUTE_V1)
         updated=source.replace(ASSET_V1,ASSET_V2,1).replace(ROUTE_V1,ROUTE_V2,1)
-        ast.parse(updated,filename=str(BRIDGE))
+        _route_ast_guard(updated,ASSET_V2,ROUTE_V2)
+        # Reversing exactly these two replacements must recover the byte-for-byte
+        # original, including unrelated VM customizations and line-ending style.
+        if updated.replace(ASSET_V2,ASSET_V1,1).replace(ROUTE_V2,ROUTE_V1,1)!=source:
+            raise RuntimeError("Route-only replacement failed content preservation")
         return updated
     if ASSET_V2 in source and ROUTE_V2 in source and ASSET_V1 not in source and ROUTE_V1 not in source:
+        _route_ast_guard(source,ASSET_V2,ROUTE_V2)
         return source
     raise RuntimeError("Existing web routing does not match approved V1/V2 anchors")
 
@@ -176,6 +208,12 @@ def rollout(package,apply=False):
     for path,raw in prior.items():
         if raw is None:
             if path.name!="abroad-roster.json":raise RuntimeError("Expected preexisting V1 asset missing")
+        elif path==BRIDGE and raw!=desired[path]:
+            # This VM has its own evolving web bridge. The two exact V1 routing
+            # anchors were validated in BetaMiddleware.dispatch above. Only those
+            # anchors are replaced; all other installed source is preserved.
+            if patch_bridge(raw.decode("utf-8")).encode("utf-8")!=desired[path]:
+                raise RuntimeError("Unexpected mutation outside the two route snippets")
         elif raw!=desired[path] and not approved_v1(raw,path):
             raise RuntimeError(
                 "Changed or unknown installed web file beyond CRLF normalization: "
@@ -192,6 +230,8 @@ def rollout(package,apply=False):
     report={"status":"HOTLIST_ROUTE_PREFLIGHT_PASSED","prior":observed_mode,
             "changed_files":[str(p) for p in changed],
             "model_sha":before["model_sha"],"forecast_count":before["forecast_count"],
+            "bridge_source_sha256_before":sha(prior[BRIDGE]),
+            "bridge_edit":"TWO_VERIFIED_MIDDLEWARE_ROUTING_SNIPPETS_ONLY",
             "models_changed":False,"collector_changed":False,"databases_changed":False}
     if not apply: return report
     BACKUPS.mkdir(mode=0o700,parents=True,exist_ok=True)

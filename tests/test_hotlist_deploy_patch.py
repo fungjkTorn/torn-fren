@@ -20,6 +20,29 @@ assert reviewed.count(mod.ASSET_V1)==0
 v1=reviewed.replace(mod.ASSET_V2,mod.ASSET_V1).replace(mod.ROUTE_V2,mod.ROUTE_V1)
 assert mod.patch_bridge(v1)==reviewed
 assert mod.patch_bridge(reviewed)==reviewed
+
+# The installed bridge has an independent VM-specific Git blob. Never replace
+# that entire source with GitHub's copy: preserve arbitrary unrelated source
+# byte-for-byte, and only mutate the two exact reviewed middleware snippets.
+vm_extra = "# Production-only diagnostics retained by the web service.\n"
+vm_source = v1.replace('UI_REVISION="forward-beta-24-v1"',
+                       'UI_REVISION="vm-custom-revision"') + "\n" + vm_extra
+assert not mod.approved_v1(vm_source.encode("utf-8"),mod.BRIDGE)
+patched = mod.patch_bridge(vm_source)
+assert patched == (vm_source.replace(mod.ASSET_V1,mod.ASSET_V2,1)
+                    .replace(mod.ROUTE_V1,mod.ROUTE_V2,1))
+assert patched.replace(mod.ASSET_V2,mod.ASSET_V1,1).replace(
+    mod.ROUTE_V2,mod.ROUTE_V1,1)==vm_source
+assert 'vm-custom-revision' in patched and vm_extra in patched
+assert mod.patch_bridge(patched)==patched
+for suspicious in (
+    v1.replace('async def dispatch(', 'async def different_dispatch('),
+    v1.replace('app.add_middleware(BetaMiddleware)','app.add_middleware(OtherMiddleware)'),
+    v1.replace(mod.ASSET_V1,mod.ASSET_V1+"\n                # "+mod.ASSET_V1)
+):
+    try: mod.patch_bridge(suspicious)
+    except RuntimeError: pass
+    else: raise AssertionError("Ambiguous or misplaced routing patch was not rejected")
 for source in ("unexpected source", v1.replace(mod.ASSET_V1,mod.ASSET_V2)):
     try:mod.patch_bridge(source)
     except RuntimeError:pass
@@ -53,4 +76,4 @@ with tempfile.TemporaryDirectory() as folder:
     files=mod.read_package(archive)
     assert len(files)==3
     assert (mod.ASSETS/"abroad-roster.json") in files
-print("PASS: route relocator verifies exact v1/v2, 236 roster, LF or CRLF-only signed source guard")
+print("PASS: exact middleware-only patch preserves VM bridge customizations, validates routes, and enforces signed asset blobs")
