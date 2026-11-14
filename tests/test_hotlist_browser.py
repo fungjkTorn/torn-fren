@@ -75,154 +75,25 @@ with sync_playwright() as p:
  assert page.locator('#rows tr').count()>0
  page.get_by_role('button',name='All',exact=True).click()
 
- # Edelweiss is explicitly excluded from Hot List but remains in All Items.
+
+ # Swiss Edelweiss is excluded from Hot List and remains available in All Items.
  page.locator('#search').fill('Edelweiss')
  assert page.locator('#rows tr').count()==0
  page.get_by_role('button',name='All Items',exact=True).click()
  page.wait_for_function("document.querySelectorAll('#rows tr').length===1")
  assert 'Edelweiss' in page.locator('#rows').inner_text()
- primary=int(page.locator('#rows .hot-value').nth(1).inner_text().replace('
- page.locator('#search').fill('Shark Fin')
- page.wait_for_function("document.querySelectorAll('#rows tr').length===1")
- shark=page.locator('#rows').inner_text()
- assert 'Nikeh fixed NPC · no fee' in shark,shark
- assert '$681,810' in shark,shark
- assert '$229,824' in shark,shark
- assert 'Theoretical profit only' in shark,shark
- assert 'Awaiting forecast' in shark and 'Leave now' not in shark,shark
- page.locator('[data-details]').first.evaluate("(b)=>b.click()")
- info=page.locator('#detail-body').inner_text()
- assert 'Sports Administration' in info and 'Fixed Nikeh Performance NPC payout' in info,info
- assert '$66,000' in info and '$681,810' in info,info
- page.locator('#details .beta-dialog-close').click()
-
- # The Hot List $15k market-value floor and manual exclusions do not affect All Items.
- page.locator('#search').fill('Budget Trinket')
- assert page.locator('#rows tr').count()==0
- page.get_by_role('button',name='All Items',exact=True).click()
- page.wait_for_function("document.querySelectorAll('#rows tr').length===1")
- assert 'Budget Trinket' in page.locator('#rows').inner_text()
- page.locator('#search').fill('Jaguar Plushie')
- assert 'Jaguar Plushie' in page.locator('#rows').inner_text()
- page.locator('#search').fill('Xanax')
- page.wait_for_function("document.querySelectorAll('#rows tr').length===4")
- xanax=page.locator('#rows').inner_text()
- assert all(country in xanax for country in ('Japan','South Africa','United Kingdom','Canada')),xanax
-
- # Item Market still charges 5% fee. Pricing is read-only.
- page.locator('#search').fill('Ceibo Flower')
- page.wait_for_function("document.querySelectorAll('#rows tr').length===1")
- page.locator('#capacity').fill('30')
- page.locator('#capacity').dispatch_event('change')
- assert '$2,700' in page.locator('#rows').inner_text()
- assert 'Item Market estimate · 5% fee' in page.locator('#rows').inner_text()
- page.locator('#search').fill('Orchid')
- assert 'Hawaii' in page.locator('#rows').inner_text()
- assert page.locator('#rows .beta-dot').count()==0
- page.screenshot(path=str(root/'desktop-test.png'),full_page=True)
- page.set_viewport_size({'width':390,'height':844})
- assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
- assert not errors,errors
- browser.close()
-print('PASS: Edelweiss excluded but visible in All Items, profit/hour follows chosen sort, Nikeh NPC, 15 slots, market fee, mobile')
-,'').replace(',',''))
- secondary=page.locator('#rows td[data-label="Profit / hour"] .beta-sub').inner_text()
- assert 'including departure wait' in secondary,secondary
- wait_hour=int(secondary.split(' / hr')[0].replace('
- page.locator('#search').fill('Shark Fin')
- page.wait_for_function("document.querySelectorAll('#rows tr').length===1")
- shark=page.locator('#rows').inner_text()
- assert 'Nikeh fixed NPC · no fee' in shark,shark
- assert '$681,810' in shark,shark
- assert '$229,824' in shark,shark
- assert 'Theoretical profit only' in shark,shark
- assert 'Awaiting forecast' in shark and 'Leave now' not in shark,shark
- page.locator('[data-details]').first.evaluate("(b)=>b.click()")
- info=page.locator('#detail-body').inner_text()
- assert 'Sports Administration' in info and 'Fixed Nikeh Performance NPC payout' in info,info
- assert '$66,000' in info and '$681,810' in info,info
- page.locator('#details .beta-dialog-close').click()
-
- # The Hot List $15k market-value floor and manual exclusions do not affect All Items.
- page.locator('#search').fill('Budget Trinket')
- assert page.locator('#rows tr').count()==0
- page.get_by_role('button',name='All Items',exact=True).click()
- page.wait_for_function("document.querySelectorAll('#rows tr').length===1")
- assert 'Budget Trinket' in page.locator('#rows').inner_text()
- page.locator('#search').fill('Jaguar Plushie')
- assert 'Jaguar Plushie' in page.locator('#rows').inner_text()
- page.locator('#search').fill('Xanax')
- page.wait_for_function("document.querySelectorAll('#rows tr').length===4")
- xanax=page.locator('#rows').inner_text()
- assert all(country in xanax for country in ('Japan','South Africa','United Kingdom','Canada')),xanax
-
- # Item Market still charges 5% fee. Pricing is read-only.
- page.locator('#search').fill('Ceibo Flower')
- page.wait_for_function("document.querySelectorAll('#rows tr').length===1")
- page.locator('#capacity').fill('30')
- page.locator('#capacity').dispatch_event('change')
- assert '$2,700' in page.locator('#rows').inner_text()
- assert 'Item Market estimate · 5% fee' in page.locator('#rows').inner_text()
- page.locator('#search').fill('Orchid')
- assert 'Hawaii' in page.locator('#rows').inner_text()
- assert page.locator('#rows .beta-dot').count()==0
- page.screenshot(path=str(root/'desktop-test.png'),full_page=True)
- page.set_viewport_size({'width':390,'height':844})
- assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
- assert not errors,errors
- browser.close()
-print('PASS: curated Hot List $15k threshold, unrestricted All Items, Nikeh NPC rate without GO, 15 slots, market fee, mobile')
-,'').replace(',',''))
- assert primary>wait_hour,(primary,wait_hour)
+ digits=lambda value:int(''.join(c for c in value if c.isdigit()))
+ primary=digits(page.locator('#rows .hot-value').nth(1).inner_text())
+ subline=page.locator('#rows td[data-label="Profit / hour"] .beta-sub').inner_text()
+ assert 'including departure wait' in subline,subline
+ wait_adjusted=digits(subline.split(' / hr')[0])
+ assert primary>wait_adjusted,(primary,wait_adjusted)
  page.locator('#sort').select_option('cycle')
- assert int(page.locator('#rows .hot-value').nth(1).inner_text().replace('
- page.locator('#search').fill('Shark Fin')
- page.wait_for_function("document.querySelectorAll('#rows tr').length===1")
- shark=page.locator('#rows').inner_text()
- assert 'Nikeh fixed NPC · no fee' in shark,shark
- assert '$681,810' in shark,shark
- assert '$229,824' in shark,shark
- assert 'Theoretical profit only' in shark,shark
- assert 'Awaiting forecast' in shark and 'Leave now' not in shark,shark
- page.locator('[data-details]').first.evaluate("(b)=>b.click()")
- info=page.locator('#detail-body').inner_text()
- assert 'Sports Administration' in info and 'Fixed Nikeh Performance NPC payout' in info,info
- assert '$66,000' in info and '$681,810' in info,info
- page.locator('#details .beta-dialog-close').click()
-
- # The Hot List $15k market-value floor and manual exclusions do not affect All Items.
- page.locator('#search').fill('Budget Trinket')
- assert page.locator('#rows tr').count()==0
- page.get_by_role('button',name='All Items',exact=True).click()
- page.wait_for_function("document.querySelectorAll('#rows tr').length===1")
- assert 'Budget Trinket' in page.locator('#rows').inner_text()
- page.locator('#search').fill('Jaguar Plushie')
- assert 'Jaguar Plushie' in page.locator('#rows').inner_text()
- page.locator('#search').fill('Xanax')
- page.wait_for_function("document.querySelectorAll('#rows tr').length===4")
- xanax=page.locator('#rows').inner_text()
- assert all(country in xanax for country in ('Japan','South Africa','United Kingdom','Canada')),xanax
-
- # Item Market still charges 5% fee. Pricing is read-only.
- page.locator('#search').fill('Ceibo Flower')
- page.wait_for_function("document.querySelectorAll('#rows tr').length===1")
- page.locator('#capacity').fill('30')
- page.locator('#capacity').dispatch_event('change')
- assert '$2,700' in page.locator('#rows').inner_text()
- assert 'Item Market estimate · 5% fee' in page.locator('#rows').inner_text()
- page.locator('#search').fill('Orchid')
- assert 'Hawaii' in page.locator('#rows').inner_text()
- assert page.locator('#rows .beta-dot').count()==0
- page.screenshot(path=str(root/'desktop-test.png'),full_page=True)
- page.set_viewport_size({'width':390,'height':844})
- assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
- assert not errors,errors
- browser.close()
-print('PASS: curated Hot List $15k threshold, unrestricted All Items, Nikeh NPC rate without GO, 15 slots, market fee, mobile')
-,'').replace(',',''))==wait_hour
+ assert digits(page.locator('#rows .hot-value').nth(1).inner_text())==wait_adjusted
  assert 'theoretical / hr' in page.locator('#rows td[data-label="Profit / hour"] .beta-sub').inner_text()
  page.locator('#sort').select_option('hourly')
  page.get_by_role('button',name='Hot List',exact=True).click()
+ page.locator('#search').fill('')
 
  # Nikeh item appears without a published forecast, using fixed NPC, not 5% market fee.
  page.locator('#search').fill('Shark Fin')
@@ -267,4 +138,4 @@ print('PASS: curated Hot List $15k threshold, unrestricted All Items, Nikeh NPC 
  assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
  assert not errors,errors
  browser.close()
-print('PASS: curated Hot List $15k threshold, unrestricted All Items, Nikeh NPC rate without GO, 15 slots, market fee, mobile')
+print('PASS: Edelweiss excluded only from Hot List; primary hourly matches selected sort; Nikeh and unrestricted All Items preserved')
