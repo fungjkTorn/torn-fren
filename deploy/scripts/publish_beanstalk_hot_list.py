@@ -96,8 +96,9 @@ def _middleware_guard(source):
 
 def patch_bridge(source):
     _middleware_guard(source)
-    if INSERT in source:
-        if source.count(INSERT)!=1:
+    installed=(INSERT,INSERT.replace("\n","\r\n"))
+    if any(block in source for block in installed):
+        if sum(source.count(block) for block in installed)!=1:
             raise RuntimeError("Duplicate seven-pick route installed")
         return source
     if PUBLIC_PATH in source:
