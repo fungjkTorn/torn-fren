@@ -55,7 +55,7 @@ const HOT_CANDIDATES=new Set([
  'uni:Heather','uni:Nessie Plushie','uni:Red Fox Plushie','uni:Xanax',
  ...Object.keys(NIKEH_PAYOUTS)
 ]);
-const HOT_EXCLUSIONS=new Set(['uni:Xanax','mex:Jaguar Plushie','haw:Orchid','cay:Banana Orchid']);
+const HOT_EXCLUSIONS=new Set(['uni:Xanax','mex:Jaguar Plushie','haw:Orchid','cay:Banana Orchid','swi:Edelweiss']);
 function hotEligible(key,item,p,e){
  return HOT_CANDIDATES.has(key)
    && !HOT_EXCLUSIONS.has(key)
