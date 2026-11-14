@@ -4,11 +4,11 @@
 - Public travel planner is `/experimental`, not root. The original stock graph remains at `/` and `/?country=...&item=...`.
 - Hot List is a **curated profitability shortlist**, not a promise of stock availability. All Items is an **unrestricted union** of the 236 reference identities, live catalog and publisher roster.
 - **The $15,000 Item Market value floor applies ONLY to Hot List.** All Items must continue to display low-value items and manually excluded items with search/category filters intact.
-- Initial Hot List pool is 25 existing foreign candidates (the first 25 tracked item/country identities), plus five Nikeh Performance NPC redemption candidates. Exclude UK Xanax, Mexico Jaguar Plushie, Hawaii Orchid, and Cayman Banana Orchid from Hot List only.
+- Initial Hot List pool is 25 existing foreign candidates (the first 25 tracked item/country identities), plus five Nikeh Performance NPC redemption candidates. Exclude UK Xanax, Mexico Jaguar Plushie, Hawaii Orchid, Cayman Banana Orchid, and Swiss Edelweiss from Hot List only. All five remain available in All Items.
 - Require valid current market reference `>= $15,000` and positive estimated net trip profit; stale or missing market data suppresses eligibility. No forecast is required for *profitability-only* membership.
 
 ## Selling sources and math
-- Default capacity **15**, editable by runners. Default comparison `theoretical profit / hour`.
+- Default capacity **15**, editable by runners. Default comparison `theoretical profit / hour`. The primary displayed hourly figure follows the selected sort: theoretical hourly by default, wait-adjusted hourly only when that sort is selected and published advice supports it. The other figure is labeled beneath when available.
 - **Item Market**: 5% fee. Per-item profit = `0.95 * market_price - foreign_price`.
 - **Nikeh Performance**: fixed NPC cash redemption, no Item Market fee. Per-item profit = `nikeh_payout - foreign_price`. Requires Sports Administration education. These are NOT bazaar sale quotes.
 - Fixed NPC payouts (Torn wiki): Canada Bear Gall $35,000; China Pangolin Scales $205,000; Hawaii Shark Fin $66,000; China Tiger Bone Powder $70,000; Japan Whale Meat $40,000.

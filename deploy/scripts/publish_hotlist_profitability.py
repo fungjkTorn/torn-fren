@@ -25,12 +25,15 @@ PACKAGE_NAMES={*(f"web/first_release_assets/{n}" for n in NAMES),
                "deploy/scripts/publish_hotlist_profitability.py"}
 # Approved PR #25 / V2 web UI assets. Do not accept arbitrary VM changes.
 APPROVED_PRIOR_BLOBS={
- "hotlist.html":("396c288f79048ce196c10cda0f5cf4ea09fa3e1c",),
+ "hotlist.html":("6a3567ca12cb1c8f6e957fe28ce9b3d8434d9cf2",  # PR #26 Nikeh UI
+                 "396c288f79048ce196c10cda0f5cf4ea09fa3e1c"),  # PR #25
  "hotlist.js":(
+  "27032e5890cacec3c5e87705db50b9cb2a103ca7",  # PR #26 published Nikeh UI
   "a1b43cfe7fcf01fc8422f259f33a2c438e5e7ce1",  # PR #25
   "8be2046d2bb096f15b0a7a842babf396c1f6adae",  # PR #24 route release
  ),
  "hotlist-core.js":(
+  "b6b02eb33eaf96838caa63b35e0781bd8c11bf60",  # PR #26 published Nikeh core
   "320678d633a8813460fc9249de7068f4f0375186",  # PR #25 threshold
   "629658ffa1a66eccf1e9f2ac3dd6f316dc3edbfa",  # PR #24 original core
  ),

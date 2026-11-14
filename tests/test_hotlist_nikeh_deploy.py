@@ -7,8 +7,9 @@ source=ROOT/"deploy/scripts/publish_hotlist_profitability.py"
 spec=importlib.util.spec_from_file_location("hotlist_nikeh",source)
 mod=importlib.util.module_from_spec(spec)
 spec.loader.exec_module(mod)
-prior_shas=("542bca15a6af7880cf04e4f45dab21136a32e9e4",
-            "1db892dcd81059adfd809f0c4c062ccd4513a330")
+prior_shas=("a544edcb334a1be2f522c87b2dac6a696048a3a8",  # PR #26 Nikeh live UI
+            "542bca15a6af7880cf04e4f45dab21136a32e9e4",  # PR #25
+            "1db892dcd81059adfd809f0c4c062ccd4513a330")  # PR #24
 assets={}
 for j,prior_sha in enumerate(prior_shas):
  for name in mod.NAMES:

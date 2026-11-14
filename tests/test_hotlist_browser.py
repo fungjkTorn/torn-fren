@@ -41,6 +41,9 @@ for j,key in enumerate(keys):
                            'estimated_departure_epoch':now,
                            'estimated_departure_deadline_epoch':now+130,
                            'selected_restock_event_index':1}})
+  if key=='swi:Edelweiss':
+   rows[-1]['decision']['estimated_departure_epoch']=now+120
+   rows[-1]['decision']['estimated_departure_deadline_epoch']=now+150
 payload={'countries':[{'country':c,'items':v} for c,v in catalog.items()]}
 
 with sync_playwright() as p:
@@ -71,6 +74,26 @@ with sync_playwright() as p:
  page.get_by_role('button',name='Drugs',exact=True).click()
  assert page.locator('#rows tr').count()>0
  page.get_by_role('button',name='All',exact=True).click()
+
+
+ # Swiss Edelweiss is excluded from Hot List and remains available in All Items.
+ page.locator('#search').fill('Edelweiss')
+ assert page.locator('#rows tr').count()==0
+ page.get_by_role('button',name='All Items',exact=True).click()
+ page.wait_for_function("document.querySelectorAll('#rows tr').length===1")
+ assert 'Edelweiss' in page.locator('#rows').inner_text()
+ digits=lambda value:int(''.join(c for c in value if c.isdigit()))
+ primary=digits(page.locator('#rows .hot-value').nth(1).inner_text())
+ subline=page.locator('#rows td[data-label="Profit / hour"] .beta-sub').inner_text()
+ assert 'including departure wait' in subline,subline
+ wait_adjusted=digits(subline.split(' / hr')[0])
+ assert primary>wait_adjusted,(primary,wait_adjusted)
+ page.locator('#sort').select_option('cycle')
+ assert digits(page.locator('#rows .hot-value').nth(1).inner_text())==wait_adjusted
+ assert 'theoretical / hr' in page.locator('#rows td[data-label="Profit / hour"] .beta-sub').inner_text()
+ page.locator('#sort').select_option('hourly')
+ page.get_by_role('button',name='Hot List',exact=True).click()
+ page.locator('#search').fill('')
 
  # Nikeh item appears without a published forecast, using fixed NPC, not 5% market fee.
  page.locator('#search').fill('Shark Fin')
@@ -115,4 +138,4 @@ with sync_playwright() as p:
  assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
  assert not errors,errors
  browser.close()
-print('PASS: curated Hot List $15k threshold, unrestricted All Items, Nikeh NPC rate without GO, 15 slots, market fee, mobile')
+print('PASS: Edelweiss excluded only from Hot List; primary hourly matches selected sort; Nikeh and unrestricted All Items preserved')

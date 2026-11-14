@@ -22,10 +22,14 @@ assert.equal(c.hotEligible('arg:Monkey Plushie',{market_price:15000},validPlan,p
 assert.equal(c.hotEligible('arg:Monkey Plushie',{market_price:20000},null,positiveProfit),true,'unforecasted profitable items remain eligible');
 assert.equal(c.hotEligible('arg:Monkey Plushie',{market_price:20000,market_price_stale:true},validPlan,positiveProfit),false);
 assert.equal(c.hotEligible('arg:Monkey Plushie',{market_price:20000},validPlan,{profit:-1}),false);
-for(const k of ['uni:Xanax','mex:Jaguar Plushie','haw:Orchid','cay:Banana Orchid']){
+for(const k of ['uni:Xanax','mex:Jaguar Plushie','haw:Orchid','cay:Banana Orchid','swi:Edelweiss']){
  assert.equal(c.hotEligible(k,{market_price:50000},validPlan,positiveProfit),false,k);
 }
 assert.equal(c.HOT_CANDIDATES.size,30);
+assert.equal(c.HOT_EXCLUSIONS.has('swi:Edelweiss'),true);
+assert.equal(c.hotEligible('swi:Edelweiss',{market_price:15402},validPlan,{profit:205978,hourly:53270,cycleHourly:26564}),false);
+assert.equal(c.hotEligible('swi:Chamois Plushie',{market_price:15402},validPlan,{profit:205978,hourly:53270,cycleHourly:26564}),true);
+
 assert.equal(Object.keys(c.NIKEH_PAYOUTS).length,5);
 assert.equal(c.saleQuote('haw:Shark Fin',{market_price:65795}).price,66000);
 assert.equal(c.saleQuote('haw:Shark Fin',{market_price:65795}).feeRate,0);
