@@ -114,6 +114,7 @@ jobs:
           node tests/hotlist-core.test.cjs
       - name: Compile and validate guarded deployment patch
         run: |
+          python -m pip install --disable-pip-version-check fastapi httpx
           python -m py_compile deploy/scripts/relocate_hotlist.py
           python tests/test_hotlist_deploy_patch.py
           python -m py_compile deploy/scripts/publish_hotlist_profitability.py
