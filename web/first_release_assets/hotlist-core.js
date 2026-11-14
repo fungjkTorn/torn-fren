@@ -20,23 +20,51 @@ function plan(row,profile,at){
  }
  return null;
 }
-function economics(item,sale,capacity,seconds,waitSeconds=0){
+function economics(item,sale,capacity,seconds,waitSeconds=0,feeRate=0.05){
  const buy=item.foreign_price??item.price;
- if(!Number.isFinite(buy)||buy<=0||!Number.isFinite(sale)||sale<=0||!Number.isInteger(capacity)||capacity<1||!Number.isFinite(seconds)||seconds<=0)return null;
- // Torn market-value reference, net of the existing 5% Item Market selling fee.
- const netSale=sale*0.95;
+ if(!Number.isFinite(buy)||buy<=0||!Number.isFinite(sale)||sale<=0||!Number.isInteger(capacity)||capacity<1||!Number.isFinite(seconds)||seconds<=0||!Number.isFinite(feeRate)||feeRate<0||feeRate>=1)return null;
+ const netSale=sale*(1-feeRate);
  const profit=(netSale-buy)*capacity,round=seconds*2;
- return {profit,unit:netSale-buy,hourly:profit*3600/round,cycleHourly:profit*3600/(round+Math.max(0,waitSeconds))};
+ return {profit,unit:netSale-buy,hourly:profit*3600/round,cycleHourly:profit*3600/(round+Math.max(0,waitSeconds)),netSale,feeRate,upfront:buy*capacity};
+}
+const NIKEH_PAYOUTS=Object.freeze({
+ 'can:Bear Gall':35000,
+ 'chi:Pangolin Scales':205000,
+ 'haw:Shark Fin':66000,
+ 'chi:Tiger Bone Powder':70000,
+ 'jap:Whale Meat':40000
+});
+function saleQuote(key,item){
+ if(item?.market_price_stale===true)return null;
+ if(Object.hasOwn(NIKEH_PAYOUTS,key)){
+  return {price:NIKEH_PAYOUTS[key],feeRate:0,source:'Nikeh NPC',requiresEducation:true};
+ }
+ if(!Number.isFinite(item?.market_price)||item.market_price<=0)return null;
+ return {price:item.market_price,feeRate:0.05,source:'Item Market',requiresEducation:false};
 }
 const MIN_HOT_MARKET_VALUE=15000;
+// Deliberate shortlist, NOT the full catalog: no public model is promoted by listing an item.
+// These 25 already tracked items plus five Nikeh NPC redemption opportunities are
+// the starter profitability pool; All Items remains an unrestricted live/catalog union.
+const HOT_CANDIDATES=new Set([
+ 'arg:Ceibo Flower','arg:Monkey Plushie','can:Crocus','can:Wolverine Plushie',
+ 'can:Xanax','cay:Banana Orchid','cay:Stingray Plushie',
+ 'chi:Panda Plushie','chi:Peony','haw:Orchid','jap:Cherry Blossom','jap:Xanax',
+ 'mex:Dahlia','mex:Jaguar Plushie','sou:African Violet','sou:Lion Plushie','sou:Xanax',
+ 'swi:Chamois Plushie','swi:Edelweiss','uae:Camel Plushie','uae:Tribulus Omanense',
+ 'uni:Heather','uni:Nessie Plushie','uni:Red Fox Plushie','uni:Xanax',
+ ...Object.keys(NIKEH_PAYOUTS)
+]);
 const HOT_EXCLUSIONS=new Set(['uni:Xanax','mex:Jaguar Plushie','haw:Orchid','cay:Banana Orchid']);
 function hotEligible(key,item,p,e){
- return !HOT_EXCLUSIONS.has(key)
+ return HOT_CANDIDATES.has(key)
+   && !HOT_EXCLUSIONS.has(key)
    && Number.isFinite(item?.market_price)
    && item.market_price>=MIN_HOT_MARKET_VALUE
    && item.market_price_stale!==true
-   && p!==null
    && Number.isFinite(e?.profit)&&e.profit>0;
 }
-const api={flights,category,plan,economics,MIN_HOT_MARKET_VALUE,HOT_EXCLUSIONS,hotEligible};if(typeof module!=='undefined')module.exports=api;else root.TornHotList=api;
+// The forecast argument is intentionally optional for profitability-only items.
+// It must NEVER be treated as permission to recommend an unverified departure.
+const api={flights,category,plan,economics,saleQuote,NIKEH_PAYOUTS,HOT_CANDIDATES,MIN_HOT_MARKET_VALUE,HOT_EXCLUSIONS,hotEligible};if(typeof module!=='undefined')module.exports=api;else root.TornHotList=api;
 })(typeof window==='undefined'?globalThis:window);
