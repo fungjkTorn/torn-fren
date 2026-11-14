@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from functools import lru_cache
-from itertools import combinations, product
+from itertools import combinations
 import math
 import time
 
@@ -165,6 +165,20 @@ def _candidates(catalog, board, now):
     return list(found.values())
 
 
+def _pair(items, *, blocked=frozenset(), previous=()):
+    choices = []
+    for a, b in combinations(items, 2):
+        if a["country_code"] == b["country_code"]:
+            continue
+        if a["country_code"] in blocked or b["country_code"] in blocked:
+            continue
+        picked = (a, b)
+        unique = len(set(previous) | {a["country_code"], b["country_code"]})
+        choices.append((a["_rank"]+b["_rank"], unique,
+                        tuple(i["item_key"] for i in picked), picked))
+    return choices
+
+
 def _select(eligible):
     groups = {category: [] for category in QUOTAS}
     for item in eligible:
@@ -172,47 +186,44 @@ def _select(eligible):
     if any(len(groups[category]) < qty for category, qty in QUOTAS.items()):
         return []
 
-    # Pangolin is not a runner-facing recommendation unless it actually is
-    # the best Nikeh hourly performer; a high NPC sticker price isn't enough.
+    # The Beanstalk spec prioritizes the best *within each category*: select
+    # plushies before flowers, so a slightly better alternative combination
+    # cannot displace the agreed Panda/Camel + African Violet/Heather structure.
+    xanax = sorted(groups["xanax"], key=lambda i: (-i["_rank"], i["item_key"]))[0]
+    plushies = _pair(groups["plushie"])
+    if not plushies:
+        return []
+    plush = sorted(plushies, key=lambda p: (-p[0], -p[1], p[2]))[0][3]
+    plush_countries = {i["country_code"] for i in plush}
+    flowers = _pair(groups["flower"], blocked=plush_countries)
+    if not flowers:
+        return []
+    flower = sorted(flowers, key=lambda p: (-p[0], -p[1], p[2]))[0][3]
+
+    # Pangolin must NOT be chosen merely because it has the highest sticker
+    # payout. It can qualify only when it has the best Nikeh hourly return.
     top_nikeh = max(item["_rank"] for item in groups["nikeh"])
-    groups["nikeh"] = [
+    nikeh = [
         item for item in groups["nikeh"]
         if item["item_key"] != "chi:Pangolin Scales" or item["_rank"] >= top_nikeh
     ]
-    if len(groups["nikeh"]) < 2:
+    seen = (xanax["country_code"],
+            *(i["country_code"] for i in plush),
+            *(i["country_code"] for i in flower))
+    nikeh_pairs = _pair(nikeh, previous=seen)
+    if not nikeh_pairs:
         return []
+    # Prefer at least six different destinations for the seven-item drawer;
+    # within that diversity constraint favor the higher-paid NPC opportunities.
+    if any(p[1] >= 6 for p in nikeh_pairs):
+        nikeh_pairs = [p for p in nikeh_pairs if p[1] >= 6]
+    chosen_nikeh = sorted(nikeh_pairs, key=lambda p: (-p[0], -p[1], p[2]))[0][3]
 
-    # Every category has its reserved slots. A flower may not duplicate either
-    # plushie country; the two plushies, flowers and Nikeh items are distinct
-    # within each pair. Prefer >=6 unique destinations without sacrificing
-    # category quotas or manufacturing replacements.
-    options = []
-    for plushies in combinations(groups["plushie"], 2):
-        p_countries = {i["country_code"] for i in plushies}
-        if len(p_countries) != 2:
-            continue
-        for flowers in combinations(groups["flower"], 2):
-            f_countries = {i["country_code"] for i in flowers}
-            if len(f_countries) != 2 or f_countries & p_countries:
-                continue
-            for nikeh in combinations(groups["nikeh"], 2):
-                if nikeh[0]["country_code"] == nikeh[1]["country_code"]:
-                    continue
-                for xanax in groups["xanax"]:
-                    selection = (xanax, *plushies, *flowers, *nikeh)
-                    diversity = len({i["country_code"] for i in selection})
-                    score = sum(i["_rank"] for i in selection)
-                    keys = tuple(i["item_key"] for i in selection)
-                    options.append((diversity >= 6, score, diversity, keys, selection))
-    if not options:
+    selected = (xanax, *plush, *flower, *chosen_nikeh)
+    if len(selected) != 7:
         return []
-    if any(option[0] for option in options):
-        options = [option for option in options if option[0]]
-    # Profitability decides among diversity-compliant combinations. Deterministic
-    # tie-breaking keeps the Beanstalk drawer from jumping between equal quotes.
-    best = sorted(options, key=lambda x: (-x[1], -x[2], x[3]))[0][4]
-    return [{k: v for k, v in item.items() if not k.startswith("_")} for item in best]
-
+    return [{k: v for k, v in item.items() if not k.startswith("_")}
+            for item in selected]
 
 def build_hot_list(catalog, board, *, now=None):
     now = int(time.time()) if now is None else int(now)
