@@ -1,0 +1,38 @@
+name: Read-only Nikeh publisher PowerShell and public route probe
+on:
+  push:
+    branches:
+      - diagnostic/hotlist-nikeh-powershell-parse-20261113
+permissions:
+  contents: read
+jobs:
+  windows-parser:
+    runs-on: windows-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse actual Windows PowerShell publisher without executing it
+        shell: pwsh
+        run: |
+          $tokens=$null
+          $errors=$null
+          $file=Join-Path (Get-Location) 'deploy/Publish-HotList.ps1'
+          $tree=[System.Management.Automation.Language.Parser]::ParseFile($file,[ref]$tokens,[ref]$errors)
+          if ($errors.Count -ne 0) { $errors | Format-Table | Out-String | Write-Host; throw "Invalid PowerShell syntax" }
+          if (!$tree) { throw "No parsed PowerShell script tree" }
+          Write-Host 'WIN_POWERSHELL_PARSE_PASSED'
+  public-readonly:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check current public route only (no VM changes)
+        run: |
+          python3 - <<'PY'
+          import urllib.request
+          root="https://tornfren.duckdns.org"
+          for route in ["/","/experimental","/travel-decisions"]:
+              with urllib.request.urlopen(root+route,timeout=15) as f:
+                  data=f.read(1024*1024)
+              typ="Hot List" if b"hotlist.js" in data else "Legacy graph/travel view" if b"beta.js" in data else "Unexpected"
+              print("PUBLIC_ROUTE",route,typ)
+          PY
