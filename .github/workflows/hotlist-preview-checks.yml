@@ -13,6 +13,7 @@ on:
       - 'deploy/scripts/publish_hotlist_profitability.py'
       - 'tests/test_hotlist_nikeh_deploy.py'
       - 'deploy/Publish-HotList.ps1'
+      - 'docs/HOT_LIST_REVIEW.md'
       - 'tests/test_first_release_live.py'
       - '.github/workflows/hotlist-preview-checks.yml'
   push:
@@ -28,6 +29,7 @@ on:
       - 'deploy/scripts/publish_hotlist_profitability.py'
       - 'tests/test_hotlist_nikeh_deploy.py'
       - 'deploy/Publish-HotList.ps1'
+      - 'docs/HOT_LIST_REVIEW.md'
       - '.github/workflows/hotlist-preview-checks.yml'
 
 permissions:
