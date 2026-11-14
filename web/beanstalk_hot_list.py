@@ -172,7 +172,7 @@ def _pair(items, *, blocked=frozenset(), previous=()):
             continue
         if a["country_code"] in blocked or b["country_code"] in blocked:
             continue
-        picked = (a, b)
+        picked = tuple(sorted((a, b), key=lambda i: (-i["_rank"], i["item_key"])))
         unique = len(set(previous) | {a["country_code"], b["country_code"]})
         choices.append((a["_rank"]+b["_rank"], unique,
                         tuple(i["item_key"] for i in picked), picked))
