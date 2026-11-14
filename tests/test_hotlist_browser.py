@@ -5,7 +5,7 @@ from playwright.sync_api import sync_playwright
 root=Path(__file__).resolve().parents[1]
 now=int(time.time())
 names=['Camel Plushie','Xanax','African Violet','Bearer Bond']
-items=[{'item_name':names[i] if i<4 else 'Special Test Item '+str(i),'item_id':i+1,'foreign_price':100,'market_price':200,'quantity':2500,'market_price_stale':False} for i in range(24)]
+items=[{'item_name':names[i] if i<4 else 'Special Test Item '+str(i),'item_id':i+1,'foreign_price':18910,'market_price':20000,'quantity':2500,'market_price_stale':False} for i in range(24)]
 rows=[{'item_key':'sou:'+i['item_name'],'valid_until_epoch':now+170,'source_heartbeat_epoch':now,'forecast':{'observed_current_quantity':2500},'decision':{'player_flight_seconds':11820,'estimated_departure_epoch':now,'estimated_departure_deadline_epoch':now+120,'selected_restock_event_index':1}} for i in items]
 with sync_playwright() as p:
  chromium_path='/usr/bin/chromium' if Path('/usr/bin/chromium').exists() else None

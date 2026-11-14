@@ -28,5 +28,15 @@ function economics(item,sale,capacity,seconds,waitSeconds=0){
  const profit=(netSale-buy)*capacity,round=seconds*2;
  return {profit,unit:netSale-buy,hourly:profit*3600/round,cycleHourly:profit*3600/(round+Math.max(0,waitSeconds))};
 }
-const api={flights,category,plan,economics};if(typeof module!=='undefined')module.exports=api;else root.TornHotList=api;
+const MIN_HOT_MARKET_VALUE=15000;
+const HOT_EXCLUSIONS=new Set(['uni:Xanax','mex:Jaguar Plushie','haw:Orchid','cay:Banana Orchid']);
+function hotEligible(key,item,p,e){
+ return !HOT_EXCLUSIONS.has(key)
+   && Number.isFinite(item?.market_price)
+   && item.market_price>=MIN_HOT_MARKET_VALUE
+   && item.market_price_stale!==true
+   && p!==null
+   && Number.isFinite(e?.profit)&&e.profit>0;
+}
+const api={flights,category,plan,economics,MIN_HOT_MARKET_VALUE,HOT_EXCLUSIONS,hotEligible};if(typeof module!=='undefined')module.exports=api;else root.TornHotList=api;
 })(typeof window==='undefined'?globalThis:window);
