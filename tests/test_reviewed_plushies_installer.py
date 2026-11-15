@@ -10,6 +10,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 spec=importlib.util.spec_from_file_location('installer',Path(__file__).resolve().parents[1]/'deploy/scripts/install_reviewed_plushies.py')
 installer=importlib.util.module_from_spec(spec);spec.loader.exec_module(installer)
@@ -32,6 +33,18 @@ class InstallerTests(unittest.TestCase):
             finally:
                 os.umask(old)
                 if stage:shutil.rmtree(stage)
+
+    def test_staging_uses_only_publisher_replay_overrides(self):
+        configured='OPENBLAS_NUM_THREADS=1 "TORNFREN_REPLAY_PINNED_RESEARCH=/var/lib/torn-fren-live-beta/no-legacy-stage" "TORNFREN_REPLAY_WORK=/path with spaces" UNRELATED_TOKEN=never-forward'
+        with patch.object(installer,'show',return_value=configured) as show:
+            args=installer.replay_environment('publisher.service')
+        self.assertEqual(args,['TORNFREN_REPLAY_PINNED_RESEARCH=/var/lib/torn-fren-live-beta/no-legacy-stage','TORNFREN_REPLAY_WORK=/path with spaces'])
+        show.assert_called_once_with('publisher.service','Environment')
+
+    def test_missing_publisher_replay_configuration_fails_before_cutover(self):
+        with patch.object(installer,'show',return_value='OPENBLAS_NUM_THREADS=1'):
+            with self.assertRaisesRegex(ValueError,'no changes applied'):
+                installer.replay_environment('publisher.service')
 
     def test_exit_two_preserves_underlying_python_error(self):
         output=io.StringIO()
