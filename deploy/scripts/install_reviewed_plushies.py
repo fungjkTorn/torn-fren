@@ -32,8 +32,11 @@ def stage_directory():
     stage.chmod(0o755)
     return stage
 
-def stage_cohort(parent,cohort):
-    stage=parent/cohort;stage.mkdir(mode=0o755);stage.chmod(0o755)
+def stage_cohort(parent,cohort,uid,gid):
+    # SQLite creates rollback/WAL journals beside the database. File ownership
+    # alone is insufficient: the inference user must own this directory too.
+    stage=parent/cohort;stage.mkdir(mode=0o700)
+    os.chown(stage,uid,gid);stage.chmod(0o700)
     return stage
 def replay_environment(unit):
     # The real services disable the legacy private-research override. A bare
@@ -142,7 +145,7 @@ def apply():
         collector=Path('/opt/torn-fren/data/stock_history.db').resolve()
         ubuntu=pwd.getpwnam('ubuntu')
         for cohort,root,changes in plans:
-            stage=stage_cohort(staging,cohort)
+            stage=stage_cohort(staging,cohort,ubuntu.pw_uid,ubuntu.pw_gid)
             for target,data in changes.items():
                 dst=stage/target.name;dst.write_bytes(data);dst.chmod(0o644);py_compile.compile(str(dst),doraise=True)
                 saved.append({'path':str(target),'previous':base64.b64encode(target.read_bytes()).decode()if target.exists()else None,'mode':target.stat().st_mode&0o777 if target.exists()else 0o644,'new_sha256':hashlib.sha256(data).hexdigest()})
