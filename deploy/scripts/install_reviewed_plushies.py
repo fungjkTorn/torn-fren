@@ -7,8 +7,19 @@ PAYLOAD = {'services/reviewed_foundation.py': 'IiIiUmV2aWV3ZWQgaXRlbSBmb3VuZGF0a
 FOUNDATION_AST = 'd6070819639dbbc6970ca4a6650ebe9fb65511d44bb670a3eab6f3d636f8e5a1'
 MONKEY_AST = 'a8d719722de9b5143db666267de5b5eacf2fe0249f95659b755a943cface257e'
 COHORTS={'first-ten-beta':[('mex:Jaguar Plushie',1020)],'challengers-beta':[('can:Wolverine Plushie',1620),('cay:Stingray Plushie',1380),('arg:Monkey Plushie',6660),('sou:Lion Plushie',11820)],'next-six-beta':[('uae:Camel Plushie',10800)]}
+HISTORY_ROWS=200000
+READER_FUNCTION_SOURCE='def _read_item(conn,key,issued):\n    country,item=key.split(":",1)\n    raw=conn.execute(\n        """SELECT timestamp,quantity,source FROM stock_history\n           WHERE country=? AND lower(item_name)=lower(?)\n             AND timestamp<=?\n           ORDER BY timestamp DESC,id DESC LIMIT ?""",\n        (country,item,issued,MAX_ITEM_ROWS+1),\n    ).fetchall()\n    if len(raw)>MAX_ITEM_ROWS:\n        return None,"MAX_SOURCE_ROWS_EXCEEDED"\n    rows=[]\n    for epoch,qty,source in reversed(raw):\n        if (epoch is None or qty is None or source is None or\n            int(qty)<0):\n            continue\n        rows.append(StockObservation(int(epoch),int(qty),str(source)))\n    return rows,None'
 POLICY='REVIEWED_STOCKED_SAMPLES_AND_PHASE_GUARDS_20261114_V1'
 def semantic(text):return hashlib.sha256(ast.dump(ast.parse(text),include_attributes=False).encode()).hexdigest()
+def patch_reader(text):
+    tree=ast.parse(text)
+    readers=[n for n in tree.body if isinstance(n,ast.FunctionDef) and n.name=='_read_item']
+    if len(readers)!=1 or ast.dump(readers[0],include_attributes=False)!=ast.dump(ast.parse(READER_FUNCTION_SOURCE).body[0],include_attributes=False):
+        raise ValueError('Unrecognized history reader; no changes applied')
+    changed,count=re.subn(r'(?m)^MAX_ITEM_ROWS[ \t]*=[ \t]*(?:50000|200000)[ \t]*$', 'MAX_ITEM_ROWS='+str(HISTORY_ROWS),text)
+    if count!=1:raise ValueError('Unrecognized history capacity; no changes applied')
+    return changed
+
 def patch_schedule(text):
     replacements=[('from services.reviewed_foundation import REVIEWED,calculate,sa_forecast','from services.reviewed_foundation import REVIEWED,calculate,sa_forecast,camel_forecast,BASE_REVIEWED,BASE_POLICY'),('SELECT received_epoch,country_update_epoch,clock_status FROM country_stock_observations','SELECT received_epoch,source,country_update_epoch,clock_status FROM country_stock_observations'),("        if item_key=='sou:Xanax':event_forecaster=sa_forecast","        if item_key=='sou:Xanax':event_forecaster=sa_forecast\n        if item_key=='uae:Camel Plushie':event_forecaster=camel_forecast"),('timing_choice=lambda **kw: native_timing_choice(source','timing_choice=None if item_key in {"uae:Camel Plushie","sou:Lion Plushie"} else lambda **kw: native_timing_choice(source')]
     for before,after in replacements:
@@ -74,6 +85,7 @@ def freeze_input(source,snapshot):
 def stage_entry(stage,cohort):
     names=('reviewed_stock_samples','reviewed_foundation')+(('monkey_combined',) if cohort=='challengers-beta' else ())+('first_release_schedule',)
     code="import importlib.util,sys,os,runpy\nsys.path.insert(0,os.getcwd())\nimport services\n"
+    code+="from research import v128_full24_earliest_shadow as reader\nreader.MAX_ITEM_ROWS="+str(HISTORY_ROWS)+"\n"
     for name in names:
         code+="spec=importlib.util.spec_from_file_location('services.'+"+repr(name)+", "+repr(str(stage/(name+'.py')))+");m=importlib.util.module_from_spec(spec);sys.modules[spec.name]=m;setattr(services,"+repr(name)+",m);spec.loader.exec_module(m)\n"
     code+="if sys.argv[1]=='prepare-input':\n from services.first_release_source import refresh_tail\n import json\n"
@@ -118,9 +130,13 @@ def apply():
         if not root.is_absolute()or root.is_symlink()or not str(root.resolve()).startswith('/var/lib/torn-fren-live-beta/releases/'):
             raise ValueError('Unexpected publisher working directory; no changes applied')
         f=root/'services/reviewed_foundation.py';schedule=root/'services/first_release_schedule.py'
+        reader=root/'research/v128_full24_earliest_shadow.py'
+        if reader.is_symlink() or not reader.is_file():raise ValueError('Unexpected history reader path; no changes applied')
+        reader_bytes=patch_reader(reader.read_text()).encode()
         if f.is_symlink()or schedule.is_symlink():raise ValueError('Unexpected source link; no changes applied')
         if semantic(f.read_text())==semantic(payload['services/reviewed_foundation.py'].decode()):
             expected={root/rel:data for rel,data in payload.items()if rel!='services/monkey_combined.py'or cohort=='challengers-beta'}
+            expected[reader]=reader_bytes
             if not all(path.is_file()and path.read_bytes()==data for path,data in expected.items())or 'reviewed_base_policy'not in schedule.read_text():
                 raise ValueError('Mixed installed update; no changes applied')
             already.append(cohort);continue
@@ -128,6 +144,7 @@ def apply():
             raise ValueError('Installed foundation differs from the reviewed base; no changes applied')
         changes={root/rel:data for rel,data in payload.items()if rel!='services/monkey_combined.py'or cohort=='challengers-beta'}
         changes[schedule]=patch_schedule(schedule.read_text()).encode()
+        changes[reader]=reader_bytes
         if cohort=='challengers-beta'and semantic((root/'services/monkey_combined.py').read_text())!=MONKEY_AST:
             raise ValueError('Installed Monkey model differs from the reviewed base; no changes applied')
         sources[cohort]=publisher_source(unit)
