@@ -1,4 +1,6 @@
 """Installer regressions: staging traversal and actionable child failures."""
+import ast
+from collections import namedtuple
 import contextlib
 import importlib.util
 import io
@@ -133,6 +135,27 @@ finally:shutil.rmtree(stage)
 """
         result=subprocess.run(['sudo','-n',sys.executable,'-c',root_code,str(Path(installer.__file__).resolve()),str(os.getuid()),str(os.getgid()),pwd.getpwuid(os.getuid()).pw_name],capture_output=True,text=True,timeout=30)
         self.assertEqual(result.returncode,0,result.stderr)
+
+    def test_history_capacity_keeps_all_rows_and_preserves_guard(self):
+        source=(Path(installer.__file__).resolve().parents[2]/'research/v128_full24_earliest_shadow.py').read_text()
+        tree=ast.parse(source)
+        fn=next(n for n in tree.body if isinstance(n,ast.FunctionDef) and n.name=='_read_item')
+        ns={'MAX_ITEM_ROWS':installer.HISTORY_ROWS,'StockObservation':namedtuple('StockObservation','epoch quantity source')}
+        exec(compile(ast.Module(body=[fn],type_ignores=[]),'history-reader','exec'),ns)
+        with sqlite3.connect(':memory:') as db:
+            db.execute('CREATE TABLE stock_history(id INTEGER PRIMARY KEY,timestamp,country,item_name,quantity,source)')
+            db.executemany('INSERT INTO stock_history(timestamp,country,item_name,quantity,source) VALUES(?,?,?,?,?)',((i,'can','Wolverine Plushie',2500,'yata') for i in range(60001)))
+            rows,error=ns['_read_item'](db,'can:Wolverine Plushie',60001)
+            self.assertIsNone(error);self.assertEqual(len(rows),60001)
+            self.assertEqual((rows[0].epoch,rows[-1].epoch),(0,60000))
+            db.executemany('INSERT INTO stock_history(timestamp,country,item_name,quantity,source) VALUES(?,?,?,?,?)',((i,'can','Wolverine Plushie',2500,'yata') for i in range(60001,200001)))
+            self.assertEqual(ns['_read_item'](db,'can:Wolverine Plushie',200001),(None,'MAX_SOURCE_ROWS_EXCEEDED'))
+        old=source.replace('MAX_ITEM_ROWS=200000','MAX_ITEM_ROWS=50000')
+        self.assertEqual(installer.patch_reader(old),source)
+        self.assertEqual(installer.patch_reader(source),source)
+        bad=old.replace('return rows,None','return rows[:10],None')
+        with self.assertRaisesRegex(ValueError,'Unrecognized history reader'):
+            installer.patch_reader(bad)
 
     def test_exit_two_preserves_underlying_python_error(self):
         output=io.StringIO()
