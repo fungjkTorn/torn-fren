@@ -59,6 +59,7 @@ jobs:
             test_first_release_schedule.py \
             test_first_release_source.py \
             test_reviewed_stock_samples.py \
+            test_reviewed_plushies_installer.py \
             test_first_release_graph_contract.py \
             test_first_release_history_summary.py \
             test_admin_live_beta_health.py \
