@@ -11,6 +11,7 @@ import hashlib
 import subprocess
 import sys
 import tempfile
+import pwd
 import unittest
 from unittest.mock import patch
 
@@ -24,11 +25,12 @@ class InstallerTests(unittest.TestCase):
             stage=None
             try:
                 stage=installer.stage_directory()
-                cohort=installer.stage_cohort(stage,'first-ten-beta')
+                cohort=installer.stage_cohort(stage,'first-ten-beta',os.getuid(),os.getgid())
                 self.assertNotIn(Path(private),stage.parents)
                 self.assertEqual(stage.parent,Path('/tmp'))
                 self.assertEqual(stage.stat().st_mode & 0o777,0o755)
-                self.assertEqual(cohort.stat().st_mode & 0o777,0o755)
+                self.assertEqual(cohort.stat().st_mode & 0o777,0o700)
+                self.assertEqual((cohort.stat().st_uid,cohort.stat().st_gid),(os.getuid(),os.getgid()))
                 shim=cohort/'stage.py';shim.write_text('print("stage-readable")');shim.chmod(0o644)
                 r=installer.cmd([sys.executable,'-B',str(shim)])
                 self.assertEqual(r.stdout.strip(),'stage-readable')
@@ -72,6 +74,65 @@ class InstallerTests(unittest.TestCase):
                 self.assertEqual(db.execute('SELECT quantity FROM stock_history').fetchall(),[(30,),(2500,)])
                 db.execute('INSERT INTO stock_history VALUES(99)')
             self.assertEqual(hashlib.sha256(source.read_bytes()).hexdigest(),before)
+
+    @unittest.skipIf(os.geteuid()==0,'root bypasses directory DAC permissions')
+    def test_writable_db_in_nonwritable_directory_reproduces_readonly_error(self):
+        with tempfile.TemporaryDirectory() as td:
+            directory=Path(td);db_path=directory/'input.sqlite'
+            with sqlite3.connect(db_path) as db:
+                db.execute('CREATE TABLE stock_history(quantity)')
+                db.execute('INSERT INTO stock_history VALUES(2500)')
+            db_path.chmod(0o600);directory.chmod(0o555)
+            try:
+                self.assertTrue(os.access(db_path,os.W_OK))
+                with sqlite3.connect(db_path) as db:
+                    with self.assertRaisesRegex(sqlite3.OperationalError,'readonly'):
+                        db.execute('DELETE FROM stock_history')
+            finally:directory.chmod(0o700)
+
+    def test_inference_owned_directory_allows_sqlite_journal_transaction(self):
+        stage=installer.stage_directory()
+        try:
+            cohort=installer.stage_cohort(stage,'challengers-beta',os.getuid(),os.getgid())
+            db_path=cohort/'input.sqlite'
+            with sqlite3.connect(db_path) as db:
+                db.execute('PRAGMA journal_mode=DELETE')
+                db.execute('CREATE TABLE stock_history(quantity)')
+                db.execute('INSERT INTO stock_history VALUES(2500)')
+            db_path.chmod(0o600)
+            with sqlite3.connect(db_path) as db:
+                db.execute('DELETE FROM stock_history')
+                self.assertTrue(Path(str(db_path)+'-journal').is_file())
+                db.execute('INSERT INTO stock_history VALUES(30)')
+            self.assertFalse(Path(str(db_path)+'-journal').exists())
+            db_path.chmod(0o400)
+            with sqlite3.connect(db_path.as_uri()+'?mode=ro',uri=True) as db:
+                self.assertEqual(db.execute('SELECT quantity FROM stock_history').fetchall(),[(30,)])
+        finally:shutil.rmtree(stage)
+
+    @unittest.skipUnless(shutil.which('sudo') and shutil.which('runuser'),'requires CI sudo and runuser for split-user test')
+    def test_root_created_stage_can_be_refreshed_by_inference_user(self):
+        if subprocess.run(['sudo','-n','true'],capture_output=True).returncode:
+            self.skipTest('passwordless CI sudo unavailable')
+        root_code="""
+import importlib.util,os,sqlite3,subprocess,sys,shutil
+from pathlib import Path
+spec=importlib.util.spec_from_file_location('installer',sys.argv[1]);m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
+stage=m.stage_directory()
+try:
+ cohort=m.stage_cohort(stage,'split-user',int(sys.argv[2]),int(sys.argv[3]))
+ db_path=cohort/'input.sqlite'
+ with sqlite3.connect(db_path) as db:
+  db.execute('CREATE TABLE stock_history(quantity)')
+  db.execute('INSERT INTO stock_history VALUES(2500)')
+ os.chown(db_path,int(sys.argv[2]),int(sys.argv[3]));db_path.chmod(0o600)
+ child="import sqlite3,sys; db=sqlite3.connect(sys.argv[1]); db.execute('DELETE FROM stock_history'); db.execute('INSERT INTO stock_history VALUES(30)'); db.commit(); db.close()"
+ subprocess.run(['runuser','-u',sys.argv[4],'--',sys.executable,'-c',child,str(db_path)],check=True,capture_output=True,text=True)
+ with sqlite3.connect(db_path) as db:assert db.execute('SELECT quantity FROM stock_history').fetchall()==[(30,)]
+finally:shutil.rmtree(stage)
+"""
+        result=subprocess.run(['sudo','-n',sys.executable,'-c',root_code,str(Path(installer.__file__).resolve()),str(os.getuid()),str(os.getgid()),pwd.getpwuid(os.getuid()).pw_name],capture_output=True,text=True,timeout=30)
+        self.assertEqual(result.returncode,0,result.stderr)
 
     def test_exit_two_preserves_underlying_python_error(self):
         output=io.StringIO()
