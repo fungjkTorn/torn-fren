@@ -8,13 +8,13 @@ FOUNDATION_AST = 'd6070819639dbbc6970ca4a6650ebe9fb65511d44bb670a3eab6f3d636f8e5
 MONKEY_AST = 'a8d719722de9b5143db666267de5b5eacf2fe0249f95659b755a943cface257e'
 COHORTS={'first-ten-beta':[('mex:Jaguar Plushie',1020)],'challengers-beta':[('can:Wolverine Plushie',1620),('cay:Stingray Plushie',1380),('arg:Monkey Plushie',6660),('sou:Lion Plushie',11820)],'next-six-beta':[('uae:Camel Plushie',10800)]}
 HISTORY_ROWS=200000
-READER_FUNCTION_AST='f8eb8b26a3db18f539fc9e272571e654af32614d50fe3ce103777d7a19b2beee'
+READER_FUNCTION_SOURCE='def _read_item(conn,key,issued):\n    country,item=key.split(":",1)\n    raw=conn.execute(\n        """SELECT timestamp,quantity,source FROM stock_history\n           WHERE country=? AND lower(item_name)=lower(?)\n             AND timestamp<=?\n           ORDER BY timestamp DESC,id DESC LIMIT ?""",\n        (country,item,issued,MAX_ITEM_ROWS+1),\n    ).fetchall()\n    if len(raw)>MAX_ITEM_ROWS:\n        return None,"MAX_SOURCE_ROWS_EXCEEDED"\n    rows=[]\n    for epoch,qty,source in reversed(raw):\n        if (epoch is None or qty is None or source is None or\n            int(qty)<0):\n            continue\n        rows.append(StockObservation(int(epoch),int(qty),str(source)))\n    return rows,None'
 POLICY='REVIEWED_STOCKED_SAMPLES_AND_PHASE_GUARDS_20261114_V1'
 def semantic(text):return hashlib.sha256(ast.dump(ast.parse(text),include_attributes=False).encode()).hexdigest()
 def patch_reader(text):
     tree=ast.parse(text)
     readers=[n for n in tree.body if isinstance(n,ast.FunctionDef) and n.name=='_read_item']
-    if len(readers)!=1 or hashlib.sha256(ast.dump(readers[0],include_attributes=False).encode()).hexdigest()!=READER_FUNCTION_AST:
+    if len(readers)!=1 or ast.dump(readers[0],include_attributes=False)!=ast.dump(ast.parse(READER_FUNCTION_SOURCE).body[0],include_attributes=False):
         raise ValueError('Unrecognized history reader; no changes applied')
     changed,count=re.subn(r'(?m)^MAX_ITEM_ROWS[ \t]*=[ \t]*(?:50000|200000)[ \t]*$', 'MAX_ITEM_ROWS='+str(HISTORY_ROWS),text)
     if count!=1:raise ValueError('Unrecognized history capacity; no changes applied')
