@@ -6,6 +6,8 @@ import json
 import os
 from pathlib import Path
 import shutil
+import sqlite3
+import hashlib
 import subprocess
 import sys
 import tempfile
@@ -45,6 +47,31 @@ class InstallerTests(unittest.TestCase):
         with patch.object(installer,'show',return_value='OPENBLAS_NUM_THREADS=1'):
             with self.assertRaisesRegex(ValueError,'no changes applied'):
                 installer.replay_environment('publisher.service')
+
+    def test_configured_publisher_source_instead_of_collector(self):
+        first='{ path=/usr/bin/flock ; argv[]=/usr/bin/flock -n /state/lock /venv/python entry.py publish --source /var/lib/torn-fren-research/stock_history_forward.db --state /var/lib/torn-fren-live-beta --live-source /opt/torn-fren/data/stock_history.db ; ignore_errors=no ; }'
+        other='{ path=/venv/python ; argv[]=/venv/python -m services.challenger_live --collector /opt/torn-fren/data/stock_history.db --state /var/lib/torn-fren-live-beta/challengers ; ignore_errors=no ; }'
+        self.assertEqual(installer.configured_source(first),Path('/var/lib/torn-fren-research/stock_history_forward.db'))
+        self.assertEqual(installer.configured_source(other),Path('/var/lib/torn-fren-live-beta/challengers/stock_history.sqlite'))
+        explicit=other.replace('--collector','--source /var/lib/torn-fren-live-beta/challengers/custom.sqlite --collector')
+        self.assertEqual(installer.configured_source(explicit),Path('/var/lib/torn-fren-live-beta/challengers/custom.sqlite'))
+
+    def test_unrecognized_launch_does_not_guess_source(self):
+        with self.assertRaisesRegex(ValueError,'no changes applied'):
+            installer.configured_source('not-systemd-launch-properties')
+
+    def test_freeze_preserves_input_and_confines_changes_to_private_copy(self):
+        with tempfile.TemporaryDirectory() as td:
+            source=Path(td)/'source.sqlite';snapshot=Path(td)/'copy.sqlite'
+            with sqlite3.connect(source) as db:
+                db.execute('CREATE TABLE stock_history(quantity)')
+                db.executemany('INSERT INTO stock_history VALUES(?)',[(30,),(2500,)])
+            before=hashlib.sha256(source.read_bytes()).hexdigest()
+            installer.freeze_input(source,snapshot)
+            with sqlite3.connect(snapshot) as db:
+                self.assertEqual(db.execute('SELECT quantity FROM stock_history').fetchall(),[(30,),(2500,)])
+                db.execute('INSERT INTO stock_history VALUES(99)')
+            self.assertEqual(hashlib.sha256(source.read_bytes()).hexdigest(),before)
 
     def test_exit_two_preserves_underlying_python_error(self):
         output=io.StringIO()
