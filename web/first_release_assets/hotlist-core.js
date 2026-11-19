@@ -55,7 +55,7 @@ const HOT_CANDIDATES=new Set([
  'uni:Heather','uni:Nessie Plushie','uni:Red Fox Plushie','uni:Xanax',
  ...Object.keys(NIKEH_PAYOUTS)
 ]);
-const HOT_EXCLUSIONS=new Set(['uni:Xanax','mex:Jaguar Plushie','haw:Orchid','cay:Banana Orchid','swi:Edelweiss']);
+const HOT_EXCLUSIONS=new Set(['mex:Jaguar Plushie','haw:Orchid','cay:Banana Orchid','swi:Edelweiss']);
 function hotEligible(key,item,p,e){
  return HOT_CANDIDATES.has(key)
    && !HOT_EXCLUSIONS.has(key)
@@ -68,3 +68,4 @@ function hotEligible(key,item,p,e){
 // It must NEVER be treated as permission to recommend an unverified departure.
 const api={flights,category,plan,economics,saleQuote,NIKEH_PAYOUTS,HOT_CANDIDATES,MIN_HOT_MARKET_VALUE,HOT_EXCLUSIONS,hotEligible};if(typeof module!=='undefined')module.exports=api;else root.TornHotList=api;
 })(typeof window==='undefined'?globalThis:window);
+

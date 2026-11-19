@@ -214,7 +214,10 @@ def install_first_release(app):
                          "Access-Control-Allow-Origin":"*"}
                 try:
                     from web.beanstalk_hot_list import public_hot_list
-                    payload=await run_in_threadpool(public_hot_list)
+                    version=request.query_params.get("version","1")
+                    if version not in ("1","2"):
+                        return JSONResponse({"status":"UNSUPPORTED_VERSION","picks":[]},status_code=400,headers=headers)
+                    payload=await run_in_threadpool(public_hot_list,version=int(version))
                     return JSONResponse(payload,
                         status_code=200 if payload["status"]=="OK" else 503,
                         headers=headers)
@@ -261,4 +264,5 @@ def install_first_release(app):
                 return HTMLResponse(raw.replace(b"</body>",tag+b"</body>"),headers={"Cache-Control":"no-store"})
             return response
     app.add_middleware(BetaMiddleware)
+
 
