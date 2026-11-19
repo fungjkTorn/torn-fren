@@ -1,5 +1,43 @@
 # Beanstalk seven-pick Hot List — public JSON contract
 
+## Version 2 upgrade: two Xanax destinations and freshness
+
+Prepared November 19, 2026; this code change is not a production deployment.
+GET `/api/beanstalk-hot-list?version=2` opts into schema
+`torn-fren-beanstalk-hot-list-v2`: exactly eight picks, two Xanax, two plushies,
+two flowers and two Nikeh. The default URL still returns the legacy v1 seven
+picks, so old clients remain supported during rollout. Unsupported versions
+return 400; insufficient eligible items return 503 without padding/duplicates.
+
+The two Xanax are the highest estimated round-trip profit/hour from distinct
+eligible destinations, with UK Xanax still excluded. All prior prices, fee,
+flight, market floor, other exclusions and plushie/flower/Nikeh constraints
+remain intact. The minimum-six-destination preference also counts both Xanax.
+
+V2 includes `valid_until` (at most 120 seconds after generation),
+`market_price_checked_at` and `market_price_valid_until` (300-second market
+cache life). Missing trustworthy timestamps are null, never replaced with the
+list generation time. The current catalog lacks a foreign-price receipt clock,
+so `foreign_price_checked_at` is explicitly null. A known market timestamp older
+than 300 seconds makes v2 unavailable. Estimates with unknown clocks must be
+labeled unknown; a newly generated list is not proof of newly collected prices.
+
+Published departure rows additionally include `source_checked_at` and
+`departure_valid_until`, bounded by the publication validity, the 180-second
+heartbeat window and the departure deadline. Unverified departures have null
+clocks. A client must expire timing independently of price/list expiry and must
+not invent confidence probabilities from these status checks. These are clock
+validity checks, not calibrated accuracy guarantees.
+
+Use the guarded `deploy/scripts/publish_beanstalk_hot_list.py` procedure for a
+later reviewed deployment. It upgrades only the exact recognized legacy handler
+or inserts the reviewed route at its original anchor, retaining unrelated VM
+customizations. Publish the backend upgrade and then the Beanstalk UI. The new
+UI accepts v1 during rollout, clearly labels the pending upgrade, and treats
+legacy timing as unverified because v1 does not expose timing expiry.
+
+The original v1 contract below is retained for existing clients.
+
 **Deployment status:** This endpoint is not public until the guarded VM deployment succeeds. GitHub merge alone does not make it live.
 
 ## GET endpoint
@@ -68,3 +106,4 @@ Theoretical profit per hour excludes forecast wait, selling delay, unsuccessful 
 Jedi should read `picks` directly and render compact rows in the existing drawer; no separate price calculations, live-model imports, or independent exclusions in the Beanstalk codebase. A frontend client can `fetch` the public URL directly with a 30–60 second polling cadence and a small cache; do not poll more often than the endpoint's 15-second server cache. Use `generated_at` to display data freshness, and link to `https://tornfren.duckdns.org/experimental` for full details. On a 503 or network error, do not render cached departure times as current.
 
 Future real bazaar sale-price and liquidity rankings can replace the price basis on the Torn-FREN side without modifying this response shape.
+
