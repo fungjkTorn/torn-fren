@@ -15,14 +15,23 @@ class HotListV2Tests(unittest.TestCase):
         self.assertEqual(['jap:Xanax','can:Xanax'],[p['item_key'] for p in new['picks'][:2]])
         self.assertEqual(2,new['category_quotas']['xanax'])
         self.assertEqual(8,len({p['item_key'] for p in new['picks']}))
-        self.assertNotIn('uni:Xanax',[p['item_key'] for p in new['picks']])
+        self.assertIn('uni:Xanax',hot.CANDIDATES)
+        self.assertNotIn('uni:Xanax',hot.EXCLUSIONS)
         old=hot.build_hot_list(catalog(),{},now=NOW)
         self.assertEqual(7,len(old['picks']))
         self.assertEqual('torn-fren-beanstalk-hot-list-v1',old['schema'])
         self.assertNotIn('valid_until',old)
 
+    def test_uk_is_selected_when_second_best_and_can_win_first(self):
+        prices=dict(PRICES);prices['uni:Xanax']=(700000,841787)
+        result=hot.build_hot_list(catalog(prices),{},now=NOW,version=2)
+        self.assertEqual(['jap:Xanax','uni:Xanax'],[p['item_key'] for p in result['picks'][:2]])
+        prices['uni:Xanax']=(600000,841787)
+        result=hot.build_hot_list(catalog(prices),{},now=NOW,version=2)
+        self.assertEqual('uni:Xanax',result['picks'][0]['item_key'])
+
     def test_no_padding_when_two_eligible_xanax_unavailable(self):
-        prices={k:v for k,v in PRICES.items() if k not in ('can:Xanax','sou:Xanax')}
+        prices={k:v for k,v in PRICES.items() if k not in ('can:Xanax','sou:Xanax','uni:Xanax')}
         new=hot.build_hot_list(catalog(prices),{},now=NOW,version=2)
         self.assertEqual('INSUFFICIENT_ELIGIBLE_ITEMS',new['status'])
         self.assertEqual([],new['picks'])
