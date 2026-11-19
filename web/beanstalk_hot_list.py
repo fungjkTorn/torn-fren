@@ -179,17 +179,17 @@ def _pair(items, *, blocked=frozenset(), previous=()):
     return choices
 
 
-def _select(eligible):
+def _select(eligible, *, xanax_count=1):
     groups = {category: [] for category in QUOTAS}
     for item in eligible:
         groups[item["category"]].append(item)
-    if any(len(groups[category]) < qty for category, qty in QUOTAS.items()):
+    if any(len(groups[category]) < qty for category, qty in {**QUOTAS, "xanax": xanax_count}.items()):
         return []
 
     # The Beanstalk spec prioritizes the best *within each category*: select
     # plushies before flowers, so a slightly better alternative combination
     # cannot displace the agreed Panda/Camel + African Violet/Heather structure.
-    xanax = sorted(groups["xanax"], key=lambda i: (-i["_rank"], i["item_key"]))[0]
+    xanax = sorted(groups["xanax"], key=lambda i: (-i["_rank"], i["item_key"]))[:xanax_count]
     plushies = _pair(groups["plushie"])
     if not plushies:
         return []
@@ -207,7 +207,7 @@ def _select(eligible):
         item for item in groups["nikeh"]
         if item["item_key"] != "chi:Pangolin Scales" or item["_rank"] >= top_nikeh
     ]
-    seen = (xanax["country_code"],
+    seen = (*(i["country_code"] for i in xanax),
             *(i["country_code"] for i in plush),
             *(i["country_code"] for i in flower))
     nikeh_pairs = _pair(nikeh, previous=seen)
@@ -219,33 +219,56 @@ def _select(eligible):
         nikeh_pairs = [p for p in nikeh_pairs if p[1] >= 6]
     chosen_nikeh = sorted(nikeh_pairs, key=lambda p: (-p[0], -p[1], p[2]))[0][3]
 
-    selected = (xanax, *plush, *flower, *chosen_nikeh)
-    if len(selected) != 7:
+    selected = (*xanax, *plush, *flower, *chosen_nikeh)
+    if len(selected) != 6+xanax_count:
         return []
     return [{k: v for k, v in item.items() if not k.startswith("_")}
             for item in selected]
 
-def build_hot_list(catalog, board, *, now=None):
+def build_hot_list(catalog, board, *, now=None, version=1):
     now = int(time.time()) if now is None else int(now)
-    picks = _select(_candidates(catalog, board, now))
+    if version not in (1, 2):
+        raise ValueError("unsupported Hot List version")
+    picks = _select(_candidates(catalog, board, now), xanax_count=2 if version==2 else 1)
     result = {
-        "schema": SCHEMA,
-        "status": "OK" if len(picks) == 7 else "INSUFFICIENT_ELIGIBLE_ITEMS",
+        "schema": SCHEMA if version==1 else "torn-fren-beanstalk-hot-list-v2",
+        "status": "OK" if len(picks) == (8 if version==2 else 7) else "INSUFFICIENT_ELIGIBLE_ITEMS",
         "generated_at": _iso(now),
         "generated_epoch": now,
         "inventory_slots": SLOTS,
         "flight_profile": "PI + pilot",
         "selling_price_basis": "Torn Item Market (5% fee) or Nikeh fixed NPC payout (0% Item Market fee)",
         "market_value_floor": MARKET_FLOOR,
-        "category_quotas": QUOTAS,
+        "category_quotas": {**QUOTAS, "xanax": 2 if version==2 else 1},
         "forecast_feed_status": (board or {}).get("status", "UNAVAILABLE"),
         "picks": picks,
     }
+    if version==2:
+        market = (catalog.get("profitability") or {}).get("market_price_fetched_at")
+        if not (_numeric(market) and 0 < market <= now):
+            market = None
+        if market is not None and now-market > 300:
+            raise ValueError("market price timestamp is stale")
+        result["market_price_checked_at"] = _iso(market) if market is not None else None
+        result["market_price_valid_until"] = _iso(market+300) if market is not None else None
+        result["valid_until"] = _iso(min(now+120, market+300) if market is not None else now+120)
+        result["foreign_price_checked_at"] = None  # No trustworthy receipt clock in this catalog contract.
+        rows = {r.get("item_key"): r for r in (board or {}).get("rows", []) if isinstance(r, dict)}
+        for pick in picks:
+            row = rows.get(pick["item_key"], {})
+            departure = _departure(row, now)
+            if departure is not None:
+                deadline = row["decision"]["estimated_departure_deadline_epoch"]
+                pick["departure_valid_until"] = _iso(min(row["valid_until_epoch"], row["source_heartbeat_epoch"]+180, deadline))
+                pick["source_checked_at"] = _iso(row["source_heartbeat_epoch"])
+            else:
+                pick["departure_valid_until"] = None
+                pick["source_checked_at"] = None
     return result
 
 
 @lru_cache(maxsize=4)
-def _public_bucket(bucket):
+def _public_bucket(bucket, version=1):
     # Lazy imports avoid app/module import cycles and reuse the already installed
     # public catalog endpoint and precomputed publisher instead of research code.
     from web.app import api_catalog
@@ -256,8 +279,9 @@ def _public_bucket(bucket):
         board = read_board(now=now)
     except (OSError, ValueError, KeyError, TypeError):
         board = {"status": "UNAVAILABLE", "rows": []}
-    return build_hot_list(catalog, board, now=now)
+    return build_hot_list(catalog, board, now=now, version=version)
 
 
-def public_hot_list():
-    return _public_bucket(int(time.time()) // 15)
+def public_hot_list(version=1):
+    return _public_bucket(int(time.time()) // 15, version)
+
