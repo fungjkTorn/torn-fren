@@ -10,7 +10,7 @@ picks, so old clients remain supported during rollout. Unsupported versions
 return 400; insufficient eligible items return 503 without padding/duplicates.
 
 The two Xanax are the highest estimated round-trip profit/hour from distinct
-eligible destinations, with UK Xanax still excluded. All prior prices, fee,
+eligible destinations, including UK Xanax when its profitability qualifies. All prior prices, fee,
 flight, market floor, other exclusions and plushie/flower/Nikeh constraints
 remain intact. The minimum-six-destination preference also counts both Xanax.
 
@@ -90,14 +90,14 @@ On incomplete, missing, or stale prices, or if the required category quotas cann
 
 Exactly seven items, grouped in this order:
 
-1. Highest theoretical hourly **Xanax**, excluding UK Xanax.
+1. Highest theoretical hourly **Xanax**, including UK Xanax.
 2. Two highest-profit **plushies**, each from a different country.
 3. Two highest-profit **flowers**, from different countries and neither flower sharing either selected plushie country.
 4. Two highest-profit **Nikeh NPC** items from different countries.
 
 At least six different country destinations are preferred when possible. Pangolin Scales can qualify only if its theoretical hourly profit becomes the highest among current eligible Nikeh items. These are **dynamic** category-based rankings rather than hardcoded item names.
 
-Other fixed rules: 15 inventory slots, PI + pilot one-way flight times, each trip modeled outbound + return, Item Market price reference minus 5% fee or Nikeh fixed NPC payout without that fee, valid market reference at least $15,000, positive trip profit, and the exclusions for UK Xanax, Jaguar Plushie, Orchid, Banana Orchid, and Edelweiss. These exclusions do **not** remove items from Torn-FREN All Items.
+Other fixed rules: 15 inventory slots, PI + pilot one-way flight times, each trip modeled outbound + return, Item Market price reference minus 5% fee or Nikeh fixed NPC payout without that fee, valid market reference at least $15,000, positive trip profit, and the exclusions for Jaguar Plushie, Orchid, Banana Orchid, and Edelweiss. These exclusions do **not** remove items from Torn-FREN All Items.
 
 Theoretical profit per hour excludes forecast wait, selling delay, unsuccessful inventory loads, and travel incidentals. Nikeh access requires Sports Administration. This endpoint never promotes a research-only forecasting model.
 
