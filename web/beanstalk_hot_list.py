@@ -55,7 +55,7 @@ CANDIDATES = frozenset({
     *NIKEH_PAYOUTS,
 })
 EXCLUSIONS = frozenset({
-    "uni:Xanax", "mex:Jaguar Plushie", "haw:Orchid",
+    "mex:Jaguar Plushie", "haw:Orchid",
     "cay:Banana Orchid", "swi:Edelweiss",
 })
 QUOTAS = {"xanax": 1, "plushie": 2, "flower": 2, "nikeh": 2}
