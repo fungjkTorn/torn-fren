@@ -1,6 +1,6 @@
 # Torn-FREN VM service audit — 2026-11-18
 
-**Checkpoint.** The read-only inventory, consumer trace, and follow-up inspection of the running configuration and deployed page wiring are complete. The 7:21 p.m. EST live recheck confirmed seven Hot List picks and two stale final-pair rows. Next, review the separate gap-recovery repair and confirm private ownership and reactivation plans before any timer pause. Final-pair repair and rollout are on hold pending model approval. See the [24-item model inventory and Canada freshness follow-up](VM_PUBLIC_MODEL_INVENTORY_20261118.md).
+**Checkpoint.** Read-only service, model, and coverage audits are complete. The collector was active and all 11 countries had fresh provider receipts at the sample. Keep final-pair rollout on hold. Operational follow-up is split below into final-pair publication, gap recovery, research reporting, and a separate Beanstalk Gateway sizing decision. See the [24-item model inventory](VM_PUBLIC_MODEL_INVENTORY_20261118.md) and [collector and export coverage](VM_COLLECTOR_COVERAGE_20261118.md).
 
 ## Scope and evidence
 
@@ -58,6 +58,19 @@ The owner's main view is `/experimental`, including Hot List and All Items. The 
 3. **Review a V48 trial only after confirming the private shadow plan.** If the owner confirms V38 private shadow will stay inactive, pause only the V48 timer in a separately authorized change and let any running oneshot finish. Retain its unit and cache. Observe several publisher cycles and compare collector cadence, forecast ages per cohort, Hot List, All Items roster, prices and departures, graph history, and Discord stock and V2 commands. **Rollback:** restart the timer and restore recorded enablement if it changed. Confirm the timer fires.
 4. **Keep currently collecting research jobs and fallback data in service.** Confirm who uses the older export, Japan publication, and canary. If the owner later ends an experiment and authorizes pausing it, preserve its ledger and reports first. **Rollback:** restore any paused exporter and wait for fresh input before resuming its dependent research timer. Verify issue and report freshness.
 5. **Archive release copies after verifying references.** Check effective launchers, live configuration, private tools, and rollback paths. Archive only cleared copies and retain the manifest. **Rollback:** restore original paths, ownership, and permissions and verify the affected producers and consumers.
+
+## Operational checkpoint and Beanstalk Gateway sizing
+
+| Separate follow-up | Evidence and disposition |
+| --- | --- |
+| **Final-pair publication** | The enabled publisher repeatedly raised `IndexError` in `grade_trip`. Its stock input and collector stayed fresh while both public forecast rows expired. The 8:06 p.m. EST service sample still showed an exit-code failure. Preserve state and keep repair and rollout on hold pending an exact owner decision for Canada Xanax and Swiss Chamois. |
+| **Recovery and routine-audit backlog** | The three-minute recovery worker hit 10 start timeouts in a sampled 30 minutes. The 7:21 p.m. recheck found three pending recovery jobs, up to 3,406 attempts, and 479 routine jobs deferred. Treat queue drainage and validation as a separate operational issue. Preserve queue and ledger contents. |
+| **Five-minute private research reporting** | Five runs failed report generation in a sampled 30 minutes. Some of those runs still recorded 24-item prospective issues, and one issue run skipped stale sanitized input. Track issue and report freshness separately and keep the recorder, fallback, and evidence. The observations do not establish a new model problem or a resolved report failure. |
+| **Collector coverage** | The bounded check found eight significant global heartbeat gaps and an October 21 group of item-key discontinuities despite continuing country receipts. The collector and active stock exports remain in service. The linked item inventory records the scope and evidence limits. |
+
+**Resource assessment.** At 8:06 p.m. EST the VM had two vCPUs, 9.2 GiB RAM available out of 11 GiB, no swap, and 29 GiB free. The existing Discord bot used about 41 MiB of service memory, the web service about 98 MiB, and the poller about 23 MiB. Load averages were 2.95 / 2.45 / 2.14, and the three one-second CPU samples after the cumulative line showed 0%–3% idle. RAM and disk have room for a small separate service. CPU headroom was limited during the sampled publisher overlap, so these measurements do not establish capacity for unrestricted work.
+
+If separately authorized, assess an independent, outbound-only Beanstalk Gateway process with its own service identity and restart policy. Use the cached, read-only Hot List HTTP feed if it needs predictions. Estimate a **64–128 MiB working set** and start assessment with a **192 MiB memory ceiling** and **10% of one vCPU** as trial limits, subject to startup and reconnect measurements. Use bounded requests, backoff, and bounded logs. A trial should preserve collector heartbeat cadence, cohort publication age, existing Discord responsiveness, and research issue/report freshness. If it causes contention or fails to reconnect within the budget, roll back only the new service. No Beanstalk service was installed or started.
 
 ## Limits
 
