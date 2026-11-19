@@ -49,6 +49,9 @@ INSERT = '''            if path=="/api/beanstalk-hot-list":
 '''
 
 
+LEGACY_INSERT = INSERT
+INSERT = '            if path=="/api/beanstalk-hot-list":\n                # Read-only Beanstalk drawer feed. No background prediction or mutation.\n                headers={"Cache-Control":"public, max-age=15",\n                         "Access-Control-Allow-Origin":"*"}\n                try:\n                    from web.beanstalk_hot_list import public_hot_list\n                    version=request.query_params.get("version","1")\n                    if version not in ("1","2"):\n                        return JSONResponse({"status":"UNSUPPORTED_VERSION","picks":[]},status_code=400,headers=headers)\n                    payload=await run_in_threadpool(public_hot_list,version=int(version))\n                    return JSONResponse(payload,\n                        status_code=200 if payload["status"]=="OK" else 503,\n                        headers=headers)\n                except (OSError,ValueError,KeyError,TypeError,RuntimeError):\n                    return JSONResponse(\n                        {"schema":"torn-fren-beanstalk-hot-list-v1",\n                         "status":"UNAVAILABLE","picks":[]},\n                        status_code=503,headers=headers)\n'
+
 def sha(raw):
     return hashlib.sha256(raw).hexdigest()
 
@@ -101,6 +104,10 @@ def patch_bridge(source):
         if sum(source.count(block) for block in installed)!=1:
             raise RuntimeError("Duplicate seven-pick route installed")
         return source
+    for legacy in (LEGACY_INSERT, LEGACY_INSERT.replace("\n","\r\n")):
+        if source.count(legacy)==1:
+            replacement=INSERT.replace("\n","\r\n") if "\r\n" in source else INSERT
+            return source.replace(legacy,replacement,1)
     if PUBLIC_PATH in source:
         raise RuntimeError("Unrecognized existing Beanstalk Hot List route")
     sep="\r\n" if "\r\n" in source else "\n"
@@ -320,3 +327,4 @@ def main():
 
 if __name__=="__main__":
     raise SystemExit(main())
+
